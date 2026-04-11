@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 680" fill="none">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+
+  <!-- 无背景：保持透明以兼容 Obsidian 主题 -->
+
+  <!-- 标题 -->
+  <text x="460" y="28" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="16" font-weight="bold" fill="currentColor">内存生命周期：正常路径与风险路径</text>
+
+  <!-- ==================== 左列：正常路径 ==================== -->
+
+  <!-- 生产者（主线程） -->
+  <rect x="30" y="55" width="380" height="130" rx="12" stroke="#3498DB" stroke-width="2" fill="none"/>
+  <text x="220" y="78" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="bold" fill="#3498DB">生产者（主线程）</text>
+
+  <rect x="55" y="92" width="330" height="34" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="220" y="114" text-anchor="middle" font-family="Consolas, monospace" font-size="11" fill="currentColor">new IOCP_PARAM(IocpListPush, "hello")</text>
+
+  <line x1="220" y1="126" x2="220" y2="148" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="250" y="141" font-family="Segoe UI, sans-serif" font-size="9" fill="#888">堆指针</text>
+
+  <rect x="55" y="148" width="330" height="28" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="220" y="167" text-anchor="middle" font-family="Consolas, monospace" font-size="11" fill="currentColor">PostQueuedCompletionStatus(hIOCP, ..., pParam)</text>
+
+  <!-- Arrow: Producer -> Kernel -->
+  <line x1="220" y1="185" x2="220" y2="210" stroke="#3498DB" stroke-width="2" marker-end="url(#a1b)"/>
+
+  <!-- Kernel IOCP Queue -->
+  <rect x="100" y="210" width="240" height="50" rx="10" stroke="#8E44AD" stroke-width="2" fill="none"/>
+  <text x="220" y="232" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="bold" fill="#8E44AD">内核 IOCP 队列</text>
+  <text x="220" y="250" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="currentColor">CompletionKey = pParam</text>
+
+  <!-- Arrow: Kernel -> Worker -->
+  <line x1="220" y1="260" x2="220" y2="290" stroke="#8E44AD" stroke-width="2" marker-end="url(#a1p)"/>
+
+  <!-- Worker Thread -->
+  <rect x="30" y="290" width="380" height="280" rx="12" stroke="#27AE60" stroke-width="2" fill="none"/>
+  <text x="220" y="313" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="bold" fill="#27AE60">工作线程（threadmain）</text>
+
+  <rect x="55" y="325" width="330" height="28" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="220" y="344" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="currentColor">pParam = (IOCP_PARAM*)CompletionKey</text>
+
+  <!-- Decision diamond -->
+  <polygon points="220,370 310,400 220,430 130,400" stroke="currentColor" stroke-width="1.5" fill="none"/>
+  <text x="220" y="404" text-anchor="middle" font-family="Consolas, monospace" font-size="9" fill="currentColor">nOperator?</text>
+
+  <!-- Push path -->
+  <line x1="130" y1="400" x2="80" y2="400" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="80" y1="400" x2="80" y2="460" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="75" y="390" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="9" fill="#888">Push</text>
+
+  <rect x="45" y="460" width="160" height="40" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="125" y="477" text-anchor="middle" font-family="Consolas, monospace" font-size="9" fill="currentColor">lstString.push_back</text>
+  <text x="125" y="493" text-anchor="middle" font-family="Consolas, monospace" font-size="9" fill="currentColor">delete pParam ✓</text>
+
+  <!-- Pop path -->
+  <line x1="310" y1="400" x2="360" y2="400" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="360" y1="400" x2="360" y2="460" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="365" y="390" font-family="Segoe UI, sans-serif" font-size="9" fill="#888">Pop</text>
+
+  <rect x="260" y="460" width="140" height="54" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="330" y="477" text-anchor="middle" font-family="Consolas, monospace" font-size="9" fill="currentColor">str = front()</text>
+  <text x="330" y="491" text-anchor="middle" font-family="Consolas, monospace" font-size="9" fill="currentColor">cbFunc(&amp;str)</text>
+  <text x="330" y="507" text-anchor="middle" font-family="Consolas, monospace" font-size="9" fill="currentColor">delete pParam ✓</text>
+
+  <!-- Check marks -->
+  <text x="125" y="540" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#27AE60">✓ 内存已释放</text>
+  <text x="330" y="540" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#27AE60">✓ 内存已释放</text>
+
+  <!-- ==================== 右列：风险路径 ==================== -->
+
+  <!-- Risk 1: Post failure -->
+  <rect x="490" y="55" width="400" height="230" rx="12" stroke="#E74C3C" stroke-width="2.5" fill="none"/>
+  <text x="690" y="80" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="bold" fill="#E74C3C">⚠ 风险路径 1：Post 失败</text>
+
+  <rect x="520" y="100" width="340" height="28" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="690" y="119" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="currentColor">pParam = new IOCP_PARAM(...)</text>
+
+  <line x1="690" y1="128" x2="690" y2="148" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+
+  <rect x="520" y="148" width="340" height="28" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="690" y="167" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="currentColor">PostQueuedCompletionStatus(...)  →  失败</text>
+
+  <line x1="690" y1="176" x2="690" y2="200" stroke="#E74C3C" stroke-width="2" marker-end="url(#a1r)"/>
+
+  <rect x="560" y="200" width="260" height="34" rx="6" stroke="#E74C3C" stroke-width="2" fill="none"/>
+  <text x="690" y="222" text-anchor="middle" font-family="Consolas, monospace" font-size="11" fill="#E74C3C">pParam —— 无人拥有！</text>
+
+  <text x="690" y="260" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="bold" fill="#E74C3C">✗ 堆泄漏：失败路径没有清理</text>
+  <text x="690" y="278" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="10" fill="#888">修复：检查返回值，失败时 delete pParam</text>
+
+  <!-- Risk 2: _endthread destructor skip -->
+  <rect x="490" y="310" width="400" height="260" rx="12" stroke="#E74C3C" stroke-width="2.5" fill="none"/>
+  <text x="690" y="335" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="bold" fill="#E74C3C">⚠ 风险路径 2：在同一作用域里调用 _endthread()</text>
+
+  <rect x="520" y="355" width="340" height="28" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="690" y="374" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="currentColor">std::list&lt;string&gt; lstString;  // 局部对象</text>
+
+  <line x1="690" y1="383" x2="690" y2="403" stroke="currentColor" stroke-width="1.5" marker-end="url(#a1)"/>
+
+  <rect x="520" y="403" width="340" height="28" rx="6" stroke="currentColor" stroke-width="1" fill="none"/>
+  <text x="690" y="422" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="currentColor">// ... 循环把数据不断 push 进 lstString ...</text>
+
+  <line x1="690" y1="431" x2="690" y2="451" stroke="#E74C3C" stroke-width="2" marker-end="url(#a1r)"/>
+
+  <rect x="560" y="451" width="260" height="28" rx="6" stroke="#E74C3C" stroke-width="2" fill="none"/>
+  <text x="690" y="470" text-anchor="middle" font-family="Consolas, monospace" font-size="11" fill="#E74C3C">_endthread()  // 杀死线程</text>
+
+  <line x1="690" y1="479" x2="690" y2="500" stroke="#E74C3C" stroke-width="2" marker-end="url(#a1r)"/>
+
+  <rect x="530" y="500" width="320" height="34" rx="6" stroke="#E74C3C" stroke-width="2" fill="none"/>
+  <text x="690" y="522" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#E74C3C">~lstString() 可能不会运行</text>
+
+  <text x="690" y="555" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" font-weight="bold" fill="#E74C3C">✗ 链表节点和字符串在堆上泄漏</text>
+  <text x="690" y="573" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="10" fill="#888">修复：拆分为 threadQueueEntry() + threadmain()</text>
+
+  <!-- Divider line -->
+  <line x1="460" y1="55" x2="460" y2="600" stroke="currentColor" stroke-width="1" stroke-dasharray="8"/>
+  <text x="220" y="620" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="13" font-weight="bold" fill="#27AE60">正常路径（无泄漏）</text>
+  <text x="690" y="620" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="13" font-weight="bold" fill="#E74C3C">风险路径（可能泄漏）</text>
+
+  <!-- Arrowhead definitions -->
+  <defs>
+    <marker id="a1" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor"/>
+    </marker>
+    <marker id="a1b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3498DB"/>
+    </marker>
+    <marker id="a1p" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8E44AD"/>
+    </marker>
+    <marker id="a1r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#E74C3C"/>
+    </marker>
+  </defs>
+</svg>
