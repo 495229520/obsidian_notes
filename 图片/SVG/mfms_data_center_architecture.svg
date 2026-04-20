@@ -1,0 +1,211 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 980" font-family="'Segoe UI','Microsoft YaHei',sans-serif" font-size="13">
+  <rect x="0" y="0" width="1100" height="980" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrowDown" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="arrowUp" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="arrowRight" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="0">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <linearGradient id="bgUI" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#E8F5E9"/><stop offset="100%" stop-color="#C8E6C9"/></linearGradient>
+    <linearGradient id="bgComm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#E3F2FD"/><stop offset="100%" stop-color="#BBDEFB"/></linearGradient>
+    <linearGradient id="bgGW" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFF3E0"/><stop offset="100%" stop-color="#FFE0B2"/></linearGradient>
+    <linearGradient id="bgSvc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F3E5F5"/><stop offset="100%" stop-color="#E1BEE7"/></linearGradient>
+    <linearGradient id="bgProxy" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFEBEE"/><stop offset="100%" stop-color="#FFCDD2"/></linearGradient>
+    <linearGradient id="bgDev" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ECEFF1"/><stop offset="100%" stop-color="#CFD8DC"/></linearGradient>
+    <linearGradient id="bgDB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFF9C4"/><stop offset="100%" stop-color="#FFF176"/></linearGradient>
+  </defs>
+
+  <!-- 标题 -->
+  <text x="550" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">MFMS 数据中台整体架构</text>
+
+  <!-- ===== Layer 1: Qt Frontend ===== -->
+  <rect x="30" y="50" width="1040" height="80" rx="10" fill="url(#bgUI)" stroke="#4CAF50" stroke-width="2"/>
+  <text x="50" y="75" font-size="15" font-weight="bold" fill="#2E7D32">Qt Frontend (UI 主线程)</text>
+  <rect x="50" y="85" width="150" height="35" rx="5" fill="#fff" stroke="#4CAF50"/>
+  <text x="125" y="107" text-anchor="middle" font-size="11">hybrid_robot_system</text>
+  <rect x="220" y="85" width="100" height="35" rx="5" fill="#fff" stroke="#4CAF50"/>
+  <text x="270" y="107" text-anchor="middle" font-size="11">Control</text>
+  <rect x="340" y="85" width="110" height="35" rx="5" fill="#fff" stroke="#4CAF50"/>
+  <text x="395" y="107" text-anchor="middle" font-size="11">TaskManager</text>
+  <rect x="470" y="85" width="130" height="35" rx="5" fill="#fff" stroke="#4CAF50"/>
+  <text x="535" y="107" text-anchor="middle" font-size="11">VisualProgram</text>
+  <rect x="620" y="85" width="140" height="35" rx="5" fill="#fff" stroke="#4CAF50"/>
+  <text x="690" y="107" text-anchor="middle" font-size="11">SystemManagement</text>
+  <rect x="780" y="85" width="270" height="35" rx="5" fill="#A5D6A7" stroke="#4CAF50"/>
+  <text x="915" y="107" text-anchor="middle" font-size="12" font-weight="bold">connect(&amp;comm, SIGNAL, SLOT)</text>
+
+  <!-- Arrow: UI → Singleton -->
+  <line x1="550" y1="130" x2="550" y2="155" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="570" y="148" font-size="10" fill="#888">Qt::QueuedConnection</text>
+
+  <!-- ===== Layer 2: CommunicationInterfaceImpl (Singleton) ===== -->
+  <rect x="30" y="155" width="1040" height="65" rx="10" fill="url(#bgComm)" stroke="#1976D2" stroke-width="2"/>
+  <text x="50" y="180" font-size="15" font-weight="bold" fill="#1565C0">CommunicationInterfaceImpl (Meyers 单例)</text>
+  <text x="50" y="205" font-size="11" fill="#555">client_api | 公开槽: refreshRobotList, connectRobot, armJogJoint, agvMoveForward, getStations, getPaths ...</text>
+  <text x="770" y="180" font-size="11" fill="#1565C0">内部信号: requestXxx → QueuedConnection → Worker</text>
+  <rect x="770" y="188" width="280" height="25" rx="4" fill="#fff" stroke="#1976D2" stroke-dasharray="4"/>
+  <text x="910" y="206" text-anchor="middle" font-size="10">emit requestRefreshRobotList() / requestArmJogJoint() ...</text>
+
+  <!-- Arrow: Singleton → Worker -->
+  <line x1="550" y1="220" x2="550" y2="250" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="470" y="240" font-size="10" fill="#D32F2F" font-weight="bold">跨线程边界 ↓</text>
+
+  <!-- ===== Layer 3: CommunicationWorker (独立线程) ===== -->
+  <rect x="30" y="250" width="1040" height="75" rx="10" fill="url(#bgComm)" stroke="#1976D2" stroke-width="2" stroke-dasharray="6"/>
+  <text x="50" y="275" font-size="15" font-weight="bold" fill="#1565C0">CommunicationWorker (QThread 独立线程)</text>
+  <text x="50" y="298" font-size="11" fill="#555">槽: doRefreshRobotList, doConnectRobot, doArmJogJoint, doGetStations, doExeToPath ...</text>
+  <text x="50" y="315" font-size="11" fill="#555">维护: rosNode_ | gateway_ | currentDeviceId_ | devices_ | connectingDeviceId_</text>
+  <text x="770" y="298" font-size="11" fill="#1565C0">handleRobotStatus() → emit armStateReceived / agvStateReceived</text>
+
+  <!-- Arrow: Worker → Gateway -->
+  <line x1="550" y1="325" x2="550" y2="355" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+
+  <!-- ===== Layer 4: MfmsGatewayImpl (门面) ===== -->
+  <rect x="30" y="355" width="1040" height="75" rx="10" fill="url(#bgGW)" stroke="#F57C00" stroke-width="2"/>
+  <text x="50" y="380" font-size="15" font-weight="bold" fill="#E65100">MfmsGatewayImpl (门面 / Facade)</text>
+  <text x="50" y="400" font-size="11" fill="#555">gateway/ | 统一封装 → db_service_ + ros_bridge_ + cmd_service_</text>
+
+  <!-- Three sub-services in gateway -->
+  <rect x="60" y="405" width="300" height="20" rx="3" fill="#fff" stroke="#F57C00"/>
+  <text x="210" y="420" text-anchor="middle" font-size="10">start() → db_service_→start, ros_bridge_→start, cmd_service_→start</text>
+
+  <rect x="380" y="405" width="320" height="20" rx="3" fill="#fff" stroke="#F57C00"/>
+  <text x="540" y="420" text-anchor="middle" font-size="10">信号直通: deviceStateChanged / robotStatusUpdated / commandExecuted</text>
+
+  <rect x="720" y="405" width="330" height="20" rx="3" fill="#fff" stroke="#F57C00"/>
+  <text x="885" y="420" text-anchor="middle" font-size="10">类型转换: gateway::AgvMotionCommand → mfms::AgvMotionCommand</text>
+
+  <!-- Arrows: Gateway → Three Services -->
+  <line x1="200" y1="430" x2="200" y2="465" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <line x1="550" y1="430" x2="550" y2="465" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <line x1="900" y1="430" x2="900" y2="465" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+
+  <!-- ===== Layer 5: Three Backend Services ===== -->
+  <!-- DB Service -->
+  <rect x="50" y="465" width="300" height="90" rx="8" fill="url(#bgSvc)" stroke="#7B1FA2" stroke-width="2"/>
+  <text x="200" y="488" text-anchor="middle" font-size="14" font-weight="bold" fill="#4A148C">MfmsDbService</text>
+  <text x="200" y="505" text-anchor="middle" font-size="10" fill="#555">mfms_db/</text>
+  <text x="70" y="522" font-size="10">loadDevice / unloadDevice</text>
+  <text x="70" y="536" font-size="10">start/pause/resume/abort LuaScript</text>
+  <text x="70" y="550" font-size="10">轮询 device_ui_event / lua_ui_event</text>
+
+  <!-- ROS Bridge -->
+  <rect x="400" y="465" width="300" height="90" rx="8" fill="url(#bgSvc)" stroke="#7B1FA2" stroke-width="2"/>
+  <text x="550" y="488" text-anchor="middle" font-size="14" font-weight="bold" fill="#4A148C">MfmsRosBridge</text>
+  <text x="550" y="505" text-anchor="middle" font-size="10" fill="#555">ros_bridge/</text>
+  <text x="420" y="522" font-size="10">refreshDeviceList → DB 查询 device/device_state</text>
+  <text x="420" y="536" font-size="10">subscribeDevice → 订阅 /{name}_state topic</text>
+  <text x="420" y="550" font-size="10">robotStatusUpdated 信号 (10-100Hz)</text>
+
+  <!-- Command Service -->
+  <rect x="750" y="465" width="300" height="90" rx="8" fill="url(#bgSvc)" stroke="#7B1FA2" stroke-width="2"/>
+  <text x="900" y="488" text-anchor="middle" font-size="14" font-weight="bold" fill="#4A148C">MfmsCommandService</text>
+  <text x="900" y="505" text-anchor="middle" font-size="10" fill="#555">cmd_service/</text>
+  <text x="770" y="522" font-size="10">connectRobot / connectAgv</text>
+  <text x="770" y="536" font-size="10">jogRobotAxis / jogRobotCartesian / setRobotMode</text>
+  <text x="770" y="550" font-size="10">queryAgvStations / executeAgvToStation / addAgvPath</text>
+
+  <!-- Arrows: Services → Adapters -->
+  <line x1="200" y1="555" x2="200" y2="605" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="210" y="590" font-size="9" fill="#888">MySQL</text>
+
+  <line x1="550" y1="555" x2="550" y2="605" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="560" y="590" font-size="9" fill="#888">ROS Topic</text>
+
+  <line x1="830" y1="555" x2="830" y2="605" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="840" y="590" font-size="9" fill="#888">Robot</text>
+  <line x1="970" y1="555" x2="970" y2="605" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="980" y="590" font-size="9" fill="#888">AGV</text>
+
+  <!-- ===== Layer 6: Proxy Adapters ===== -->
+  <!-- DB -->
+  <rect x="80" y="605" width="240" height="55" rx="8" fill="url(#bgDB)" stroke="#F9A825" stroke-width="2"/>
+  <text x="200" y="625" text-anchor="middle" font-size="13" font-weight="bold" fill="#F57F17">MySQL (MFMS_BASE)</text>
+  <text x="200" y="645" text-anchor="middle" font-size="10">device | device_state | lua_state</text>
+  <text x="200" y="655" text-anchor="middle" font-size="10">agv_path | agv_path_station | triggers</text>
+
+  <!-- ROS Topic placeholder -->
+  <rect x="430" y="605" width="240" height="55" rx="8" fill="url(#bgDev)" stroke="#546E7A" stroke-width="2"/>
+  <text x="550" y="625" text-anchor="middle" font-size="13" font-weight="bold" fill="#37474F">ROS 2 Topic Layer</text>
+  <text x="550" y="645" text-anchor="middle" font-size="10">/{device}_state (FrRobotState / SeerCtrlState)</text>
+  <text x="550" y="655" text-anchor="middle" font-size="10">订阅频率 ~50ms / 包</text>
+
+  <!-- Robot Proxy -->
+  <rect x="750" y="605" width="130" height="55" rx="8" fill="url(#bgProxy)" stroke="#C62828" stroke-width="2"/>
+  <text x="815" y="625" text-anchor="middle" font-size="12" font-weight="bold" fill="#B71C1C">RobotProxy</text>
+  <text x="815" y="640" text-anchor="middle" font-size="10">Adapter</text>
+  <text x="815" y="655" text-anchor="middle" font-size="9" fill="#777">PIMPL + Executor</text>
+
+  <!-- AGV Proxy -->
+  <rect x="900" y="605" width="130" height="55" rx="8" fill="url(#bgProxy)" stroke="#C62828" stroke-width="2"/>
+  <text x="965" y="625" text-anchor="middle" font-size="12" font-weight="bold" fill="#B71C1C">AgvProxy</text>
+  <text x="965" y="640" text-anchor="middle" font-size="10">Adapter</text>
+  <text x="965" y="655" text-anchor="middle" font-size="9" fill="#777">PIMPL + Executor</text>
+
+  <!-- Arrows: Adapters → hyrms_export -->
+  <line x1="815" y1="660" x2="815" y2="700" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <line x1="965" y1="660" x2="965" y2="700" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+
+  <!-- ===== Layer 7: hyrms_export ===== -->
+  <rect x="730" y="700" width="320" height="65" rx="8" fill="url(#bgProxy)" stroke="#C62828" stroke-width="1.5" stroke-dasharray="5"/>
+  <text x="890" y="720" text-anchor="middle" font-size="14" font-weight="bold" fill="#B71C1C">hyrms_export (下位机代理库)</text>
+  <rect x="750" y="730" width="130" height="28" rx="4" fill="#fff" stroke="#C62828"/>
+  <text x="815" y="749" text-anchor="middle" font-size="11">RobotProxy::FrRobot</text>
+  <rect x="900" y="730" width="130" height="28" rx="4" fill="#fff" stroke="#C62828"/>
+  <text x="965" y="749" text-anchor="middle" font-size="11">AgvProxy::SeerCtrl</text>
+
+  <!-- DB Arrows (bidirectional) for 上下位机 -->
+  <line x1="200" y1="660" x2="200" y2="700" stroke="#F9A825" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <rect x="80" y="700" width="240" height="65" rx="8" fill="url(#bgDB)" stroke="#F9A825" stroke-width="1.5" stroke-dasharray="5"/>
+  <text x="200" y="720" text-anchor="middle" font-size="12" font-weight="bold" fill="#F57F17">MySQL Trigger 事件</text>
+  <text x="200" y="738" text-anchor="middle" font-size="10">trg_device_state_event</text>
+  <text x="200" y="753" text-anchor="middle" font-size="10">trg_lua_state_event</text>
+
+  <!-- Arrows: hyrms → ROS Service → Physical -->
+  <line x1="815" y1="765" x2="815" y2="800" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <line x1="965" y1="765" x2="965" y2="800" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="890" y="790" text-anchor="middle" font-size="10" fill="#888">ROS 2 Service (/{device}_cmd)</text>
+
+  <!-- ROS Topic arrows -->
+  <line x1="550" y1="660" x2="550" y2="800" stroke="#546E7A" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arrowDown)"/>
+
+  <!-- ===== Layer 8: Device Adapters ===== -->
+  <rect x="400" y="800" width="640" height="55" rx="8" fill="url(#bgDev)" stroke="#455A64" stroke-width="2"/>
+  <text x="720" y="820" text-anchor="middle" font-size="14" font-weight="bold" fill="#263238">Device Adapter Nodes (ROS 2)</text>
+  <rect x="420" y="825" width="190" height="25" rx="4" fill="#fff" stroke="#455A64"/>
+  <text x="515" y="842" text-anchor="middle" font-size="10">FrAdapterServer + Publisher</text>
+  <rect x="630" y="825" width="190" height="25" rx="4" fill="#fff" stroke="#455A64"/>
+  <text x="725" y="842" text-anchor="middle" font-size="10">SeerCtrl Adapter Node</text>
+  <rect x="840" y="825" width="180" height="25" rx="4" fill="#fff" stroke="#455A64"/>
+  <text x="930" y="842" text-anchor="middle" font-size="10">未来: HsRobot / PLC ...</text>
+
+  <!-- DB → 下位机 -->
+  <line x1="200" y1="765" x2="200" y2="835" stroke="#F9A825" stroke-width="1.5" stroke-dasharray="4"/>
+  <line x1="200" y1="835" x2="400" y2="835" stroke="#F9A825" stroke-width="1.5" marker-end="url(#arrowRight)"/>
+  <text x="280" y="825" font-size="9" fill="#F57F17">device_state_event / lua_state_event</text>
+
+  <!-- Arrow: Adapters → Physical -->
+  <line x1="720" y1="855" x2="720" y2="890" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+
+  <!-- ===== Layer 9: Physical Devices ===== -->
+  <rect x="300" y="890" width="500" height="65" rx="10" fill="url(#bgDev)" stroke="#263238" stroke-width="2.5"/>
+  <text x="550" y="915" text-anchor="middle" font-size="15" font-weight="bold" fill="#263238">物理设备</text>
+  <rect x="320" y="925" width="130" height="25" rx="4" fill="#fff" stroke="#455A64"/>
+  <text x="385" y="942" text-anchor="middle" font-size="11">Fairino 机械臂</text>
+  <rect x="470" y="925" width="110" height="25" rx="4" fill="#fff" stroke="#455A64"/>
+  <text x="525" y="942" text-anchor="middle" font-size="11">仙工 AGV</text>
+  <rect x="600" y="925" width="180" height="25" rx="4" fill="#fff" stroke="#455A64"/>
+  <text x="690" y="942" text-anchor="middle" font-size="11">西门子 PLC / 华数 ...</text>
+
+  <!-- Legend -->
+  <rect x="30" y="890" width="240" height="65" rx="6" fill="#FAFAFA" stroke="#CCC"/>
+  <text x="40" y="908" font-size="11" font-weight="bold">图例</text>
+  <line x1="40" y1="920" x2="70" y2="920" stroke="#555" stroke-width="2" marker-end="url(#arrowDown)"/>
+  <text x="80" y="924" font-size="10">同步/直接调用</text>
+  <line x1="40" y1="938" x2="70" y2="938" stroke="#555" stroke-width="1.5" stroke-dasharray="4"/>
+  <text x="80" y="942" font-size="10">异步/跨线程/事件</text>
+</svg>
