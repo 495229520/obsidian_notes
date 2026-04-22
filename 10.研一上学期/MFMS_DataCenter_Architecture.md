@@ -36,7 +36,7 @@ MFMS (Multi-Functional Manufacturing System) 数据中台是一个基于 **ROS 2
 
 ## 2. 数据中台整体架构 (SVG)
 
-![[图片/SVG/mfms_data_center_architecture.svg|1025]]
+![[图片/SVG/mfms_data_center_architecture.svg|795]]
 
 ---
 
