@@ -3,7 +3,9 @@
 > 日期: 2026-04-21
 > 对比范围: 初版 `0716051` -> 当前版 `83138c0`
 > 本周重点范围: `58f80da` -> `83138c0`
-> 参考文档: `src/mfms_server/design/MFMS_DataCenter_Architecture.md`
+> 当前主文档: `MFMS_DataCenter_Architecture.md`
+> 相关详细说明: `MFMS_DataCenter_Technical_Documentation.md`
+> 说明: `CommunicationInterface_Current_CallChain.md`、`DataPlatform_Structure_and_TopLevel_CallChain.md` 属于阶段性调用链草稿，当前已归档至 `归档/MFMS-AGV历史设计/`。
 
 ## 1. 本周结论
 
@@ -67,7 +69,7 @@
 
 ### 4.2 补齐路径资源管理能力
 
-结合 `MFMS_DataCenter_Architecture.md` 与 `CommunicationInterface_Current_CallChain.md`，当前版本已经把路径相关能力从“概念预留”推进到“中台内部可用”：
+结合 `MFMS_DataCenter_Architecture.md` 与阶段性调用链文档（`CommunicationInterface_Current_CallChain.md`，现已归档至 `归档/MFMS-AGV历史设计/`），当前版本已经把路径相关能力从“概念预留”推进到“中台内部可用”：
 
 - 补齐 `getPaths()`
 - 补齐 `addPath()`
@@ -124,9 +126,10 @@
 本周同步更新了：
 
 - `MFMS_BASE_04171715.sql`
-- `src/mfms_server/design/MFMS_DataCenter_Architecture.md`
-- `src/mfms_server/design/CommunicationInterface_Current_CallChain.md`
-- `src/mfms_server/design/DataPlatform_Structure_and_TopLevel_CallChain.md`
+- `MFMS_DataCenter_Architecture.md`
+- 阶段性调用链草稿（后续已归档整理）：
+  - `CommunicationInterface_Current_CallChain.md`
+  - `DataPlatform_Structure_and_TopLevel_CallChain.md`
 
 这说明当前阶段不是只补代码，而是在同步固化三类资产：
 

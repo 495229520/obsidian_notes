@@ -604,6 +604,16 @@ CREATE TABLE agv_path_station (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
+### 12.6 本机 `MFMS_BASE` 与 `MFMS_BASE_04171715.sql` 的现场差异提示
+
+结合 2026-04-18 的现场库查询结果，当前本机 `MFMS_BASE` 不能简单视为 `MFMS_BASE_04171715.sql` 的直接落地副本，而更接近一个持续演进后的“混合态”数据库：
+
+- 本机已存在 `agv_path` / `agv_path_station` 两张表，但当前仓库导出的 `MFMS_BASE.sql` 仍未包含其 DDL。
+- `device_state.state` 的现场默认值仍偏旧（`unload`），与 `04171715.sql` 中的 `offline` 语义不完全一致。
+- `lua_state` / `lua_state_event` / `lua_ui_event` 已经使用 8 状态模型，并包含 `reason`、`script_name` 等扩展字段。
+
+因此在部署、回库、排查“数据库结构与代码访问不一致”问题时，不能默认现场库与仓库 SQL 完全一致；涉及路径表、Lua 状态机和设备默认状态时，应优先核对现场 schema 与代码当前访问路径。
+
 ## 13. 接口契约总表
 
 | 前端 API / signal | 当前状态 | 主要调用链 |
@@ -617,7 +627,7 @@ CREATE TABLE agv_path_station (
 | `armJogCartesian()` -> `armControlRes` | 可用 | `getDescPose` + `moveL` |
 | `armChangeMode()` -> `armChangeModeRes` | 可用但枚举需确认 | CommandService -> RobotProxyAdapter -> `setMode` |
 | `refreshState()` | 仅等待周期状态 | Gateway 只记日志，不主动查询 |
-| `agvMove*()` / `stopAgvManualControl()` -> `agvControlRes` | 接口存在，底层能力需实机确认 | CommandService -> AgvProxyAdapter -> manual control |
+| `agvMove*()` / `stopAgvManualControl()` -> `agvControlRes` | 可用，已完成联调验证 | CommandService -> AgvProxyAdapter -> manual control |
 | `getStations()` -> `returnStations` | 可用 | AgvProxyAdapter -> `checkStation` |
 | `exeToStation()` -> `returnExeToStationRes` | 可用 | AgvProxyAdapter -> `guideGoTarget` |
 | `exeToStationList()` -> `agvControlRes` | 可用 | AgvProxyAdapter -> `guideGoTargetList` |
@@ -696,7 +706,7 @@ ros2 run mfms_server simulated_lower_machine
 
 - 当前环境未安装 `mmdc`，本文不新增 Mermaid CLI 依赖，也不生成独立 SVG 文件。
 - Mermaid 图保留源码，阅读器负责渲染；总览架构图使用内嵌 SVG。
-- AGV 手动运动接口当前受下位机协议和代理实现限制，接口存在不等于所有运动能力已在实机验证。
+- AGV 手动运动接口已在 `周报/Weekly_Report_2026-04-24_AGV_Manual_Control.md` 记录联调验证结果：`agvMoveForward/agvMoveBackward/agvTurnLeft/agvTurnRight/stopAgvManualControl` 已完成从 Qt 接口到 `AgvProxyAdapter::manualControl/stopManualControl` 再到 `SeerCtrl::startManualCtrl/stopManualCtrl` 的链路打通。
 - `returnSinglePath` 保留但当前调用链未实际使用。
 - `addPath(const QList<QString>&)` 旧接口保留但固定失败；新接入应使用 `addPath(pathName, stationList)`。
 - `agv_path` / `agv_path_station` 未包含在当前 `MFMS_BASE.sql`，部署前必须补齐。
