@@ -19,10 +19,9 @@
 
 ---
 
-
-> **文档定位说明**: 本文档作为当前版本的 MFMS 数据中台总纲，已覆盖并取代早期的 `CommunicationInterface_Current_CallChain.md`、`DataPlatform_Structure_and_TopLevel_CallChain.md` 等阶段性调用链草稿。历史草稿如果仍保留，应仅作为归档资料，不再作为当前实现入口。
-
 ## 1. 系统总览
+
+MFMS (Multi-Functional Manufacturing System) 数据中台是一个基于 **ROS 2 Humble + Qt5** 的工业设备集成控制平台。它通过单例通信接口将 Qt 前端与 ROS 设备控制、MySQL 数据库事件驱动三大系统统一封装，对 UI 层提供线程安全的信号/槽契约。
 
 ### 核心设计原则
 
