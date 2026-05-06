@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#546e7a"/>
+    </marker>
+    <style>
+      .title { font: 700 28px Arial, sans-serif; fill: #1f2933; }
+      .h2 { font: 700 20px Arial, sans-serif; fill: #263238; }
+      .text { font: 15px Arial, sans-serif; fill: #37474f; }
+      .small { font: 13px Arial, sans-serif; fill: #455a64; }
+      .host { fill: #e3f2fd; stroke: #1976d2; stroke-width: 2; rx: 14; }
+      .device { fill: #e8f5e9; stroke: #388e3c; stroke-width: 2; rx: 14; }
+      .memory { fill: #fff; stroke: #607d8b; stroke-width: 1.8; rx: 8; }
+      .kernel { fill: #fff8e1; stroke: #f9a825; stroke-width: 2; rx: 12; }
+      .arrow { stroke: #546e7a; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .copy { stroke: #7b1fa2; stroke-width: 2.8; fill: none; marker-end: url(#arrow); }
+      .sync { stroke: #d84315; stroke-width: 2.5; fill: none; stroke-dasharray: 7 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="980" height="520" fill="#ffffff"/>
+  <text x="40" y="46" class="title">CUDA 程序的典型数据流：分配 → 拷贝 → 计算 → 拷回</text>
+
+  <rect x="60" y="100" width="330" height="320" class="host"/>
+  <text x="90" y="138" class="h2">Host Memory（CPU 内存）</text>
+  <rect x="105" y="175" width="230" height="55" class="memory"/>
+  <text x="130" y="208" class="text">std::vector a, b</text>
+  <rect x="105" y="285" width="230" height="55" class="memory"/>
+  <text x="145" y="318" class="text">std::vector c</text>
+  <text x="100" y="380" class="small">特点：普通 C++ 代码可直接访问</text>
+
+  <rect x="590" y="100" width="330" height="320" class="device"/>
+  <text x="620" y="138" class="h2">Device Memory（GPU 显存）</text>
+  <rect x="635" y="175" width="230" height="55" class="memory"/>
+  <text x="688" y="208" class="text">d_a, d_b</text>
+  <rect x="655" y="270" width="190" height="70" class="kernel"/>
+  <text x="690" y="300" class="text">kernel 执行</text>
+  <text x="684" y="323" class="small">c[i] = a[i] + b[i]</text>
+  <rect x="635" y="365" width="230" height="40" class="memory"/>
+  <text x="710" y="390" class="text">d_c</text>
+
+  <path d="M335 200 C430 200, 500 200, 635 200" class="copy"/>
+  <text x="430" y="182" class="text">cudaMemcpy H2D</text>
+
+  <path d="M750 232 L750 267" class="arrow"/>
+  <text x="770" y="255" class="small">读取输入</text>
+  <path d="M750 342 L750 363" class="arrow"/>
+  <text x="770" y="358" class="small">写入输出</text>
+
+  <path d="M635 385 C505 385, 430 312, 335 312" class="copy"/>
+  <text x="430" y="356" class="text">cudaMemcpy D2H</text>
+
+  <path d="M655 305 C515 305, 475 255, 390 255" class="sync"/>
+  <text x="420" y="284" class="text">cudaDeviceSynchronize</text>
+
+  <rect x="410" y="105" width="150" height="90" fill="#f5f5f5" stroke="#b0bec5" stroke-width="1.5" rx="10"/>
+  <text x="437" y="135" class="small">cudaMalloc</text>
+  <text x="430" y="160" class="small">在 GPU 上</text>
+  <text x="428" y="180" class="small">申请显存</text>
+
+  <text x="60" y="470" class="small">核心理解：CPU 内存和 GPU 显存是两个不同空间；kernel 只能直接处理 device memory，结果要拷回 host 才能被普通 C++ 代码检查。</text>
+</svg>
