@@ -90,13 +90,13 @@ AI Agent-native 的 AI Infra / GPU Performance Engineer
 
 ## 路线总图
 
-![AI Agent Native 路线总图|1062](../图片/SVG/ai-agent-native-roadmap.svg)
+![AI Agent Native 路线总图|1062](../../图片/SVG/ai-agent-native-roadmap.svg)
 
 *图示说明：按“当前起点 → 三个阶段 → 最终目标”重绘，减少原 Mermaid 的交叉感。*
 
 ## 项目总图
 
-![AI Agent Native 项目总图|894](../图片/SVG/ai-agent-native-project-map.svg)
+![AI Agent Native 项目总图|894](../../图片/SVG/ai-agent-native-project-map.svg)
 
 *图示说明：左侧是能力主线，中间是项目阶段，右侧是作品集收口，依赖关系更容易顺着看。*
 

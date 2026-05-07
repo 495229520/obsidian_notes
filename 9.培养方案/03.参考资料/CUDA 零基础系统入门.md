@@ -75,7 +75,7 @@ Grid
 - **Block**：一组 thread，同一个 block 内的线程可以协作。
 - **Grid**：一次 kernel launch 产生的所有 block。
 
-![CUDA 执行模型](../图片/SVG/cuda-execution-model.svg)
+![CUDA 执行模型](../../图片/SVG/cuda-execution-model.svg)
 
 ### 2.1 Mermaid 总览
 
@@ -130,7 +130,7 @@ const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 初学 CUDA 最容易犯的错误，是把 CPU 内存和 GPU 显存当成同一个东西。普通 `std::vector` 里的数据在 CPU 内存中，GPU kernel 不能直接把它当作 device memory 使用。
 
-![CUDA 内存拷贝流程](../图片/SVG/cuda-memory-flow.svg)
+![CUDA 内存拷贝流程](../../图片/SVG/cuda-memory-flow.svg)
 
 典型流程是：
 
