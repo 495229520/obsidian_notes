@@ -1,0 +1,178 @@
+---
+title: CUDA Runtime 进阶
+date: 2026-05-06
+tags:
+  - 培养方案
+  - CUDA
+  - GPU
+  - Runtime
+aliases:
+  - CUDA Runtime API
+  - CUDA 并发与同步
+status: active
+---
+
+# CUDA Runtime 进阶
+
+> 这份笔记补齐 `vector add` 之后必须掌握的 Runtime API：同步、stream、pinned memory、异步拷贝、CUDA Graph 和设备信息查询。
+
+---
+
+## 1. 错误处理统一封装
+
+CUDA Runtime API 大多返回 `cudaError_t`。工程里不要把错误检查散落在业务逻辑里。
+
+最低要求：
+
+- [ ] 所有 Runtime API 调用都检查返回值。
+- [ ] kernel launch 后检查 `cudaGetLastError()`。
+- [ ] 必要时使用 `cudaDeviceSynchronize()` 暴露异步错误。
+- [ ] 错误信息包含 API 名称、文件和行号。
+
+常见边界：
+
+```cpp
+kernel<<<grid, block>>>(...);
+check_cuda(cudaGetLastError());
+check_cuda(cudaDeviceSynchronize());
+```
+
+---
+
+## 2. 同步模型
+
+| 同步方式 | 范围 | 用途 |
+|---|---|---|
+| `__syncthreads()` | 同一个 block 内线程 | shared memory 协作 |
+| `cudaDeviceSynchronize()` | host 等待 device 全部完成 | debug、阶段边界 |
+| `cudaStreamSynchronize()` | host 等待某个 stream | 多 stream 控制 |
+| `cudaEventSynchronize()` | host 等待某个 event | timing 或阶段完成点 |
+
+必须理解：
+
+- kernel launch 默认异步。
+- `cudaMemcpy` 的同步/异步行为取决于 API 和内存类型。
+- 过度同步会破坏并发。
+
+---
+
+## 3. Stream 基础
+
+Stream 是 GPU 上的任务队列。同一个 stream 内按顺序执行，不同 stream 之间有机会并发。
+
+学习清单：
+
+- [ ] 创建和销毁 stream。
+- [ ] 在指定 stream 上 launch kernel。
+- [ ] 在指定 stream 上记录 event。
+- [ ] 用 `cudaStreamSynchronize()` 等待一个 stream。
+- [ ] 理解 default stream 的行为。
+
+最小实验：
+
+1. stream 0 跑 kernel A。
+2. stream 1 跑 kernel B。
+3. 用 Nsight Systems 看 timeline。
+4. 判断是否真正 overlap。
+
+---
+
+## 4. Pinned Memory 与异步拷贝
+
+普通 host memory 不能稳定支持高效异步传输。要做 H2D/D2H overlap，通常需要 pinned / page-locked memory。
+
+学习清单：
+
+- [ ] `cudaMallocHost` / `cudaFreeHost`。
+- [ ] `cudaMemcpyAsync`。
+- [ ] pinned memory + stream。
+- [ ] H2D copy、kernel、D2H copy 分 stream 分块流水线。
+- [ ] 用 Nsight Systems 看 copy/compute overlap。
+
+注意：
+
+- pinned memory 不是越多越好，会影响系统内存管理。
+- 小数据量不一定能看到 overlap 收益。
+
+---
+
+## 5. Event 与 Timing
+
+CUDA event 记录在 stream 时间线上，适合测 GPU 任务时间。
+
+学习清单：
+
+- [ ] `cudaEventCreate`。
+- [ ] `cudaEventRecord`。
+- [ ] `cudaEventSynchronize`。
+- [ ] `cudaEventElapsedTime`。
+- [ ] 区分 kernel-only 和 end-to-end。
+- [ ] 理解 event 属于哪个 stream。
+
+注意：
+
+- event timing 不包括 CPU 侧准备时间。
+- 跨 stream timing 要明确同步关系。
+
+---
+
+## 6. CUDA Graph 基础
+
+CUDA Graph 用于把重复的任务序列捕获成图，降低 launch overhead。
+
+入门场景：
+
+- 固定 shape。
+- 固定 kernel 序列。
+- 高频重复执行。
+
+学习清单：
+
+- [ ] 知道 CUDA Graph 解决 launch overhead。
+- [ ] 能解释 stream capture。
+- [ ] 能复现一个 copy + kernel + copy 的 graph toy example。
+- [ ] 知道动态 shape 不适合直接套用。
+
+早期不要求深入优化，只需要知道它为什么存在。
+
+---
+
+## 7. Device Query
+
+每个 CUDA 实验都应该记录硬件信息：
+
+- GPU name。
+- compute capability。
+- SM count。
+- warp size。
+- max threads per block。
+- shared memory per block。
+- registers per block。
+- memory clock / bus width。
+
+用途：
+
+- 解释 block size 上限。
+- 解释 shared memory 使用量限制。
+- 解释不同 GPU benchmark 不可直接比较。
+
+---
+
+## 8. 必做实验
+
+| 实验 | 目标 | 产出 |
+|---|---|---|
+| error handling wrapper | 统一错误处理 | `cuda_check.cuh` |
+| stream launch | 指定 stream 运行 kernel | timeline 截图 |
+| pinned async copy | H2D/D2H 异步拷贝 | overlap 记录 |
+| CUDA event timing | kernel-only benchmark | benchmark 表 |
+| device query | 记录 GPU 信息 | `env.md` |
+| CUDA Graph toy | 固定任务图 | README 解释 |
+
+---
+
+## 关联知识
+
+- [[CUDA 学习清单]]
+- [[Week 1 - CUDA + Agent workflow]]
+- [[CUDA Nsight Compute 指标速查]]

@@ -1,0 +1,196 @@
+---
+title: CUDA 生态工具清单
+date: 2026-05-06
+tags:
+  - 培养方案
+  - CUDA
+  - GPU
+  - 生态
+aliases:
+  - CUDA Ecosystem
+  - CUDA 工具链
+status: active
+---
+
+# CUDA 生态工具清单
+
+> 这份笔记用于区分“应该手写学习的部分”和“应该使用成熟库作为 baseline 的部分”。早期不要用库绕过基础 kernel，但必须学会用库校准自己。
+
+---
+
+## 1. 学习顺序
+
+1. 手写基础 kernel：vector add、reduction、transpose、matmul。
+2. 用 CUDA event 和 Nsight 建立性能证据。
+3. 用 cuBLAS、CUB、Thrust、CUTLASS 做 baseline 或参考。
+4. 用 PyTorch extension 把 kernel 接到真实框架。
+5. 用 Triton 对照 CUDA 写法。
+6. 再进入 vLLM、FlashAttention、PagedAttention、TensorRT-LLM。
+
+---
+
+## 2. cuBLAS
+
+定位：GEMM baseline。
+
+必须会：
+
+- [ ] 跑 SGEMM / HGEMM。
+- [ ] 记录同 shape 的 cuBLAS 时间。
+- [ ] 理解 row-major / column-major 差异。
+- [ ] 知道 Tensor Core 可能被 cuBLAS 使用。
+- [ ] 在 README 解释“打不过 cuBLAS 不是失败”。
+
+适合项目：
+
+- [[Week 4 - MatMul v0]]
+- `matmul-lab-cuda-triton-cutlass`
+
+---
+
+## 3. CUTLASS
+
+定位：学习工业级 GEMM 层级设计。
+
+必须会：
+
+- [ ] 跑官方 GEMM example。
+- [ ] 理解 threadblock tile、warp tile、instruction tile。
+- [ ] 知道 Tensor Core 在 CUTLASS 中的位置。
+- [ ] 用 CUTLASS 作为高级 baseline。
+- [ ] 写一篇 profiler 对比笔记。
+
+早期策略：
+
+- 先跑 examples 和读结构。
+- 不急着改 CUTLASS 核心模板。
+- 用它理解 GEMM hierarchy。
+
+---
+
+## 4. CUB
+
+定位：CUDA block/warp primitives 工具库。
+
+适合学习：
+
+- block reduce。
+- warp reduce。
+- scan。
+- histogram。
+
+必须会：
+
+- [ ] 用 CUB 实现 reduce baseline。
+- [ ] 对比自己手写 reduction。
+- [ ] 理解库接口背后的 block 协作模式。
+
+关联项目：
+
+- [[Week 2 - Reduction + Profiling]]
+
+---
+
+## 5. Thrust
+
+定位：类似 C++ STL 的并行算法接口。
+
+适合学习：
+
+- transform。
+- reduce。
+- scan。
+- sort。
+- device vector。
+
+使用原则：
+
+- 学算法接口和快速 baseline。
+- 不用它替代手写 CUDA 基础训练。
+- benchmark 时明确标注 Thrust 版本。
+
+---
+
+## 6. PyTorch C++ / CUDA Extension
+
+定位：把自定义 CUDA kernel 接到真实深度学习框架。
+
+必须会：
+
+- [ ] 写 PyTorch reference。
+- [ ] 写 C++ binding。
+- [ ] 写 CUDA kernel。
+- [ ] 用 `torch.utils.cpp_extension` 构建。
+- [ ] 做 FP32 / FP16 correctness test。
+- [ ] benchmark 与 PyTorch 原生算子对比。
+
+适合算子：
+
+- RMSNorm。
+- Softmax。
+- RoPE。
+- elementwise activation。
+
+---
+
+## 7. Triton
+
+定位：kernel DSL，对 LLM 常见算子非常重要。
+
+必须会：
+
+- [ ] program id。
+- [ ] block pointer。
+- [ ] mask load / store。
+- [ ] `BLOCK_SIZE`。
+- [ ] `num_warps`。
+- [ ] fused softmax。
+- [ ] matmul。
+- [ ] RMSNorm。
+- [ ] autotune 基础。
+
+使用原则：
+
+- 至少 3 个算子做 CUDA vs Triton 对比。
+- 每个 Triton 版本同样需要 correctness test 和 benchmark。
+- 不把 Triton 当成“自动优化黑盒”，要解释 block 设计。
+
+---
+
+## 8. LLM Serving 生态
+
+| 工具 | 学什么 | 早期任务 |
+|---|---|---|
+| vLLM | PagedAttention、KV cache、serving benchmark | 跑小模型 benchmark |
+| SGLang | serving runtime、调度 | 对比 vLLM 指标 |
+| FlashInfer | attention / paged attention kernels | 跑 example |
+| TensorRT-LLM | 工业推理优化、quantization | 可选 sample |
+
+重点指标：
+
+- TTFT。
+- TPOT。
+- TPS。
+- 显存占用。
+- cost / 1M tokens。
+- batch size / sequence length / dtype 的权衡。
+
+---
+
+## 9. 选择原则
+
+- 学基础：手写 CUDA。
+- 做 baseline：cuBLAS、CUB、Thrust。
+- 学 GEMM 工业实现：CUTLASS。
+- 接框架：PyTorch extension。
+- 写 LLM kernel 快速实验：Triton。
+- 做推理系统成本分析：vLLM / SGLang。
+- 了解工业部署：TensorRT-LLM。
+
+---
+
+## 关联知识
+
+- [[CUDA 学习清单]]
+- [[Week 4 - MatMul v0]]
+- [[LLM Kernel 专题清单]]

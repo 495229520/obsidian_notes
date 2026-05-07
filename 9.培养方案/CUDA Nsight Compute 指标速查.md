@@ -1,0 +1,198 @@
+---
+title: CUDA Nsight Compute 指标速查
+date: 2026-05-06
+tags:
+  - 培养方案
+  - CUDA
+  - GPU
+  - Profiling
+  - Nsight
+aliases:
+  - Nsight Compute 指标
+  - CUDA Profiling 指标
+status: active
+---
+
+# CUDA Nsight Compute 指标速查
+
+> 这份笔记用于把 benchmark 结论变成 profiling 证据。核心原则：**先有 correctness，再有 benchmark，最后用 Nsight 解释为什么快或慢。**
+
+---
+
+## 1. Profiling 基本流程
+
+1. 固定输入 shape、dtype、block size、编译参数。
+2. 先运行 correctness test。
+3. 用 CUDA event 得到稳定时间。
+4. 只挑一个代表性 shape 跑 Nsight Compute。
+5. 记录关键指标，不截图堆砌。
+6. 用指标支持瓶颈判断。
+
+推荐记录：
+
+```text
+GPU:
+Driver:
+CUDA:
+Kernel:
+Shape:
+Dtype:
+Block size:
+Compile flags:
+CUDA event time:
+Nsight metrics:
+Bottleneck:
+Next action:
+```
+
+---
+
+## 2. 常看指标
+
+| 指标 | 看什么 | 常见解释 |
+|---|---|---|
+| GPU Speed Of Light | 总体利用率 | 快速判断离硬件上限有多远 |
+| SM utilization | SM 是否忙 | 低可能是 launch、访存、并行度不足 |
+| memory throughput | 显存带宽利用 | memory-bound kernel 的核心指标 |
+| achieved occupancy | 实际 occupancy | 低不一定错，要结合 stall |
+| register count | 每线程寄存器数 | 高可能压低 occupancy |
+| shared memory usage | 每 block shared memory | 高可能限制 resident block 数 |
+| warp stall reason | warp 为什么停 | 指导优化方向 |
+| branch efficiency | 分支发散 | divergence 是否明显 |
+| shared bank conflict | shared memory 冲突 | transpose 等 tile kernel 重点看 |
+
+---
+
+## 3. 指标如何指导优化
+
+### Memory throughput 低
+
+可能原因：
+
+- 访问不连续，memory coalescing 差。
+- 有大量随机访问。
+- 每个线程处理数据太少，launch overhead 明显。
+- cache 命中或数据复用没有做好。
+- kernel 其实不是 memory-bound。
+
+下一步：
+
+- 检查线程编号到数据下标的映射。
+- 对比 copy baseline。
+- 做 vectorized load。
+- 用 shared memory 重排访问。
+
+### Achieved occupancy 低
+
+可能原因：
+
+- block size 太小。
+- register pressure 高。
+- shared memory 使用量大。
+- 每个 SM resident block 数受限。
+
+注意：
+
+- occupancy 低不一定性能差。
+- 如果 kernel 已经 compute-bound 或 memory bandwidth 接近上限，盲目提高 occupancy 可能无效。
+
+### Stall reason 明显
+
+常见方向：
+
+| Stall | 含义 | 可能行动 |
+|---|---|---|
+| memory dependency | 等内存数据 | 改访存、增加复用、预取 |
+| execution dependency | 指令依赖 | 展开循环、增加独立计算 |
+| barrier | 等同步 | 减少 `__syncthreads()` 或重排算法 |
+| not selected | 有 warp 可跑但没被选 | 可能不是首要瓶颈 |
+| instruction fetch | 取指问题 | 通常不是入门阶段重点 |
+
+---
+
+## 4. 不同 kernel 看什么
+
+| Kernel | 第一指标 | 第二指标 | 解释重点 |
+|---|---|---|---|
+| vector add | memory throughput | SM utilization | 是否接近带宽上限 |
+| reduction | memory throughput | stall reason | 同步和分阶段开销 |
+| transpose | memory throughput | bank conflict | coalescing 和 padding |
+| matmul | TFLOPS / SM utilization | register / occupancy | 数据复用和计算密度 |
+| softmax | memory throughput | reduction stall | row-wise reduce 和数值稳定 |
+| RMSNorm | memory throughput | vectorized load | row-wise reduce + elementwise |
+
+---
+
+## 5. profiling.md 模板
+
+```markdown
+# Profiling Report
+
+## Setup
+
+- GPU:
+- Driver:
+- CUDA:
+- Commit:
+- Kernel:
+- Shape:
+- Dtype:
+- Compile flags:
+
+## Correctness
+
+- Reference:
+- Tolerance:
+- Result:
+
+## Benchmark
+
+| Version | Time(ms) | Throughput | Correct |
+|---|---:|---:|---|
+
+## Nsight Compute
+
+| Metric | Value | Interpretation |
+|---|---:|---|
+
+## Conclusion
+
+- Bottleneck:
+- Evidence:
+- Next optimization:
+```
+
+---
+
+## 6. 常见错误
+
+> [!warning] 用 profiler 代替 benchmark
+> Nsight 运行会改变执行环境，最终性能比较仍以独立 benchmark 为准。
+
+> [!warning] 指标堆太多
+> 每次报告只保留能支持结论的指标。否则看起来专业，实际没有判断。
+
+> [!warning] 先优化再验证
+> 每次 kernel 改动后先跑 correctness test，再跑 benchmark，最后 profiling。
+
+---
+
+## 面试问题
+
+- CUDA event timing 怎么写？
+- warm-up 为什么必要？
+- benchmark 如何保证公平？
+- Nsight Compute 主要看哪些指标？
+- memory throughput 低说明什么？
+- occupancy 低一定是问题吗？
+- stall reason 如何指导优化？
+- roofline thinking 怎么判断瓶颈？
+
+---
+
+## 关联知识
+
+- [[CUDA 学习清单]]
+- [[Week 2 - Reduction + Profiling]]
+- [[Week 3 - Transpose + Memory Coalescing]]
+- [[Week 4 - MatMul v0]]
