@@ -1,26 +1,29 @@
-﻿---
-title: CUDA 闆跺熀纭€绯荤粺鍏ラ棬
+---
+title: CUDA 零基础系统入门
 date: 2026-05-06
 tags:
-  - 鍩瑰吇鏂规
+  - 培养方案
   - CUDA
   - GPU
-  - 骞惰璁＄畻
+  - 并行计算
   - infra
 aliases:
-  - CUDA 鍏ラ棬
-  - CUDA 绯荤粺鍏ラ棬
+  - CUDA 入门
+  - CUDA 系统入门
 status: active
 ---
 
-# CUDA 闆跺熀纭€绯荤粺鍏ラ棬
+# CUDA 零基础系统入门
 
-> CUDA 鏄?NVIDIA 鎻愪緵鐨?GPU 閫氱敤璁＄畻骞冲彴锛氬畠璁?C/C++ 绋嬪簭鍙互鎶婇€傚悎骞惰鐨勫ぇ閲忛噸澶嶈绠椾氦缁?GPU 鎵ц锛屼粠鑰岃幏寰楁瘮 CPU 鏇撮珮鐨勫悶鍚愰噺銆?
+> CUDA 是 NVIDIA 提供的 GPU 通用计算平台：它让 C/C++ 程序可以把适合并行的大量重复计算交给 GPU 执行，从而获得比 CPU 更高的吞吐量。
+
 ---
 
-## 0. 鍏堝缓绔嬬洿瑙夛細CUDA 瑙ｅ喅浠€涔堥棶棰?
-濡傛灉浣犳病鏈夊杩?CUDA锛屽彲浠ュ厛鎶婂畠鐞嗚В鎴愪竴绉嶁€滄妸寰幆鎷嗙粰寰堝 GPU 绾跨▼鍚屾椂鍋氣€濈殑缂栫▼鏂瑰紡銆?
-鏅€?CPU 绋嬪簭甯歌鍐欐硶鏄細
+## 0. 先建立直觉：CUDA 解决什么问题
+
+如果你没有学过 CUDA，可以先把它理解成一种“把循环拆给很多 GPU 线程同时做”的编程方式。
+
+普通 CPU 程序常见写法是：
 
 ```cpp
 for (int i = 0; i < n; ++i) {
@@ -28,49 +31,61 @@ for (int i = 0; i < n; ++i) {
 }
 ```
 
-杩欐浠ｇ爜鍦ㄨ涔変笂鏄竴涓惊鐜紝浣嗘瘡涓?`i` 涔嬮棿浜掍笉渚濊禆銆侰UDA 鐨勬€濊矾鏄細涓嶈璁╀竴涓?CPU 鏍稿績鎸夐『搴忚窇瀹屾墍鏈?`i`锛岃€屾槸璁?GPU 鍚姩澶ч噺绾跨▼锛屾瘡涓嚎绋嬭礋璐ｄ竴涓垨鍑犱釜鍏冪礌銆?
-```text
-CPU 涓茶鎬濊矾锛氫竴涓伐浜轰粠绗?0 涓厓绱犲仛鍒扮 n-1 涓厓绱?CUDA 骞惰鎬濊矾锛氬緢澶氬伐浜哄悓鏃跺紑宸ワ紝姣忎釜宸ヤ汉澶勭悊鑷繁鐨勫厓绱?```
+这段代码在语义上是一个循环，但每个 `i` 之间互不依赖。CUDA 的思路是：不要让一个 CPU 核心按顺序跑完所有 `i`，而是让 GPU 启动大量线程，每个线程负责一个或几个元素。
 
-> [!important] 绗竴鎬у師鐞?> CUDA 閫傚悎鈥滃悓涓€绉嶆搷浣滀綔鐢ㄥ湪澶ч噺鏁版嵁涓娾€濈殑浠诲姟锛屼緥濡傚悜閲忓姞娉曘€佺煩闃典箻娉曘€佸浘鍍忓鐞嗐€佹繁搴﹀涔犵畻瀛愩€傚畠涓嶉€傚悎澶ч噺鍒嗘敮澶嶆潅銆佹暟鎹妯″緢灏忋€佺嚎绋嬩箣闂村己渚濊禆鐨勪换鍔°€?
+```text
+CPU 串行思路：一个工人从第 0 个元素做到第 n-1 个元素
+CUDA 并行思路：很多工人同时开工，每个工人处理自己的元素
+```
+
+> [!important] 第一性原理
+> CUDA 适合“同一种操作作用在大量数据上”的任务，例如向量加法、矩阵乘法、图像处理、深度学习算子。它不适合大量分支复杂、数据规模很小、线程之间强依赖的任务。
+
 ---
 
-## 1. CUDA 鐨勫熀鏈蹇?
-CUDA 绋嬪簭鍚屾椂娑夊強涓ょ被浠ｇ爜锛?
-| 鍚嶇О          | 杩愯浣嶇疆 | 鑱岃矗                           |
-| ----------- | ---- | ---------------------------- |
-| Host code   | CPU  | 鍑嗗鏁版嵁銆佸垎閰嶆樉瀛樸€佸惎鍔?GPU kernel銆佸彇鍥炵粨鏋?|
-| Device code | GPU  | 鎵ц鐪熸鐨勫ぇ瑙勬ā骞惰璁＄畻                 |
+## 1. CUDA 的基本概念
 
-GPU 涓婅繍琛岀殑鍑芥暟鍙?**kernel**銆侰PU 閫氳繃鐗规畩璇硶鍚姩 kernel锛?
+CUDA 程序同时涉及两类代码：
+
+| 名称 | 运行位置 | 职责 |
+|---|---|---|
+| Host code | CPU | 准备数据、分配显存、启动 GPU kernel、取回结果 |
+| Device code | GPU | 执行真正的大规模并行计算 |
+
+GPU 上运行的函数叫 **kernel**。CPU 通过特殊语法启动 kernel：
+
 ```cpp
 my_kernel<<<grid_size, block_size>>>(args...);
 ```
 
-杩欓噷鐨?`<<<grid_size, block_size>>>` 涓嶆槸鏅€?C++ 鍑芥暟璋冪敤璇硶锛岃€屾槸 CUDA 鎵╁睍璇硶锛岃〃绀衡€滃湪 GPU 涓婂惎鍔ㄥ灏戠嚎绋嬧€濄€?
+这里的 `<<<grid_size, block_size>>>` 不是普通 C++ 函数调用语法，而是 CUDA 扩展语法，表示“在 GPU 上启动多少线程”。
+
 ---
 
-## 2. CUDA 鎵ц妯″瀷锛欸rid / Block / Thread
+## 2. CUDA 执行模型：Grid / Block / Thread
 
-CUDA 鎶婁竴娆?kernel 鍚姩缁勭粐鎴愪笁灞傦細
+CUDA 把一次 kernel 启动组织成三层：
 
 ```text
 Grid
-鈹斺攢鈹€ Block
-    鈹斺攢鈹€ Thread
+└── Block
+    └── Thread
 ```
 
-- **Thread**锛氭渶灏忔墽琛屽崟鍏冿紝閫氬父澶勭悊涓€涓垨鍑犱釜鏁版嵁鍏冪礌銆?- **Block**锛氫竴缁?thread锛屽悓涓€涓?block 鍐呯殑绾跨▼鍙互鍗忎綔銆?- **Grid**锛氫竴娆?kernel launch 浜х敓鐨勬墍鏈?block銆?
-![CUDA 鎵ц妯″瀷](../../鍥剧墖/SVG/cuda-execution-model.svg)
+- **Thread**：最小执行单元，通常处理一个或几个数据元素。
+- **Block**：一组 thread，同一个 block 内的线程可以协作。
+- **Grid**：一次 kernel launch 产生的所有 block。
 
-### 2.1 Mermaid 鎬昏
+![CUDA 执行模型](../../图片/SVG/cuda-execution-model.svg)
+
+### 2.1 Mermaid 总览
 
 ```mermaid
 graph TD
-    A[CPU Host Code] --> B[鍑嗗杈撳叆鏁版嵁]
-    B --> C[鐢宠 GPU 鏄惧瓨 cudaMalloc]
-    C --> D[鎷疯礉鏁版嵁 Host to Device]
-    D --> E["鍚姩 Kernel <<<grid, block>>>"]
+    A[CPU Host Code] --> B[准备输入数据]
+    B --> C[申请 GPU 显存 cudaMalloc]
+    C --> D[拷贝数据 Host to Device]
+    D --> E["启动 Kernel <<<grid, block>>>"]
     E --> F[GPU Grid]
     F --> G[Block 0]
     F --> H[Block 1]
@@ -78,25 +93,27 @@ graph TD
     G --> G1[Thread 0]
     G --> G2[Thread 1]
     G --> G3[Thread ...]
-    E --> J[鍚屾绛夊緟 cudaDeviceSynchronize]
-    J --> K[鎷峰洖缁撴灉 Device to Host]
-    K --> L[CPU 鏍￠獙缁撴灉]
+    E --> J[同步等待 cudaDeviceSynchronize]
+    J --> K[拷回结果 Device to Host]
+    K --> L[CPU 校验结果]
 ```
 
-### 2.2 绾跨▼濡備綍鐭ラ亾鑷繁璐熻矗鍝釜鍏冪礌
+### 2.2 线程如何知道自己负责哪个元素
 
-CUDA kernel 閲屽父瑙佺殑绗竴琛屾槸璁＄畻鍏ㄥ眬绾跨▼缂栧彿锛?
+CUDA kernel 里常见的第一行是计算全局线程编号：
+
 ```cpp
 const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 ```
 
-**鍚箟鎷嗚В**锛?
-- `blockIdx.x`锛氬綋鍓?block 鍦?grid 涓殑缂栧彿銆?- `blockDim.x`锛氭瘡涓?block 涓湁澶氬皯绾跨▼銆?- `threadIdx.x`锛氬綋鍓嶇嚎绋嬪湪 block 鍐呯殑缂栧彿銆?- `idx`锛氬綋鍓嶇嚎绋嬪搴旂殑鍏ㄥ眬鍏冪礌涓嬫爣銆?
-```
-idx 璁＄畻鍏紡
-const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-```
-鍋囪姣忎釜 block 鏈?256 涓嚎绋嬶細
+**含义拆解**：
+
+- `blockIdx.x`：当前 block 在 grid 中的编号。
+- `blockDim.x`：每个 block 中有多少线程。
+- `threadIdx.x`：当前线程在 block 内的编号。
+- `idx`：当前线程对应的全局元素下标。
+
+假设每个 block 有 256 个线程：
 
 | blockIdx.x | threadIdx.x | idx |
 |---|---:|---:|
@@ -106,61 +123,73 @@ const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 | 1 | 0 | 256 |
 | 1 | 1 | 257 |
 
-杩欏氨鏄?CUDA 鍏ラ棬鏈€閲嶈鐨勬槧灏勫叧绯伙細**绾跨▼缂栧彿 鈫?鏁版嵁涓嬫爣**銆?
+这就是 CUDA 入门最重要的映射关系：**线程编号 → 数据下标**。
+
 ---
 
-## 3. CUDA 绋嬪簭鍏稿瀷鏁版嵁娴侊細鍒嗛厤 鈫?鎷疯礉 鈫?璁＄畻 鈫?鎷峰洖
+## 3. CUDA 程序典型数据流：分配 → 拷贝 → 计算 → 拷回
 
-鍒濆 CUDA 鏃讹紝鏈€閲嶈鐨勪笉鏄厛璁颁綇寰堝 API锛岃€屾槸鍏堝缓绔嬩竴鏉＄ǔ瀹氱殑鏁版嵁娴佸績鏅烘ā鍨嬶細
+初学 CUDA 时，最重要的不是先记住很多 API，而是先建立一条稳定的数据流心智模型：
 
 ```text
-CPU 鍑嗗鏁版嵁
-鈫?GPU 鐢宠鏄惧瓨
-鈫?CPU 鏁版嵁鎷疯礉鍒?GPU
-鈫?GPU kernel 骞惰璁＄畻
-鈫?GPU 缁撴灉鎷峰洖 CPU
-鈫?CPU 鏍￠獙缁撴灉
+CPU 准备数据
+→ GPU 申请显存
+→ CPU 数据拷贝到 GPU
+→ GPU kernel 并行计算
+→ GPU 结果拷回 CPU
+→ CPU 校验结果
 ```
 
-![CUDA 鍐呭瓨鎷疯礉娴佺▼|873](../../鍥剧墖/SVG/cuda-memory-flow.svg)
+![CUDA 内存拷贝流程|873](../../图片/SVG/cuda-memory-flow.svg)
 
-杩欐潯閾捐矾鏄嚑涔庢墍鏈?CUDA 绋嬪簭鐨勫熀纭€銆俙vector add` 涔嬫墍浠ラ€傚悎浣滀负 CUDA Hello World锛屾槸鍥犱负瀹冨垰濂借鐩栦簡杩欐潯瀹屾暣娴佺▼锛屼絾绠楁硶鏈韩鍙堣冻澶熺畝鍗曪紝涓嶄細骞叉壈瀵?CUDA 鎵ц妯″瀷鍜屽唴瀛樻ā鍨嬬殑鐞嗚В銆?
-> [!important] 鏍稿績鐩磋
-> CPU 鍐呭瓨鍜?GPU 鏄惧瓨鏄袱涓笉鍚岀┖闂淬€傛櫘閫?`std::vector` 閲岀殑鏁版嵁鍦?CPU 鍐呭瓨涓紝GPU kernel 涓嶈兘鐩存帴鎶婂畠褰撲綔 device memory 浣跨敤銆傚繀椤诲厛鎶婃暟鎹粠 Host 鎷疯礉鍒?Device锛宬ernel 鎵嶈兘澶勭悊銆?
-### 3.1 Host 渚у噯澶囨暟鎹?
-CPU 渚т緷鐒朵娇鐢ㄦ櫘閫?Modern C++ 瀹瑰櫒锛屼緥濡?`std::vector`锛?
+这条链路是几乎所有 CUDA 程序的基础。`vector add` 之所以适合作为 CUDA Hello World，是因为它刚好覆盖了这条完整流程，但算法本身又足够简单，不会干扰对 CUDA 执行模型和内存模型的理解。
+
+> [!important] 核心直觉
+> CPU 内存和 GPU 显存是两个不同空间。普通 `std::vector` 里的数据在 CPU 内存中，GPU kernel 不能直接把它当作 device memory 使用。必须先把数据从 Host 拷贝到 Device，kernel 才能处理。
+
+### 3.1 Host 侧准备数据
+
+CPU 侧依然使用普通 Modern C++ 容器，例如 `std::vector`：
+
 ```cpp
 std::vector<float> a(n, 1.0f);
 std::vector<float> b(n, 2.0f);
 std::vector<float> c(n, 0.0f);
 ```
 
-杩欓噷鐨勮鑹叉槸锛?
-| 鍙橀噺 | 鎵€鍦ㄤ綅缃?| 浣滅敤 |
+这里的角色是：
+
+| 变量 | 所在位置 | 作用 |
 |---|---|---|
-| `a` | CPU 鍐呭瓨 | 杈撳叆鏁扮粍 |
-| `b` | CPU 鍐呭瓨 | 杈撳叆鏁扮粍 |
-| `c` | CPU 鍐呭瓨 | 鎺ユ敹 GPU 璁＄畻鍚庣殑缁撴灉 |
+| `a` | CPU 内存 | 输入数组 |
+| `b` | CPU 内存 | 输入数组 |
+| `c` | CPU 内存 | 接收 GPU 计算后的结果 |
 
-姝ゆ椂鏁版嵁杩樻病鏈夎繘鍏?GPU銆俙a.data()`銆乣b.data()`銆乣c.data()` 閮芥槸 host pointer锛屽彧鑳借 CPU 渚т唬鐮佺洿鎺ヨ闂€?
-> [!warning] 甯歌璇尯
-> `std::vector<float> a` 鐨?`a.data()` 鏄?host pointer锛屼笉鏄?device pointer銆傛妸 host pointer 鐩存帴浼犵粰 kernel锛岄€氬父浼氬鑷撮潪娉曞唴瀛樿闂垨閿欒缁撴灉銆?
-### 3.2 Device 渚х敵璇锋樉瀛橈細`cudaMalloc`
+此时数据还没有进入 GPU。`a.data()`、`b.data()`、`c.data()` 都是 host pointer，只能被 CPU 侧代码直接访问。
 
-`cudaMalloc` 鏄渶鍩虹鐨?device memory 鐢宠鎺ュ彛锛?
+> [!warning] 常见误区
+> `std::vector<float> a` 的 `a.data()` 是 host pointer，不是 device pointer。把 host pointer 直接传给 kernel，通常会导致非法内存访问或错误结果。
+
+### 3.2 Device 侧申请显存：`cudaMalloc`
+
+`cudaMalloc` 是最基础的 device memory 申请接口：
+
 ```cpp
 cudaError_t cudaMalloc(void** devPtr, size_t size);
 ```
 
-鍙傛暟鍚箟锛?
-| 鍙傛暟 | 鍚箟 |
-|---|---|
-| `devPtr` | 杈撳嚭鍙傛暟锛屾垚鍔熷悗鍐欏叆涓€娈?GPU 鏄惧瓨鐨?device pointer |
-| `size` | 鐢宠鐨勫瓧鑺傛暟锛岄€氬父鍐欐垚 `n * sizeof(T)` |
+参数含义：
 
-杩斿洖鍊?`cudaError_t` 琛ㄧず璋冪敤鏄惁鎴愬姛銆俙cudaMalloc` 鍙礋璐ｇ敵璇?GPU 鏄惧瓨锛屼笉浼氬垵濮嬪寲鍐呭锛屼篃涓嶄細鎶?host 鏁版嵁鎷疯繘鍘汇€?
-`devPtr` 鏄?`void**`锛屽洜涓?Runtime API 闇€瑕佹妸鐢宠鍒扮殑 device pointer 鍥炲啓缁欒皟鐢ㄨ€呫€傛瘮濡?`d_a` 鏄?`float*`锛屼紶鍏?`&d_a` 鍚庯紝`cudaMalloc` 鎵嶈兘淇敼 `d_a` 淇濆瓨鐨勫湴鍧€鍊笺€?
-GPU kernel 闇€瑕佽闂?GPU 鏄惧瓨锛屾墍浠ヨ鍏堝湪 device memory 涓敵璇风┖闂达細
+| 参数 | 含义 |
+|---|---|
+| `devPtr` | 输出参数，成功后写入一段 GPU 显存的 device pointer |
+| `size` | 申请的字节数，通常写成 `n * sizeof(T)` |
+
+返回值 `cudaError_t` 表示调用是否成功。`cudaMalloc` 只负责申请 GPU 显存，不会初始化内容，也不会把 host 数据拷进去。
+
+`devPtr` 是 `void**`，因为 Runtime API 需要把申请到的 device pointer 回写给调用者。比如 `d_a` 是 `float*`，传入 `&d_a` 后，`cudaMalloc` 才能修改 `d_a` 保存的地址值。
+
+GPU kernel 需要访问 GPU 显存，所以要先在 device memory 中申请空间：
 
 ```cpp
 float* d_a = nullptr;
@@ -172,67 +201,76 @@ cudaMalloc(&d_b, n * sizeof(float));
 cudaMalloc(&d_c, n * sizeof(float));
 ```
 
-杩欓噷鐨?`d_` 琛ㄧず device锛?
-| 鍙橀噺 | 鎸囧悜浣嶇疆 | 浣滅敤 |
+这里的 `d_` 表示 device：
+
+| 变量 | 指向位置 | 作用 |
 |---|---|---|
-| `d_a` | GPU 鏄惧瓨 | 瀛樻斁杈撳叆 `a` 鐨?device 鍓湰 |
-| `d_b` | GPU 鏄惧瓨 | 瀛樻斁杈撳叆 `b` 鐨?device 鍓湰 |
-| `d_c` | GPU 鏄惧瓨 | 瀛樻斁杈撳嚭缁撴灉 |
+| `d_a` | GPU 显存 | 存放输入 `a` 的 device 副本 |
+| `d_b` | GPU 显存 | 存放输入 `b` 的 device 副本 |
+| `d_c` | GPU 显存 | 存放输出结果 |
 
-`cudaMalloc` 鍙礋璐ｇ敵璇?GPU 鏄惧瓨锛屼笉璐熻矗鎷疯礉鏁版嵁銆傛墽琛屽畬杩欎竴姝ュ悗锛孏PU 涓婂彧鏄湁浜嗙┖闂达紝`d_a` 鍜?`d_b` 閲岃繕娌℃湁鏈夋晥杈撳叆銆?
-### 3.3 Host to Device锛氭妸杈撳叆鎷峰埌 GPU
+`cudaMalloc` 只负责申请 GPU 显存，不负责拷贝数据。执行完这一步后，GPU 上只是有了空间，`d_a` 和 `d_b` 里还没有有效输入。
 
-`cudaMemcpy` 鏄?CUDA Runtime API 涓渶甯哥敤鐨勬暟鎹嫹璐濇帴鍙ｏ細
+### 3.3 Host to Device：把输入拷到 GPU
+
+`cudaMemcpy` 是 CUDA Runtime API 中最常用的数据拷贝接口：
 
 ```cpp
 cudaError_t cudaMemcpy(void* dst, const void* src, size_t count, cudaMemcpyKind kind);
 ```
 
-鍙傛暟鍚箟锛?
-| 鍙傛暟 | 鍚箟 |
-|---|---|
-| `dst` | 鐩爣鍦板潃 |
-| `src` | 鏉ユ簮鍦板潃 |
-| `count` | 鎷疯礉鐨勫瓧鑺傛暟锛屼笉鏄厓绱犱釜鏁?|
-| `kind` | 鎷疯礉鏂瑰悜锛岀敱 `cudaMemcpyKind` 鏋氫妇鎸囧畾 |
+参数含义：
 
-鏈妭鏈€甯歌鐨勪袱涓柟鍚戞槸锛?
-| 鏂瑰悜 | 鍚箟 |
+| 参数 | 含义 |
 |---|---|
-| `cudaMemcpyHostToDevice` | 浠?CPU 鍐呭瓨鎷疯礉鍒?GPU 鏄惧瓨 |
-| `cudaMemcpyDeviceToHost` | 浠?GPU 鏄惧瓨鎷疯礉鍥?CPU 鍐呭瓨 |
+| `dst` | 目标地址 |
+| `src` | 来源地址 |
+| `count` | 拷贝的字节数，不是元素个数 |
+| `kind` | 拷贝方向，由 `cudaMemcpyKind` 枚举指定 |
 
-鎺ヤ笅鏉ョ敤 `cudaMemcpyHostToDevice` 鎶?CPU 鍐呭瓨涓殑杈撳叆鎷疯礉鍒?GPU 鏄惧瓨锛?
+本节最常见的两个方向是：
+
+| 方向 | 含义 |
+|---|---|
+| `cudaMemcpyHostToDevice` | 从 CPU 内存拷贝到 GPU 显存 |
+| `cudaMemcpyDeviceToHost` | 从 GPU 显存拷贝回 CPU 内存 |
+
+接下来用 `cudaMemcpyHostToDevice` 把 CPU 内存中的输入拷贝到 GPU 显存：
+
 ```cpp
 cudaMemcpy(d_a, a.data(), n * sizeof(float), cudaMemcpyHostToDevice);
 cudaMemcpy(d_b, b.data(), n * sizeof(float), cudaMemcpyHostToDevice);
 ```
 
-浠ョ涓€琛屼负渚嬶細
+以第一行为例：
 
 ```cpp
 cudaMemcpy(
-    d_a,                    // 鐩爣锛欸PU 鏄惧瓨
-    a.data(),               // 鏉ユ簮锛欳PU 鍐呭瓨
-    n * sizeof(float),      // 鎷疯礉瀛楄妭鏁?    cudaMemcpyHostToDevice  // 鎷疯礉鏂瑰悜锛欻ost 鈫?Device
+    d_a,                    // 目标：GPU 显存
+    a.data(),               // 来源：CPU 内存
+    n * sizeof(float),      // 拷贝字节数
+    cudaMemcpyHostToDevice  // 拷贝方向：Host → Device
 );
 ```
 
-杩欎竴姝ュ畬鎴愬悗锛屽彲浠ョ悊瑙ｆ垚锛?
+这一步完成后，可以理解成：
+
 ```text
-CPU 鍐呭瓨: a, b 浠嶇劧瀛樺湪
-GPU 鏄惧瓨: d_a, d_b 鎷ユ湁 a, b 鐨勫壇鏈?```
+CPU 内存: a, b 仍然存在
+GPU 显存: d_a, d_b 拥有 a, b 的副本
+```
 
-瀹冧笉鏄妸 `a`銆乣b` 绉诲姩鍒?GPU锛岃€屾槸澶嶅埗涓€浠藉埌 GPU銆?
-### 3.4 Kernel 鎵ц锛欸PU 骞惰璁＄畻
+它不是把 `a`、`b` 移动到 GPU，而是复制一份到 GPU。
 
-`vector add` 鐨勮绠楅€昏緫闈炲父绠€鍗曪細
+### 3.4 Kernel 执行：GPU 并行计算
+
+`vector add` 的计算逻辑非常简单：
 
 ```text
 c[i] = a[i] + b[i]
 ```
 
-瀵瑰簲鐨?CUDA kernel 鏄細
+对应的 CUDA kernel 是：
 
 ```cpp
 __global__ void vector_add_kernel(const float* a, const float* b, float* c, int n) {
@@ -243,26 +281,23 @@ __global__ void vector_add_kernel(const float* a, const float* b, float* c, int 
 }
 ```
 
-鍏抽敭鐐癸細
+关键点：
 
-- `__global__` 琛ㄧず杩欎釜鍑芥暟浠?CPU 渚у惎鍔ㄣ€佸湪 GPU 涓婃墽琛屻€?- `a`銆乣b`銆乣c` 蹇呴』鏄?device pointer锛屼篃灏辨槸杩欓噷浼犲叆鐨?`d_a`銆乣d_b`銆乣d_c`銆?- 姣忎釜绾跨▼閫氳繃 `idx` 鎵惧埌鑷繁璐熻矗鐨勬暟缁勫厓绱犮€?- `idx < n` 鏄竟鐣屼繚鎶わ紝鍥犱负鍚姩鐨勭嚎绋嬫暟閫氬父浼氬悜涓婂彇鏁达紝涓嶄竴瀹氬垰濂界瓑浜庡厓绱犱釜鏁般€?
-鏈€閲嶈鐨勬槧灏勫叧绯绘槸锛?
+- `__global__` 表示这个函数从 CPU 侧启动、在 GPU 上执行。
+- `a`、`b`、`c` 必须是 device pointer，也就是这里传入的 `d_a`、`d_b`、`d_c`。
+- 每个线程通过 `idx` 找到自己负责的数组元素。
+- `idx < n` 是边界保护，因为启动的线程数通常会向上取整，不一定刚好等于元素个数。
+
+最重要的映射关系是：
+
 ```cpp
 const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 ```
 
-鍋囪姣忎釜 block 鏈?256 涓嚎绋嬶細
+这就是 CUDA 入门最重要的关系：**线程编号 → 数据下标**。
 
-| blockIdx.x | threadIdx.x | idx |
-|---|---:|---:|
-| 0 | 0 | 0 |
-| 0 | 1 | 1 |
-| 0 | 255 | 255 |
-| 1 | 0 | 256 |
-| 1 | 1 | 257 |
+启动 kernel 的 host 代码通常写成：
 
-杩欏氨鏄?CUDA 鍏ラ棬鏈€閲嶈鐨勫叧绯伙細**绾跨▼缂栧彿 鈫?鏁版嵁涓嬫爣**銆?
-鍚姩 kernel 鐨?host 浠ｇ爜閫氬父鍐欐垚锛?
 ```cpp
 constexpr int threads_per_block = 256;
 const int blocks = (n + threads_per_block - 1) / threads_per_block;
@@ -270,19 +305,27 @@ const int blocks = (n + threads_per_block - 1) / threads_per_block;
 vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
 ```
 
-鍏朵腑锛?
-- `threads_per_block` 琛ㄧず涓€涓?block 鍐呮湁澶氬皯绾跨▼銆?- `blocks` 浣跨敤鍚戜笂鍙栨暣锛岀‘淇濇墍鏈夊厓绱犻兘鏈夌嚎绋嬭鐩栥€?- `<<<blocks, threads_per_block>>>` 鍚姩鐨勬槸 `blocks * threads_per_block` 涓嚎绋嬨€?
-> [!tip] 鎬庝箞閫?256锛?> 鍏ラ棬闃舵鍙互鍏堢敤 128 鎴?256 浣滀负 block size銆傜湡姝ｄ紭鍖栨椂瑕佺粨鍚?GPU 鏋舵瀯銆佸瘎瀛樺櫒浣跨敤銆乻hared memory銆乷ccupancy 鍜?profiling 鎸囨爣鍒ゆ柇銆?
-### 3.5 绛夊緟 GPU 瀹屾垚锛歚cudaDeviceSynchronize`
+其中：
 
-kernel launch 榛樿閫氬父鏄紓姝ョ殑銆備篃灏辨槸璇达紝CPU 鍙戝嚭 kernel 鍚姩鍛戒护鍚庯紝涓嶄竴瀹氱瓑 GPU 绠楀畬鎵嶇户缁線涓嬫墽琛屻€?
+- `threads_per_block` 表示一个 block 内有多少线程。
+- `blocks` 使用向上取整，确保所有元素都有线程覆盖。
+- `<<<blocks, threads_per_block>>>` 启动的是 `blocks * threads_per_block` 个线程。
+
+> [!tip] 怎么选 256？
+> 入门阶段可以先用 128 或 256 作为 block size。真正优化时要结合 GPU 架构、寄存器使用、shared memory、occupancy 和 profiling 指标判断。
+
+### 3.5 等待 GPU 完成：`cudaDeviceSynchronize`
+
+kernel launch 默认通常是异步的。也就是说，CPU 发出 kernel 启动命令后，不一定等 GPU 算完才继续往下执行。
+
 ```cpp
 vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
 cudaDeviceSynchronize();
 ```
 
-`cudaDeviceSynchronize()` 鐨勪綔鐢ㄦ槸璁?host 绛夊緟 device 褰撳墠浠诲姟瀹屾垚銆傚畠涓嶆槸鏁版嵁鎷疯礉锛屽彧鏄竴涓畬鎴愮偣銆?
-瀹為檯宸ョ▼涓紝kernel launch 鍚庤繕搴旇妫€鏌ラ敊璇細
+`cudaDeviceSynchronize()` 的作用是让 host 等待 device 当前任务完成。它不是数据拷贝，只是一个完成点。
+
+实际工程中，kernel launch 后还应该检查错误：
 
 ```cpp
 vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
@@ -290,24 +333,26 @@ check_cuda(cudaGetLastError());
 check_cuda(cudaDeviceSynchronize());
 ```
 
-### 3.6 Device to Host锛氭妸缁撴灉鎷峰洖 CPU
+### 3.6 Device to Host：把结果拷回 CPU
 
-GPU kernel 鍐欏叆鐨勬槸 `d_c`锛屼篃灏辨槸 GPU 鏄惧瓨涓殑杈撳嚭銆侰PU 濡傛灉瑕佹墦鍗般€佹牎楠屾垨缁х画鏅€?C++ 閫昏緫锛屽繀椤绘妸缁撴灉鎷峰洖 host memory锛?
+GPU kernel 写入的是 `d_c`，也就是 GPU 显存中的输出。CPU 如果要打印、校验或继续普通 C++ 逻辑，必须把结果拷回 host memory：
+
 ```cpp
 cudaMemcpy(c.data(), d_c, n * sizeof(float), cudaMemcpyDeviceToHost);
 ```
 
-鎷嗗紑鐪嬶細
+拆开看：
 
 ```cpp
 cudaMemcpy(
-    c.data(),               // 鐩爣锛欳PU 鍐呭瓨
-    d_c,                    // 鏉ユ簮锛欸PU 鏄惧瓨
-    n * sizeof(float),      // 鎷疯礉瀛楄妭鏁?    cudaMemcpyDeviceToHost  // 鎷疯礉鏂瑰悜锛欴evice 鈫?Host
+    c.data(),               // 目标：CPU 内存
+    d_c,                    // 来源：GPU 显存
+    n * sizeof(float),      // 拷贝字节数
+    cudaMemcpyDeviceToHost  // 拷贝方向：Device → Host
 );
 ```
 
-杩欎竴姝ョ粨鏉熷悗锛孋PU 渚х殑 `std::vector c` 鎵嶅寘鍚绠楃粨鏋滐紝娴嬭瘯浠ｇ爜鎵嶈兘妫€鏌ワ細
+这一步结束后，CPU 侧的 `std::vector c` 才包含计算结果，测试代码才能检查：
 
 ```cpp
 for (int i = 0; i < n; ++i) {
@@ -315,40 +360,45 @@ for (int i = 0; i < n; ++i) {
 }
 ```
 
-### 3.7 閲婃斁鏄惧瓨锛歚cudaFree`
+### 3.7 释放显存：`cudaFree`
 
-`cudaFree` 鐢ㄦ潵閲婃斁涔嬪墠鐢宠鐨?device memory锛?
-```cpp
-cudaError_t cudaFree(void* devPtr);
-```
+用 `cudaMalloc` 申请的显存，最后必须用 `cudaFree` 释放：
 
-鍙傛暟 `devPtr` 搴旇鏄箣鍓嶇敱 `cudaMalloc` 寰楀埌鐨?device pointer銆傚畠閲婃斁鐨勬槸 GPU 鏄惧瓨锛屼笉鏄?CPU 鍐呭瓨锛涢噴鏀惧悗涓嶅簲缁х画浣跨敤杩欎釜鎸囬拡銆?
-鐢?`cudaMalloc` 鐢宠鐨勬樉瀛橈紝鏈€鍚庡繀椤荤敤 `cudaFree` 閲婃斁锛?
 ```cpp
 cudaFree(d_c);
 cudaFree(d_b);
 cudaFree(d_a);
 ```
 
-`cudaMalloc` 鍜?`cudaFree` 蹇呴』閰嶅銆傚鏋滀腑閫斿嚭閿欙紝鎵嬪姩閲婃斁寰堝鏄撻仐婕忥紝鎵€浠ュ伐绋嬩唬鐮佸簲浣跨敤 RAII 灏佽 device memory銆?
-### 3.8 鐢?RAII 灏佽 device memory
+`cudaMalloc` 和 `cudaFree` 必须配对。如果中途出错，手动释放很容易遗漏，所以工程代码应使用 RAII 封装 device memory。
 
-CUDA Runtime API 鏈韩鏄?C 椋庢牸鎺ュ彛锛屼細杩斿洖 `cudaError_t`锛屽苟涓旇姹傛墜鍔ㄩ厤瀵?`cudaMalloc/cudaFree`銆傚湪 C++ 宸ョ▼涓紝寤鸿鍙湪杈圭晫澶勭洿鎺ユ帴瑙﹁繖浜?C API锛岀劧鍚庣敤 RAII 瀵硅薄鎶婅祫婧愮敓鍛藉懆鏈熺鐞嗚捣鏉ャ€?
-RAII 鐨勬牳蹇冩€濇兂鏄細
+### 3.8 用 RAII 封装 device memory
+
+CUDA Runtime API 本身是 C 风格接口，会返回 `cudaError_t`，并且要求手动配对 `cudaMalloc/cudaFree`。在 C++ 工程中，建议只在边界处直接接触这些 C API，然后用 RAII 对象把资源生命周期管理起来。
+
+RAII 的核心思想是：
 
 ```text
-鏋勯€犲嚱鏁拌礋璐ｈ幏鍙栬祫婧?鏋愭瀯鍑芥暟璐熻矗閲婃斁璧勬簮
-瀵硅薄鐢熷懡鍛ㄦ湡灏辨槸璧勬簮鐢熷懡鍛ㄦ湡
+构造函数负责获取资源
+析构函数负责释放资源
+对象生命周期就是资源生命周期
 ```
 
-鏀惧埌 CUDA 閲岋紝灏辨槸锛?
+放到 CUDA 里，就是：
+
 ```text
-cudaMalloc 鈫?鏋勯€犲嚱鏁?cudaFree   鈫?鏋愭瀯鍑芥暟
+cudaMalloc → 构造函数
+cudaFree   → 析构函数
 ```
 
-杩欐牱鍙互閬垮厤涓夌被甯歌闂锛?
-- **璧勬簮娉勬紡**锛氫腑閫?`return` 鎴栨姏寮傚父鏃跺繕璁?`cudaFree`銆?- **閲嶅閲婃斁**锛氬涓寚閽堣鎸囧悜鍚屼竴鍧?device memory 鍚庨噸澶?`cudaFree`銆?- **閿欒璺緞闅剧淮鎶?*锛氭瘡娆℃柊澧?`cudaMalloc` 閮借灏忓績琛ラ綈鎵€鏈夊け璐ヨ矾寰勪笂鐨勯噴鏀鹃€昏緫銆?
-鍙互鎶?`DeviceBuffer<T>` 鐞嗚В鎴?**GPU 鏄惧瓨鐗堟湰鐨?`std::unique_ptr`**锛氬畠鐙崰涓€鍧?device memory锛屼綔鐢ㄥ煙缁撴潫鏃惰嚜鍔ㄩ噴鏀俱€俁AII 鐨勮祫婧愮鐞嗘€濇兂鍙互鍥炵湅 [[鐙韩鏅鸿兘鎸囬拡]]銆?
+这样可以避免三类常见问题：
+
+- **资源泄漏**：中途 `return` 或抛异常时忘记 `cudaFree`。
+- **重复释放**：多个指针误指向同一块 device memory 后重复 `cudaFree`。
+- **错误路径难维护**：每次新增 `cudaMalloc` 都要小心补齐所有失败路径上的释放逻辑。
+
+可以把 `DeviceBuffer<T>` 理解成 **GPU 显存版本的 `std::unique_ptr`**：它独占一块 device memory，作用域结束时自动释放。RAII 的资源管理思想可以回看 [[独享智能指针]]。
+
 ```cpp
 inline void check_cuda(cudaError_t status) {
     if (status != cudaSuccess) {
@@ -380,19 +430,24 @@ private:
 };
 ```
 
-杩欐牱鍙互鎶?`cudaMalloc/cudaFree` 缁戝畾鍒板璞＄敓鍛藉懆鏈熶腑锛岄伩鍏嶈祫婧愭硠婕忋€傜姝㈡嫹璐濇槸蹇呰鐨勶紝鍚﹀垯涓や釜 `DeviceBuffer` 浼氭寔鏈夊悓涓€鍧?device memory锛屾瀽鏋勬椂鍙戠敓閲嶅閲婃斁銆?
-杩欏嚑涓垚鍛樺嚱鏁板垎鍒搴斾笉鍚岀殑宸ョ▼绾︽潫锛?
-| 浠ｇ爜 | 浣滅敤 | 涓轰粈涔堥渶瑕?|
-|---|---|---|
-| 鏋勯€犲嚱鏁颁腑鐨?`cudaMalloc` | 鐢宠 GPU 鏄惧瓨 | 鍒涘缓瀵硅薄鏃剁珛鍗虫嫢鏈夎祫婧?|
-| 鏋愭瀯鍑芥暟涓殑 `cudaFree` | 閲婃斁 GPU 鏄惧瓨 | 绂诲紑浣滅敤鍩熸椂鑷姩娓呯悊 |
-| 鍒犻櫎鎷疯礉鏋勯€?/ 鎷疯礉璧嬪€?| 绂佹澶嶅埗鎵€鏈夋潈 | 闃叉涓や釜瀵硅薄閲婃斁鍚屼竴鍧楁樉瀛?|
-| `get()` | 鍊熷嚭搴曞眰 device pointer | 渚?`cudaMemcpy` 鍜?kernel launch 浣跨敤 |
+这样可以把 `cudaMalloc/cudaFree` 绑定到对象生命周期中，避免资源泄漏。禁止拷贝是必要的，否则两个 `DeviceBuffer` 会持有同一块 device memory，析构时发生重复释放。
 
-> [!warning] `get()` 涓嶈浆绉绘墍鏈夋潈
-> `d_a.get()` 鍙槸鎶婂簳灞?device pointer 鍊熺粰 CUDA API 浣跨敤锛宍DeviceBuffer` 浠嶇劧鎷ユ湁杩欏潡鏄惧瓨銆備笉瑕佸 `get()` 杩斿洖鐨勬寚閽堟墜鍔ㄨ皟鐢?`cudaFree`锛屽惁鍒欐瀽鏋勬椂浼氬彂鐢熼噸澶嶉噴鏀俱€?
-鏋愭瀯鍑芥暟涓€氬父涓嶅簲璇ユ姏寮傚父銆備笂闈㈢殑绀轰緥鐩存帴璋冪敤 `cudaFree(ptr_)`锛屾槸鍥犱负鏋愭瀯闃舵涓昏鑱岃矗鏄敖鍔涢噴鏀捐祫婧愶紱濡傛灉鏋愭瀯鍑芥暟鍦ㄦ爤灞曞紑杩囩▼涓户缁姏寮傚父锛屽彲鑳藉鑷?`std::terminate`銆傛洿瀹屾暣鐨勫伐绋嬬増鏈彲浠ヨ褰曢噴鏀惧け璐ワ紝浣嗕笉瑕佷粠鏋愭瀯鍑芥暟鎶涘嚭寮傚父銆?
-杩欏眰灏佽鐨勭洰鐨勪笉鏄殣钘?CUDA锛岃€屾槸鎶?C 椋庢牸璧勬簮绠＄悊闄愬埗鍦ㄥ緢灏忕殑杈圭晫鍐咃紝璁╀笟鍔′唬鐮佷繚鎸?Modern C++ 椋庢牸锛?
+这几个成员函数分别对应不同的工程约束：
+
+| 代码 | 作用 | 为什么需要 |
+|---|---|---|
+| 构造函数中的 `cudaMalloc` | 申请 GPU 显存 | 创建对象时立即拥有资源 |
+| 析构函数中的 `cudaFree` | 释放 GPU 显存 | 离开作用域时自动清理 |
+| 删除拷贝构造 / 拷贝赋值 | 禁止复制所有权 | 防止两个对象释放同一块显存 |
+| `get()` | 借出底层 device pointer | 供 `cudaMemcpy` 和 kernel launch 使用 |
+
+> [!warning] `get()` 不转移所有权
+> `d_a.get()` 只是把底层 device pointer 借给 CUDA API 使用，`DeviceBuffer` 仍然拥有这块显存。不要对 `get()` 返回的指针手动调用 `cudaFree`，否则析构时会发生重复释放。
+
+析构函数中通常不应该抛异常。上面的示例直接调用 `cudaFree(ptr_)`，是因为析构阶段主要职责是尽力释放资源；如果析构函数在栈展开过程中继续抛异常，可能导致 `std::terminate`。更完整的工程版本可以记录释放失败，但不要从析构函数抛出异常。
+
+这层封装的目的不是隐藏 CUDA，而是把 C 风格资源管理限制在很小的边界内，让业务代码保持 Modern C++ 风格：
+
 ```cpp
 DeviceBuffer<float> d_a(a.size());
 DeviceBuffer<float> d_b(b.size());
@@ -403,59 +458,41 @@ check_cuda(cudaMemcpy(d_a.get(), a.data(), a.size() * sizeof(float), cudaMemcpyH
 vector_add_kernel<<<blocks, threads_per_block>>>(d_a.get(), d_b.get(), d_c.get(), n);
 ```
 
-杩欓噷鐨勬牳蹇冨叧绯诲彲浠ヨ鎴愶細
+这里的核心关系可以记成：
 
 ```text
-CUDA Runtime API 璐熻矗鐪熸鐢宠鍜岄噴鏀捐祫婧?DeviceBuffer 璐熻矗淇濊瘉鐢宠鍜岄噴鏀句竴瀹氭垚瀵瑰嚭鐜?涓氬姟浠ｇ爜鍙€氳繃瀵硅薄琛ㄨ揪鈥滄垜鎷ユ湁涓€鍧?GPU 鏄惧瓨鈥?```
-
-瀹屾暣鐨?`vector_add` host 灏佽鍙互鍐欐垚锛?
-```cpp
-std::vector<float> vector_add(const std::vector<float>& a, const std::vector<float>& b) {
-    if (a.size() != b.size()) {
-        throw std::invalid_argument("input sizes must match");
-    }
-
-    const auto n = static_cast<int>(a.size());
-    std::vector<float> c(a.size());
-
-    DeviceBuffer<float> d_a(a.size());
-    DeviceBuffer<float> d_b(b.size());
-    DeviceBuffer<float> d_c(c.size());
-
-    check_cuda(cudaMemcpy(d_a.get(), a.data(), a.size() * sizeof(float), cudaMemcpyHostToDevice));
-    check_cuda(cudaMemcpy(d_b.get(), b.data(), b.size() * sizeof(float), cudaMemcpyHostToDevice));
-
-    constexpr int threads_per_block = 256;
-    const int blocks = (n + threads_per_block - 1) / threads_per_block;
-    vector_add_kernel<<<blocks, threads_per_block>>>(d_a.get(), d_b.get(), d_c.get(), n);
-    check_cuda(cudaGetLastError());
-    check_cuda(cudaDeviceSynchronize());
-
-    check_cuda(cudaMemcpy(c.data(), d_c.get(), c.size() * sizeof(float), cudaMemcpyDeviceToHost));
-    return c;
-}
+CUDA Runtime API 负责真正申请和释放资源
+DeviceBuffer 负责保证申请和释放一定成对出现
+业务代码只通过对象表达“我拥有一块 GPU 显存”
 ```
 
-### 3.9 杩欎竴鑺傝璁颁綇鐨勬祦绋?
+### 3.9 这一节要记住的流程
+
 ```text
 std::vector a, b, c       // Host memory
 cudaMalloc d_a, d_b, d_c  // Device memory
-cudaMemcpy H2D            // 杈撳叆杩涘叆 GPU
-kernel<<<grid, block>>>   // GPU 骞惰璁＄畻
-cudaDeviceSynchronize     // Host 绛夊緟 Device 瀹屾垚
-cudaMemcpy D2H            // 缁撴灉鍥炲埌 CPU
-cudaFree                  // 閲婃斁 GPU 鏄惧瓨
+cudaMemcpy H2D            // 输入进入 GPU
+kernel<<<grid, block>>>   // GPU 并行计算
+cudaDeviceSynchronize     // Host 等待 Device 完成
+cudaMemcpy D2H            // 结果回到 CPU
+cudaFree                  // 释放 GPU 显存
 ```
 
-绗竴鍛ㄥ彧瑕佹妸杩欐潯閾捐矾璁叉竻妤氾紝骞惰兘鐢?`vector add` 璺戦€氾紝灏卞凡缁忓畬鎴?CUDA 鍏ラ棬鏈€鍏抽敭鐨勪竴姝ャ€?
+第一阶段只要把这条链路讲清楚，并能用 `vector add` 跑通，就已经完成 CUDA 入门最关键的一步。
+
 ---
 
-## 4. CUDA 绋嬪簭鐨勭紪璇戯細涓轰粈涔?`.cu` 涓嶇瓑浜庢櫘閫?`.cpp`
+## 4. CUDA 程序的编译：为什么 `.cu` 不等于普通 `.cpp`
 
-CUDA 婧愭枃浠堕€氬父浣跨敤 `.cu` 鍚庣紑銆傚畠閲岄潰鍙兘鍚屾椂鍖呭惈锛?
-- CPU 渚?host code銆?- GPU 渚?device code銆?- kernel launch 璇硶銆?
-鍥犳瀹冧笉鑳藉畬鍏ㄦ寜鏅€?C++ 鏂囦欢澶勭悊锛岄渶瑕?CUDA 缂栬瘧鍣ㄥ弬涓庛€傜紪璇戝拰閾炬帴鐨勫熀纭€鍙互鍥炵湅 [[1.1 绋嬪簭缂栬瘧涓庨摼鎺ュ師鐞哴]銆?
-### 4.1 CMake 涓惎鐢?CUDA
+CUDA 源文件通常使用 `.cu` 后缀。它里面可能同时包含：
+
+- CPU 侧 host code。
+- GPU 侧 device code。
+- kernel launch 语法。
+
+因此它不能完全按普通 C++ 文件处理，需要 CUDA 编译器参与。编译和链接的基础可以回看 [[1.1 程序编译与链接原理]]。
+
+### 4.1 CMake 中启用 CUDA
 
 ```cmake
 cmake_minimum_required(VERSION 3.24)
@@ -467,75 +504,110 @@ set(CMAKE_CUDA_STANDARD 17)
 add_executable(vector_add main.cu)
 ```
 
-**鍏抽敭鐐?*锛?
-- `LANGUAGES CXX CUDA` 琛ㄧず椤圭洰鍚屾椂浣跨敤 C++ 鍜?CUDA銆?- `main.cu` 浼氫氦缁?CUDA 缂栬瘧閾惧鐞嗐€?- 鏇村畬鏁寸殑椤圭洰妯℃澘鍙互鍙傝€?[[Week 1 - CUDA + Agent workflow]]锛孋Make 鍩虹鍙互鍥炵湅 [[14.3 CMake鍩虹]]銆?
+**关键点**：
+
+- `LANGUAGES CXX CUDA` 表示项目同时使用 C++ 和 CUDA。
+- `main.cu` 会交给 CUDA 编译链处理。
+- 更完整的项目模板可以参考 [[Week 1 - CUDA + Agent workflow]]，CMake 基础可以回看 [[14.3 CMake基础]]。
+
 ---
 
-## 5. CUDA 鐨勬€ц兘鐩磋
+## 5. CUDA 的性能直觉
 
-CUDA 鎬ц兘浼樺寲涓嶆槸鈥滅嚎绋嬭秺澶氳秺蹇€濄€傚叆闂ㄩ樁娈靛厛寤虹珛涓夋潯鐩磋銆?
-### 5.1 鏁版嵁鎼繍鍙兘姣旇绠楁洿璐?
-濡傛灉鍙仛涓€娆＄畝鍗曞姞娉曪細
+CUDA 性能优化不是“线程越多越快”。入门阶段先建立三条直觉。
+
+### 5.1 数据搬运可能比计算更贵
+
+如果只做一次简单加法：
 
 ```text
-浠?CPU 鎷峰埌 GPU 鈫?GPU 鍔犳硶 鈫?浠?GPU 鎷峰洖 CPU
+从 CPU 拷到 GPU → GPU 加法 → 从 GPU 拷回 CPU
 ```
 
-鐪熸鑰楁椂鍙兘涓昏鍦ㄦ暟鎹嫹璐濓紝鑰屼笉鏄姞娉曟湰韬€傚洜姝?CUDA 鏇撮€傚悎锛?
-- 鏁版嵁閲忓緢澶э紱
-- 鍚屼竴鎵规暟鎹細鍦?GPU 涓婅繛缁仛寰堝璁＄畻锛?- 璁＄畻瀵嗗害瓒冲楂橈紱
-- 鏈€缁堝彧闇€瑕佹妸灏戦噺缁撴灉鎷峰洖 CPU銆?
-### 5.2 GPU 鍠滄瑙勫垯璁块棶
+真正耗时可能主要在数据拷贝，而不是加法本身。因此 CUDA 更适合：
 
-GPU 绾跨▼閫氬父鎸夎繛缁紪鍙锋垚缁勬墽琛屻€傚鏋滅嚎绋?0 璁块棶 `a[0]`锛岀嚎绋?1 璁块棶 `a[1]`锛岀嚎绋?2 璁块棶 `a[2]`锛岃繖绉嶈闂洿瀹规槗鍚堝苟鎴愰珮鏁堝唴瀛樹簨鍔°€?
+- 数据量很大；
+- 同一批数据会在 GPU 上连续做很多计算；
+- 计算密度足够高；
+- 最终只需要把少量结果拷回 CPU。
+
+### 5.2 GPU 喜欢规则访问
+
+GPU 线程通常按连续编号成组执行。如果线程 0 访问 `a[0]`，线程 1 访问 `a[1]`，线程 2 访问 `a[2]`，这种访问更容易合并成高效内存事务。
+
 ```text
-濂斤細thread i 璁块棶 a[i]
-宸細thread i 闅忔満璁块棶 a[random[i]]
+好：thread i 访问 a[i]
+差：thread i 随机访问 a[random[i]]
 ```
 
-杩欏氨鏄悗缁瀛︿範鐨?**memory coalescing**銆?
-### 5.3 鎬ц兘缁撹蹇呴』闈?benchmark 鍜?profiler
+这就是后续要学习的 **memory coalescing**。
 
-CUDA 鎬ц兘缁撹涓嶈兘鍙潬鎰熻銆備竴涓?kernel 鈥滆兘璺戔€濅笉浠ｈ〃鈥滅畻寰楀鈥濓紝涓€娆¤繍琛屸€滅湅璧锋潵寰堝揩鈥濅篃涓嶄唬琛ㄦ€ц兘绋冲畾銆傚叆闂ㄩ樁娈佃嚦灏戣寤虹珛涓夊眰璇佹嵁锛?
+### 5.3 性能结论必须靠 benchmark 和 profiler
+
+CUDA 性能结论不能只靠感觉。一个 kernel “能跑”不代表“算得对”，一次运行“看起来很快”也不代表性能稳定。入门阶段至少要建立三层证据：
+
 ```text
-correctness test 鈫?璇佹槑缁撴灉姝ｇ‘
-CUDA event benchmark 鈫?璇佹槑杩愯鏃堕棿
-profiler 鈫?瑙ｉ噴涓轰粈涔堝揩鎴栨參
+correctness test → 证明结果正确
+CUDA event benchmark → 证明运行时间
+profiler → 解释为什么快或慢
 ```
 
-CUDA 鍏ラ棬闃舵鍙互鍏堢敤 CUDA event 娴?kernel 鏃堕棿锛?
+CUDA 入门阶段可以先用 CUDA event 测 kernel 时间：
+
 ```cpp
-// CUDA event 鏄褰曞湪 GPU stream 鏃堕棿绾夸笂鐨勪簨浠剁偣銆?// start 鍜?stop 鍒嗗埆琛ㄧず璁℃椂鍖洪棿鐨勮捣鐐瑰拰缁堢偣銆?cudaEvent_t start = nullptr;
+// CUDA event 是记录在 GPU stream 时间线上的事件点。
+// start 和 stop 分别表示计时区间的起点和终点。
+cudaEvent_t start = nullptr;
 cudaEvent_t stop = nullptr;
 
-// 鍒涘缓涓や釜 event 瀵硅薄銆傚伐绋嬩唬鐮佷腑搴旀鏌ヨ繑鍥炲€笺€?cudaEventCreate(&start);
+// 创建两个 event 对象。工程代码中应检查返回值。
+cudaEventCreate(&start);
 cudaEventCreate(&stop);
 
-// 鍦ㄥ綋鍓?GPU stream 涓褰?start銆?// 瀹冧笉鏄?CPU 褰撳墠鏃堕棿锛岃€屾槸 GPU 浠诲姟闃熷垪涓殑涓€涓椂闂存埑銆?cudaEventRecord(start);
+// 在当前 GPU stream 中记录 start。
+// 它不是 CPU 当前时间，而是 GPU 任务队列中的一个时间戳。
+cudaEventRecord(start);
 
-// 鍚姩瑕佹祴閲忕殑 kernel銆?// 杩欓噷娴嬪埌鐨勬槸 start 鍜?stop 涔嬮棿鐨?GPU kernel 鎵ц鏃堕棿銆?vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
+// 启动要测量的 kernel。
+// 这里测到的是 start 和 stop 之间的 GPU kernel 执行时间。
+vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
 
-// 鍦?kernel 涔嬪悗璁板綍 stop銆?// GPU stream 涓殑椤哄簭鍙互鐞嗚В涓猴細start event 鈫?kernel 鈫?stop event銆?cudaEventRecord(stop);
+// 在 kernel 之后记录 stop。
+// GPU stream 中的顺序可以理解为：start event → kernel → stop event。
+cudaEventRecord(stop);
 
-// CPU 绛夊緟 stop event 瀹屾垚銆?// 鍚﹀垯 GPU 鍙兘杩樻病鎵ц鍒?stop锛屽氨鍘昏鍙栬€楁椂銆?cudaEventSynchronize(stop);
+// CPU 等待 stop event 完成。
+// 否则 GPU 可能还没执行到 stop，就去读取耗时。
+cudaEventSynchronize(stop);
 
-// 璁＄畻 start 鍜?stop 涔嬮棿鐨勬椂闂村樊锛屽崟浣嶆槸姣銆?float elapsed_ms = 0.0f;
+// 计算 start 和 stop 之间的时间差，单位是毫秒。
+float elapsed_ms = 0.0f;
 cudaEventElapsedTime(&elapsed_ms, start, stop);
 
-// event 涔熸槸 CUDA 璧勬簮锛岀敤瀹屽悗搴旈攢姣併€?cudaEventDestroy(stop);
+// event 也是 CUDA 资源，用完后应销毁。
+cudaEventDestroy(stop);
 cudaEventDestroy(start);
 ```
 
-**鍏抽敭鐐?*锛?
-- CUDA event 璁板綍鐨勬槸 GPU stream 鏃堕棿绾夸笂鐨勬椂闂达紝涓嶆槸 CPU 澧欓挓鏃堕棿銆?- 涓婇潰杩欑鍐欐硶涓昏娴?**kernel-only time**锛屼笉鍖呭惈 `cudaMalloc`銆丠2D 鎷疯礉銆丏2H 鎷疯礉鍜?CPU 鏍￠獙銆?- 濡傛灉瑕佹祴瀹屾暣涓氬姟鑰楁椂锛屽簲鍗曠嫭鍋?**end-to-end benchmark**锛屾妸鏁版嵁鍑嗗銆佹嫹璐濄€乲ernel銆佹嫹鍥為兘绾冲叆锛屽苟鍦ㄧ粨鏋滀腑鏄庣‘鏍囨敞銆?- benchmark 瑕佸厛 warm-up锛屽啀 repeat 澶氭锛岄伩鍏嶇涓€娆?CUDA 鍒濆鍖栧拰鍗曟娉㈠姩璇鍒ゆ柇銆?- 鍙湅涓€娆¤繍琛屾椂闂存病鏈夋剰涔夛紝蹇呴』鍚屾椂妫€鏌?correctness銆傞敊璇?kernel 鍙兘闈炲父蹇紝浣嗙粨鏋滄病鏈変环鍊笺€?- 鍚庣画鎬ц兘鍒嗘瀽瑕佸涔?Nsight Compute / Nsight Systems銆?
-### 5.4 鏇村彲闈犵殑 benchmark 缁撴瀯
+**关键点**：
 
-鍙繍琛屼竴娆?kernel 寰楀埌鐨勬椂闂翠笉绋冲畾銆傛洿鎺ㄨ崘鐨勬渶灏忕粨鏋勬槸锛?
+- CUDA event 记录的是 GPU stream 时间线上的时间，不是 CPU 墙钟时间。
+- 上面这种写法主要测 **kernel-only time**，不包含 `cudaMalloc`、H2D 拷贝、D2H 拷贝和 CPU 校验。
+- 如果要测完整业务耗时，应单独做 **end-to-end benchmark**，把数据准备、拷贝、kernel、拷回都纳入，并在结果中明确标注。
+- benchmark 要先 warm-up，再 repeat 多次，避免第一次 CUDA 初始化和单次波动误导判断。
+- 只看一次运行时间没有意义，必须同时检查 correctness。错误 kernel 可能非常快，但结果没有价值。
+- 后续性能分析要学习 Nsight Compute / Nsight Systems。
+
+### 5.4 更可靠的 benchmark 结构
+
+只运行一次 kernel 得到的时间不稳定。更推荐的最小结构是：
+
 ```cpp
 constexpr int warmup = 5;
 constexpr int repeat = 100;
 
-// 棰勭儹锛氫笉璁″叆鏈€缁堢粨鏋滐紝鐢ㄤ簬閬垮紑棣栨鍚姩銆乧ache銆丟PU 棰戠巼绛夋尝鍔ㄣ€?for (int i = 0; i < warmup; ++i) {
+// 预热：不计入最终结果，用于避开首次启动、cache、GPU 频率等波动。
+for (int i = 0; i < warmup; ++i) {
     vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
 }
 cudaDeviceSynchronize();
@@ -561,65 +633,77 @@ cudaEventDestroy(stop);
 cudaEventDestroy(start);
 ```
 
-杩欎釜鐗堟湰寰楀埌鐨勬槸骞冲潎姣忔 kernel 鐨勮€楁椂锛?
+这个版本得到的是平均每次 kernel 的耗时：
+
 ```text
-avg_ms = repeat 娆?kernel 鎬昏€楁椂 / repeat
+avg_ms = repeat 次 kernel 总耗时 / repeat
 ```
 
-瀵逛簬 `vector add`锛岃繕鍙互璁＄畻鏈夋晥鍐呭瓨甯﹀锛?
+对于 `vector add`，还可以计算有效内存带宽：
+
 ```text
 bandwidth = 3 * n * sizeof(float) / avg_time
 ```
 
-杩欓噷鐨?`3` 鏉ヨ嚜涓€娆¤绠楅渶瑕佽鍙?`a`銆佽鍙?`b`銆佸啓鍏?`c`銆?
-### 5.5 benchmark 鍜?profiler 鐨勫尯鍒?
-| 宸ュ叿 | 鍥炵瓟鐨勯棶棰?| 绀轰緥 |
-|---|---|---|
-| correctness test | 缁撴灉瀵逛笉瀵?| `c[i] == a[i] + b[i]` |
-| CUDA event benchmark | 璺戝蹇?| kernel 骞冲潎鑰楁椂銆佹湁鏁堝甫瀹?|
-| Nsight Compute | 鍗曚釜 kernel 涓轰粈涔堝揩鎴栨參 | memory throughput銆乷ccupancy銆乻tall reason |
-| Nsight Systems | 鏁翠釜绋嬪簭鏃堕棿绾垮浣?| H2D銆乲ernel銆丏2H 鏄惁涓茶鎴栭噸鍙?|
+这里的 `3` 来自一次计算需要读取 `a`、读取 `b`、写入 `c`。
 
-瀵逛簬 `vector add`锛岀涓€浼樺厛鎸囨爣閫氬父鏄?**memory throughput**锛屽洜涓哄畠姣忎釜鍏冪礌鍙仛涓€娆″姞娉曪紝鍗磋璇讳袱涓暟缁勩€佸啓涓€涓暟缁勶紝閫氬父鏇存帴杩?memory-bound kernel銆?
-鍏ラ棬闃舵鍏堣浣忎竴鍙ヨ瘽锛?
+### 5.5 benchmark 和 profiler 的区别
+
+| 工具 | 回答的问题 | 示例 |
+|---|---|---|
+| correctness test | 结果对不对 | `c[i] == a[i] + b[i]` |
+| CUDA event benchmark | 跑多快 | kernel 平均耗时、有效带宽 |
+| Nsight Compute | 单个 kernel 为什么快或慢 | memory throughput、occupancy、stall reason |
+| Nsight Systems | 整个程序时间线如何 | H2D、kernel、D2H 是否串行或重叠 |
+
+对于 `vector add`，第一优先指标通常是 **memory throughput**，因为它每个元素只做一次加法，却要读两个数组、写一个数组，通常更接近 memory-bound kernel。
+
+入门阶段先记住一句话：
+
 ```text
-benchmark 鍛婅瘔浣犫€滃蹇€濓紝profiler 鍛婅瘔浣犫€滀负浠€涔堣繖涔堝揩鎴栨參鈥濄€?```
+benchmark 告诉你“多快”，profiler 告诉你“为什么这么快或慢”。
+```
 
 ---
 
-## 6. CUDA 瀛︿範璺嚎鍥?
+## 6. CUDA 学习路线图
+
 ```mermaid
 graph LR
-    A[闆跺熀纭€] --> B[CUDA 鎵ц妯″瀷]
-    B --> C[鍏稿瀷鏁版嵁娴乚
-    C --> D[閿欒妫€鏌ヤ笌 RAII]
+    A[零基础] --> B[CUDA 执行模型]
+    B --> C[典型数据流]
+    C --> D[错误检查与 RAII]
     D --> E[CUDA event benchmark]
     E --> F[shared memory]
     F --> G[memory coalescing]
     G --> H[occupancy / warp]
     H --> I[Nsight profiling]
-    I --> J[鐭╅樀涔樻硶 / LLM kernel]
+    I --> J[矩阵乘法 / LLM kernel]
 ```
 
-寤鸿涓嶈璺崇潃瀛︺€侰UDA 寰堝楂樼骇浼樺寲閮戒緷璧栨渶鍩虹鐨勭嚎绋嬬紪鍙枫€佸唴瀛樻嫹璐濆拰鍚屾姒傚康銆?
+建议不要跳着学。CUDA 很多高级优化都依赖最基础的线程编号、内存拷贝和同步概念。
+
 ---
 
-## 7. CUDA 涓庢櫘閫?C++ 鐨勫叧绯?
-| 瑙掑害 | 鏅€?C++ | CUDA C++ |
+## 7. CUDA 与普通 C++ 的关系
+
+| 角度 | 普通 C++ | CUDA C++ |
 |---|---|---|
-| 涓昏杩愯浣嶇疆 | CPU | CPU + GPU |
-| 婧愭枃浠?| `.cpp` | `.cu` |
-| 鍑芥暟璋冪敤 | 鏅€氬嚱鏁拌皟鐢?| kernel launch `<<<...>>>` |
-| 鍐呭瓨 | 杩涚▼铏氭嫙鍦板潃绌洪棿涓轰富 | host memory + device memory |
-| 骞惰鏂瑰紡 | thread / async / SIMD | grid / block / thread / warp |
-| 璋冭瘯閲嶇偣 | 閫昏緫銆佺敓鍛藉懆鏈熴€佸苟鍙?| 鍐呭瓨鎷疯礉銆佸悓姝ャ€佽秺鐣屻€佹€ц兘鎸囨爣 |
+| 主要运行位置 | CPU | CPU + GPU |
+| 源文件 | `.cpp` | `.cu` |
+| 函数调用 | 普通函数调用 | kernel launch `<<<...>>>` |
+| 内存 | 进程虚拟地址空间为主 | host memory + device memory |
+| 并行方式 | thread / async / SIMD | grid / block / thread / warp |
+| 调试重点 | 逻辑、生命周期、并发 | 内存拷贝、同步、越界、性能指标 |
 
-CUDA 骞朵笉鏄浛浠?C++锛岃€屾槸鍦?C++ 鏃佽竟澧炲姞 GPU 缂栫▼妯″瀷銆俬ost 渚т粛鐒跺簲璇ラ伒寰?Modern C++ 椋庢牸锛氳祫婧愮鐞嗙敤 RAII锛屽鍣ㄤ紭鍏堢敤 STL锛屾瀯寤烘祦绋嬩繚鎸佹竻鏅般€?
+CUDA 并不是替代 C++，而是在 C++ 旁边增加 GPU 编程模型。host 侧仍然应该遵循 Modern C++ 风格：资源管理用 RAII，容器优先用 STL，构建流程保持清晰。
+
 ---
 
-## 8. 甯歌閿欒
+## 8. 常见错误
 
-> [!warning] 閿欒 1锛氬繕璁拌竟鐣屽垽鏂?
+> [!warning] 错误 1：忘记边界判断
+
 ```cpp
 __global__ void bad_kernel(float* c, int n) {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -627,7 +711,8 @@ __global__ void bad_kernel(float* c, int n) {
 }
 ```
 
-濡傛灉鍚姩绾跨▼鏁板ぇ浜?`n`锛岃繖娈典唬鐮佷細瓒婄晫鍐欏叆銆?
+如果启动线程数大于 `n`，这段代码会越界写入。
+
 ```cpp
 __global__ void good_kernel(float* c, int n) {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -637,15 +722,16 @@ __global__ void good_kernel(float* c, int n) {
 }
 ```
 
-**涓轰粈涔堟纭?*锛氭渶鍚庝竴涓?block 寰€寰€涓嶆槸婊＄殑锛宍idx < n` 鍙互淇濇姢鏁扮粍杈圭晫銆?
-> [!warning] 閿欒 2锛氭病鏈夋鏌?kernel launch 閿欒
+**为什么正确**：最后一个 block 往往不是满的，`idx < n` 可以保护数组边界。
+
+> [!warning] 错误 2：没有检查 kernel launch 错误
 
 ```cpp
 vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
 cudaDeviceSynchronize();
 ```
 
-鏇村ソ鐨勫啓娉曟槸鍦?launch 鍚庢鏌ラ敊璇細
+更好的写法是在 launch 后检查错误：
 
 ```cpp
 vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
@@ -653,45 +739,59 @@ cudaGetLastError();
 cudaDeviceSynchronize();
 ```
 
-瀹為檯宸ョ▼涓笉瑕佷涪寮冭繑鍥炲€硷紝搴斿皝瑁呮垚 `check_cuda(cudaGetLastError())`銆?
-> [!warning] 閿欒 3锛氭妸 benchmark 褰撴垚 correctness test
+实际工程中不要丢弃返回值，应封装成 `check_cuda(cudaGetLastError())`。
 
-鎬ц兘娴嬭瘯蹇呴』淇濈暀姝ｇ‘鎬ф牎楠屻€傚惁鍒?kernel 鍐欓敊浜嗭紝鍙兘鍙嶈€屾洿蹇€?
+> [!warning] 错误 3：把 benchmark 当成 correctness test
+
+性能测试必须保留正确性校验。否则 kernel 写错了，可能反而更快。
+
 ---
 
-## 9. 瀛︿範妫€鏌ユ竻鍗?
-瀛﹀畬杩欑瘒鍚庯紝涓嶅彧鏄€滅湅杩囨蹇碘€濓紝鑰屾槸鑷冲皯搴旇鑳界敤鑷繁鐨勮瘽鍥炵瓟涓嬮潰杩欎簺闂銆?
-| 妫€鏌ラ棶棰?| 绠€鐭瓟妗?|
+## 9. 学习检查清单
+
+学完这篇后，不只是“看过概念”，而是至少应该能用自己的话回答下面这些问题。
+
+| 检查问题 | 简短答案 |
 |---|---|
-| CUDA 涓轰粈涔堥€傚悎澶ц妯″苟琛岃绠楋紵 | 鍥犱负瀹冮€傚悎鍚屼竴绉嶆搷浣滀綔鐢ㄥ湪澶ч噺鐙珛鎴栧急渚濊禆鐨勬暟鎹笂锛屼緥濡傚悜閲忓姞娉曘€佺煩闃典箻娉曘€佸浘鍍忓鐞嗗拰娣卞害瀛︿範绠楀瓙銆?|
-| host code 鍜?device code 鐨勫尯鍒槸浠€涔堬紵 | host code 鍦?CPU 涓婃墽琛岋紝璐熻矗鍑嗗鏁版嵁銆佺敵璇锋樉瀛樸€佹嫹璐濇暟鎹€佸惎鍔?kernel 鍜屽彇鍥炵粨鏋滐紱device code 鍦?GPU 涓婃墽琛岋紝璐熻矗鐪熸鐨勫ぇ瑙勬ā骞惰璁＄畻銆?|
-| `__global__` kernel 鏄粈涔堬紵 | 瀹冩槸鐢?CPU 渚у惎鍔ㄣ€佸湪 GPU 涓婃墽琛岀殑鍑芥暟銆傚嚱鏁板悕鍙互鏀瑰彉锛宍__global__` 琛ㄧず瀹冩槸 CUDA kernel銆?|
-| `<<<grid, block>>>` 琛ㄧず浠€涔堬紵 | 瀹冩槸 kernel launch 閰嶇疆锛屽憡璇?GPU 鍚姩澶氬皯涓?block锛屼互鍙婃瘡涓?block 鏈夊灏戜釜 thread銆?|
-| `blockIdx.x * blockDim.x + threadIdx.x` 涓轰粈涔堣兘绠楀嚭鍏ㄥ眬涓嬫爣锛?| `blockIdx.x * blockDim.x` 鍏堣烦杩囧墠闈㈡墍鏈?block 鐨勭嚎绋嬫暟閲忥紝鍐嶅姞涓婂綋鍓嶇嚎绋嬪湪 block 鍐呯殑缂栧彿 `threadIdx.x`锛屽緱鍒板綋鍓?thread 瀵瑰簲鐨勫叏灞€鍏冪礌涓嬫爣銆?|
-| `cudaMalloc`銆乣cudaMemcpy`銆乣cudaFree` 鍒嗗埆鍋氫粈涔堬紵 | `cudaMalloc` 鐢宠 GPU 鏄惧瓨锛沗cudaMemcpy` 鍦?CPU 鍐呭瓨鍜?GPU 鏄惧瓨涔嬮棿鎷疯礉鏁版嵁锛沗cudaFree` 閲婃斁 GPU 鏄惧瓨銆?|
-| 濡備綍璁叉竻 CUDA 鍏稿瀷鏁版嵁娴侊紵 | CPU 鍑嗗鏁版嵁 鈫?GPU 鐢宠鏄惧瓨 鈫?Host to Device 鎷疯礉杈撳叆 鈫?kernel 骞惰璁＄畻 鈫?Device to Host 鎷峰洖缁撴灉 鈫?CPU 鏍￠獙缁撴灉銆傚彲浠ュ帇缂╂垚锛氬垎閰?鈫?鎷疯礉 鈫?璁＄畻 鈫?鎷峰洖銆?|
-| 涓轰粈涔?kernel launch 鍚庨€氬父闇€瑕佸悓姝ユ垨閿欒妫€鏌ワ紵 | 鍥犱负 kernel launch 榛樿閫氬父鏄紓姝ョ殑锛孋PU 鍙戝嚭浠诲姟鍚庝笉涓€瀹氱瓑寰?GPU 鎵ц瀹屾垚锛沰ernel launch 閿欒鍜屾墽琛岄敊璇篃鍙兘寤惰繜鏆撮湶锛屾墍浠ラ渶瑕?`cudaGetLastError()` 鍜屽繀瑕佺殑鍚屾銆?|
-| 涓轰粈涔?benchmark 瑕?warm-up銆侀噸澶嶈繍琛屻€佷繚鐣欐纭€ф鏌ワ紵 | warm-up 閬垮厤绗竴娆?CUDA 鍒濆鍖栥€乧ache 鍜岄鐜囨尝鍔ㄥ共鎵帮紱repeat 闄嶄綆鍗曟娴嬮噺鍣０锛沜orrectness 闃叉閿欒 kernel 鍥犱负浠€涔堥兘娌″仛鎴栧皯鍋氫簡璁＄畻鑰屸€滅湅璧锋潵寰堝揩鈥濄€?|
+| CUDA 为什么适合大规模并行计算？ | 因为它适合同一种操作作用在大量独立或弱依赖的数据上，例如向量加法、矩阵乘法、图像处理和深度学习算子。 |
+| host code 和 device code 的区别是什么？ | host code 在 CPU 上执行，负责准备数据、申请显存、拷贝数据、启动 kernel 和取回结果；device code 在 GPU 上执行，负责真正的大规模并行计算。 |
+| `__global__` kernel 是什么？ | 它是由 CPU 侧启动、在 GPU 上执行的函数。函数名可以改变，`__global__` 表示它是 CUDA kernel。 |
+| `<<<grid, block>>>` 表示什么？ | 它是 kernel launch 配置，告诉 GPU 启动多少个 block，以及每个 block 有多少个 thread。 |
+| `blockIdx.x * blockDim.x + threadIdx.x` 为什么能算出全局下标？ | `blockIdx.x * blockDim.x` 先跳过前面所有 block 的线程数量，再加上当前线程在 block 内的编号 `threadIdx.x`，得到当前 thread 对应的全局元素下标。 |
+| `cudaMalloc`、`cudaMemcpy`、`cudaFree` 分别做什么？ | `cudaMalloc` 申请 GPU 显存；`cudaMemcpy` 在 CPU 内存和 GPU 显存之间拷贝数据；`cudaFree` 释放 GPU 显存。 |
+| 如何讲清 CUDA 典型数据流？ | CPU 准备数据 → GPU 申请显存 → Host to Device 拷贝输入 → kernel 并行计算 → Device to Host 拷回结果 → CPU 校验结果。可以压缩成：分配 → 拷贝 → 计算 → 拷回。 |
+| 为什么 kernel launch 后通常需要同步或错误检查？ | 因为 kernel launch 默认通常是异步的，CPU 发出任务后不一定等待 GPU 执行完成；kernel launch 错误和执行错误也可能延迟暴露，所以需要 `cudaGetLastError()` 和必要的同步。 |
+| 为什么 benchmark 要 warm-up、重复运行、保留正确性检查？ | warm-up 避免第一次 CUDA 初始化、cache 和频率波动干扰；repeat 降低单次测量噪声；correctness 防止错误 kernel 因为什么都没做或少做了计算而“看起来很快”。 |
 
-濡傛灉杩欎簺闂閮借兘绋冲畾鍥炵瓟锛屽氨璇存槑宸茬粡瀹屾垚 CUDA 鍏ラ棬鐨勭涓€灞傜洰鏍囷細鑳界悊瑙?CUDA 绋嬪簭濡備綍缁勭粐鏁版嵁銆佸惎鍔?kernel銆侀獙璇佺粨鏋滃拰鍒濇娴嬮噺鎬ц兘銆?
----
-
-## 10. 鍏抽敭瑕佺偣鎬荤粨
-
-1. CUDA 鐨勬牳蹇冩槸鎶婂ぇ閲忕嫭绔嬫垨寮变緷璧栫殑璁＄畻鎷嗙粰 GPU 绾跨▼骞惰鎵ц銆?2. CPU 璐熻矗璋冨害鍜屾暟鎹噯澶囷紝GPU 璐熻矗楂樺悶鍚愯绠椼€?3. `Grid 鈫?Block 鈫?Thread` 鏄悊瑙?CUDA kernel 鐨勭涓€寮犲湴鍥俱€?4. CPU 鍐呭瓨鍜?GPU 鏄惧瓨涓嶆槸涓€鍥炰簨锛屾暟鎹渶瑕佹樉寮忔嫹璐濄€?5. 鍏ラ棬椤圭洰浠?`vector add` 寮€濮嬫渶鍚堥€傦紝鍥犱负瀹冭鐩栦簡 CUDA 鐨勫畬鏁村熀鏈祦绋嬨€?6. 鎬ц兘缁撹蹇呴』閫氳繃 benchmark 鍜?profiler 楠岃瘉锛屼笉鑳藉嚟鎰熻鍒ゆ柇銆?
----
-
-## 鍏宠仈鐭ヨ瘑
-
-- [[CUDA 瀛︿範娓呭崟]] - CUDA 鍚庣画瀛︿範浠诲姟銆佸繀鍋?kernel 鍜屼笓棰樼储寮?- [[Week 1 - CUDA + Agent workflow]] - 绗竴鍛?CUDA 椤圭洰妯℃澘銆乿ector add 鍜?benchmark 闂幆
-- [[AI Agent Native AI Infra GPU Performance Engineer 鍩瑰吇鏂规]] - CUDA 鍦ㄦ暣浣撳煿鍏昏矾绾夸腑鐨勪綅缃?- [[14.3 CMake鍩虹]] - CUDA 椤圭洰鐨?CMake 鏋勫缓鍩虹
-- [[14.1 vector]] - host 渚ц緭鍏ヨ緭鍑哄鍣ㄥ熀纭€
-- [[鐙韩鏅鸿兘鎸囬拡]] - 鐞嗚В RAII 璧勬簮绠＄悊鎬濇兂
-- [[1.1 绋嬪簭缂栬瘧涓庨摼鎺ュ師鐞哴] - 鐞嗚В `.cu` 缂栬瘧鍜岄摼鎺ョ殑鍓嶇疆鐭ヨ瘑
+如果这些问题都能稳定回答，就说明已经完成 CUDA 入门的第一层目标：能理解 CUDA 程序如何组织数据、启动 kernel、验证结果和初步测量性能。
 
 ---
 
-## 鍙傝€?
+## 10. 关键要点总结
+
+1. CUDA 的核心是把大量独立或弱依赖的计算拆给 GPU 线程并行执行。
+2. CPU 负责调度和数据准备，GPU 负责高吞吐计算。
+3. `Grid → Block → Thread` 是理解 CUDA kernel 的第一张地图。
+4. CPU 内存和 GPU 显存不是一回事，数据需要显式拷贝。
+5. 入门项目从 `vector add` 开始最合适，因为它覆盖了 CUDA 的完整基本流程。
+6. 性能结论必须通过 benchmark 和 profiler 验证，不能凭感觉判断。
+
+---
+
+## 关联知识
+
+- [[CUDA 学习清单]] - CUDA 后续学习任务、必做 kernel 和专题索引
+- [[Week 1 - CUDA + Agent workflow]] - 第一周 CUDA 项目模板、vector add 和 benchmark 闭环
+- [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]] - CUDA 在整体培养路线中的位置
+- [[14.3 CMake基础]] - CUDA 项目的 CMake 构建基础
+- [[14.1 vector]] - host 侧输入输出容器基础
+- [[独享智能指针]] - 理解 RAII 资源管理思想
+- [[1.1 程序编译与链接原理]] - 理解 `.cu` 编译和链接的前置知识
+
+---
+
+## 参考
+
 - NVIDIA CUDA C++ Programming Guide
 - NVIDIA CUDA C++ Best Practices Guide
 - NVIDIA Nsight Compute Documentation
