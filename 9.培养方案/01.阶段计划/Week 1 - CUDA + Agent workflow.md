@@ -371,56 +371,43 @@ Agent workflow 的核心不是“让模型自由发挥”，而是建立一个�
 
 ---
 
-## 6. 推荐的一周工作流
+## 6. AI 提效后的 1-2 天工作流
 
-### Day 1：建立模板
+> [!important] 节奏调整
+> 如果已经借助 AI Agent 在 1 天内理解并完成 CUDA 入门理论、项目解析和 Week 1 Hello World 工程阅读，则 Week 1 不再需要按 7 天展开。新的目标是用 1-2 天完成闭环验收，然后尽快进入 [[Week 2 - Reduction + Profiling]]。
 
-- 创建 `cuda-week1/` 项目结构。
-- 配好 CMake 或 Makefile。
-- 写入最小 `CLAUDE.md`，记录构建、测试、benchmark 命令。
+### Day 1：快速打通 CUDA Hello World 闭环
 
-**验收标准**：空项目可以完成 configure/build，Agent 能根据 `CLAUDE.md` 说出验证命令。
+- 阅读 [[CUDA 零基础系统入门]]，确认能解释 host/device、grid/block/thread、kernel launch、显存拷贝和同步。
+- 阅读 [[CUDA Week 1 Hello World 项目解析]]，按项目结构理解 `include/`、`src/`、`tests/`、`benchmarks/` 的职责。
+- 在本机或 Linux + GTX 1660S 上构建 `week01` 项目。
+- 跑通 `test_vector_add`，确认小规模、非 block 对齐长度和大规模输入都正确。
+- 跑通 `bench_vector_add`，记录 `N`、`Kernel(ms)`、`Bandwidth(GB/s)`、`Check`。
 
-### Day 2：完成 vector add
+**验收标准**：能用自己的话讲清楚 `vector add` 从 host vector 到 device memory、kernel 执行、D2H 拷回、correctness test 和 CUDA event benchmark 的完整流程。
 
-- 写 `vector_add_kernel`。
-- 写 host 侧 `vector_add` 封装。
-- 用小数组测试正确性。
+### Day 2：补齐工程边界与复盘
 
-**验收标准**：输入 `[1, 2, 3] + [4, 5, 6]` 得到 `[5, 7, 9]`。
+- 检查 `CLAUDE.md` 是否写清构建、测试、benchmark 命令。
+- 记录 GPU 型号、CUDA 版本、Driver、CMake、编译命令和 benchmark 结果。
+- 让 Agent review 一次项目结构，但性能结论和 correctness 判断必须人工确认。
+- 把遇到的报错、benchmark 波动和解决过程整理成简短记录。
+- 如果 Day 1 已全部完成，Day 2 可以直接开始 Week 2 的 reduction 预习。
 
-### Day 3：补齐错误检查与 RAII
+**验收标准**：下一个 kernel 不需要重新搭项目框架；只需要复用 `cuda_check.cuh`、`DeviceBuffer`、test/benchmark 结构继续开发。
 
-- 加 `check_cuda`。
-- 用 `DeviceBuffer` 管理 device memory。
-- 检查 size mismatch、kernel launch error、同步错误。
+### 加速后的退出条件
 
-**验收标准**：错误能被明确暴露，而不是静默失败。
+满足以下条件即可结束 Week 1，不必为了“学满一周”而停留：
 
-### Day 4：建立 benchmark
-
-- 加 warm-up。
-- 使用 CUDA event 计时。
-- 输出平均耗时和有效带宽。
-
-**验收标准**：benchmark 每次输出包含 `N`、`Kernel(ms)`、`Bandwidth(GB/s)`、`Check`。
-
-### Day 5：让 Agent 参与一次小迭代
-
-- 让 Agent 先读 `CLAUDE.md` 和代码。
-- 要求 Agent 提出修改计划。
-- 只允许它做局部、可逆修改。
-- 修改后运行测试和 benchmark。
-
-**验收标准**：每个改动都能从 diff 中解释清楚，并且通过测试。
-
-### Day 6-7：复盘与固化
-
-- 记录遇到的 CUDA 报错。
-- 补充 `CLAUDE.md` 中缺失的构建/测试说明。
-- 把 benchmark 结果保存成表格，作为后续优化基线。
-
-**验收标准**：下周继续做优化时，不需要重新猜测项目如何构建、如何验证、哪些操作有风险。
+- [ ] 能构建 CUDA 项目。
+- [ ] 能解释并实现 `vector_add_kernel`。
+- [ ] 能解释 `blocks = (n + threads_per_block - 1) / threads_per_block` 和 `idx < n`。
+- [ ] 能用 RAII 管理 device memory。
+- [ ] correctness test 覆盖小规模、非 block 对齐长度和大规模输入。
+- [ ] benchmark 使用 warm-up、repeat、CUDA event 和正确性检查。
+- [ ] benchmark 结果记录了 GPU / CUDA / Driver / 编译参数。
+- [ ] Agent 权限边界清楚：Agent 可生成脚手架和测试，但不能替代人工判断 kernel correctness 和性能结论。
 
 ---
 
@@ -461,7 +448,7 @@ Agent workflow 的核心不是“让模型自由发挥”，而是建立一个�
 
 ---
 
-## 8. 本周交付物
+## 8. 本阶段交付物
 
 | 交付物 | 内容 | 验收方式 |
 |---|---|---|
@@ -475,7 +462,7 @@ Agent workflow 的核心不是“让模型自由发挥”，而是建立一个�
 
 ## 关键要点总结
 
-1. CUDA 第一周不要追求复杂优化，先建立“能构建、能验证、能测量”的闭环。
+1. CUDA 第一阶段不要追求复杂优化，先建立“能构建、能验证、能测量”的闭环。AI 提效后，这个阶段可以压缩到 1-2 天完成。
 2. `vector add` 的价值在于覆盖 CUDA 执行模型：host/device、grid/block、kernel launch、同步和拷贝。
 3. benchmark 必须同时包含 warm-up、重复运行、GPU 侧计时和正确性检查。
 4. `CLAUDE.md` 是 Agent workflow 的项目约束层，应该写具体命令和明确边界。

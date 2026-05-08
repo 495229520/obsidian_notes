@@ -350,20 +350,31 @@ y = my_ops.rmsnorm(x, weight, eps)
 - prefill 和 decode 的瓶颈有什么不同？
 - 成本怎么算？
 
-### 阶段一 8 周冲刺计划
+### 阶段一 AI 提效冲刺计划
 
 CUDA 细化任务、必做 kernel 和专题补课清单见 [[CUDA 学习清单]]。
 
-| 周次     | 主题                            | 产出                                                                           |
+> [!important] 节奏调整
+> 原计划按 8 周推进，但如果使用 AI Agent 高强度辅助阅读、代码解释、项目拆解和 benchmark 框架生成，Week 1 的 CUDA Hello World 闭环可以压缩到 1-2 天完成。节省出来的时间不用于跳过验证，而是更早进入 reduction、profiling 和更复杂 kernel。
+
+| 阶段 | 主题 | 产出 |
 | ------ | ----------------------------- | ---------------------------------------------------------------------------- |
-| Week 1 | CUDA + Agent workflow         | CUDA 项目模板、vector add、benchmark 框架、`CLAUDE.md`、Agent 权限边界                     |
-| Week 2 | Reduction + Profiling         | reduce sum、warp / block reduction、CUDA event、第一次 Nsight Compute              |
+| Day 1-2 | CUDA + Agent workflow | CUDA 项目模板、vector add、correctness test、benchmark 框架、`CLAUDE.md`、Agent 权限边界 |
+| Week 1 剩余时间 | Reduction 预热 + Profiling 准备 | naive reduce、CPU reference、benchmark matrix、Nsight Compute 环境检查 |
+| Week 2 | Reduction + Profiling | reduce sum、warp / block reduction、CUDA event、第一次 Nsight Compute |
 | Week 3 | Transpose + Memory Coalescing | naive transpose、shared memory transpose、bank conflict padding、`profiling.md` |
-| Week 4 | MatMul v0                     | naive matmul、tiled matmul、cuBLAS 对比、差距解释                                     |
-| Week 5 | Triton                        | Triton fused softmax、Triton matmul、Triton RMSNorm 初版                         |
-| Week 6 | PyTorch Extension             | CUDA RMSNorm、PyTorch extension、correctness test、FP32 / FP16 对比               |
-| Week 7 | LLM Cost Lab                  | vLLM 小模型、TTFT / TPOT / TPS、cost / 1M tokens                                  |
-| Week 8 | 投递包装                          | README、benchmark 表、10 个面试 Q&A、简历、开始投递                                        |
+| Week 4 | MatMul v0 | naive matmul、tiled matmul、cuBLAS 对比、差距解释 |
+| Week 5 | Triton | Triton fused softmax、Triton matmul、Triton RMSNorm 初版 |
+| Week 6 | PyTorch Extension | CUDA RMSNorm、PyTorch extension、correctness test、FP32 / FP16 对比 |
+| Week 7 | LLM Cost Lab | vLLM 小模型、TTFT / TPOT / TPS、cost / 1M tokens |
+| Week 8 | 投递包装 | README、benchmark 表、10 个面试 Q&A、简历、开始投递 |
+
+加速原则：
+
+- AI 可以压缩阅读、脚手架、代码解释和测试框架时间。
+- correctness test、benchmark 记录、profiling 结论不能压缩掉。
+- 学完一个阶段后必须留下可运行代码、结果表和自己的解释。
+- 如果一天完成原 Week 1，应立即进入 Week 2 的 reduction，而不是继续重复看基础概念。
 
 ### 阶段一验收标准
 
@@ -801,7 +812,7 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 
 ## 每周执行模板
 
-适用于每天 2 到 4 小时。
+适用于常规节奏下每天 2 到 4 小时。如果 AI Agent 已经帮助你在 1-2 天内完成某个阶段的阅读、代码理解和脚手架搭建，可以直接把剩余时间投入下一阶段，但必须保留 correctness、benchmark、profiling 和复盘产出。
 
 ### 周一：理论 + Agent 任务拆解
 
