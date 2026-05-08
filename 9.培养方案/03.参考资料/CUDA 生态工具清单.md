@@ -6,6 +6,7 @@ tags:
   - CUDA
   - GPU
   - 生态
+  - infra
 aliases:
   - CUDA Ecosystem
   - CUDA 工具链

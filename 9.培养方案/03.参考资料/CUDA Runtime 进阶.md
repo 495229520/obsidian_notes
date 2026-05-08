@@ -6,6 +6,7 @@ tags:
   - CUDA
   - GPU
   - Runtime
+  - infra
 aliases:
   - CUDA Runtime API
   - CUDA 并发与同步

@@ -8,6 +8,7 @@ tags:
   - Triton
   - LLM推理
   - Agent工程流
+  - infra
 status: active
 ---
 
@@ -69,6 +70,19 @@ AI Agent-native 的 AI Infra / GPU Performance Engineer
 > [!important] 核心人设
 > 我会用 AI Agent 快速搭工程、生成测试和 benchmark，但 kernel 核心逻辑、correctness、profiling 结论、性能报告和最终上线判断都由我人工验证。
 
+## 为什么补 compiler-aware 视角
+
+这条路线仍然是 **LLM Inference Performance / GPU Infra**，不是转成纯编译器工程师路线。补 compiler-aware 视角，是为了能把高层算子、kernel 实现、profiling 结论、serving 指标和 lowering / codegen correctness 串起来。
+
+不赌 2028 一定是推理爆发年，但按“推理工程链路继续变深、推理成本优化持续重要”来准备；即使赛道节奏变化，kernel + profiling + serving benchmark + compiler-aware 的能力组合仍然可迁移。
+
+AI 可以生成工程代码和初版 kernel，但不能替代以下判断：
+
+- benchmark 是否公平、可信、可复现；
+- 性能瓶颈是否被硬件指标支持；
+- lowering / codegen 生成的代码是否经过 reference、shape、dtype 和边界条件验证；
+- 优化是否真的改善 TTFT / TPOT / TPS / cost，而不是只改善单个 toy benchmark。
+
 ## 能力主线
 
 | 主线 | 要练什么 | 最终简历表达 |
@@ -77,6 +91,7 @@ AI Agent-native 的 AI Infra / GPU Performance Engineer
 | Kernel 能力 | CUDA、Triton、RMSNorm、Softmax、MatMul、RoPE、Attention | 能写并优化 LLM 常见算子 |
 | GPU 性能分析 | Nsight Compute、Nsight Systems、CUDA event、roofline、memory-bound / compute-bound | 能解释 kernel 为什么慢、怎么优化 |
 | 推理成本优化 | vLLM、SGLang、FlashInfer、TensorRT-LLM、KV cache、batching、quantization | 能用 TTFT / TPOT / TPS / cost per 1M tokens 评估系统 |
+| 编译器 / Lowering 认知 | Triton lowering、MLIR basics、IR / pass / backend lowering、codegen correctness、operator fusion | 能解释高层算子如何走到 kernel / codegen，并知道 generated code 的 correctness 与性能风险 |
 
 最低可验证能力：
 
@@ -86,11 +101,12 @@ AI Agent-native 的 AI Infra / GPU Performance Engineer
 - 能用 CUDA event benchmark。
 - 能读 Nsight Compute 的关键指标。
 - 能解释 TTFT / TPOT / TPS / RPS / GPU utilization / cost per 1M tokens。
+- 能画出 Triton kernel 到 IR / lowering / PTX 的粗链路，并说明哪些环节会影响 correctness 与性能。
 - 能让 Agent 生成脚手架、测试、benchmark，但不让 Agent 决定性能结论。
 
 ## 路线总图
 
-![AI Agent Native 路线总图|1062](../../图片/SVG/ai-agent-native-roadmap.svg)
+![AI Agent Native 路线总图|935](../../图片/SVG/ai-agent-native-roadmap.svg)
 
 *图示说明：按“当前起点 → 三个阶段 → 最终目标”重绘，减少原 Mermaid 的交叉感。*
 
@@ -408,6 +424,14 @@ LLM kernel 深入：
 - speculative decoding
 - quantization
 
+Compiler-aware kernel 路线：
+
+- Triton lowering / MLIR basics：理解 Triton kernel 不是黑盒，知道 IR、dialect、pass、lowering 的基本概念。
+- TVM 或 IREE 二选一入门：建立 compiler stack 地图感，不把它们同时作为深入主线。
+- codegen correctness：generated code 需要 reference test、shape / dtype 覆盖和边界条件验证。
+- operator fusion 直觉：fusion 可能减少访存和 launch overhead，也可能带来 register pressure、occupancy、correctness 风险。
+- 目标边界：看懂链路、能解释取舍，不从零实现完整编译器 backend。
+
 AI Agent 进阶：
 
 | Agent | 负责内容 | 人工检查点 |
@@ -455,6 +479,7 @@ Agent 不可以改 benchmark 数据。
 - cuBLAS 是 baseline，不把打不过 cuBLAS 解释成失败。
 - README 解释每个版本快慢原因。
 - Nsight 分析至少包含 memory throughput、occupancy、stall 原因之一。
+- 输出一篇 CUDA / Triton / CUTLASS / cuBLAS GEMM comparison report，统一 GPU、shape、dtype、warmup、测量方法，比较性能、可维护性、调优空间、correctness 风险和开发成本。
 
 面试问题：
 
@@ -490,6 +515,7 @@ Agent 不可以改 benchmark 数据。
 - 至少 3 个算子有 CUDA 和 Triton 两个版本。
 - 每个算子都要判断 memory-bound / compute-bound。
 - 至少写一篇“哪些算子适合 fusion”的总结。
+- 可选：实现一个 toy fusion demo，例如 bias + GELU、residual + RMSNorm 或 dequant + matmul 的简化版本，并给出 fusion 前后的 correctness 与 benchmark 对比。
 
 ### 必做项目 6：llm-serving-cost-benchmark
 
@@ -544,6 +570,9 @@ Agent 不可以改 benchmark 数据。
 - 能用 Nsight Compute 分析瓶颈。
 - 能搭 vLLM / SGLang benchmark。
 - 能解释 TTFT / TPOT / TPS / cost。
+- 能画出 Triton / MLIR / backend lowering 的粗链路。
+- 能说明 CUDA / Triton / CUTLASS / cuBLAS 在 GEMM 上各自适合什么场景。
+- 至少产出 1 篇 GEMM comparison report，而不是只跑 benchmark 数字。
 - 能用 AI Agent 快速生成工程代码。
 - 能人工 review Agent 生成的性能代码。
 - 有 1 到 2 个开源 issue / PR 记录。
@@ -567,6 +596,29 @@ Agent 不可以改 benchmark 数据。
 - CUTLASS GEMM
 - Nsight Systems timeline
 - multi-agent engineering workflow
+
+### 可选高级项目：toy lowering / fusion demo
+
+这个项目是 compiler-aware 加分项，不是阶段三必做主线。fusion pass 和 toy kernel codegen 二选一即可，目标是证明你理解“算子表示 → lowering / codegen → generated kernel → correctness / benchmark”的链路。
+
+可选方向一：toy fusion demo。
+
+- 选择一个小型融合模式，例如 bias + GELU、residual + RMSNorm 或 dequant + matmul toy version。
+- 写出 fusion 前后的 PyTorch / NumPy reference。
+- 对比 fusion 前后的 correctness、launch overhead、memory traffic 和简单 benchmark。
+
+可选方向二：toy kernel codegen。
+
+- 设计一个极简 AST / IR，只表达 elementwise 或 row-wise reduction。
+- 将它 lowering 到 Triton / CUDA kernel skeleton。
+- 用 reference test 验证 generated code 的 correctness。
+- 用少量 shape benchmark 说明 codegen 结果的性能边界。
+
+面试表达不要说“做了完整编译器”，而是强调：
+
+```text
+我通过一个小型 lowering / fusion demo，理解了高层算子表示、kernel 生成、correctness 验证和 benchmark 之间的关系。
+```
 
 ### 秋招项目 7：llm-kernel-benchmark-suite
 
@@ -651,6 +703,7 @@ Agent 不可以改 benchmark 数据。
 - 1 个 merged PR。
 - 3 个高质量 issue reproduction。
 - 2 篇 benchmark report。
+- 1 个 compiler-aware 小作品或高质量报告，能讲清输入表示、lowering / codegen、生成结果、correctness 验证方式和性能验证方式。
 - 1 个被项目 maintainer 回复认可的性能分析。
 
 优先级：

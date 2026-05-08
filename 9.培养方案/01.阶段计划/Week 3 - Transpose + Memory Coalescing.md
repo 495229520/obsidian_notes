@@ -7,6 +7,7 @@ tags:
   - GPU
   - MemoryCoalescing
   - Transpose
+  - infra
 aliases:
   - CUDA Week 3
   - CUDA Transpose

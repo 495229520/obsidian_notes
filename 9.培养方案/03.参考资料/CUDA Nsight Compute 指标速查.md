@@ -7,6 +7,7 @@ tags:
   - GPU
   - Profiling
   - Nsight
+  - infra
 aliases:
   - Nsight Compute 指标
   - CUDA Profiling 指标

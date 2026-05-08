@@ -7,6 +7,7 @@ tags:
   - GPU
   - MatMul
   - GEMM
+  - infra
 aliases:
   - CUDA Week 4
   - MatMul Lab v0

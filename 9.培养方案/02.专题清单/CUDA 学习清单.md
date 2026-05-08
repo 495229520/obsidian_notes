@@ -6,6 +6,7 @@ tags:
   - CUDA
   - GPU
   - 学习清单
+  - infra
 aliases:
   - CUDA checklist
   - CUDA 路线清单

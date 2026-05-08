@@ -7,6 +7,7 @@ tags:
   - GPU
   - Reduction
   - Profiling
+  - infra
 aliases:
   - CUDA Week 2
   - Reduction Profiling

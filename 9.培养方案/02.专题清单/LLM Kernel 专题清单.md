@@ -7,6 +7,7 @@ tags:
   - GPU
   - LLM
   - Kernel
+  - infra
 aliases:
   - LLM CUDA Kernel
   - LLM 算子清单

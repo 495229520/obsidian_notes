@@ -3,6 +3,7 @@ tags:
   - 培养方案
   - CUDA
   - Agent
+  - infra
 ---
 
 # Week 1 - CUDA + Agent workflow
