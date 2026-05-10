@@ -15,7 +15,7 @@ status: active
 
 # CUDA 学习清单
 
-> 这份清单承接 [[CUDA 零基础系统入门]]、[[Week 1 - CUDA + Agent workflow]] 和 [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]]。目标不是继续堆 CUDA 语法，而是把学习推进到 **性能模型 + 典型算子 + profiling 证据链**。
+> 这份清单承接 [[3.1 CUDA 零基础系统入门|CUDA 零基础系统入门]]、[[Week 1 - CUDA + Agent workflow]] 和 [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]]。目标不是继续堆 CUDA 语法，而是把学习推进到 **性能模型 + 典型算子 + profiling 证据链**。
 
 ---
 
@@ -23,7 +23,7 @@ status: active
 
 已有内容：
 
-- [[CUDA 零基础系统入门]]：执行模型、内存模型、`vector add`、CMake、基础 benchmark。
+- [[3.1 CUDA 零基础系统入门|CUDA 零基础系统入门]]：执行模型、内存模型、`vector add`、CMake、基础 benchmark。
 - [[Week 1 - CUDA + Agent workflow]]：CUDA 项目模板、测试、benchmark、Agent 权限边界。
 - [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]]：阶段路线、作品集项目、投递目标。
 
@@ -32,9 +32,9 @@ status: active
 - Week 2：[[Week 2 - Reduction + Profiling]]
 - Week 3：[[Week 3 - Transpose + Memory Coalescing]]
 - Week 4：[[Week 4 - MatMul v0]]
-- profiling：[[CUDA Nsight Compute 指标速查]]
-- runtime：[[CUDA Runtime 进阶]]
-- ecosystem：[[CUDA 生态工具清单]]
+- profiling：[[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
+- runtime：[[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]]
+- ecosystem：[[3.6 CUDA 生态工具清单|CUDA 生态工具清单]]
 - LLM kernels：[[LLM Kernel 专题清单]]
 
 ---
@@ -143,7 +143,7 @@ status: active
 - [ ] error handling 统一封装。
 - [ ] device query，读取 SM 数、shared memory、warp size、compute capability。
 
-专题笔记：[[CUDA Runtime 进阶]]
+专题笔记：[[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]]
 
 ---
 
@@ -247,7 +247,7 @@ status: active
 - [ ] roofline 分析。
 - [ ] 每次优化必须有 profiler 证据。
 
-专题笔记：[[CUDA Nsight Compute 指标速查]]
+专题笔记：[[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
 
 ---
 
@@ -265,7 +265,7 @@ status: active
 - [ ] FlashAttention / PagedAttention 思想。
 - [ ] TensorRT-LLM 可选，不作为早期主线。
 
-专题笔记：[[CUDA 生态工具清单]]
+专题笔记：[[3.6 CUDA 生态工具清单|CUDA 生态工具清单]]
 
 ---
 

@@ -1,4 +1,4 @@
----
+﻿---
 title: Week 2 - Reduction + Profiling
 date: 2026-05-06
 tags:
@@ -194,6 +194,6 @@ Next optimization:
 ## 关联知识
 
 - [[CUDA 学习清单]]
-- [[CUDA Nsight Compute 指标速查]]
-- [[CUDA Runtime 进阶]]
+- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
+- [[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]]
 - [[Week 3 - Transpose + Memory Coalescing]]

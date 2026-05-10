@@ -1,4 +1,4 @@
----
+﻿---
 title: Week 4 - MatMul v0
 date: 2026-05-06
 tags:
@@ -209,5 +209,5 @@ TFLOPS = FLOPs / time_seconds / 1e12
 
 - [[CUDA 学习清单]]
 - [[Week 3 - Transpose + Memory Coalescing]]
-- [[CUDA Nsight Compute 指标速查]]
-- [[CUDA 生态工具清单]]
+- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
+- [[3.6 CUDA 生态工具清单|CUDA 生态工具清单]]

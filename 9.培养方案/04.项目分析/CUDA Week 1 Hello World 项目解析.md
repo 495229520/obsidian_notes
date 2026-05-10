@@ -1,4 +1,4 @@
----
+﻿---
 title: CUDA Week 1 Hello World 项目解析
 date: 2026-05-08
 tags:
@@ -490,7 +490,7 @@ std::vector<float> vector_add(const std::vector<float>& a, const std::vector<flo
 → 返回 host 输出
 ```
 
-这正是 [[CUDA 零基础系统入门]] 中“分配 → 拷贝 → 计算 → 拷回”的工程实现。
+这正是 [[3.1 CUDA 零基础系统入门|CUDA 零基础系统入门]] 中“分配 → 拷贝 → 计算 → 拷回”的工程实现。
 
 ---
 
@@ -765,10 +765,10 @@ Week 1 跑通后，进入 [[Week 2 - Reduction + Profiling]]。
 ## 关联知识
 
 - [[Week 1 - CUDA + Agent workflow]] - 这个项目对应的 Week 1 阶段计划
-- [[CUDA 零基础系统入门]] - CUDA 执行模型、典型数据流和 benchmark 入门
+- [[3.1 CUDA 零基础系统入门|CUDA 零基础系统入门]] - CUDA 执行模型、典型数据流和 benchmark 入门
 - [[CUDA 学习清单]] - 后续 CUDA kernel 与 profiling 学习路线
-- [[CUDA Runtime 进阶]] - event、stream、pinned memory 和 Runtime API
-- [[CUDA Nsight Compute 指标速查]] - 后续解释 kernel 性能瓶颈
+- [[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]] - event、stream、pinned memory 和 Runtime API
+- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]] - 后续解释 kernel 性能瓶颈
 - [[独享智能指针]] - 理解 `DeviceBuffer<T>` 的 RAII 与独占所有权
 - [[14.3 CMake基础]] - 理解 CUDA 项目的 CMake 构建
 

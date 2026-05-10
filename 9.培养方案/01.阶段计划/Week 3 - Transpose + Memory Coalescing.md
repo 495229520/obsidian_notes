@@ -1,4 +1,4 @@
----
+﻿---
 title: Week 3 - Transpose + Memory Coalescing
 date: 2026-05-06
 tags:
@@ -196,5 +196,5 @@ Conclusion:
 
 - [[CUDA 学习清单]]
 - [[Week 2 - Reduction + Profiling]]
-- [[CUDA Nsight Compute 指标速查]]
+- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
 - [[Week 4 - MatMul v0]]

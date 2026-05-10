@@ -1,4 +1,4 @@
----
+﻿---
 title: LLM Kernel 专题清单
 date: 2026-05-06
 tags:
@@ -27,7 +27,7 @@ status: active
 - [[Week 2 - Reduction + Profiling]]
 - [[Week 3 - Transpose + Memory Coalescing]]
 - [[Week 4 - MatMul v0]]
-- [[CUDA Nsight Compute 指标速查]]
+- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
 
 最低能力：
 
@@ -206,5 +206,5 @@ fp16_value = int8_value * scale
 ## 关联知识
 
 - [[CUDA 学习清单]]
-- [[CUDA 生态工具清单]]
-- [[CUDA Nsight Compute 指标速查]]
+- [[3.6 CUDA 生态工具清单|CUDA 生态工具清单]]
+- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
