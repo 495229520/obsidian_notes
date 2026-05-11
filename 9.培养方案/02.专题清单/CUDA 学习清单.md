@@ -15,7 +15,7 @@ status: active
 
 # CUDA 学习清单
 
-> 这份清单承接 [[3.1 CUDA 零基础系统入门|CUDA 零基础系统入门]]、[[Week 1 - CUDA + Agent workflow]] 和 [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]]。目标不是继续堆 CUDA 语法，而是把学习推进到 **性能模型 + 典型算子 + profiling 证据链**。
+> 这份清单承接 [[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]]、[[Week 1 - CUDA + Agent workflow]] 和 [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]]。目标不是继续堆 CUDA 语法，而是把学习推进到 **性能模型 + 典型算子 + profiling 证据链**。
 
 ---
 
@@ -23,7 +23,7 @@ status: active
 
 已有内容：
 
-- [[3.1 CUDA 零基础系统入门|CUDA 零基础系统入门]]：执行模型、内存模型、`vector add`、CMake、基础 benchmark。
+- [[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]]：执行模型、内存模型、`vector add`、CMake、基础 benchmark。
 - [[Week 1 - CUDA + Agent workflow]]：CUDA 项目模板、测试、benchmark、Agent 权限边界。
 - [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]]：阶段路线、作品集项目、投递目标。
 

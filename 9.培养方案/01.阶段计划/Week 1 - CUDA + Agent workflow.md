@@ -378,7 +378,7 @@ Agent workflow 的核心不是“让模型自由发挥”，而是建立一个�
 
 ### Day 1：快速打通 CUDA Hello World 闭环
 
-- 阅读 [[3.1 CUDA 零基础系统入门|CUDA 零基础系统入门]]，确认能解释 host/device、grid/block/thread、kernel launch、显存拷贝和同步。
+- 阅读[[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]]]，确认能解释 host/device、grid/block/thread、kernel launch、显存拷贝和同步。
 - 阅读 [[CUDA Week 1 Hello World 项目解析]]，按项目结构理解 `include/`、`src/`、`tests/`、`benchmarks/` 的职责。
 - 在本机或 Linux + GTX 1660S 上构建 `week01` 项目。
 - 跑通 `test_vector_add`，确认小规模、非 block 对齐长度和大规模输入都正确。
