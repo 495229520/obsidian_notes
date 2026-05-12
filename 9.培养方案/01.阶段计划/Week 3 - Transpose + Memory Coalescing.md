@@ -196,5 +196,6 @@ Conclusion:
 
 - [[CUDA 学习清单]]
 - [[Week 2 - Reduction + Profiling]]
+- [[3.7 CUDA Week 3 前置知识 - Transpose + Memory Coalescing|CUDA Week 3 前置知识]]
 - [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
 - [[Week 4 - MatMul v0]]

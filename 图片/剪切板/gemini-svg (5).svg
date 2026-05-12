@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 850" width="100%" height="100%">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <style>
+      .title-box { fill: #1565c0; rx: 4px; }
+      .title-num { fill: #ffffff; font-family: sans-serif; font-size: 18px; font-weight: bold; }
+      .title-text { font-family: sans-serif; font-size: 24px; font-weight: bold; fill: #1565c0; }
+      .title-text-black { fill: #202124; }
+      .subtitle { font-family: sans-serif; font-size: 16px; fill: #3c4043; }
+      .code-bg { fill: #ffffff; stroke: #9aa0a6; stroke-width: 1.5; stroke-dasharray: 6,4; rx: 8px; }
+      .code { font-family: 'Courier New', Courier, monospace; font-size: 14px; fill: #202124; }
+      .keyword { fill: #8e24aa; font-weight: bold; }
+      .type { fill: #8e24aa; font-weight: bold; }
+      .comment { fill: #137333; }
+      .arrow { stroke: #137333; stroke-width: 1.5; }
+      .annotation { font-family: sans-serif; font-size: 14px; fill: #137333; font-weight: bold; }
+      .bottom-box { fill: #f4f8ff; stroke: #8ab4f8; stroke-width: 1.5; rx: 8px; }
+      .bottom-text { font-family: sans-serif; font-size: 16px; fill: #164bc5; }
+      .bold { font-weight: bold; }
+    </style>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+      <polygon points="0 0, 8 4, 0 8" fill="#137333" />
+    </marker>
+  </defs>
+
+  <rect width="100%" height="100%" fill="#ffffff"/>
+
+  <rect x="30" y="30" width="28" height="28" class="title-box"/>
+  <text x="39" y="50" class="title-num">1</text>
+  <text x="70" y="52" class="title-text">同步屏障 __syncthreads(): <tspan class="title-text-black">只保证本 block 内同步</tspan></text>
+
+  <text x="70" y="95" class="subtitle">一个 block 内的所有线程，可以通过 <tspan class="code">__syncthreads()</tspan> 互相等待，</text>
+  <text x="70" y="125" class="subtitle">直到本 block 内所有线程都到达这里，大家再一起往下走。</text>
+
+  <rect x="30" y="165" width="630" height="530" class="code-bg"/>
+
+  <text x="50" y="200" class="code"><tspan class="keyword">__shared__</tspan> <tspan class="type">float</tspan> sdata[256];</text>
+  <text x="50" y="230" class="code"><tspan class="type">int</tspan> tid = threadIdx.x;</text>
+  <text x="50" y="260" class="code"><tspan class="type">int</tspan> i = blockIdx.x * blockDim.x + threadIdx.x;</text>
+
+  <text x="50" y="310" class="code">sdata[tid] = input[i];    <tspan class="comment">// 每个线程写自己的数据</tspan></text>
+
+  <text x="50" y="360" class="code"><tspan class="keyword">__syncthreads</tspan>();          <tspan class="comment">// 同步屏障</tspan></text>
+
+  <text x="50" y="410" class="code"><tspan class="comment">// 这里可以保证：本 block 内所有 sdata 都已经写好了</tspan></text>
+  <text x="50" y="435" class="code"><tspan class="comment">// 接下来可以安全地互相读取并做规约（求和等）</tspan></text>
+  <text x="50" y="465" class="code"><tspan class="keyword">for</tspan> (<tspan class="type">int</tspan> stride = blockDim.x/2; stride &gt; 0; stride &gt;&gt;= 1) {</text>
+  <text x="80" y="495" class="code"><tspan class="keyword">if</tspan> (tid &lt; stride) {</text>
+  <text x="110" y="525" class="code">sdata[tid] += sdata[tid + stride];</text>
+  <text x="80" y="555" class="code">}</text>
+  <text x="80" y="585" class="code"><tspan class="keyword">__syncthreads</tspan>(); <tspan class="comment">// 每一轮规约后再次同步</tspan></text>
+  <text x="50" y="615" class="code">}</text>
+  <text x="50" y="645" class="code"><tspan class="keyword">if</tspan> (tid == 0) {</text>
+  <text x="80" y="675" class="code">partial[blockIdx.x] = sdata[0]; <tspan class="comment">// 本 block 的结果</tspan></text>
+  <text x="50" y="705" class="code">}</text>
+
+  <line x1="695" y1="305" x2="665" y2="305" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="705" y="285" class="annotation">本 block 内</text>
+  <text x="705" y="305" class="annotation">所有线程都</text>
+  <text x="705" y="325" class="annotation">执行完写入</text>
+  <text x="705" y="345" class="annotation">操作</text>
+
+  <line x1="695" y1="355" x2="665" y2="355" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="705" y="348" class="annotation">所有线程在</text>
+  <text x="705" y="368" class="annotation">这里等待</text>
+
+  <line x1="695" y1="520" x2="665" y2="520" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="705" y="500" class="annotation">保证本 block 内</text>
+  <text x="705" y="520" class="annotation">sdata[] 都写好</text>
+  <text x="705" y="540" class="annotation">了，才能安全读取</text>
+
+  <rect x="30" y="730" width="850" height="95" class="bottom-box"/>
+  <text x="50" y="760" class="bottom-text"><tspan class="bold">问：</tspan>同步之后这个 block 是不是结束了？</text>
+  <text x="50" y="790" class="bottom-text"><tspan class="bold">答：</tspan>不是。同步屏障只让本 block 内的所有线程在这里“集合”，等大家都到齐了，</text>
+  <text x="85" y="815" class="bottom-text">然后一起继续往下执行。这个 block 会一直执行完后面的代码，直到 kernel 结束。</text>
+</svg>

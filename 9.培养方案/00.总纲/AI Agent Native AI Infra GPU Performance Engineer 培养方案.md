@@ -83,6 +83,61 @@ AI 可以生成工程代码和初版 kernel，但不能替代以下判断：
 - lowering / codegen 生成的代码是否经过 reference、shape、dtype 和边界条件验证；
 - 优化是否真的改善 TTFT / TPOT / TPS / cost，而不是只改善单个 toy benchmark。
 
+## 为什么要把数值分析 / 误差理论接入这条路线
+
+这条路线虽然定位是 **LLM Inference Performance / GPU Infra**，但它不是只拼 CUDA 语法或 vLLM 参数。真正有区分度的地方，是能判断一个 kernel 或 serving 优化在**数值上是否可靠、性能上是否真实、上线后是否可控**。这正好对应 [[第01次课-绪论与误差理论笔记]] 中的四个核心标准：复杂度、精度、稳定性、数值实验。
+
+> [!important] 数值分析在本路线中的定位
+> 数值分析不是为了刷积分题，而是为了回答：低精度计算是否稳定？reference test 的误差阈值怎么设？softmax / RMSNorm / reduction 的误差会不会被放大？benchmark 结论是否可信？Agent 生成的 kernel 是否只是“看起来能跑”？
+
+| 误差理论概念 | 在 GPU Performance / 推理 Infra 中的对应问题 | 项目落点 |
+|---|---|---|
+| 舍入误差 | FP16 / BF16 / FP8 / INT8 下计算结果是否可靠 | RMSNorm、Softmax、MatMul、quantization |
+| 截断误差 / 近似替代 | 用低精度、近似 kernel、quantization 替代原始计算时误差是否可接受 | INT8 dequant、FP8/INT4、近似 attention |
+| 绝对误差 / 相对误差 | correctness test 不能只看 `==`，要设置 `atol / rtol` | PyTorch reference test、多 dtype test |
+| 有效数字 | FP32 / FP16 / BF16 的有效精度不同，决定累加策略 | FP16 输入 + FP32 accumulation |
+| 误差传播 | reduction、softmax、normalization 中局部误差如何传到输出 | row-wise reduction、stable softmax |
+| 条件数 / 病态问题 | 某些输入分布会放大误差，不能只测随机 toy case | 边界 shape、极端值、长序列 |
+| 数值稳定性 | 数学等价的写法，工程上可能一个稳定、一个爆炸 | stable softmax、反向/正向递推类比 |
+| 数值实验 | 理论判断必须用 benchmark、profiling、correctness 数据闭环 | `benchmark.md`、`profiling.md`、Nsight 证据 |
+
+这会直接改变每个 kernel 项目的验收方式：
+
+- **Softmax**：必须解释为什么要减去 `max(x)`，并用极端输入证明 naive softmax 可能 overflow。
+- **RMSNorm**：必须说明为什么 FP16 输入常用 FP32 accumulation，以及 `eps` 对稳定性的影响。
+- **Reduction**：必须解释并行归约和 CPU 串行求和结果不完全一致的原因，测试使用合理 `rtol / atol`。
+- **MatMul / GEMM**：必须区分 FP32、TF32、FP16、BF16、Tensor Core 路径的精度差异，不只看 TFLOPS。
+- **Quantization**：必须记录 scale、zero point、dequant 误差和速度收益，不能只说“INT8 更快”。
+- **Serving benchmark**：必须区分性能波动、测量误差和真实优化，避免把一次随机结果当成稳定结论。
+
+### 数值分析进入作品集的最低要求
+
+每个 CUDA / Triton / 推理 benchmark 项目，都要留下一个小节：
+
+```text
+Numerical correctness
+- Reference: PyTorch / CPU implementation
+- Dtypes: FP32 / FP16 / BF16 / INT8 等
+- Tolerance: atol / rtol 设置及原因
+- Edge cases: 极端值、非对齐 shape、长序列、全 0 / 大值输入
+- Stability note: 是否存在 overflow、underflow、相近数相减、大数吃小数等风险
+```
+
+### 面试表达
+
+不要只说：
+
+```text
+我做了 correctness test。
+```
+
+应该说：
+
+```text
+我用 PyTorch reference 做 correctness test，并根据 dtype 设置 atol / rtol；对于 softmax 使用 max-shift 保证数值稳定，对于 RMSNorm 使用 FP32 accumulation 控制 FP16 舍入误差；benchmark 结论同时结合 CUDA event、Nsight 指标和多次重复实验，避免把测量噪声当成优化收益。
+```
+
+
 ## 能力主线
 
 | 主线 | 要练什么 | 最终简历表达 |
