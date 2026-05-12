@@ -1,12 +1,8 @@
-﻿---
+---
 title: Week 3 - Transpose + Memory Coalescing
 date: 2026-05-06
 tags:
-  - 培养方案
   - CUDA
-  - GPU
-  - MemoryCoalescing
-  - Transpose
   - infra
 aliases:
   - CUDA Week 3

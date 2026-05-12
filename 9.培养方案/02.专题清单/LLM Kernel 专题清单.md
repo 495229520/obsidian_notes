@@ -1,12 +1,8 @@
-﻿---
+---
 title: LLM Kernel 专题清单
 date: 2026-05-06
 tags:
-  - 培养方案
   - CUDA
-  - GPU
-  - LLM
-  - Kernel
   - infra
 aliases:
   - LLM CUDA Kernel

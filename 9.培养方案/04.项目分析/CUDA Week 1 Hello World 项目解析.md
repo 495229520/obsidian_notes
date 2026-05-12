@@ -1,12 +1,8 @@
-﻿---
+---
 title: CUDA Week 1 Hello World 项目解析
 date: 2026-05-08
 tags:
-  - 培养方案
   - CUDA
-  - GPU
-  - 项目解析
-  - benchmark
   - infra
 aliases:
   - CUDA Week1 项目解析

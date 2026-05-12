@@ -1,12 +1,8 @@
-﻿---
+---
 title: Week 4 - MatMul v0
 date: 2026-05-06
 tags:
-  - 培养方案
   - CUDA
-  - GPU
-  - MatMul
-  - GEMM
   - infra
 aliases:
   - CUDA Week 4

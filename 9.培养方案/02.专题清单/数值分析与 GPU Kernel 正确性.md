@@ -2,14 +2,8 @@
 title: 数值分析与 GPU Kernel 正确性
 date: 2026-05-08
 tags:
-  - 培养方案
-  - AIInfra
   - CUDA
-  - Triton
-  - 数值分析
-  - GPU
-  - Kernel
-  - LLM推理
+  - infra
 aliases:
   - GPU Kernel 数值正确性
   - 数值分析到 GPU Performance

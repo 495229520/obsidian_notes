@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 540" role="img" aria-labelledby="title desc">
+  <title id="title">三种 reduction 实现对比</title>
+  <desc id="desc">对比 naive、shared memory 和 warp shuffle 在并行度、通信介质、同步成本和学习重点上的差异。</desc>
+  <rect x="0" y="0" width="1080" height="540" fill="rgb(245, 244, 237)"/>
+
+  <text x="540" y="36" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="18" font-weight="500" fill="#0C447C">三种 parallel reduction 的核心差异</text>
+  <text x="540" y="62" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">从“几乎没有 block 内协作”逐步走向“warp 内寄存器通信”</text>
+
+  <rect x="60" y="108" width="280" height="300" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="200" y="138" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#633806">Naive reduce</text>
+  <text x="200" y="172" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">线程 0 在 block 内串行累加</text>
+  <text x="200" y="218" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">并行度：低</text>
+  <text x="200" y="254" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">通信：几乎没有协作</text>
+  <text x="200" y="290" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">同步：不需要 barrier</text>
+  <text x="200" y="326" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">作用：建立 baseline</text>
+  <text x="200" y="362" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">瓶颈：线程闲置和全局访存等待</text>
+
+  <rect x="400" y="108" width="280" height="300" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="540" y="138" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#085041">Shared memory reduce</text>
+  <text x="540" y="172" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">block 内二分树形归约</text>
+  <text x="540" y="218" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">并行度：block 内提升</text>
+  <text x="540" y="254" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">通信：shared memory</text>
+  <text x="540" y="290" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">同步：每轮 __syncthreads()</text>
+  <text x="540" y="326" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">作用：学习 block 协作</text>
+  <text x="540" y="362" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">瓶颈：barrier 和 shared 资源</text>
+
+  <rect x="740" y="108" width="280" height="300" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="880" y="138" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#3C3489">Warp shuffle reduce</text>
+  <text x="880" y="172" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">warp 内寄存器到寄存器</text>
+  <text x="880" y="218" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">并行度：warp 内高效</text>
+  <text x="880" y="254" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">通信：register + 少量 shared</text>
+  <text x="880" y="290" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">同步：warp 内天然同步</text>
+  <text x="880" y="326" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">作用：学习 warp primitive</text>
+  <text x="880" y="362" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">瓶颈：跨 warp 汇总和最终拷回</text>
+
+  <rect x="230" y="468" width="620" height="26" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="540" y="481" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">优化方向：减少闲置线程、减少高延迟通信、用 Nsight 指标验证判断</text>
+</svg>

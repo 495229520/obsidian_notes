@@ -2,12 +2,7 @@
 title: AI Agent Native AI Infra GPU Performance Engineer 培养方案
 date: 2026-05-06
 tags:
-  - 培养方案
-  - AIInfra
   - CUDA
-  - Triton
-  - LLM推理
-  - Agent工程流
   - infra
 status: active
 ---

@@ -2,10 +2,7 @@
 title: CUDA 学习清单
 date: 2026-05-06
 tags:
-  - 培养方案
   - CUDA
-  - GPU
-  - 学习清单
   - infra
 aliases:
   - CUDA checklist

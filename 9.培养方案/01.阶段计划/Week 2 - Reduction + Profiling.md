@@ -1,12 +1,8 @@
-﻿---
+---
 title: Week 2 - Reduction + Profiling
 date: 2026-05-06
 tags:
-  - 培养方案
   - CUDA
-  - GPU
-  - Reduction
-  - Profiling
   - infra
 aliases:
   - CUDA Week 2

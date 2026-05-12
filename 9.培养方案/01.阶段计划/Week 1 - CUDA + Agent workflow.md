@@ -1,8 +1,7 @@
-﻿---
+---
 tags:
-  - 培养方案
   - CUDA
-  - Agent
+  - infra
   - infra
 ---
 
