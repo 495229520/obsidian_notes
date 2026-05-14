@@ -207,3 +207,4 @@ TFLOPS = FLOPs / time_seconds / 1e12
 - [[Week 3 - Transpose + Memory Coalescing]]
 - [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
 - [[3.6 CUDA 生态工具清单|CUDA 生态工具清单]]
+- [[Week 5 - Serving Benchmark Harness]]

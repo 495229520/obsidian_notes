@@ -20,6 +20,7 @@ AI Infra Performance Engineer
 + CUDA / Triton / C++ kernel
 + GPU profiling
 + LLM inference engine
++ serving benchmark / observability
 + 推理成本优化
 ```
 
@@ -31,6 +32,7 @@ AI Infra Performance Engineer
 - 硬件理解
 - benchmark 可信度
 - 线上推理效率
+- serving 指标解释能力
 - Agent 生成代码的审查能力
 
 关联笔记：
@@ -58,6 +60,7 @@ AI Agent-native 的 AI Infra / GPU Performance Engineer
 - 它是 memory-bound 还是 compute-bound？
 - Nsight 指标能不能支持你的判断？
 - 这个优化是否真的降低了 TTFT / TPOT / cost？
+- TTFT 变高到底来自 queueing、prefill、decode 还是 KV cache 压力？
 - Agent 生成的代码怎么验证 correctness？
 - benchmark 数据是否公平、可复现、可解释？
 - 这个改动是否值得上线？
@@ -140,7 +143,7 @@ Numerical correctness
 | AI Agent 工程流 | Claude Code / Codex / Cursor、MCP、hooks、自动化测试、PR review | 能用 Agent 提高开发效率，但有人工审查和性能验证流程 |
 | Kernel 能力 | CUDA、Triton、RMSNorm、Softmax、MatMul、RoPE、Attention | 能写并优化 LLM 常见算子 |
 | GPU 性能分析 | Nsight Compute、Nsight Systems、CUDA event、roofline、memory-bound / compute-bound | 能解释 kernel 为什么慢、怎么优化 |
-| 推理成本优化 | vLLM、SGLang、FlashInfer、TensorRT-LLM、KV cache、batching、quantization | 能用 TTFT / TPOT / TPS / cost per 1M tokens 评估系统 |
+| 推理 Infra / 成本优化 | vLLM、SGLang、FlashInfer、TensorRT-LLM、KV cache、prefix cache、prefill / decode、observability、quantization | 能用 TTFT / TPOT / TPS / RPS / queueing / KV cache / cost per 1M tokens 评估系统 |
 | 编译器 / Lowering 认知 | Triton lowering、MLIR basics、IR / pass / backend lowering、codegen correctness、operator fusion | 能解释高层算子如何走到 kernel / codegen，并知道 generated code 的 correctness 与性能风险 |
 
 最低可验证能力：
@@ -149,8 +152,9 @@ Numerical correctness
 - 能写 Triton softmax / RMSNorm。
 - 能接 PyTorch C++ / CUDA extension。
 - 能用 CUDA event benchmark。
-- 能读 Nsight Compute 的关键指标。
-- 能解释 TTFT / TPOT / TPS / RPS / GPU utilization / cost per 1M tokens。
+- 能读 Nsight Compute / Nsight Systems 的关键指标。
+- 能解释 TTFT / TPOT / ITL / TPS / RPS / queue time / GPU utilization / KV cache usage / cost per 1M tokens。
+- 能把 kernel benchmark 的收益接回 serving 指标，而不是只停留在 toy latency。
 - 能画出 Triton kernel 到 IR / lowering / PTX 的粗链路，并说明哪些环节会影响 correctness 与性能。
 - 能让 Agent 生成脚手架、测试、benchmark，但不让 Agent 决定性能结论。
 
@@ -188,12 +192,27 @@ Numerical correctness
 | agentic-cuda-kernel-playground | 拟建作品集项目 | 不是外部开源项目 | 基础 CUDA kernel + Agent workflow | 本人未来创建 |
 | torch-triton-rmsnorm | 拟建作品集项目 | 不是外部开源项目 | CUDA + Triton RMSNorm + PyTorch extension | 本人未来创建 |
 | llm-inference-cost-lab-v0 | 拟建作品集项目 | 不是外部开源项目 | 小模型 vLLM / SGLang 成本 benchmark | 本人未来创建 |
+| llm-serving-benchmark-harness | 拟建作品集项目 | 不是外部开源项目 | 可信 serving benchmark、负载建模、TTFT / TPOT / p95 分析 | 本人未来创建 |
+| vllm-observability-lab | 拟建作品集项目 | 不是外部开源项目 | vLLM metrics、Prometheus / Grafana、serving runbook | 本人未来创建 |
 | matmul-lab-cuda-triton-cutlass | 拟建作品集项目 | 不是外部开源项目 | 对比 CUDA / Triton / CUTLASS / cuBLAS GEMM | 本人未来创建 |
 | tiny-llm-kernels | 拟建作品集项目 | 不是外部开源项目 | LLM 小算子集合 | 本人未来创建 |
+| paged-kv-attention-lab | 拟建作品集项目 | 不是外部开源项目 | toy paged KV cache、batch decode attention、FlashInfer baseline | 本人未来创建 |
 | llm-serving-cost-benchmark | 拟建作品集项目 | 不是外部开源项目 | vLLM / SGLang / TensorRT-LLM 推理成本对比 | 本人未来创建 |
+| prefill-decode-disaggregation-lab | 拟建作品集项目 | 不是外部开源项目 | prefill / decode 分离、KV transfer、调度与 SLO 分析 | 本人未来创建 |
 | llm-kernel-benchmark-suite | 拟建作品集项目 | 不是外部开源项目 | 秋招统一 kernel benchmark suite | 本人未来创建 |
 | mini-vllm-style-kv-cache | 拟建作品集项目 | 不是外部开源项目 | 简化版推理调度器和 paged KV cache toy model | 本人未来创建 |
 | agentic-infra-workflow | 拟建作品集项目 | 不是外部开源项目 | AI Agent 工程流模板和审查流程 | 本人未来创建 |
+
+推理 Infra 官方参考：
+
+- [vLLM bench serve](https://docs.vllm.ai/en/latest/api/vllm/benchmarks/serve/)：request rate、burstiness、max concurrency 等 serving benchmark 参数。
+- [vLLM metrics](https://docs.vllm.ai/en/latest/design/metrics/)：Prometheus metrics、TTFT、TPOT、queue interval、GPU cache usage、prefix cache hit rate。
+- [vLLM prefix caching](https://docs.vllm.ai/en/stable/design/prefix_caching/)：KV cache block reuse 和 shared prefix workload。
+- [vLLM disaggregated prefilling](https://docs.vllm.ai/en/v0.14.0/features/disagg_prefill/)：prefill / decode 分离与 KV transfer。
+- [SGLang PD Disaggregation](https://docs.sglang.io/docs/advanced_features/pd_disaggregation)：prefill 计算密集、decode KV cache 访存密集，以及 router / worker 拆分。
+- [FlashInfer cascade wrappers](https://docs.flashinfer.ai/api/cascade.html)：shared-prefix paged KV cache wrapper，可作为 paged KV attention baseline。
+- [TensorRT-LLM docs](https://nvidia.github.io/TensorRT-LLM/)：KV cache、chunked prefill、in-flight batching、quantization、parallelism 等工业推理能力。
+- [NVIDIA GenAI-Perf guide](https://developer.nvidia.com/blog/llm-performance-benchmarking-measuring-nvidia-nim-performance-with-genai-perf/)：TTFT、ITL、TPS、RPS 与 latency-throughput tradeoff。
 
 ## 阶段一：现在到 2026 年 7 月
 
@@ -414,17 +433,17 @@ CUDA 细化任务、必做 kernel 和专题补课清单见 [[CUDA 学习清单]]
 | Week 2 | Reduction + Profiling | reduce sum、warp / block reduction、CUDA event、第一次 Nsight Compute |
 | Week 3 | Transpose + Memory Coalescing | naive transpose、shared memory transpose、bank conflict padding、`profiling.md` |
 | Week 4 | MatMul v0 | naive matmul、tiled matmul、cuBLAS 对比、差距解释 |
-| Week 5 | Triton | Triton fused softmax、Triton matmul、Triton RMSNorm 初版 |
-| Week 6 | PyTorch Extension | CUDA RMSNorm、PyTorch extension、correctness test、FP32 / FP16 对比 |
-| Week 7 | LLM Cost Lab | vLLM 小模型、TTFT / TPOT / TPS、cost / 1M tokens |
-| Week 8 | 投递包装 | README、benchmark 表、10 个面试 Q&A、简历、开始投递 |
+| Week 5 | [[Week 5 - Serving Benchmark Harness|Serving Benchmark Harness]] | request rate、max concurrency、prompt / output 分布、TTFT / TPOT / p95、`benchmark_config.yaml` |
+| Week 6 | [[Week 6 - Observability + Metrics|Observability + Metrics]] | vLLM OpenAI server、Prometheus / Grafana、queue / KV cache / latency dashboard、`runbook.md` |
+| Week 7 | [[Week 7 - KV Cache + Prefix Cache + Paged KV|KV Cache + Prefix Cache + Paged KV]] | shared prefix workload、prefix cache on/off、toy paged KV、FlashInfer baseline |
+| Week 8 | [[Week 8 - Prefill Decode + Open Source Repro|Prefill Decode + Open Source Repro]] | prefill-heavy / decode-heavy workload、PD disaggregation 调研、issue reproduction / benchmark report |
 
 加速原则：
 
 - AI 可以压缩阅读、脚手架、代码解释和测试框架时间。
 - correctness test、benchmark 记录、profiling 结论不能压缩掉。
 - 学完一个阶段后必须留下可运行代码、结果表和自己的解释。
-- 如果一天完成原 Week 1，应立即进入 Week 2 的 reduction，而不是继续重复看基础概念。
+- 如果前四周已经完成，不继续横向刷更多基础 CUDA toy kernel，而是进入推理 Infra 桥接期。
 
 ### 阶段一验收标准
 
@@ -436,7 +455,134 @@ CUDA 细化任务、必做 kernel 和专题补课清单见 [[CUDA 学习清单]]
 - 能用 Agent 搭工程框架。
 - 能用 CUDA event benchmark。
 - 能解释 TTFT / TPOT / TPS。
+- 能把 benchmark 负载、队列、prefill / decode 和 KV cache 压力拆开解释。
 - 能在简历上写 2 到 3 个 AI Infra 项目。
+
+## 阶段 1.5：推理 Infra 桥接期
+
+适用情况：如果阶段一前四周已经完成了 CUDA 基础 kernel、Reduction / Profiling、Transpose / Memory Coalescing 和 MatMul v0，就不要继续横向堆更多 CUDA 入门 kernel。接下来四周的主线改成：
+
+```text
+kernel 能力
+  ↓
+serving benchmark
+  ↓
+observability / KV cache / prefill-decode
+  ↓
+可复现报告 / 开源 issue
+```
+
+目标：
+
+- 把 CUDA / Triton / profiling 能力接到 LLM serving 指标上。
+- 从“会写 kernel”升级到“能解释 serving 指标为什么变化”。
+- 提前进入 vLLM / SGLang / TensorRT-LLM 的调度、KV cache、prefill / decode、benchmark 和 observability。
+- 产出可以放进简历和面试的 benchmark report、profiling report、runbook 或 issue reproduction。
+
+核心原则：
+
+- 不跳过 correctness、benchmark、profiling 和 README。
+- 不把一次 benchmark 当成结论。
+- 不只看平均 TPS，必须看 TTFT、TPOT / ITL、p50 / p95 / p99 latency、GPU memory、KV cache 使用率和 failed requests。
+- 所有 serving 实验必须记录模型、GPU、CUDA、PyTorch、Triton、vLLM / SGLang 版本、prompt length、output length、request rate、max concurrency、warmup 和测量方式。
+
+### 桥接期四周安排
+
+| 周次 | 主题 | 产出 |
+|---|---|---|
+| Week 5 | [[Week 5 - Serving Benchmark Harness|Serving Benchmark Harness]] | `benchmark_config.yaml`、`benchmark_results.csv`、`benchmark_report.md`、`reproduce.sh` |
+| Week 6 | [[Week 6 - Observability + Metrics|Observability + Metrics]] | `docker-compose.yaml`、`prometheus.yml`、`grafana-dashboard.json`、`runbook.md` |
+| Week 7 | [[Week 7 - KV Cache + Prefix Cache + Paged KV|KV / Prefix / Paged KV]] | `prefix_cache_benchmark.md`、`paged_kv_layout.md`、`design_note.md` |
+| Week 8 | [[Week 8 - Prefill Decode + Open Source Repro|Prefill / Decode + Open Source Repro]] | `prefill_decode_report.md`、`reproduce.sh`、issue reproduction 或 benchmark report |
+
+### 新增项目 3.5：llm-serving-benchmark-harness
+
+定位：从“能跑 vLLM / SGLang benchmark”升级到“能设计可信 serving benchmark”。
+
+测试对象：
+
+- vLLM
+- SGLang
+- 可选：TensorRT-LLM / TensorRT-LLM serve
+
+测试维度：
+
+- request rate
+- max concurrency
+- burstiness
+- prompt length distribution
+- output length distribution
+- shared prefix ratio
+- long context ratio
+- streaming / non-streaming
+- quantization on / off
+- prefix caching on / off
+- chunked prefill on / off
+
+必须记录：
+
+- TTFT p50 / p95 / p99
+- TPOT / ITL p50 / p95 / p99
+- E2E latency p50 / p95 / p99
+- output TPS
+- RPS
+- GPU memory
+- KV cache usage
+- failed requests
+- cost / 1M tokens
+
+产出：
+
+- `benchmark_config.yaml`
+- `benchmark_results.csv`
+- `benchmark_report.md`
+- `reproduce.sh`
+- `serving_metrics.md`
+
+验收标准：
+
+- 至少覆盖低延迟、高吞吐、长上下文、共享 prefix 四类场景。
+- 能解释为什么某个配置 TTFT 低但 TPS 不高。
+- 能解释为什么 max concurrency 提高后 TPS 上升但 TPOT / p95 latency 变差。
+- 能解释 benchmark 中 failed requests 的原因。
+- 能说明 benchmark 是否公平、可复现、可解释。
+
+### 新增项目 3.6：vllm-observability-lab
+
+定位：学习 LLM serving 的线上观测和故障定位。
+
+目标：
+
+- 部署 vLLM OpenAI-compatible server。
+- 接入 Prometheus / Grafana。
+- 记录 server-level metrics 和 request-level metrics。
+- 用 dashboard 观察 TTFT、TPOT、queueing、running requests、waiting requests、KV cache usage、GPU cache utilization、tokens/s。
+- 写出一份 serving runbook。
+
+实验场景：
+
+- 低并发短 prompt。
+- 高并发短 prompt。
+- 低并发长 prompt。
+- 高并发长 prompt。
+- 共享 prefix 场景。
+- KV cache 接近满的场景。
+- 人为制造 request backlog 的场景。
+
+产出：
+
+- `docker-compose.yaml`
+- `prometheus.yml`
+- `grafana-dashboard.json`
+- `observability_report.md`
+- `runbook.md`
+
+runbook 至少回答：
+
+- TTFT 变高时，如何判断是 queueing、prefill、网络还是 KV cache 压力？
+- TPOT 变高时，如何判断是 decode 阶段慢还是 batch 太大？
+- GPU utilization 高但 TPS 不涨，可能是什么原因？
+- KV cache usage 接近满时，应该降低 max model len、降低 concurrency、增加 GPU，还是开启 prefix cache / offloading？
 
 ## 阶段二：2026 年 7 月到 2027 年 3 月
 
@@ -578,6 +724,43 @@ Agent 不可以改 benchmark 数据。
 - 至少写一篇“哪些算子适合 fusion”的总结。
 - 可选：实现一个 toy fusion demo，例如 bias + GELU、residual + RMSNorm 或 dequant + matmul 的简化版本，并给出 fusion 前后的 correctness 与 benchmark 对比。
 
+### 新增项目 5.5：paged-kv-attention-lab
+
+定位：把 Attention kernel、paged KV cache 和 serving engine 连接起来。
+
+实现内容：
+
+- toy contiguous KV cache。
+- toy paged KV cache。
+- page table / block table。
+- variable-length sequence batch。
+- batch decode attention toy version。
+- 可选：调用 FlashInfer paged KV cache attention API 做 baseline。
+- 可选：对比 vLLM PagedAttention 设计文档和实际 kernel 入口。
+
+实验对比：
+
+- contiguous KV vs paged KV。
+- fixed length batch vs variable length batch。
+- small batch decode vs large batch decode。
+- short context vs long context。
+- page size 不同对 memory 和 latency 的影响。
+
+必须回答：
+
+- 为什么 decode attention 主要受 KV cache 读带宽影响？
+- 为什么 variable-length request 会带来 cache 管理问题？
+- paged KV cache 解决的是显存碎片、调度灵活性，还是 attention 本身计算复杂度？
+- 为什么 page table / block table 会影响 kernel 访存？
+- 为什么长上下文下 KV cache 成本会变成主要瓶颈？
+
+产出：
+
+- `paged_kv_layout.md`
+- `attention_decode_benchmark.csv`
+- `profiling.md`
+- `design_note.md`
+
 ### 必做项目 6：llm-serving-cost-benchmark
 
 对比至少两个 serving engine：
@@ -611,6 +794,48 @@ Agent 不可以改 benchmark 数据。
 - 为什么长上下文会让 KV cache 成为瓶颈？
 - quantization 降成本的代价是什么？
 
+### 新增项目 6.5：prefill-decode-disaggregation-lab
+
+定位：理解 prefill / decode 分离、KV cache transfer 和推理系统调度。
+
+学习目标：
+
+- 区分 prefill-bound 和 decode-bound workload。
+- 理解为什么长 prompt 会推高 TTFT。
+- 理解为什么 decode 阶段更关注 TPOT / ITL。
+- 理解 prefill-decode disaggregation 的收益和代价。
+- 理解 KV cache transfer 对 latency 和 bandwidth 的影响。
+
+实验路径：
+
+- 轻量版本：用 vLLM / SGLang benchmark 构造长 prompt / 短 output、短 prompt / 长 output、混合负载，分析 TTFT、TPOT、TPS、queueing、GPU memory。
+- 进阶版本：尝试 vLLM disaggregated prefill example 或 SGLang PD disaggregation，画出 prefill worker、decode worker、KV transfer、request router 的系统图。
+
+必须回答：
+
+- 什么 workload 适合 prefill / decode disaggregation？
+- 什么 workload 不适合？
+- KV cache transfer 的开销在哪里？
+- prefill worker 和 decode worker 的比例如何估算？
+- disaggregation 是提升吞吐、降低 TTFT，还是改善资源隔离？
+
+产出：
+
+- `prefill_decode_report.md`
+- `pd_system_diagram.svg`
+- `benchmark_results.csv`
+- `reproduce.sh`
+
+### 阶段二增强项目
+
+这些项目不必一次全部做完，按面试和作品集需求逐步补：
+
+| 项目 | 定位 | 最低产出 |
+|---|---|---|
+| `prefix-cache-and-shared-context-lab` | 研究共享 system prompt、tools schema、长文档 prefix、多轮对话对推理成本的影响 | prefix cache on/off benchmark、shared prefix workload、收益解释 |
+| `quantization-cost-quality-lab` | 把 quantization 从参数概念变成 serving 成本和质量实验 | FP16 / BF16 vs INT8 / FP8 / INT4 对比、cost / 1M tokens、简单质量检查 |
+| `multi-gpu-inference-scaling-lab` | 理解 tensor parallel、serving replica、NCCL 通信和多 GPU cost tradeoff | 1 GPU vs 2 GPU 对比、TTFT / TPOT / TPS、通信开销分析 |
+
 ### 阶段二开源学习路线
 
 | 项目 | 学习重点 | 初级贡献 | 中级贡献 |
@@ -630,7 +855,9 @@ Agent 不可以改 benchmark 数据。
 - 能写 LLM 小算子。
 - 能用 Nsight Compute 分析瓶颈。
 - 能搭 vLLM / SGLang benchmark。
-- 能解释 TTFT / TPOT / TPS / cost。
+- 能解释 TTFT / TPOT / ITL / TPS / queueing / KV cache / cost。
+- 能区分 prefill-heavy、decode-heavy、shared-prefix、long-context 等 workload。
+- 能说明 prefix cache、paged KV、chunked prefill、PD disaggregation 和 quantization 分别解决什么问题。
 - 能画出 Triton / MLIR / backend lowering 的粗链路。
 - 能说明 CUDA / Triton / CUTLASS / cuBLAS 在 GEMM 上各自适合什么场景。
 - 至少产出 1 篇 GEMM comparison report，而不是只跑 benchmark 数字。
@@ -780,6 +1007,46 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 - FlashInfer 更贴近 kernel 但门槛高。
 - CUTLASS 适合读和做 benchmark，不适合新手直接改核心。
 
+### 开源贡献冲刺模板
+
+目标：不以“硬改核心代码”为第一步，而是用 benchmark、reproduction、profiling 和文档进入开源社区。
+
+优先切入点：
+
+1. vLLM / SGLang benchmark issue reproduction。
+2. Triton tutorial / benchmark / docs 小 PR。
+3. FlashInfer example reproduction。
+4. TensorRT-LLM benchmark report。
+5. CUTLASS profiler 对比报告。
+
+Step 1：Reproduce
+
+- 找一个 issue、discussion 或 benchmark gap。
+- 在自己的环境复现。
+- 记录版本、命令、GPU、日志和结果。
+- 判断是否稳定复现。
+
+Step 2：Minimize
+
+- 缩小到最小模型、最小配置、最小 prompt。
+- 去掉无关变量。
+- 写 `reproduce.sh`。
+
+Step 3：Analyze
+
+- 如果是性能问题，补 benchmark 表。
+- 如果是 kernel 问题，补 Nsight Compute / Systems 证据。
+- 如果是 serving 问题，补 TTFT / TPOT / queue / KV cache 指标。
+- 如果是文档问题，补正确命令和解释。
+
+Step 4：Contribute
+
+- 发 issue reproduction。
+- 发 benchmark report。
+- 发 docs PR。
+- 发小 bugfix PR。
+- 等 maintainer 回复后再尝试更深入修改。
+
 ## 最小可行作品集
 
 ### 2026 暑期实习版本
@@ -788,26 +1055,29 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 
 1. `agentic-cuda-kernel-playground`
 2. `torch-triton-rmsnorm`
-3. `llm-inference-cost-lab-v0`
+3. `llm-serving-benchmark-harness`
 
 表达能力：
 
 ```text
 我有 CUDA 基础。
 我能写真实 LLM 小算子。
-我知道推理服务的成本指标。
+我能设计可信 serving benchmark。
+我能解释 TTFT / TPOT / queue / KV cache 为什么变化。
 我能用 Agent 加速工程，但有人工验证流程。
 ```
 
 ### 2027 秋招加强版本
 
-升级成 5 个项目组合：
+升级成 7 个项目组合：
 
 1. `llm-kernel-benchmark-suite`
 2. `matmul-lab-cuda-triton-cutlass`
 3. `tiny-llm-kernels`
-4. `mini-vllm-style-kv-cache`
-5. `agentic-infra-workflow`
+4. `paged-kv-attention-lab`
+5. `prefill-decode-disaggregation-lab`
+6. `mini-vllm-style-kv-cache`
+7. `agentic-infra-workflow`
 
 组合表达：
 
@@ -817,6 +1087,7 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 我能做 Nsight profiling。
 我懂 LLM 推理系统。
 我能用数据计算推理成本。
+我能用 observability / benchmark / reproduction 证明瓶颈。
 ```
 
 ## GPU 最低成本策略
@@ -829,6 +1100,9 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 | Triton softmax / RMSNorm | T4 / L4 / A10 |
 | matmul 初版 | A10 / 4090 更好 |
 | vLLM 小模型 | L4 / A10 / 4090 |
+| serving benchmark harness | L4 / A10 / 4090 |
+| observability / Grafana | L4 / A10，加本地 Prometheus / Grafana |
+| prefix cache / paged KV toy | L4 / A10 / 4090 |
 | Nsight profiling | 云主机，能装 Nsight Compute 即可 |
 
 推荐节奏：
@@ -856,9 +1130,14 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 - Triton 版本
 - batch size
 - seq length
+- prompt / output length distribution
+- request rate / max concurrency
+- streaming / non-streaming
+- prefix cache / chunked prefill / quantization 配置
 - dtype
 - warmup 次数
 - 测量方式
+- failed requests
 
 ## 每周执行模板
 
@@ -866,34 +1145,34 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 
 ### 周一：理论 + Agent 任务拆解
 
-- 30 分钟：读 CUDA / Triton / vLLM 文档。
+- 30 分钟：读 CUDA / Triton / vLLM / SGLang 文档。
 - 30 分钟：让 Agent 总结本周任务和代码结构。
-- 90 分钟：人工写核心 kernel / 推理实验设计。
+- 90 分钟：人工写核心 kernel / serving 实验设计。
 - 30 分钟：写 `tasks.md`。
 
 产出：
 
 - 本周目标
-- kernel design note
+- kernel design note 或 serving workload design note
 - Agent prompt
 
 ### 周二：Coding
 
 - 30 分钟：让 Agent 生成测试框架。
-- 90 分钟：你写核心 kernel。
+- 90 分钟：你写核心 kernel 或 benchmark harness 关键逻辑。
 - 30 分钟：跑 correctness test。
 - 30 分钟：让 Agent review 代码。
 
 产出：
 
-- 可运行 kernel
+- 可运行 kernel 或 serving benchmark
 - correctness test
 - review notes
 
 ### 周三：Benchmark
 
 - 30 分钟：Agent 生成 benchmark matrix。
-- 90 分钟：跑不同 shape / dtype。
+- 90 分钟：跑不同 shape / dtype / request rate / concurrency。
 - 30 分钟：保存结果。
 - 30 分钟：人工判断异常数据。
 
@@ -901,17 +1180,19 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 
 - `benchmark.csv`
 - `benchmark.md`
+- `benchmark_config.yaml`
 
 ### 周四：Profiling
 
-- 60 分钟：跑 Nsight Compute / Systems。
-- 60 分钟：分析 memory throughput / occupancy / stall。
+- 60 分钟：跑 Nsight Compute / Systems 或采集 serving metrics。
+- 60 分钟：分析 memory throughput / occupancy / stall / queueing / KV cache usage。
 - 30 分钟：让 Agent 整理报告。
 - 30 分钟：你修改报告结论。
 
 产出：
 
 - `profiling.md`
+- `serving_metrics.md`
 - Nsight 截图
 - bottleneck 结论
 
@@ -932,7 +1213,7 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 - 4 到 6 小时租 GPU。
 - 集中跑 benchmark。
 - 跑 vLLM / SGLang serving。
-- 记录 TTFT / TPOT / TPS / cost。
+- 记录 TTFT / TPOT / ITL / TPS / queue / KV cache / cost。
 
 产出：
 
@@ -965,7 +1246,7 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 应该写：
 
 ```text
-实现 CUDA / Triton RMSNorm、Softmax、Tiled MatMul 等 LLM 常见算子，使用 CUDA event 与 Nsight Compute 进行性能分析；构建 vLLM/SGLang 推理 benchmark，统计 TTFT、TPOT、TPS 与 cost / 1M tokens，并通过 batch size、sequence length、dtype 配置分析延迟-吞吐-成本权衡。
+实现 CUDA / Triton RMSNorm、Softmax、Tiled MatMul 等 LLM 常见算子，使用 CUDA event 与 Nsight Compute 进行性能分析；构建 vLLM / SGLang serving benchmark harness，统计 TTFT、TPOT / ITL、TPS、RPS、queue time、KV cache usage 与 cost / 1M tokens，并通过 request rate、max concurrency、prompt / output length、prefix cache 配置分析延迟-吞吐-成本权衡。
 ```
 
 再加一句：
@@ -981,11 +1262,15 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 ```
 
 ```text
-构建 vLLM / SGLang 小模型推理 benchmark，覆盖不同 batch size、并发、prompt length、output length 与 dtype 配置，统计 TTFT、TPOT、TPS、显存占用和 cost / 1M tokens，分析延迟、吞吐和成本权衡。
+构建 vLLM / SGLang 小模型 serving benchmark，覆盖不同 request rate、max concurrency、prompt length、output length、shared prefix ratio 与 dtype 配置，统计 TTFT、TPOT / ITL、TPS、RPS、显存占用、KV cache usage 和 cost / 1M tokens，分析延迟、吞吐和成本权衡。
 ```
 
 ```text
 设计 AI Agent-assisted kernel development workflow，使用 Claude Code / Codex 生成工程脚手架、测试和 benchmark，并通过权限限制、review checklist、correctness gate 与人工 profiling 结论保证 Agent 代码可审查、可复现、可上线。
+```
+
+```text
+搭建 vLLM observability lab，接入 Prometheus / Grafana，围绕 running / waiting requests、queue time、TTFT、TPOT、GPU cache usage 和 prefix cache hit rate 编写 serving runbook，用于定位长上下文、共享 prefix 和 request backlog 场景下的瓶颈。
 ```
 
 ## 面试问题清单
@@ -1025,6 +1310,9 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 - paged KV cache 解决什么问题？
 - continuous batching 如何提高 GPU 利用率？
 - prefix cache 适合什么场景？
+- TTFT 变高时如何区分 queueing、prefill、网络和 KV cache 压力？
+- 什么 workload 适合 prefill / decode disaggregation？
+- 为什么 random prompt benchmark 可能低估 Agent / RAG workload 的优化空间？
 - speculative decoding 的收益和代价是什么？
 - quantization 降成本的代价是什么？
 - cost / 1M tokens 怎么算？
@@ -1062,11 +1350,56 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 - 把一次随机 benchmark 当成稳定结论。
 - 替你判断是否能上线。
 
+### Serving Benchmark 可信度标准
+
+所有 LLM serving benchmark 必须记录环境：
+
+- GPU 型号和数量。
+- CUDA / driver 版本。
+- PyTorch / Triton 版本。
+- vLLM / SGLang / TensorRT-LLM 版本。
+- 模型名称、参数量、dtype / quantization、max model len、GPU memory utilization 参数。
+
+必须记录负载：
+
+- prompt length 分布。
+- output length 分布。
+- request rate。
+- max concurrency。
+- burstiness。
+- streaming / non-streaming。
+- shared prefix ratio。
+- 数据集来源。
+- total requests 和 failed requests。
+
+必须记录指标：
+
+- TTFT p50 / p95 / p99。
+- TPOT / ITL p50 / p95 / p99。
+- E2E latency p50 / p95 / p99。
+- output TPS。
+- RPS。
+- GPU utilization。
+- KV cache usage。
+- queue time。
+- cost / 1M tokens。
+
+实验规则：
+
+- 至少 1 次 warmup。
+- 至少 3 次重复实验。
+- 不只报告最好结果。
+- 如果结果波动大，必须解释原因。
+- benchmark 命令必须可复现。
+- 所有图表必须能追溯到原始 CSV / JSON。
+- 不允许手动修改 benchmark 数据。
+
 ### 每个项目的强制 gate
 
 - correctness test 通过。
 - benchmark 命令可复现。
-- 记录 GPU / CUDA / PyTorch / Triton 版本。
+- 记录 GPU / CUDA / PyTorch / Triton / serving engine 版本。
+- serving benchmark 必须保留原始 CSV / JSON 和配置文件。
 - README 区分 Agent 生成部分和人工验证部分。
 - profiling 结论必须有指标支撑。
 - 简历 bullet 只写自己能解释清楚的内容。
@@ -1079,12 +1412,16 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 - [ ] 加入 CUDA event benchmark。
 - [ ] 写 correctness test。
 - [ ] 记录第一篇 `benchmark.md`。
-- [ ] 学 Triton fused softmax tutorial。
-- [ ] 学 vLLM benchmark 脚本。
-- [ ] 整理第一版简历 bullet。
+- [ ] 创建 `llm-serving-benchmark-harness` 仓库。
+- [ ] 学 vLLM `bench serve` 和 SGLang benchmark 参数。
+- [ ] 写 `benchmark_config.yaml`，固定 request rate、max concurrency、prompt / output 分布。
+- [ ] 跑第一轮低延迟、高吞吐、长上下文、共享 prefix 场景。
+- [ ] 搭 vLLM metrics / Prometheus / Grafana 最小闭环。
+- [ ] 写第一版 `serving_metrics.md` 和 `runbook.md`。
+- [ ] 整理第一版 serving infra 简历 bullet。
 
 ## 一句话定位
 
 ```text
-我要成为能指挥 AI Agent 快速开发，但自己能验证正确性、分析 GPU 性能、降低 LLM 推理成本的人。
+我要成为能指挥 AI Agent 快速开发，但自己能验证正确性、分析 GPU 性能、解释 serving 指标、定位 KV cache / prefill / decode 瓶颈并降低 LLM 推理成本的人。
 ```
