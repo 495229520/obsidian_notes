@@ -2,11 +2,9 @@
 title: Week 8 - Prefill Decode + Open Source Repro
 date: 2026-05-14
 tags:
-  - AIInfra
-  - LLMServing
-  - PrefillDecode
-  - OpenSource
-  - benchmark
+  - infra
+  - Reasoning
+  - 阶段计划
 status: active
 ---
 

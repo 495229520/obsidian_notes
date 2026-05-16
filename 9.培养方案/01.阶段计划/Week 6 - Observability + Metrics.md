@@ -2,11 +2,9 @@
 title: Week 6 - Observability + Metrics
 date: 2026-05-14
 tags:
-  - AIInfra
-  - LLMServing
-  - observability
-  - vLLM
-  - Prometheus
+  - infra
+  - Reasoning
+  - 阶段计划
 status: active
 ---
 

@@ -2,11 +2,9 @@
 title: Week 7 - KV Cache + Prefix Cache + Paged KV
 date: 2026-05-14
 tags:
-  - AIInfra
-  - LLMServing
-  - KVCache
-  - PrefixCache
-  - PagedAttention
+  - infra
+  - Reasoning
+  - 阶段计划
 status: active
 ---
 

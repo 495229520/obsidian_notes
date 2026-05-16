@@ -2,8 +2,9 @@
 title: CUDA Week 2 Parallel Reduction 项目解析
 date: 2026-05-12
 tags:
-  - CUDA
   - infra
+  - CUDA
+  - 项目分析
 aliases:
   - CUDA Week2 项目解析
   - CUDA Parallel Reduction 工程解析
@@ -15,6 +16,8 @@ status: active
 > 这个项目是 `CUDA_learning/week02` 的 Week 2 CUDA 归约工程：用三种 parallel reduction 实现，从 naive baseline 逐步走到 shared memory 和 warp shuffle，并配套 correctness test、enhanced benchmark、Nsight Compute profiling 模板和 Agent workflow 约束。
 
 项目地址：[CUDA_learning/week02](https://github.com/hosendovebelva-boop/CUDA_learning/tree/main/week02)
+
+配套辅助笔记：[[3.5.2 CUDA Week 2 辅助笔记 - Mark Harris Reduction 优化路线]]
 
 ---
 
@@ -963,6 +966,7 @@ Week 3: 线程如何合并访问 global memory
 - [[Week 2 - Reduction + Profiling]]
 - [[3.5 CUDA Week 2 前置知识 - Reduction + Profiling]]
 - [[3.5.1 CUDA Week 2 辅助笔记 - Benchmark + Profiling]]
+- [[3.5.2 CUDA Week 2 辅助笔记 - Mark Harris Reduction 优化路线]]
 - [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
 - [[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]]
 - [[Week 3 - Transpose + Memory Coalescing]]

@@ -1,8 +1,8 @@
 ---
 tags:
+  - infra
   - CUDA
-  - infra
-  - infra
+  - 阶段计划
 ---
 
 # Week 1 - CUDA + Agent workflow

@@ -2,8 +2,9 @@
 title: CUDA 学习清单
 date: 2026-05-06
 tags:
-  - CUDA
   - infra
+  - CUDA
+  - 专题清单
 aliases:
   - CUDA checklist
   - CUDA 路线清单

@@ -2,8 +2,9 @@
 title: AI Agent Native AI Infra GPU Performance Engineer 培养方案
 date: 2026-05-06
 tags:
-  - CUDA
   - infra
+  - CUDA
+  - 总纲
 status: active
 ---
 
@@ -92,7 +93,7 @@ AI 可以生成工程代码和初版 kernel，但不能替代以下判断：
 |---|---|---|
 | 舍入误差 | FP16 / BF16 / FP8 / INT8 下计算结果是否可靠 | RMSNorm、Softmax、MatMul、quantization |
 | 截断误差 / 近似替代 | 用低精度、近似 kernel、quantization 替代原始计算时误差是否可接受 | INT8 dequant、FP8/INT4、近似 attention |
-| 绝对误差 / 相对误差 | correctness test 不能只看 `==`，要设置 `atol / rtol` | PyTorch reference test、多 dtype test |
+| 绝对误差 / 相对误差 | correctness test 不能只看“完全相等”，要设置 `atol / rtol` | PyTorch reference test、多 dtype test |
 | 有效数字 | FP32 / FP16 / BF16 的有效精度不同，决定累加策略 | FP16 输入 + FP32 accumulation |
 | 误差传播 | reduction、softmax、normalization 中局部误差如何传到输出 | row-wise reduction、stable softmax |
 | 条件数 / 病态问题 | 某些输入分布会放大误差，不能只测随机 toy case | 边界 shape、极端值、长序列 |
@@ -432,7 +433,7 @@ CUDA 细化任务、必做 kernel 和专题补课清单见 [[CUDA 学习清单]]
 | Week 1 剩余时间 | Reduction 预热 + Profiling 准备 | naive reduce、CPU reference、benchmark matrix、Nsight Compute 环境检查 |
 | Week 2 | Reduction + Profiling | reduce sum、warp / block reduction、CUDA event、第一次 Nsight Compute |
 | Week 3 | Transpose + Memory Coalescing | naive transpose、shared memory transpose、bank conflict padding、`profiling.md` |
-| Week 4 | MatMul v0 | naive matmul、tiled matmul、cuBLAS 对比、差距解释 |
+| Week 4 | MatMul v0 + Triton 入门 | naive matmul、tiled matmul、cuBLAS 对比、差距解释、Triton program id / mask load-store、`torch-triton-rmsnorm` 起步 |
 | Week 5 | [[Week 5 - Serving Benchmark Harness|Serving Benchmark Harness]] | request rate、max concurrency、prompt / output 分布、TTFT / TPOT / p95、`benchmark_config.yaml` |
 | Week 6 | [[Week 6 - Observability + Metrics|Observability + Metrics]] | vLLM OpenAI server、Prometheus / Grafana、queue / KV cache / latency dashboard、`runbook.md` |
 | Week 7 | [[Week 7 - KV Cache + Prefix Cache + Paged KV|KV Cache + Prefix Cache + Paged KV]] | shared prefix workload、prefix cache on/off、toy paged KV、FlashInfer baseline |
@@ -607,7 +608,7 @@ GEMM 深入：
 - warp-level tiling
 - Tensor Core
 - CUTLASS
-- cuBLAS baseline
+- [[3.6.2 cuBLAS GEMM Baseline|cuBLAS baseline]]
 - Triton matmul autotune
 
 LLM kernel 深入：
@@ -667,7 +668,7 @@ Agent 不可以改 benchmark 数据。
 - register blocking matmul
 - Triton matmul
 - CUTLASS GEMM
-- cuBLAS baseline
+- [[3.6.2 cuBLAS GEMM Baseline|cuBLAS baseline]]
 
 技术点：
 

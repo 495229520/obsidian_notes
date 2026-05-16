@@ -2,8 +2,9 @@
 title: CUDA Week 1 Hello World 项目解析
 date: 2026-05-08
 tags:
-  - CUDA
   - infra
+  - CUDA
+  - 项目分析
 aliases:
   - CUDA Week1 项目解析
   - CUDA Hello World 工程解析
@@ -761,7 +762,7 @@ Week 1 跑通后，进入 [[Week 2 - Reduction + Profiling]]。
 ## 关联知识
 
 - [[Week 1 - CUDA + Agent workflow]] - 这个项目对应的 Week 1 阶段计划
--[[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]]] - CUDA 执行模型、典型数据流和 benchmark 入门
+- [[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]] - CUDA 执行模型、典型数据流和 benchmark 入门
 - [[CUDA 学习清单]] - 后续 CUDA kernel 与 profiling 学习路线
 - [[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]] - event、stream、pinned memory 和 Runtime API
 - [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]] - 后续解释 kernel 性能瓶颈

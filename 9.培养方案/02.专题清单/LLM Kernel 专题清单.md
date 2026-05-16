@@ -2,8 +2,9 @@
 title: LLM Kernel 专题清单
 date: 2026-05-06
 tags:
-  - CUDA
   - infra
+  - Reasoning
+  - 专题清单
 aliases:
   - LLM CUDA Kernel
   - LLM 算子清单

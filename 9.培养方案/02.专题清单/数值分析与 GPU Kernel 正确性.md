@@ -2,8 +2,9 @@
 title: 数值分析与 GPU Kernel 正确性
 date: 2026-05-08
 tags:
-  - CUDA
   - infra
+  - CUDA
+  - 专题清单
 aliases:
   - GPU Kernel 数值正确性
   - 数值分析到 GPU Performance

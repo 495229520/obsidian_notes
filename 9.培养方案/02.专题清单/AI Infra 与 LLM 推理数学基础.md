@@ -2,8 +2,9 @@
 title: AI Infra 与 LLM 推理数学基础
 date: 2026-05-12
 tags:
-  - CUDA
   - infra
+  - Reasoning
+  - 专题清单
 aliases:
   - LLM 推理数学基础
   - AI Infra 数学基础
