@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <rect x="0" y="0" width="1200" height="600" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#334155" stroke-width="1.8"/>
+    </marker>
+    <style>
+      .title { font: 700 30px Arial, 'PingFang SC', sans-serif; fill: #111827; }
+      .label { font: 700 20px Arial, 'PingFang SC', sans-serif; fill: #111827; }
+      .small { font: 15px Arial, 'PingFang SC', sans-serif; fill: #374151; }
+      .tiny { font: 12px Arial, 'PingFang SC', sans-serif; fill: #4b5563; }
+      .gemm { fill: #dbeafe; stroke: #2563eb; stroke-width: 2; rx: 10; }
+      .kernel { fill: #ffffff; stroke: #334155; stroke-width: 2; rx: 10; }
+      .fusion { fill: #dcfce7; stroke: #16a34a; stroke-width: 2; rx: 10; }
+      .warn { fill: #fff7ed; stroke: #ea580c; stroke-width: 2; rx: 10; }
+      .line { stroke: #334155; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <text x="56" y="55" class="title">epilogue fusion：把 GEMM 后处理放到写回阶段</text>
+  <text x="56" y="88" class="small">bias / activation / scale 不一定要单独 kernel；cuBLASLt 可以把部分后处理配置为 matmul epilogue。</text>
+
+  <text x="70" y="145" class="label">不融合：多个 kernel 读写 D</text>
+  <rect x="70" y="175" width="180" height="68" class="gemm"/>
+  <text x="123" y="216" class="small">GEMM</text>
+  <path d="M260 209 H335" class="line"/>
+  <rect x="350" y="175" width="180" height="68" class="kernel"/>
+  <text x="404" y="216" class="small">Bias</text>
+  <path d="M540 209 H615" class="line"/>
+  <rect x="630" y="175" width="180" height="68" class="kernel"/>
+  <text x="686" y="216" class="small">ReLU/GELU</text>
+  <path d="M820 209 H895" class="line"/>
+  <rect x="910" y="175" width="180" height="68" class="kernel"/>
+  <text x="967" y="216" class="small">Write D</text>
+  <text x="95" y="280" class="tiny">D 被多次写回/读出，可能增加 memory traffic 和 launch overhead。</text>
+
+  <text x="70" y="365" class="label">融合：在 GEMM epilogue 中处理</text>
+  <rect x="70" y="395" width="305" height="80" class="gemm"/>
+  <text x="162" y="441" class="small">GEMM accumulator</text>
+  <path d="M390 435 H475" class="line"/>
+  <rect x="490" y="395" width="305" height="80" class="fusion"/>
+  <text x="548" y="426" class="small">epilogue: bias + activation</text>
+  <text x="582" y="452" class="tiny">while writing D</text>
+  <path d="M810 435 H895" class="line"/>
+  <rect x="910" y="395" width="180" height="80" class="kernel"/>
+  <text x="967" y="442" class="small">D</text>
+
+  <rect x="70" y="520" width="1020" height="48" class="warn"/>
+  <text x="100" y="551" class="small">Week14 只做最小调研或 bias case：融合 GEMM 和普通 GEMM 不要混成同一个 baseline 行。</text>
+</svg>

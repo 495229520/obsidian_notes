@@ -608,7 +608,7 @@ GEMM 深入：
 - warp-level tiling
 - Tensor Core
 - CUTLASS
-- [[3.6.2 cuBLAS GEMM Baseline|cuBLAS baseline]]
+- [[3.8.1 cuBLAS GEMM Baseline|cuBLAS baseline]]
 - Triton matmul autotune
 
 LLM kernel 深入：
@@ -668,7 +668,7 @@ Agent 不可以改 benchmark 数据。
 - register blocking matmul
 - Triton matmul
 - CUTLASS GEMM
-- [[3.6.2 cuBLAS GEMM Baseline|cuBLAS baseline]]
+- [[3.8.1 cuBLAS GEMM Baseline|cuBLAS baseline]]
 
 技术点：
 

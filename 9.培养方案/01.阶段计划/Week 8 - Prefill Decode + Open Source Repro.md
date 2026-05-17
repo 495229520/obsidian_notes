@@ -235,6 +235,7 @@ status: active
 
 ## 关联知识
 
+- [[3.12 LLM Serving Week 8 前置知识 - Prefill Decode + Open Source Repro|Week 8 前置知识]]
 - [[Week 5 - Serving Benchmark Harness]]
 - [[Week 6 - Observability + Metrics]]
 - [[Week 7 - KV Cache + Prefix Cache + Paged KV]]
