@@ -64,7 +64,7 @@ repo structure
 | artifact index | CSV、profiler、logs、notes 索引 | 文件不散 |
 | interview story | 3 分钟 / 10 分钟版本 | 能讲清能力 |
 | limitations | 写清没做什么 | 不过度包装 |
-| next steps | LLM kernels / attention 衔接 | 路线自然 |
+| next steps | LLM kernels / attention / serving / multi-GPU inference 衔接 | 路线自然 |
 
 最终实现列表建议清楚分组：
 
@@ -180,12 +180,15 @@ Next steps
 - 哪些实现值得保留。
 - 哪些优化收益不明显。
 - 下一阶段做 LLM kernels / attention 时如何复用 benchmark 协议。
+- 后续 serving 路线：PagedAttention、RadixAttention、continuous batching、chunked prefill、PD disaggregation。
+- 后续多 GPU 推理路线：TP / DP / PP / EP、NCCL collectives、RDMA、MoE EP / All-to-All。
 
 验收：
 
-- 明确 Week 17 之后进入 LLM 小算子或 attention。
+- 明确 Week 17 之后进入 LLM 小算子、attention、serving engine 或 multi-GPU inference。
 - GEMM 项目形成阶段性闭环。
 - 不继续无限优化 GEMM，避免主线拖延。
+- 不把 Week 16 包装成已经实现多 GPU runtime，只写后续作品集方向和面试表达边界。
 
 ## 4. Benchmark / Profiling 指标
 
@@ -227,6 +230,7 @@ Next steps
 | `gemm_comparison_report.md` | 全量对比和解释 | 结论可追溯 |
 | `artifacts_index.md` | raw data、profiler、report 索引 | 文件清楚 |
 | `gemm_stage2_retro.md` | 阶段复盘和后续路线 | 能转入下一模块 |
+| `multi_gpu_inference_next_steps.md` | TP / DP / PP / EP、NCCL collectives、RDMA、MoE EP / All-to-All 后续索引 | 边界清楚，不冒充已实现 |
 | 面试表达 | 3 分钟 / 10 分钟版本 | 能讲清项目 |
 
 ## 验收标准
@@ -238,6 +242,7 @@ Next steps
 - [ ] limitations 明确。
 - [ ] 有 3 分钟和 10 分钟面试表达。
 - [ ] Week 17 之后的下一主线明确。
+- [ ] 后续多 GPU 推理路线包含 TP / DP / PP / EP、NCCL、RDMA、MoE EP / All-to-All，但明确这不是 Week 16 已完成实现。
 
 ## 面试问题
 

@@ -142,9 +142,10 @@ Numerical correctness
 | 主线 | 要练什么 | 最终简历表达 |
 |---|---|---|
 | AI Agent 工程流 | Claude Code / Codex / Cursor、MCP、hooks、自动化测试、PR review | 能用 Agent 提高开发效率，但有人工审查和性能验证流程 |
-| Kernel 能力 | CUDA、Triton、RMSNorm、Softmax、MatMul、RoPE、Attention | 能写并优化 LLM 常见算子 |
+| Transformer / LLM 架构 | decoder-only block、RMSNorm、QKV projection、MHA / GQA / MQA、RoPE、causal mask、Online Softmax、FlashAttention、KV cache、MLP / SwiGLU、MoE、residual、lm_head | 能把一个 Transformer block 拆成 GEMM、attention、norm、activation、KV cache、MoE routing 与 serving bottleneck |
+| Kernel 能力 | CUDA、Triton、RMSNorm、Softmax / Online Softmax、MatMul、RoPE、Attention / FlashAttention | 能写并优化 LLM 常见算子 |
 | GPU 性能分析 | Nsight Compute、Nsight Systems、CUDA event、roofline、memory-bound / compute-bound | 能解释 kernel 为什么慢、怎么优化 |
-| 推理 Infra / 成本优化 | vLLM、SGLang、FlashInfer、TensorRT-LLM、KV cache、prefix cache、prefill / decode、observability、quantization | 能用 TTFT / TPOT / TPS / RPS / queueing / KV cache / cost per 1M tokens 评估系统 |
+| 推理 Infra / 成本优化 | vLLM、SGLang、FlashInfer、TensorRT-LLM、PagedAttention、RadixAttention、Prefix Cache / Prefix Attention、continuous batching、static batching、chunked prefill、PD disaggregation、TP / DP / PP / EP、observability、quantization | 能用 TTFT / TPOT / TPS / RPS / queueing / KV cache / communication / cost per 1M tokens 评估系统 |
 | 编译器 / Lowering 认知 | Triton lowering、MLIR basics、IR / pass / backend lowering、codegen correctness、operator fusion | 能解释高层算子如何走到 kernel / codegen，并知道 generated code 的 correctness 与性能风险 |
 
 最低可验证能力：
@@ -154,6 +155,16 @@ Numerical correctness
 - 能接 PyTorch C++ / CUDA extension。
 - 能用 CUDA event benchmark。
 - 能读 Nsight Compute / Nsight Systems 的关键指标。
+- 能画出 decoder-only Transformer 单层推理路径。
+- 能根据 `hidden_size` / `num_layers` / `num_attention_heads` / `num_key_value_heads` / `intermediate_size` 推出 QKV、MLP 和 KV cache shape。
+- 能区分 MHA、GQA、MQA，并解释它们对 KV cache 体积和 decode 读带宽的影响。
+- 能说明 Online Softmax 如何支撑 FlashAttention 的分块精确 attention。
+- 能解释 MoE 的 router、top-k experts、dispatch / combine，以及它对 serving latency、负载均衡和显存的影响。
+- 能解释 prefill 为什么更偏计算密集，decode 为什么更容易受 KV cache 读带宽和调度限制。
+- 能区分 PagedAttention、RadixAttention、Prefix Cache / Prefix Attention 的作用边界。
+- 能解释 static batching 和 continuous batching 在 GPU 利用率、排队延迟、tail latency 上的取舍。
+- 能解释 chunked prefill 和 PD disaggregation 对 TTFT、TPOT、throughput、KV transfer 的影响。
+- 能说明 TP / DP / PP / EP 分别切什么维度，以及 NCCL / RDMA / AllReduce / AllGather / ReduceScatter / All-to-All 可能成为哪些瓶颈。
 - 能解释 TTFT / TPOT / ITL / TPS / RPS / queue time / GPU utilization / KV cache usage / cost per 1M tokens。
 - 能把 kernel benchmark 的收益接回 serving 指标，而不是只停留在 toy latency。
 - 能画出 Triton kernel 到 IR / lowering / PTX 的粗链路，并说明哪些环节会影响 correctness 与性能。
@@ -259,6 +270,22 @@ Triton 入门：
 - `BLOCK_SIZE`
 - fused softmax
 - Triton matmul
+
+Transformer 基础：
+
+- token -> embedding -> decoder-only Transformer block -> logits。
+- decoder block 内部路径：RMSNorm -> QKV projection -> RoPE -> causal self-attention -> output projection -> residual -> RMSNorm -> MLP / SwiGLU -> residual。
+- Q/K/V 从 hidden state 做 linear projection 得到，本质是 GEMM。
+- attention score shape 至少能从 batch、seq_len、num_heads、head_dim 推出来。
+- MHA 是每组 Q head 都有对应 K/V head；GQA 是多组 Q head 共享一组 K/V head；MQA 是所有 Q head 共享一组 K/V head。
+- causal mask 决定只能看历史 token，RoPE 作用在 Q/K，不作用在 V。
+- Online Softmax 通过边扫描边维护 row max 和 denominator，在不一次性保存完整 score 矩阵时仍保持 softmax 数值稳定。
+- MLP / SwiGLU 主要由 up / gate / down projection 组成，仍然是 GEMM + activation。
+- MoE 把部分 MLP 换成 router + top-k experts，不是每个 token 都激活所有专家。
+
+最小任务：
+
+- 从 Qwen2.5-0.5B / TinyLlama / Llama 3.2 1B 任选一个，读 `config.json`，写出一层 Transformer 的 tensor shape map。
 
 AI Agent 工程流：
 
@@ -519,6 +546,8 @@ observability / KV cache / prefill-decode
 - quantization on / off
 - prefix caching on / off
 - chunked prefill on / off
+- static batching vs continuous batching
+- request arrival pattern：steady / bursty / mixed
 
 必须记录：
 
@@ -545,6 +574,8 @@ observability / KV cache / prefill-decode
 - 至少覆盖低延迟、高吞吐、长上下文、共享 prefix 四类场景。
 - 能解释为什么某个配置 TTFT 低但 TPS 不高。
 - 能解释为什么 max concurrency 提高后 TPS 上升但 TPOT / p95 latency 变差。
+- 能解释固定 batch benchmark 为什么不能代表真实 online serving。
+- 能说明 continuous batching、chunked prefill、prefix cache 分别改变哪类指标。
 - 能解释 benchmark 中 failed requests 的原因。
 - 能说明 benchmark 是否公平、可复现、可解释。
 
@@ -616,21 +647,55 @@ LLM kernel 深入：
 - RMSNorm
 - RoPE
 - Softmax
+- Online Softmax
 - fused bias + activation
 - top-k / top-p sampling
 - dequant + matmul toy version
+- FlashAttention toy forward
+
+Transformer 深入：
+
+- MHA / GQA / MQA 的区别：Q heads 不一定等于 KV heads，KV heads 越少，KV cache 越省，decode 阶段读 KV 的带宽压力越小。
+- attention FLOPs 和 memory access 分别随 sequence length、head_dim、heads 怎么变化。
+- Online Softmax 的核心是分块更新 `m_i` 和 `l_i`，避免直接对长序列 score 做不稳定的 `exp` / `sum`。
+- MLP / SwiGLU 通常是大 GEMM，理解 `intermediate_size` 对计算量和显存流量的影响。
+- MoE 的关键不是“参数更多所以更强”，而是 router 选择少量 expert；推理 infra 要关心 expert dispatch、load balance、expert parallel、all-to-all 和 batch token 分布。
+- prefill 阶段一次处理 prompt，GEMM / attention 计算量大；decode 每步只生成一个 token，更容易被 KV cache 读取、调度和小 batch 限制。
+- FlashAttention 用 tiling + Online Softmax 避免把完整 attention score 矩阵物化到 HBM，解决 attention 中间矩阵和显存读写问题。
+- PagedAttention 解决 KV cache 分配、碎片和 variable-length batch 管理问题。
 
 推理系统：
 
 - prefill
 - decode
 - KV cache
-- paged KV cache
+- PagedAttention / paged KV cache
+- RadixAttention / radix tree prefix matching
+- Prefix Cache / Prefix Attention
 - continuous batching
+- static batching
 - chunked prefill
-- prefix cache
+- prefill / decode disaggregation
 - speculative decoding
 - quantization
+
+Serving engine 深入：
+
+- static batching：固定 batch 做吞吐测试，简单但不能代表真实 online serving 的动态到达。
+- continuous batching：每个 decode step 都可以接入新请求，提高 GPU 利用率，但可能带来 queueing 和 tail latency 取舍。
+- chunked prefill：把长 prompt prefill 切块，降低对 decode 的阻塞，但会改变 TTFT / TPOT / scheduling tradeoff。
+- PagedAttention：通过 block table / page table 管理 KV cache，解决显存碎片、变长请求和 batch decode 访存组织问题。
+- RadixAttention：用 radix tree 组织共享 prefix，让 system prompt、tools schema、长文档 prefix 的 KV cache 更容易复用。
+- PD disaggregation：拆分 prefill worker 和 decode worker，需要同时评估 TTFT、TPOT、KV transfer、network / NVLink / RDMA 带宽和 worker 配比。
+
+多 GPU 推理并行：
+
+- TP：按权重 / hidden 维度切分 tensor，需要 AllReduce / AllGather / ReduceScatter。
+- DP：复制模型副本分摊请求，主要考验 router、负载均衡和成本。
+- PP：按层切分 pipeline，关注 bubble、micro-batch 和跨 stage latency。
+- EP：MoE expert parallel，关注 expert dispatch、load balance 和 All-to-All。
+- NCCL：多 GPU collective 基础，至少能解释 AllReduce、AllGather、ReduceScatter、All-to-All 的用途。
+- RDMA：跨机通信基础，先理解它为什么影响多机推理的 KV transfer、expert dispatch 和 tail latency，不要求从零实现网络栈。
 
 Compiler-aware kernel 路线：
 
@@ -704,7 +769,9 @@ Agent 不可以改 benchmark 数据。
 - RMSNorm
 - RoPE
 - Softmax
+- Online Softmax
 - SwiGLU / GELU
+- toy attention / FlashAttention forward skeleton
 - top-k sampling
 - INT8 dequant toy kernel
 
@@ -713,6 +780,7 @@ Agent 不可以改 benchmark 数据。
 - row-wise reduction
 - warp reduction
 - vectorized load
+- streaming max / sum update
 - `half2`
 - kernel fusion
 - Triton vs CUDA
@@ -722,6 +790,8 @@ Agent 不可以改 benchmark 数据。
 - 所有算子都有 PyTorch reference。
 - 至少 3 个算子有 CUDA 和 Triton 两个版本。
 - 每个算子都要判断 memory-bound / compute-bound。
+- 至少用 Online Softmax 写出 toy attention，说明它和普通 softmax 在数值稳定性、显存占用上的差异。
+- 产出 `transformer_block_shape_map.md`，把 RMSNorm、QKV projection、RoPE、attention、MLP / SwiGLU 映射到已实现 kernel 或 PyTorch reference。
 - 至少写一篇“哪些算子适合 fusion”的总结。
 - 可选：实现一个 toy fusion demo，例如 bias + GELU、residual + RMSNorm 或 dequant + matmul 的简化版本，并给出 fusion 前后的 correctness 与 benchmark 对比。
 
@@ -734,6 +804,7 @@ Agent 不可以改 benchmark 数据。
 - toy contiguous KV cache。
 - toy paged KV cache。
 - page table / block table。
+- radix tree prefix matching toy note。
 - variable-length sequence batch。
 - batch decode attention toy version。
 - 可选：调用 FlashInfer paged KV cache attention API 做 baseline。
@@ -742,6 +813,7 @@ Agent 不可以改 benchmark 数据。
 实验对比：
 
 - contiguous KV vs paged KV。
+- prefix cache vs RadixAttention mental model。
 - fixed length batch vs variable length batch。
 - small batch decode vs large batch decode。
 - short context vs long context。
@@ -753,11 +825,14 @@ Agent 不可以改 benchmark 数据。
 - 为什么 variable-length request 会带来 cache 管理问题？
 - paged KV cache 解决的是显存碎片、调度灵活性，还是 attention 本身计算复杂度？
 - 为什么 page table / block table 会影响 kernel 访存？
+- RadixAttention 和普通 prefix cache 的区别是什么？
 - 为什么长上下文下 KV cache 成本会变成主要瓶颈？
+- Transformer 的 `num_layers` / `num_attention_heads` / `num_key_value_heads` / `context_length` 如何决定 KV cache 内存压力？
 
 产出：
 
 - `paged_kv_layout.md`
+- `radix_prefix_notes.md`
 - `attention_decode_benchmark.csv`
 - `profiling.md`
 - `design_note.md`
@@ -806,11 +881,14 @@ Agent 不可以改 benchmark 数据。
 - 理解为什么 decode 阶段更关注 TPOT / ITL。
 - 理解 prefill-decode disaggregation 的收益和代价。
 - 理解 KV cache transfer 对 latency 和 bandwidth 的影响。
+- 理解 chunked prefill 如何缓解长 prompt 阻塞 decode。
+- 理解 network / NVLink / RDMA 边界对 PD disaggregation 的影响。
 
 实验路径：
 
 - 轻量版本：用 vLLM / SGLang benchmark 构造长 prompt / 短 output、短 prompt / 长 output、混合负载，分析 TTFT、TPOT、TPS、queueing、GPU memory。
-- 进阶版本：尝试 vLLM disaggregated prefill example 或 SGLang PD disaggregation，画出 prefill worker、decode worker、KV transfer、request router 的系统图。
+- 对比 chunked prefill on / off，记录 TTFT、TPOT 和 tail latency。
+- 进阶版本：尝试 vLLM disaggregated prefill example 或 SGLang PD disaggregation，画出 request router、prefill worker、decode worker、KV transfer、network / NVLink / RDMA boundary 的系统图。
 
 必须回答：
 
@@ -819,6 +897,7 @@ Agent 不可以改 benchmark 数据。
 - KV cache transfer 的开销在哪里？
 - prefill worker 和 decode worker 的比例如何估算？
 - disaggregation 是提升吞吐、降低 TTFT，还是改善资源隔离？
+- disaggregation 什么时候会因为 KV transfer / network overhead 反而不划算？
 
 产出：
 
@@ -835,7 +914,7 @@ Agent 不可以改 benchmark 数据。
 |---|---|---|
 | `prefix-cache-and-shared-context-lab` | 研究共享 system prompt、tools schema、长文档 prefix、多轮对话对推理成本的影响 | prefix cache on/off benchmark、shared prefix workload、收益解释 |
 | `quantization-cost-quality-lab` | 把 quantization 从参数概念变成 serving 成本和质量实验 | FP16 / BF16 vs INT8 / FP8 / INT4 对比、cost / 1M tokens、简单质量检查 |
-| `multi-gpu-inference-scaling-lab` | 理解 tensor parallel、serving replica、NCCL 通信和多 GPU cost tradeoff | 1 GPU vs 2 GPU 对比、TTFT / TPOT / TPS、通信开销分析 |
+| `multi-gpu-inference-scaling-lab` | 理解 TP / DP / PP / EP、serving replica、NCCL / RDMA 通信和多 GPU cost tradeoff | 1 GPU vs 2 GPU 对比、TTFT / TPOT / TPS、AllReduce / AllGather / All-to-All 通信开销分析 |
 
 ### 阶段二开源学习路线
 
@@ -858,6 +937,7 @@ Agent 不可以改 benchmark 数据。
 - 能搭 vLLM / SGLang benchmark。
 - 能解释 TTFT / TPOT / ITL / TPS / queueing / KV cache / cost。
 - 能区分 prefill-heavy、decode-heavy、shared-prefix、long-context 等 workload。
+- 能解释 MHA / GQA / MQA、Online Softmax / FlashAttention、MoE serving 分别影响哪类瓶颈。
 - 能说明 prefix cache、paged KV、chunked prefill、PD disaggregation 和 quantization 分别解决什么问题。
 - 能画出 Triton / MLIR / backend lowering 的粗链路。
 - 能说明 CUDA / Triton / CUTLASS / cuBLAS 在 GEMM 上各自适合什么场景。
@@ -875,7 +955,10 @@ Agent 不可以改 benchmark 数据。
 ### 高级学习点
 
 - FlashAttention 思想
+- Online Softmax
 - PagedAttention
+- MHA / GQA / MQA
+- MoE serving
 - KV cache block manager
 - continuous batching
 - prefix cache
@@ -949,6 +1032,8 @@ Agent 不可以改 benchmark 数据。
 - prefill / decode 区分
 - KV cache block table
 - paged KV cache toy model
+- radix tree prefix matching toy model
+- static batching / continuous batching scheduler
 - batch decode
 - TTFT / TPOT 统计
 - cost per 1M tokens 计算
@@ -963,8 +1048,10 @@ Agent 不可以改 benchmark 数据。
 
 - KV cache 为什么会成为显存瓶颈？
 - paged KV cache 解决什么问题？
+- RadixAttention 如何复用共享 prefix？
 - prefill 和 decode 为什么瓶颈不同？
 - continuous batching 怎么提升 GPU 利用率？
+- static batching 和 continuous batching 的 tradeoff 是什么？
 
 ### 秋招项目 9：agentic-infra-workflow
 
@@ -1250,6 +1337,12 @@ Step 4：Contribute
 实现 CUDA / Triton RMSNorm、Softmax、Tiled MatMul 等 LLM 常见算子，使用 CUDA event 与 Nsight Compute 进行性能分析；构建 vLLM / SGLang serving benchmark harness，统计 TTFT、TPOT / ITL、TPS、RPS、queue time、KV cache usage 与 cost / 1M tokens，并通过 request rate、max concurrency、prompt / output length、prefix cache 配置分析延迟-吞吐-成本权衡。
 ```
 
+架构表达要补上：
+
+```text
+能从 decoder-only Transformer block 出发解释 RMSNorm、QKV projection、MHA / GQA / MQA、RoPE、Online Softmax / FlashAttention、MLP / SwiGLU、MoE、KV cache 在推理系统中的位置，并把 kernel 优化、prefill / decode 瓶颈和 serving 指标变化对应起来。
+```
+
 再加一句：
 
 ```text
@@ -1275,6 +1368,21 @@ Step 4：Contribute
 ```
 
 ## 面试问题清单
+
+### Transformer / LLM 架构
+
+- decoder-only Transformer 单层推理路径是什么？
+- Q/K/V 从哪里来，shape 怎么算？
+- MHA / GQA / MQA 的区别是什么，为什么 GQA / MQA 能降低 KV cache？
+- RoPE 作用在哪些 tensor 上？为什么不是 V？
+- causal mask 在 prefill 和 decode 中分别怎么体现？
+- Online Softmax 解决什么问题？它如何维护 running max 和 denominator？
+- FlashAttention 为什么不需要物化完整 attention score 矩阵？它和 Online Softmax 有什么关系？
+- MLP / SwiGLU 为什么主要是 GEMM + elementwise？
+- MoE 的 router、top-k experts、dispatch / combine 分别是什么？
+- MoE 推理为什么会遇到负载不均、通信和显存问题？
+- 如何根据 `num_layers`、`num_key_value_heads`、`head_dim`、`context_length` 和 dtype 估算 KV cache 大小？
+- 为什么 Transformer 架构会自然导出 prefill / decode 两种不同瓶颈？
 
 ### Kernel
 
@@ -1309,10 +1417,18 @@ Step 4：Contribute
 - 为什么 batch size 增大会提升 TPS 但可能恶化 TPOT？
 - KV cache 为什么是显存瓶颈？
 - paged KV cache 解决什么问题？
+- PagedAttention 和普通 paged KV layout 的关系是什么？
+- RadixAttention 如何用 radix tree 复用 shared prefix？
 - continuous batching 如何提高 GPU 利用率？
+- static batching 和 continuous batching 分别适合什么 benchmark？
 - prefix cache 适合什么场景？
+- chunked prefill 解决什么问题，可能牺牲什么指标？
 - TTFT 变高时如何区分 queueing、prefill、网络和 KV cache 压力？
 - 什么 workload 适合 prefill / decode disaggregation？
+- PD disaggregation 中 KV transfer 的通信瓶颈在哪里？
+- TP / DP / PP / EP 分别切什么维度？
+- NCCL 中 AllReduce、AllGather、ReduceScatter、All-to-All 分别常出现在什么并行策略里？
+- RDMA 对跨机推理的意义是什么？
 - 为什么 random prompt benchmark 可能低估 Agent / RAG workload 的优化空间？
 - speculative decoding 的收益和代价是什么？
 - quantization 降成本的代价是什么？

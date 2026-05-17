@@ -11,7 +11,7 @@ status: active
 # Week 6 - Observability + Metrics
 
 > [!goal] 本周目标
-> 从“跑 benchmark 的人”升级到“能定位线上 serving 问题的人”：部署 vLLM OpenAI-compatible server，接入 Prometheus / Grafana，观察 queueing、running / waiting requests、TTFT、TPOT、KV cache usage、tokens/s，并写出一份 serving runbook。
+> 从“跑 benchmark 的人”升级到“能定位线上 serving 问题的人”：部署 vLLM OpenAI-compatible server，接入 Prometheus / Grafana，观察 queueing、running / waiting requests、running batch、prefill queue、decode step、TTFT、TPOT、KV cache usage、tokens/s，并写出一份 serving runbook。
 
 ## 学习目标
 
@@ -81,9 +81,10 @@ observability/
 | 类别 | 指标 |
 |---|---|
 | Request state | running requests、waiting requests、finished requests、failed requests |
+| Scheduler / batching | waiting queue、running batch、prefill queue、decode step、batch size，如果框架暴露 |
 | Latency | TTFT、TPOT / ITL、E2E latency、queue time |
 | Token throughput | prompt tokens/s、generation tokens/s、output TPS |
-| Cache | GPU cache usage、KV cache blocks、prefix cache hit rate，如果暴露 |
+| Cache | GPU cache usage、KV cache blocks、prefix cache hit rate、cache hit rate，如果暴露 |
 | Resource | GPU utilization、GPU memory、CPU memory、network latency，可选 |
 | Reliability | error rate、timeout、OOM、server restart |
 
@@ -116,7 +117,7 @@ observability/
 ### Day 3：Grafana dashboard
 
 - 创建 dashboard。
-- 至少包含 latency、queue、requests、tokens/s、cache、GPU memory 六类面板。
+- 至少包含 latency、queue、requests、scheduler / batching、tokens/s、cache、GPU memory 七类面板。
 
 验收：
 
@@ -150,6 +151,9 @@ observability/
 - 症状：GPU utilization 高但 TPS 不涨。
 - 症状：KV cache usage 接近满。
 - 症状：failed requests 增多。
+- 症状：continuous batching 下 tail latency 恶化。
+- 症状：chunked prefill 开启后 TTFT / TPOT 同时变化。
+- 症状：prefix cache hit rate 或 cache hit rate 异常。
 
 每个症状都写：
 
@@ -179,9 +183,9 @@ observability/
 
 - vLLM server 暴露 metrics。
 - Prometheus 能采集指标。
-- Grafana 至少有 6 类面板。
+- Grafana 至少有 7 类面板，包含 scheduler / batching 视角。
 - 至少复跑 Week 5 的 4 类 benchmark 场景。
-- runbook 能回答 TTFT、TPOT、GPU utilization、KV cache usage、failed requests 五类问题。
+- runbook 能回答 TTFT、TPOT、GPU utilization、KV cache usage、failed requests、batching tail latency、prefix cache 命中异常七类问题。
 - 报告不只贴图，必须解释指标变化和下一步动作。
 
 ## 面试问题
@@ -192,6 +196,9 @@ observability/
 - running requests 和 waiting requests 分别说明什么？
 - GPU utilization 高但 TPS 不涨，可能是什么原因？
 - KV cache usage 接近满时有哪些处理手段？
+- 如何从指标判断瓶颈在 scheduler、prefill、decode、KV cache 还是通信？
+- continuous batching 为什么可能改善吞吐但恶化 tail latency？
+- chunked prefill 开启后，TTFT 和 TPOT 为什么可能一起变化？
 - 为什么 observability 对 AI Infra 面试加分？
 - Agent 能不能自动写 runbook？为什么最终结论仍要人工判断？
 

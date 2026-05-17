@@ -11,7 +11,7 @@ status: active
 # Week 8 - Prefill Decode + Open Source Repro
 
 > [!goal] 本周目标
-> 用 Week 5-7 的 benchmark、observability 和 KV cache 基础，专门分析 prefill-heavy / decode-heavy workload，并完成一个高质量开源 issue reproduction 或 benchmark report。重点不是“投递包装”，而是拿到一份可复现、可解释、能被 maintainer 看懂的工程证据。
+> 用 Week 5-7 的 benchmark、observability 和 KV cache 基础，专门分析 prefill-heavy / decode-heavy workload、chunked prefill 和 prefill / decode disaggregation，并完成一个高质量开源 issue reproduction 或 benchmark report。重点不是“投递包装”，而是拿到一份可复现、可解释、能被 maintainer 看懂的工程证据。
 
 ## 学习目标
 
@@ -56,6 +56,8 @@ status: active
 | high concurrency prefill | 长 prompt + 高 request rate | backlog、failed requests |
 | shared prefix prefill | 长 shared prefix + 不同问题 | prefix cache 是否降低 TTFT |
 | KV cache pressure | 长 context + 高并发 | KV cache usage、OOM / rejection |
+| chunked prefill | 长 prompt，chunked prefill off / on | TTFT、TPOT、decode starvation |
+| PD disaggregation | prefill worker / decode worker 分离 | KV transfer、network / NVLink / RDMA 边界 |
 
 ## 3. 轻量实验路径
 
@@ -64,6 +66,7 @@ status: active
 - 用 vLLM / SGLang benchmark 构造长 prompt / 短 output。
 - 构造短 prompt / 长 output。
 - 构造混合负载。
+- 对比 chunked prefill on / off。
 - 对比 TTFT、TPOT、TPS、RPS、queue time、GPU memory、KV cache usage。
 - 写出 prefill-heavy 与 decode-heavy 的判断标准。
 
@@ -80,7 +83,7 @@ status: active
 
 - vLLM disaggregated prefilling example。
 - SGLang PD disaggregation。
-- 画出 prefill worker、decode worker、KV transfer、request router 的系统图。
+- 画出 request router、prefill worker、decode worker、KV transfer、network / NVLink / RDMA boundary 的系统图。
 - 测试拆分前后 TTFT、TPOT、TPS、GPU memory、网络 / NVLink 传输压力。
 
 > [!warning] 不要硬上复杂部署
@@ -134,7 +137,7 @@ status: active
 
 - 复习 TTFT、TPOT / ITL、TPS、RPS。
 - 写 `workload_config.yaml`。
-- 定义 prefill-heavy / decode-heavy / mixed 三类 workload。
+- 定义 prefill-heavy / decode-heavy / mixed / chunked-prefill / PD-disagg 五类 workload。
 
 验收：
 
@@ -144,11 +147,13 @@ status: active
 
 - 长 prompt、短 output。
 - 扫 request rate 和 max concurrency。
+- 对比 chunked prefill off / on，如果框架支持。
 - 观察 TTFT、queue time、GPU memory、KV cache usage。
 
 验收：
 
 - 能说明为什么长 prompt 会推高 TTFT。
+- 能说明 chunked prefill 什么时候缓解 decode starvation，什么时候可能影响 TPOT。
 
 ### Day 3：decode-heavy benchmark
 
@@ -163,11 +168,22 @@ status: active
 ### Day 4：mixed workload
 
 - 混合短 prompt、长 prompt、短 output、长 output。
+- 记录 prefill-heavy / decode-heavy 混合比例。
 - 观察 tail latency 和 failed requests。
 
 验收：
 
 - 能说明混合负载为什么比固定 prompt 更接近真实 serving。
+
+### Day 4.5：PD disaggregation sketch
+
+- 如果部署成本可控，尝试 vLLM / SGLang 的 PD disaggregation 示例。
+- 如果部署成本过高，至少画出 router、prefill worker、decode worker、KV transfer 和 network / NVLink / RDMA boundary。
+- 写清 PD disaggregation on / off 需要比较哪些指标。
+
+验收：
+
+- 能解释 disaggregation 什么时候降低 TTFT，什么时候因 KV transfer / network overhead 不划算。
 
 ### Day 5：选择开源 reproduction 目标
 
@@ -208,6 +224,7 @@ status: active
 | `workload_config.yaml` | prefill-heavy、decode-heavy、mixed workload | 配置清楚 |
 | `benchmark_results.csv` | 原始 benchmark 数据 | 不手动修改 |
 | `prefill_decode_report.md` | 指标分析和判断标准 | 结论能被数据支持 |
+| `pd_system_diagram.md` | router、prefill worker、decode worker、KV transfer、network / NVLink / RDMA boundary | 系统边界清楚 |
 | `reproduce.sh` | 最小复现命令 | 可复跑 |
 | `issue_reproduction.md` 或 `benchmark_report.md` | 开源贡献材料 | maintainer 能看懂 |
 
@@ -217,6 +234,8 @@ status: active
 - 能解释 TTFT、TPOT / ITL、TPS、RPS、queue time、KV cache usage 的变化。
 - 能说明什么场景适合 prefill / decode disaggregation，什么场景不适合。
 - 能说明 KV cache transfer 的收益和代价。
+- 能解释 chunked prefill 对 TTFT、TPOT 和 throughput 的影响。
+- 能解释 disaggregation 什么时候因 KV transfer / network overhead 反而不划算。
 - 至少完成一个高质量 issue reproduction 或 benchmark report 草稿。
 - Agent 生成的报告必须人工核对指标和结论。
 
@@ -228,6 +247,8 @@ status: active
 - 什么 workload 适合 prefill / decode disaggregation？
 - 什么 workload 不适合 disaggregation？
 - KV cache transfer 的开销在哪里？
+- chunked prefill 和 PD disaggregation 解决的是同一个问题吗？
+- network / NVLink / RDMA 边界会如何影响 disaggregation 收益？
 - prefill worker 和 decode worker 比例如何估算？
 - issue reproduction 为什么要最小化？
 - benchmark report 怎样避免“看起来很漂亮但不可复现”？

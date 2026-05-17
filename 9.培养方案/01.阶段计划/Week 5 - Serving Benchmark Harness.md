@@ -11,7 +11,7 @@ status: active
 # Week 5 - Serving Benchmark Harness
 
 > [!goal] 本周目标
-> 把 Week 1-4 的 CUDA / profiling 基础接到真实 LLM serving 指标上：不再只记录一个 tokens/s，而是能设计低延迟、高吞吐、长上下文、共享 prefix 四类负载，并解释 TTFT、TPOT / ITL、TPS、RPS、p95 latency 和 failed requests 为什么变化。
+> 把 Week 1-4 的 CUDA / profiling 基础接到真实 LLM serving 指标上：不再只记录一个 tokens/s，而是能设计低延迟、高吞吐、长上下文、共享 prefix、batching 对比五类负载，并解释 TTFT、TPOT / ITL、TPS、RPS、p95 latency 和 failed requests 为什么变化。
 
 ## 学习目标
 
@@ -45,6 +45,7 @@ CUDA / Triton 在这一周仍然是支撑能力：你需要用它们理解 GPU b
 | 高吞吐 | 高 request rate、高 max concurrency、中等 prompt / output | TPS 上升时 p95 latency 如何恶化 |
 | 长上下文 | 长 prompt、短 output 或长 prompt、长 output | TTFT、GPU memory、KV cache 压力 |
 | 共享 prefix | 相同 system prompt / tools schema / 长文档 prefix，不同用户问题 | prefix cache 对 TTFT 和成本的影响 |
+| batching 对比 | 固定 batch baseline vs online request arrival | static batching 与 continuous batching 对 TPS、TPOT、tail latency 的影响 |
 
 可选扩展：
 
@@ -52,6 +53,8 @@ CUDA / Triton 在这一周仍然是支撑能力：你需要用它们理解 GPU b
 - quantization on / off。
 - prefix caching on / off。
 - chunked prefill on / off。
+- batching mode：static / continuous。
+- request arrival pattern：steady / bursty / mixed。
 - vLLM vs SGLang。
 
 ## 3. benchmark 配置模板
@@ -70,6 +73,7 @@ engine:
   gpu_memory_utilization: 0.90
   prefix_caching: false
   chunked_prefill: TBD
+  batching_mode: continuous
 
 environment:
   gpu: TBD
@@ -84,6 +88,7 @@ workload:
   request_rate: 4
   max_concurrency: 32
   burstiness: 1.0
+  request_arrival_pattern: steady
   prompt_length_distribution: fixed_512
   output_length_distribution: fixed_128
   shared_prefix_ratio: 0.0
@@ -137,11 +142,13 @@ measurement:
 - 固定 prompt / output 长度。
 - 扫 request rate：低、中、高。
 - 扫 max concurrency：低、中、高。
+- 如果工具支持，记录 static batching baseline 和 continuous batching serving 结果的差异。
 - 观察 p95 latency 开始恶化的拐点。
 
 验收：
 
 - 能解释为什么 max concurrency 增大后 TPS 可能上升，但 TPOT / p95 latency 变差。
+- 能解释固定 batch benchmark 为什么不等于真实 online serving。
 
 ### Day 4：prompt / output length 矩阵
 
@@ -161,10 +168,12 @@ measurement:
 - 构造共享 system prompt。
 - 构造共享 system prompt + tools schema。
 - 如果框架支持，比较 prefix cache off / on。
+- 如果框架支持，比较 chunked prefill off / on。
 
 验收：
 
 - 能解释 shared prefix 为什么接近 Agent / RAG / coding assistant 场景。
+- 能说明 prefix cache 和 chunked prefill 分别影响 TTFT、TPOT 还是 throughput。
 
 ### Day 6：报告
 
@@ -198,7 +207,8 @@ measurement:
 
 ## 7. 验收标准
 
-- 至少覆盖低延迟、高吞吐、长上下文、共享 prefix 四类场景。
+- 至少覆盖低延迟、高吞吐、长上下文、共享 prefix、batching 对比五类场景。
+- 至少补充一次 static batching vs continuous batching 的解释或对比。
 - 每个实验都有环境、命令、配置和原始结果。
 - 能解释 TTFT 低但 TPS 不高的情况。
 - 能解释 TPS 上升但 TPOT / p95 latency 变差的情况。
@@ -212,6 +222,9 @@ measurement:
 - 为什么不能只报告平均 TPS？
 - 为什么长 prompt 会推高 TTFT？
 - 为什么高并发下 TPS 可能上升但 p95 latency 变差？
+- static batching 和 continuous batching 的区别是什么？
+- 为什么固定 batch benchmark 不能代表真实 online serving？
+- chunked prefill 可能改善什么，又可能伤害什么？
 - random prompt benchmark 和 Agent / RAG workload 有什么差异？
 - 你怎么证明这个 benchmark 可复现？
 - Agent 生成 benchmark 脚本时你如何防止它改数据？

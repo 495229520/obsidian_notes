@@ -1,5 +1,5 @@
 ---
-title: Week 7 - KV Cache + Prefix Cache + Paged KV
+title: Week 7 - KV Cache + Prefix Cache + Paged KV + Radix
 date: 2026-05-14
 tags:
   - infra
@@ -8,14 +8,14 @@ tags:
 status: active
 ---
 
-# Week 7 - KV Cache + Prefix Cache + Paged KV
+# Week 7 - KV Cache + Prefix Cache + Paged KV + Radix
 
 > [!goal] 本周目标
-> 把 Week 5-6 的 benchmark / observability 进一步推进到 KV cache、prefix cache 和 paged KV：能解释长上下文为什么贵、共享 prefix 为什么能省 prefill、paged KV cache 解决什么问题，以及这些机制如何影响 TTFT、TPOT、GPU memory 和 serving 成本。
+> 把 Week 5-6 的 benchmark / observability 进一步推进到 KV cache、prefix cache、PagedAttention 和 RadixAttention：能解释长上下文为什么贵、共享 prefix 为什么能省 prefill、paged KV cache 解决什么问题、radix tree 如何组织可复用 prefix，以及这些机制如何影响 TTFT、TPOT、GPU memory 和 serving 成本。
 
 ## 学习目标
 
-完成这一周后，应该能回答八个问题：
+完成这一周后，应该能回答九个问题：
 
 1. **KV cache 到底缓存什么？** 能区分 prefill 产生的 K / V 和 decode 阶段复用的 K / V。
 2. **为什么长上下文会让 KV cache 成本变成瓶颈？**
@@ -25,8 +25,9 @@ status: active
 6. **page table / block table 为什么会影响 kernel 访存？**
 7. **FlashInfer / vLLM 的 paged KV 思想如何作为 baseline，而不是从零硬写工业 attention？**
 8. **指标上如何判断 prefix cache 或 paged KV 是否真的有收益？**
+9. **RadixAttention 和普通 prefix cache 的区别是什么？** 能画出 request prefix -> radix tree node -> KV block reuse 的路径。
 
-## 1. 为什么 Week 7 学 KV / Prefix / Paged KV
+## 1. 为什么 Week 7 学 KV / Prefix / Paged / Radix
 
 推理系统的核心瓶颈不是单个 RMSNorm。真实 serving 中更容易遇到：
 
@@ -35,6 +36,7 @@ status: active
 长 context -> KV cache 大 -> 显存压力变高
 variable-length requests -> cache 管理复杂
 共享 system prompt / tools schema -> prefix cache 有收益
+共享 prefix tree -> RadixAttention 组织可复用路径
 decode attention -> 反复读 KV cache -> memory bandwidth 关键
 ```
 
@@ -48,6 +50,7 @@ decode attention -> 反复读 KV cache -> memory bandwidth 关键
 | shared system prompt | 相同 system prompt，不同用户问题 | TTFT 是否下降 |
 | shared tools schema | system prompt + tools schema 相同 | Agent workload 收益 |
 | shared long document | 长文档 prefix 相同 | 长 prefix 下 prefill 成本变化 |
+| radix prefix | 多请求共享不同长度 prefix | radix tree 匹配和 KV block reuse |
 | multi-turn context | 多轮对话重复历史上下文 | cache 命中与 memory 压力 |
 | long context | 长 prompt、高并发 | KV cache usage、failed requests |
 | variable-length batch | 不同 request 长度混排 | cache fragmentation / scheduling |
@@ -79,8 +82,11 @@ decode attention -> 反复读 KV cache -> memory bandwidth 关键
 - prefix cache 为什么不改变模型输出？
 - 什么场景下 prefix cache 收益最大？
 - prefix cache 和 chunked prefill 同时存在时，可能带来什么调度问题？
+- RadixAttention 如何把共享 prefix 组织成 radix tree？
 
 ## 4. toy paged KV cache
+
+PagedAttention 是 KV block 管理和 attention 访存组织问题，不是降低 attention 理论复杂度。
 
 先做极简模型，不追求完整 kernel：
 
@@ -90,6 +96,10 @@ request_id
   -> block table
   -> physical KV pages
   -> batch decode attention reads pages
+
+request prefix
+  -> radix tree node
+  -> reusable KV blocks
 ```
 
 实现内容：
@@ -97,6 +107,7 @@ request_id
 - toy contiguous KV cache。
 - toy paged KV cache。
 - page table / block table。
+- radix tree prefix matching note。
 - variable-length sequence batch。
 - batch decode attention toy version。
 - 可选：调用 FlashInfer paged KV cache attention wrapper 做 baseline。
@@ -139,11 +150,13 @@ request_id
 
 - 生成 random prompt 和 shared prefix 两类请求。
 - 对比 prefix cache off / on。
+- 写 `radix_prefix_notes.md`，说明共享 system prompt、tools schema、长文档 prefix 如何形成 radix tree 可复用路径。
 - 保存 `prefix_cache_benchmark.md`。
 
 验收：
 
 - 能解释 shared system prompt / tools schema 为什么贴近 Agent 场景。
+- 能画出 request prefix -> radix tree node -> KV block reuse 的流程。
 
 ### Day 3：长上下文 + cache pressure
 
@@ -178,6 +191,7 @@ request_id
 
 - 阅读 FlashInfer paged KV wrapper。
 - 阅读 vLLM PagedAttention / prefix caching 设计文档。
+- 阅读 SGLang RadixAttention / prefix cache 相关设计或文档。
 - 写 `design_note.md`。
 
 ### Day 7：报告 + 面试表达
@@ -194,6 +208,7 @@ request_id
 |---|---|---|
 | `kv_cache_notes.md` | KV cache memory model 和 prefill / decode 流程 | 能解释显存成本 |
 | `prefix_cache_benchmark.md` | prefix cache on/off 对比 | 有原始数据和结论 |
+| `radix_prefix_notes.md` | radix tree prefix matching 和 KV block reuse | 能画出复用路径 |
 | `paged_kv_layout.md` | contiguous KV vs paged KV 图和说明 | 能解释 block table |
 | `attention_decode_benchmark.csv` | toy batch decode 对比 | 数据可追溯 |
 | `design_note.md` | FlashInfer / vLLM reference 阅读总结 | 不从零硬写工业 kernel |
@@ -204,7 +219,9 @@ request_id
 - 至少完成 random prompt vs shared prefix 的 benchmark。
 - 至少完成 prefix cache off / on 的对比。
 - 能解释 paged KV 解决的问题和不能解决的问题。
+- 能解释 RadixAttention 和 Prefix Cache 的关系与差异。
 - 能画出 request -> block table -> physical pages 的流程。
+- 能画出 request prefix -> radix tree node -> KV block reuse 的流程。
 - 能说明长上下文下 TTFT、TPOT、GPU memory、failed requests 的关系。
 
 ## 面试问题
@@ -215,6 +232,8 @@ request_id
 - prefix cache 会不会改变模型输出？
 - random prompt benchmark 为什么可能不代表 Agent / RAG workload？
 - paged KV cache 解决什么问题？
+- RadixAttention 为什么适合 Agent / RAG / coding assistant 的 shared prefix workload？
+- PagedAttention 是降低 attention 复杂度，还是改善 KV cache 管理和访存？
 - page size 太大或太小分别有什么风险？
 - 为什么 variable-length requests 会带来 cache 管理问题？
 - FlashInfer / vLLM 可以作为 baseline，但为什么不能只说“调库就行”？
