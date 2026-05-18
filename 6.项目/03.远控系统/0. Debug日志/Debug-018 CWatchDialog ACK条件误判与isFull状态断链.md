@@ -115,5 +115,5 @@ case 6:
 ## 关联
 
 - [[6.10 远程显示修复：ACK 陷阱复现与帧率控制]]
-- [[Bug目录/6.10-Bug-01 CWatchDialog ACK三连错与isFull状态陷阱]]
+- [[6.10-Bug-01 CWatchDialog ACK三连错与isFull状态陷阱]]
 - [[Debug-016 消息应答接线错误与分发条件误写导致机制失效]] — 同款 bug 在 RemoteClientDlg 的日志

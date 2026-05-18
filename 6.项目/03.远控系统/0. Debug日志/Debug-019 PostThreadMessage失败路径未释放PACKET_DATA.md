@@ -72,5 +72,5 @@ if (!ok) delete pFoo;
 ## 关联
 
 - [[6.10 远程显示修复：ACK 陷阱复现与帧率控制]]
-- [[Bug目录/6.10-Bug-02 PostThreadMessage失败路径内存泄漏]]
+- [[6.10-Bug-02 PostThreadMessage失败路径内存泄漏]]
 - [[Debug-017 WM_SEND_PACK_ACK回调未释放CPacket导致内存泄漏]] — 同类问题：堆对象所有权未明确
