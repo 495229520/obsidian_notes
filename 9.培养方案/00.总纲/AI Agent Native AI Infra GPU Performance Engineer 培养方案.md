@@ -148,6 +148,21 @@ Numerical correctness
 | 推理 Infra / 成本优化 | vLLM、SGLang、FlashInfer、TensorRT-LLM、PagedAttention、RadixAttention、Prefix Cache / Prefix Attention、continuous batching、static batching、chunked prefill、PD disaggregation、TP / DP / PP / EP、observability、quantization | 能用 TTFT / TPOT / TPS / RPS / queueing / KV cache / communication / cost per 1M tokens 评估系统 |
 | 编译器 / Lowering 认知 | Triton lowering、MLIR basics、IR / pass / backend lowering、codegen correctness、operator fusion | 能解释高层算子如何走到 kernel / codegen，并知道 generated code 的 correctness 与性能风险 |
 
+## 高频面试暴露点与补强方向
+
+外部 AI Infra 面试样本说明，这条路线不仅要覆盖项目产出，还要显式训练现场口算、版本比较、通信数据流和项目叙事。总纲只记录暴露面和验收标准，细节放到专题笔记中。完整排序入口见 [[00.专题清单索引]]。
+
+| 暴露点 | 必须补强的能力 | 专题入口 |
+|---|---|---|
+| 公式速算 | KV cache、decode KV 读取量、attention / MLP FLOPs、TTFT / TPOT / cost 换算 | [[LLM 推理面试公式速算清单]] |
+| FlashAttention 演进 | 从 Online Softmax、HBM traffic、SRAM tiling、parallelism 和硬件特性解释 V1 / V2 / V3 / V4 | [[FlashAttention 版本演进与面试口述]] |
+| 分布式推理通信 | 解释 TP 切分、Column / Row Parallel Linear、AllReduce、ReduceScatter、AllGather、All-to-All、NVLink / RDMA 边界 | [[分布式推理通信与 TP 切分速记]] |
+| speculative decoding / MTP | 解释 draft cost、verify cost、acceptance rate、平均接受长度和 serving 调度 tradeoff | [[Speculative Decoding 与 MTP 推理优化]] |
+| 跨框架与硬件边界 | 理解 PyTorch / Triton / torch.compile 与 JAX / XLA / TPU、dynamic shape、variable-length sequence 的差异 | [[JAX TPU Dynamic Shape 认知边界]] |
+| 存储层次与融合 | 用 HBM、shared memory / SRAM、register、global memory 往返解释 fusion 收益和副作用 | [[GPU 存储层次与算子融合口述]] |
+| 项目与开源表达 | 把科研、实习、issue / PR 按“问题 -> 证据 -> 结果 -> 取舍”讲清楚 | [[AI Infra 项目开源科研叙事模板]] |
+| 笔试保底 | DP、二分、树 DFS、递归爆栈、输入输出等求职风险点 | [[AI Infra 岗算法笔试保底清单]] |
+
 最低可验证能力：
 
 - 能手写基础 CUDA kernel。
@@ -157,14 +172,19 @@ Numerical correctness
 - 能读 Nsight Compute / Nsight Systems 的关键指标。
 - 能画出 decoder-only Transformer 单层推理路径。
 - 能根据 `hidden_size` / `num_layers` / `num_attention_heads` / `num_key_value_heads` / `intermediate_size` 推出 QKV、MLP 和 KV cache shape。
+- 能快速口算 KV cache 大小和 decode 每 token 的 KV 读取量。
 - 能区分 MHA、GQA、MQA，并解释它们对 KV cache 体积和 decode 读带宽的影响。
 - 能说明 Online Softmax 如何支撑 FlashAttention 的分块精确 attention。
+- 能比较 FlashAttention V1 / V2 / V3 / V4 的主要优化方向，而不是只背公式。
 - 能解释 MoE 的 router、top-k experts、dispatch / combine，以及它对 serving latency、负载均衡和显存的影响。
 - 能解释 prefill 为什么更偏计算密集，decode 为什么更容易受 KV cache 读带宽和调度限制。
 - 能区分 PagedAttention、RadixAttention、Prefix Cache / Prefix Attention 的作用边界。
 - 能解释 static batching 和 continuous batching 在 GPU 利用率、排队延迟、tail latency 上的取舍。
 - 能解释 chunked prefill 和 PD disaggregation 对 TTFT、TPOT、throughput、KV transfer 的影响。
 - 能说明 TP / DP / PP / EP 分别切什么维度，以及 NCCL / RDMA / AllReduce / AllGather / ReduceScatter / All-to-All 可能成为哪些瓶颈。
+- 能画出 TP 切分下常见 collective 的数据流，并说明它们如何影响 latency。
+- 能解释 speculative decoding 的 speedup 取决于 draft cost、verify cost、acceptance rate 和平均接受长度。
+- 能说明 JAX / XLA 与 PyTorch / Triton 在编译、shape 和执行模型上的基本边界。
 - 能解释 TTFT / TPOT / ITL / TPS / RPS / queue time / GPU utilization / KV cache usage / cost per 1M tokens。
 - 能把 kernel benchmark 的收益接回 serving 指标，而不是只停留在 toy latency。
 - 能画出 Triton kernel 到 IR / lowering / PTX 的粗链路，并说明哪些环节会影响 correctness 与性能。

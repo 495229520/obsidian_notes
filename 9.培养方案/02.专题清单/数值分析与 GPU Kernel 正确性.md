@@ -8,10 +8,17 @@ tags:
 aliases:
   - GPU Kernel 数值正确性
   - 数值分析到 GPU Performance
+roadmap_week: "Week 2-4"
+sort_order: "02.00"
 status: active
 ---
 
 # 数值分析与 GPU Kernel 正确性
+
+> [!info] 所属路线
+> - 总纲 Week：Week 2-4
+> - 排序：02.00
+> - 用途：为 reduction、matmul、LLM kernel 建立 correctness、tolerance 和 benchmark 可信度意识。
 
 > [!goal] 目标
 > 把 [[第01次课-绪论与误差理论笔记]] 中的误差理论，落到 [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]] 的代码实践里：写 CUDA / Triton kernel 时，不只追求“跑得快”，还要能证明**结果正确、误差可控、低精度收益真实、benchmark 可信**。

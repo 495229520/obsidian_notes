@@ -8,16 +8,25 @@ tags:
 aliases:
   - CUDA checklist
   - CUDA 路线清单
+roadmap_week: "Week 1-4"
+sort_order: "01.00"
 status: active
 ---
 
 # CUDA 学习清单
+
+> [!info] 所属路线
+> - 总纲 Week：Week 1-4
+> - 排序：01.00
+> - 用途：CUDA 基础、benchmark、profiling 的总清单。
 
 > 这份清单承接 [[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]]、[[Week 1 - CUDA + Agent workflow]] 和 [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]]。目标不是继续堆 CUDA 语法，而是把学习推进到 **性能模型 + 典型算子 + profiling 证据链**。
 
 ---
 
 ## 0. 当前定位
+
+专题清单的 Week 排序入口：[[00.专题清单索引]]。
 
 已有内容：
 

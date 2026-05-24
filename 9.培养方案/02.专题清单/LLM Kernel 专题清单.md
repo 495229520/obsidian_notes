@@ -8,10 +8,17 @@ tags:
 aliases:
   - LLM CUDA Kernel
   - LLM 算子清单
+roadmap_week: "Week 4, Week 9-16"
+sort_order: "04.10"
 status: active
 ---
 
 # LLM Kernel 专题清单
+
+> [!info] 所属路线
+> - 总纲 Week：Week 4，Week 9-16
+> - 排序：04.10
+> - 用途：从基础 CUDA 过渡到 RMSNorm、Softmax、RoPE、dequant、toy attention 等 LLM kernel。
 
 > 这份笔记把 CUDA 基础推进到 LLM 推理常见算子。目标不是一开始就写 FlashAttention，而是先把 RMSNorm、Softmax、RoPE、activation、dequant 和 fusion 做扎实。
 
@@ -47,7 +54,7 @@ status: active
 | top-k sampling | partial selection | reduction / sort |
 | INT8 dequant | scale + type conversion | vectorized load |
 | fused activation | 减少读写 global memory | fusion |
-| toy attention | QK、mask、softmax、V | matmul + softmax |
+| toy attention | QK、mask、softmax、V、Online Softmax 与 FlashAttention 口述 | matmul + softmax + [[FlashAttention 版本演进与面试口述]] |
 
 ---
 
@@ -85,6 +92,8 @@ y = x / sqrt(mean(x^2) + eps) * weight
 softmax(x_i) = exp(x_i - max(x)) / sum(exp(x_j - max(x)))
 ```
 
+这部分需要和 [[FlashAttention 版本演进与面试口述]] 联动：先把 row-wise stable softmax 讲清楚，再升级到 Online Softmax、分块 attention 和 FlashAttention 版本演进。
+
 学习点：
 
 - [ ] row-wise max reduce。
@@ -94,6 +103,7 @@ softmax(x_i) = exp(x_i - max(x)) / sum(exp(x_j - max(x)))
 - [ ] FP32 accumulation。
 - [ ] CUDA event benchmark。
 - [ ] Triton fused softmax 对比。
+- [ ] Online Softmax 口述。
 
 必须回答：
 
@@ -197,6 +207,8 @@ fp16_value = int8_value * scale
 - kernel fusion 为什么可能更快？
 - fusion 会带来什么副作用？
 - 如何为 LLM kernel 设计 correctness test？
+- FlashAttention V1 / V2 / V3 的优化主线分别是什么？
+- 为什么 FlashAttention 解决的是 HBM traffic，而 PagedAttention 更关注 KV cache 管理？
 
 ---
 

@@ -140,11 +140,13 @@ request prefix
 
 - 画出 prefill 产生 K / V、decode 复用 K / V 的流程。
 - 记录每层 KV cache 的内存量估算公式。
+- 对照 [[LLM 推理面试公式速算清单]]，练习全模型 KV cache 和 decode 每 token KV 读取量口算。
 - 写 `kv_cache_notes.md`。
 
 验收：
 
 - 能说明为什么 batch、seq length、num layers、num heads、head dim、dtype 都会影响 KV cache memory。
+- 能在 3 分钟内不看稿口述 KV cache 公式、GQA/MQA 为什么省显存，以及 decode 为什么更容易受 KV cache 读带宽限制。
 
 ### Day 2：prefix cache workload
 

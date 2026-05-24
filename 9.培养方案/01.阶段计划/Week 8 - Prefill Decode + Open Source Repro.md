@@ -136,12 +136,14 @@ status: active
 ### Day 1：prefill / decode 指标拆解
 
 - 复习 TTFT、TPOT / ITL、TPS、RPS。
+- 对照 [[LLM 推理面试公式速算清单]]，练习 prefill / decode 的计算量、访存量和成本口算。
 - 写 `workload_config.yaml`。
 - 定义 prefill-heavy / decode-heavy / mixed / chunked-prefill / PD-disagg 五类 workload。
 
 验收：
 
 - 能说明 TTFT 主要受 queueing + prefill + 网络影响，TPOT / ITL 更贴近 decode 阶段体验。
+- 能在 3 分钟内口述 prefill 为什么更偏 compute，decode 为什么更容易受 KV cache bandwidth 和调度限制。
 
 ### Day 2：prefill-heavy benchmark
 
@@ -210,6 +212,7 @@ status: active
 - 检查是否夸大结论。
 - 检查所有图表是否追溯到 CSV / JSON。
 - 检查 issue wording 是否礼貌、清晰、可复现。
+- 对照 [[Speculative Decoding 与 MTP 推理优化]] 和 [[AI Infra 项目开源科研叙事模板]]，准备 speculative decoding、benchmark report 和开源 reproduction 的口述版本。
 
 形成一句项目表达：
 

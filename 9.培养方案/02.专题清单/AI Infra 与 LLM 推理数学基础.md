@@ -8,10 +8,17 @@ tags:
 aliases:
   - LLM 推理数学基础
   - AI Infra 数学基础
+roadmap_week: "Week 4-8"
+sort_order: "04.00"
 status: active
 ---
 
 # AI Infra 与 LLM 推理数学基础
+
+> [!info] 所属路线
+> - 总纲 Week：Week 4-8
+> - 排序：04.00
+> - 用途：把数值分析公式映射到 LLM kernel、serving correctness 和低精度判断。
 
 > [!goal] 目标
 > 这篇笔记把数值分析里真正会落到 [[AI Agent Native AI Infra GPU Performance Engineer 培养方案]] 的公式整理成一条工程主线：从浮点误差、reduction 误差、GEMM 累加误差，到 stable softmax、RMSNorm、量化和近似函数实现。
