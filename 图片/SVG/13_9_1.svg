@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" viewBox="0 0 1100 640">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow-hollow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5" fill="none" stroke="#4f6f8f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
+      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
+      .box-title { font: 700 17px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
+      .box-text { font: 14px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
+      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
+      .queue { fill: #f0f6ff; stroke: #2f7ab8; stroke-width: 2.2; rx: 20; }
+      .timerfd { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 18; }
+      .loop { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.3; rx: 20; }
+      .task { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 16; }
+      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
+      .line { stroke: #4f6f8f; stroke-width: 2.2; fill: none; marker-end: url(#arrow-hollow); }
+      .soft-line { stroke: #7b8b9b; stroke-width: 1.8; fill: none; marker-end: url(#arrow-hollow); }
+      .dash { stroke: #8a98a8; stroke-width: 1.6; stroke-dasharray: 7 7; fill: none; }
+    </style>
+  </defs>
+
+  <text x="550" y="48" text-anchor="middle" class="title">timer queue 与 timerfd 的分工</text>
+  <text x="550" y="76" text-anchor="middle" class="subtitle">timer queue 管理所有业务定时任务，timerfd 只负责唤醒最近一次到期</text>
+
+  <rect x="70" y="132" width="260" height="260" class="queue"/>
+  <text x="200" y="166" text-anchor="middle" class="box-title">TimerQueue</text>
+  <text x="200" y="192" text-anchor="middle" class="box-text">最小堆 / 时间轮</text>
+
+  <rect x="108" y="220" width="184" height="42" class="task"/>
+  <text x="200" y="247" text-anchor="middle" class="small">connA: 10:00:03</text>
+  <rect x="108" y="272" width="184" height="42" class="task"/>
+  <text x="200" y="299" text-anchor="middle" class="small">connB: 10:00:07</text>
+  <rect x="108" y="324" width="184" height="42" class="task"/>
+  <text x="200" y="351" text-anchor="middle" class="small">heartbeat: 10:00:10</text>
+
+  <rect x="432" y="150" width="236" height="110" class="timerfd"/>
+  <text x="550" y="185" text-anchor="middle" class="box-title">timerfd</text>
+  <text x="550" y="211" text-anchor="middle" class="box-text">只设置最近到期时间</text>
+  <text x="550" y="235" text-anchor="middle" class="small">timerfd_settime(top.expireTime)</text>
+
+  <rect x="780" y="150" width="236" height="110" class="loop"/>
+  <text x="898" y="185" text-anchor="middle" class="box-title">epoll_wait()</text>
+  <text x="898" y="211" text-anchor="middle" class="box-text">timerfd 可读</text>
+  <text x="898" y="235" text-anchor="middle" class="small">返回 EPOLLIN</text>
+
+  <rect x="432" y="368" width="236" height="110" class="loop"/>
+  <text x="550" y="403" text-anchor="middle" class="box-title">执行到期任务</text>
+  <text x="550" y="429" text-anchor="middle" class="box-text">getExpired(now)</text>
+  <text x="550" y="453" text-anchor="middle" class="small">取出所有 expireTime &lt;= now</text>
+
+  <rect x="780" y="368" width="236" height="110" class="timerfd"/>
+  <text x="898" y="403" text-anchor="middle" class="box-title">重新 arm timerfd</text>
+  <text x="898" y="429" text-anchor="middle" class="box-text">读取新的堆顶</text>
+  <text x="898" y="453" text-anchor="middle" class="small">准备下一次唤醒</text>
+
+  <path d="M 330 222 L 430 205" class="line"/>
+  <text x="382" y="197" text-anchor="middle" class="small">top()</text>
+  <path d="M 668 205 L 778 205" class="line"/>
+  <path d="M 898 260 C 898 322 550 304 550 366" class="line"/>
+  <path d="M 668 423 L 778 423" class="line"/>
+  <path d="M 898 368 C 910 314 642 310 580 262" class="soft-line"/>
+
+  <path d="M 432 423 C 348 438 260 418 218 394" class="dash"/>
+  <text x="320" y="455" text-anchor="middle" class="small">到期任务执行后从队列移除；重复任务再插回队列</text>
+
+  <rect x="178" y="532" width="744" height="52" class="note"/>
+  <text x="550" y="563" text-anchor="middle" class="small">关键点：一个 EventLoop 通常只需要一个 timerfd；大量业务定时器由内存中的 TimerQueue 管理</text>
+</svg>
