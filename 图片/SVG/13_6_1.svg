@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2f5f8f"/>
+    </marker>
+    <marker id="arrow-soft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#6f7f8f" stroke-width="1.8"/>
+    </marker>
+    <style>
+      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
+      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
+      .box-title { font: 700 18px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
+      .box-text { font: 15px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
+      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
+      .fd { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 16; }
+      .poller { fill: #eaf4ff; stroke: #2f7ab8; stroke-width: 2.5; rx: 20; }
+      .loop { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.5; rx: 20; }
+      .handler { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 16; }
+      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
+      .main-line { stroke: #2f5f8f; stroke-width: 3; fill: none; marker-end: url(#arrow-main); }
+      .soft-line { stroke: #6f7f8f; stroke-width: 2; fill: none; marker-end: url(#arrow-soft); }
+    </style>
+  </defs>
+
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="500" y="48" text-anchor="middle" class="title">单线程 Reactor：就绪事件分发流程</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="500" y="76" text-anchor="middle" class="subtitle">epoll 负责发现就绪，EventLoop 负责分发，Handler 负责真正的 read / write / accept</text>
+
+  <rect x="54" y="130" width="170" height="70" class="fd"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="158" text-anchor="middle" class="box-title">listen_fd</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="181" text-anchor="middle" class="small">新连接到达</text>
+
+  <rect x="54" y="270" width="170" height="70" class="fd"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="298" text-anchor="middle" class="box-title">conn_fd1</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="321" text-anchor="middle" class="small">可读 / 可写</text>
+
+  <rect x="54" y="410" width="170" height="70" class="fd"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="438" text-anchor="middle" class="box-title">conn_fd2</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="461" text-anchor="middle" class="small">关闭 / 异常</text>
+
+  <rect x="320" y="238" width="220" height="150" class="poller"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="430" y="283" text-anchor="middle" class="box-title">Poller</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="430" y="312" text-anchor="middle" class="box-text">epoll_wait()</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="430" y="338" text-anchor="middle" class="small">返回 active channels</text>
+
+  <rect x="645" y="238" width="220" height="150" class="loop"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="755" y="281" text-anchor="middle" class="box-title">EventLoop</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="755" y="310" text-anchor="middle" class="box-text">遍历就绪 Channel</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="755" y="336" text-anchor="middle" class="small">handleEvent()</text>
+
+  <rect x="650" y="110" width="260" height="70" class="handler"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="138" text-anchor="middle" class="box-title">Acceptor::handleRead()</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="161" text-anchor="middle" class="small">accept 新连接</text>
+
+  <rect x="650" y="420" width="260" height="70" class="handler"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="448" text-anchor="middle" class="box-title">TcpConnection::handleRead()</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="471" text-anchor="middle" class="small">recv 到 input buffer</text>
+
+  <rect x="650" y="510" width="260" height="70" class="handler"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="538" text-anchor="middle" class="box-title">handleWrite / Close</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="561" text-anchor="middle" class="small">send 剩余数据或清理连接</text>
+
+  <path d="M 224 165 C 260 165 275 250 318 280" class="main-line"/>
+  <path d="M 224 305 L 318 305" class="main-line"/>
+  <path d="M 224 445 C 262 445 278 370 318 342" class="main-line"/>
+  <path d="M 540 313 L 643 313" class="main-line"/>
+
+  <path d="M 780 238 C 780 210 780 200 780 182" class="soft-line"/>
+  <path d="M 780 388 C 780 405 780 408 780 418" class="soft-line"/>
+  <path d="M 805 388 C 830 425 830 475 805 508" class="soft-line"/>
+
+  <rect x="304" y="438" width="260" height="86" class="note"/>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="434" y="468" text-anchor="middle" class="box-title">关键边界</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="434" y="493" text-anchor="middle" class="small">epoll 只通知“就绪”</text>
+  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="434" y="515" text-anchor="middle" class="small">应用仍要自己 read / write</text>
+
+  <path d="M 540 388 C 590 430 608 465 646 455" class="soft-line"/>
+</svg>
