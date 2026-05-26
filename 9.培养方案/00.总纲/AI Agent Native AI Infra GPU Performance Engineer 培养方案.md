@@ -1562,3 +1562,48 @@ Step 4：Contribute
 ```text
 我要成为能指挥 AI Agent 快速开发，但自己能验证正确性、分析 GPU 性能、解释 serving 指标、定位 KV cache / prefill / decode 瓶颈并降低 LLM 推理成本的人。
 ```
+
+
+## 附录：真实 GitHub 硬核项目清单（2026-05-26 补充）
+
+> [!important] 真实性边界
+> 下表是已经按公开 GitHub 仓库核验过的真实项目链接；`tiny-llm-kernels`、`paged-kv-attention-lab`、`mini-vllm-style-kv-cache` 等仍然是个人作品集规划名，不是现成外部开源项目。
+
+| 方向 | 真实仓库 | GitHub | 培养方案角色 | 建议使用方式 |
+|---|---|---|---|---|
+| CUDA Attention 学习型项目 | `sonnyli/flash_attention_from_scratch` | [GitHub](https://github.com/sonnyli/flash_attention_from_scratch) | Attention kernel 主项目 | 复现 16 轮优化，写 correctness / benchmark / profiling report |
+| 官方 FlashAttention | `Dao-AILab/flash-attention` | [GitHub](https://github.com/Dao-AILab/flash-attention) | 官方实现对照 | 对照 FA2 / FA3 / FA4，学习 production kernel 组织方式 |
+| Triton 编译器 / DSL | `triton-lang/triton` | [GitHub](https://github.com/triton-lang/triton) | Triton kernel 与 compiler-aware 主线 | 做 RMSNorm / softmax / matmul tutorial、benchmark、generated code 分析 |
+| CUTLASS | `NVIDIA/cutlass` | [GitHub](https://github.com/NVIDIA/cutlass) | GEMM / Tensor Core 主线 | 跑 CUTLASS profiler，对比 cuBLAS / Triton / CUDA，写 GEMM comparison report |
+| FlashInfer | `flashinfer-ai/flashinfer` | [GitHub](https://github.com/flashinfer-ai/flashinfer) | paged attention / decode kernel / serving kernel | 做 paged KV attention baseline、batch decode benchmark、API 示例复现 |
+| FlashInfer benchmark starter | `flashinfer-ai/flashinfer-bench-starter-kit` | [GitHub](https://github.com/flashinfer-ai/flashinfer-bench-starter-kit) | 高性能 GPU kernel benchmark 参考 | 学习 kernel benchmark 组织、输入约束、结果提交格式 |
+| vLLM | `vllm-project/vllm` | [GitHub](https://github.com/vllm-project/vllm) | 推理系统主项目 | 学 PagedAttention、KV cache、continuous batching、TTFT / TPOT benchmark |
+| SGLang | `sgl-project/sglang` | [GitHub](https://github.com/sgl-project/sglang) | Agent workload serving 主项目 | 学 RadixAttention、prefix cache、structured generation、shared prefix workload |
+| TensorRT-LLM | `NVIDIA/TensorRT-LLM` | [GitHub](https://github.com/NVIDIA/TensorRT-LLM) | 工业级推理优化参考 | 做 sample reproduction、quantization / in-flight batching / multi-GPU benchmark report |
+| ThunderKittens | `HazyResearch/ThunderKittens` | [GitHub](https://github.com/HazyResearch/ThunderKittens) | tile primitives / 硬核 CUDA kernel 抽象 | 学 tile primitive、Blackwell/Hopper kernel 写法，作为进阶阅读项目 |
+
+推荐阅读链路：
+
+```text
+Kernel 线：
+sonnyli/flash_attention_from_scratch
+→ Dao-AILab/flash-attention
+→ flashinfer-ai/flashinfer
+→ triton-lang/triton
+→ NVIDIA/cutlass
+→ HazyResearch/ThunderKittens
+
+Serving 线：
+vllm-project/vllm
+→ sgl-project/sglang
+→ NVIDIA/TensorRT-LLM
+→ flashinfer-ai/flashinfer
+```
+
+作品集映射原则：
+
+- `flash_attention_from_scratch` 是 CUDA Attention 的硬核学习主项目。
+- `FlashInfer` 用来把 Attention kernel 连接到 paged KV cache、decode attention 和 serving kernel。
+- `vLLM` / `SGLang` 用来证明自己理解推理系统，而不只是单 kernel。
+- `Triton` / `CUTLASS` 用来补齐 compiler-aware 和 GEMM / Tensor Core 体系。
+- 自拟作品集项目必须明确写成“基于这些真实开源项目的复现、benchmark、报告或小贡献”，不能写成已经存在的外部项目。
