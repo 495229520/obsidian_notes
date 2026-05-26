@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="620" viewBox="0 0 1160 620">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#365f91"/>
+    </marker>
+    <style>
+      text { font-family: 'Noto Sans CJK SC', 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif; fill: #1f2d3d; }
+      .title { font-size: 28px; font-weight: 700; }
+      .sub { font-size: 15px; fill: #52616b; }
+      .h { font-size: 19px; font-weight: 700; fill: #17324d; }
+      .b { font-size: 14px; fill: #243442; }
+      .tiny { font-size: 12.5px; fill: #5b6770; }
+      .box { fill: #fff; stroke: #8aa4bd; stroke-width: 2; rx: 16; }
+      .compute { fill: #eaf4ff; stroke: #367bb5; stroke-width: 2; rx: 16; }
+      .memory { fill: #f0ebff; stroke: #6f5bb5; stroke-width: 2; rx: 16; }
+      .serve { fill: #eaf7ec; stroke: #4b915b; stroke-width: 2; rx: 16; }
+      .warn { fill: #fff5dc; stroke: #c28a1d; stroke-width: 2; rx: 14; }
+      .line { stroke: #365f91; stroke-width: 2.5; fill: none; marker-end: url(#arrow2); }
+      .dash { stroke: #8a98a8; stroke-width: 2; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrow2); }
+    </style>
+  </defs>
+
+  <text x="580" y="44" text-anchor="middle" class="title">从 Transformer Block 到 Serving 指标的映射</text>
+  <text x="580" y="72" text-anchor="middle" class="sub">面试时要能把“一个算子为什么慢”连接到“TTFT / TPOT / cost 为什么变化”</text>
+
+  <rect x="55" y="140" width="170" height="86" class="box"/>
+  <text x="140" y="172" text-anchor="middle" class="h">Input Tokens</text>
+  <text x="140" y="199" text-anchor="middle" class="b">prompt / decode step</text>
+
+  <rect x="275" y="115" width="205" height="135" class="compute"/>
+  <text x="377" y="148" text-anchor="middle" class="h">RMSNorm + QKV</text>
+  <text x="305" y="182" class="b">• row-wise reduction</text>
+  <text x="305" y="207" class="b">• GEMM projection</text>
+  <text x="305" y="232" class="tiny">kernel: RMSNorm / MatMul</text>
+
+  <rect x="530" y="115" width="205" height="135" class="memory"/>
+  <text x="632" y="148" text-anchor="middle" class="h">Attention + KV</text>
+  <text x="560" y="182" class="b">• RoPE / Online Softmax</text>
+  <text x="560" y="207" class="b">• KV cache read/write</text>
+  <text x="560" y="232" class="tiny">kernel: FlashAttention / paged KV</text>
+
+  <rect x="785" y="115" width="205" height="135" class="compute"/>
+  <text x="887" y="148" text-anchor="middle" class="h">MLP / SwiGLU</text>
+  <text x="815" y="182" class="b">• up / gate / down GEMM</text>
+  <text x="815" y="207" class="b">• activation / fusion</text>
+  <text x="815" y="232" class="tiny">kernel: GEMM + elementwise</text>
+
+  <rect x="275" y="340" width="205" height="110" class="serve"/>
+  <text x="377" y="374" text-anchor="middle" class="h">Prefill</text>
+  <text x="305" y="407" class="b">长 prompt 一次性处理</text>
+  <text x="305" y="432" class="tiny">更偏 GEMM / attention 计算</text>
+
+  <rect x="530" y="340" width="205" height="110" class="serve"/>
+  <text x="632" y="374" text-anchor="middle" class="h">Decode</text>
+  <text x="560" y="407" class="b">每步生成一个 token</text>
+  <text x="560" y="432" class="tiny">更受 KV cache 读带宽和调度影响</text>
+
+  <rect x="785" y="340" width="205" height="110" class="serve"/>
+  <text x="887" y="374" text-anchor="middle" class="h">Serving Metrics</text>
+  <text x="815" y="407" class="b">TTFT / TPOT / TPS</text>
+  <text x="815" y="432" class="tiny">queue / p95 / cost / 1M tokens</text>
+
+  <path d="M 225 183 L 268 183" class="line"/>
+  <path d="M 480 183 L 523 183" class="line"/>
+  <path d="M 735 183 L 778 183" class="line"/>
+  <path d="M 632 250 C 632 285, 632 305, 632 333" class="line"/>
+  <path d="M 377 250 C 377 285, 377 305, 377 333" class="line"/>
+  <path d="M 735 395 L 778 395" class="line"/>
+  <path d="M 480 395 L 523 395" class="line"/>
+
+  <path d="M 377 340 C 430 295, 520 285, 600 250" class="dash"/>
+  <path d="M 632 340 C 660 300, 665 285, 675 250" class="dash"/>
+
+  <rect x="120" y="502" width="920" height="70" class="warn"/>
+  <text x="580" y="530" text-anchor="middle" class="h">关键表达</text>
+  <text x="580" y="558" text-anchor="middle" class="b">kernel benchmark 不是终点；最终要说明它如何影响 prefill / decode、queueing、KV cache、tail latency 和推理成本。</text>
+</svg>

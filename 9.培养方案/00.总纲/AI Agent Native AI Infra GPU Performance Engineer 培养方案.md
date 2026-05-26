@@ -25,6 +25,10 @@ AI Infra Performance Engineer
 + 推理成本优化
 ```
 
+![[9_0_0_1.svg|900]]
+
+*图示说明：这张图把培养方案压缩成一个能力闭环：Agent 负责提升工程效率，CUDA / Triton 和 GPU profiling 负责建立底层性能判断，serving benchmark 和 observability 负责把 kernel 结果接回 TTFT、TPOT、TPS、KV cache 与成本。最下方的人工验证 Gate 是整条路线的核心边界。*
+
 普通工程代码会越来越便宜，但以下能力会越来越值钱：
 
 - 性能判断
@@ -152,6 +156,10 @@ Numerical correctness
 
 外部 AI Infra 面试样本说明，这条路线不仅要覆盖项目产出，还要显式训练现场口算、版本比较、通信数据流和项目叙事。总纲只记录暴露面和验收标准，细节放到专题笔记中。完整排序入口见 [[00.专题清单索引]]。
 
+![[9_0_0_2.svg|900]]
+
+*图示说明：面试表达不要停在“我会写某个 kernel”，而要能从 Transformer block 中的 RMSNorm、QKV、Attention、MLP 一路讲到 prefill / decode，再落到 TTFT、TPOT、TPS、queueing、KV cache usage 和 cost / 1M tokens。这样才能证明自己理解的是 LLM 推理工程链路，而不是孤立 toy kernel。*
+
 | 暴露点 | 必须补强的能力 | 专题入口 |
 |---|---|---|
 | 公式速算 | KV cache、decode KV 读取量、attention / MLP FLOPs、TTFT / TPOT / cost 换算 | [[LLM 推理面试公式速算清单]] |
@@ -247,6 +255,10 @@ Numerical correctness
 - [NVIDIA GenAI-Perf guide](https://developer.nvidia.com/blog/llm-performance-benchmarking-measuring-nvidia-nim-performance-with-genai-perf/)：TTFT、ITL、TPS、RPS 与 latency-throughput tradeoff。
 
 ## 阶段一：现在到 2026 年 7 月
+
+![[9_0_0_3.svg|900]]
+
+*图示说明：三阶段路线的核心不是“学完更多关键词”，而是每个阶段都形成可验证产出。阶段一先证明能写基础 kernel 和 benchmark；阶段二把 kernel、Nsight、KV cache 与 serving 指标打通；阶段三把所有项目收束成作品集、开源贡献和面试叙事。*
 
 目标：拿到暑期 AI Infra 相关实习面试。
 
