@@ -85,7 +85,7 @@ C++高级/ (16章, ~50笔记)
 ├── 11. 运算符重载/          [1 note]
 ├── 12. 迭代器/              [3 notes] - 基础、vector实现、失效问题
 ├── 13. 类型转换方式/        [1 note]
-├── 14. STL/                 [13 notes] - vector, queue, list, set, map, string, 算法
+├── 5.1 STL/                 [13 notes] - vector, queue, list, set, map, string, 算法
 ├── 15. volatile/            [1 note]
 └── 16. C++11/               [11 notes] - auto, thread, atomic, lambda, 移动语义, chrono
 

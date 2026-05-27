@@ -201,7 +201,7 @@ std::vector<float> vector_add(const std::vector<float>& a, const std::vector<flo
 
 **关键点**：
 
-- `std::vector` 负责 host 侧内存，适合第一周练习；如果对 `vector` 本身不熟，可以回看 [[14.1 vector]]。
+- `std::vector` 负责 host 侧内存，适合第一周练习；如果对 `vector` 本身不熟，可以回看 [[5.1.1 vector]]。
 - `blocks = (n + threads_per_block - 1) / threads_per_block` 是整数向上取整，确保所有元素都有线程处理。
 - `cudaGetLastError()` 检查 kernel launch 是否成功。
 - `cudaDeviceSynchronize()` 等待 GPU 执行完成，否则 host 代码可能在 kernel 还没结束时继续往下走。
