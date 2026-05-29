@@ -11,9 +11,9 @@ status: active
 # AI Agent Native 的 AI Infra / GPU Performance Engineer 培养方案
 
 > [!goal] 总目标
-> 从“会写 CUDA / Triton kernel，能做 AI Infra 实习”升级为“会用 AI Agent 加速工程开发，但自己能负责 GPU 性能分析、LLM 推理成本优化、kernel 正确性与上线判断”。
+> 从"会写 CUDA / Triton kernel，能做 AI Infra 实习"，升级为"会用 AI Agent 加速工程开发，但自己负责 GPU 性能分析、LLM 推理成本优化、kernel 正确性与上线判断"。
 
-这条路线的核心不是放弃 CUDA / Triton，而是把目标从“手写 kernel 的候选人”升级成：
+这条路线的核心，不是放弃 CUDA / Triton，而是把目标从"手写 kernel 的候选人"升级成：
 
 ```text
 AI Infra Performance Engineer
@@ -27,7 +27,7 @@ AI Infra Performance Engineer
 
 ![[9_0_0_1.svg|900]]
 
-*图示说明：这张图把培养方案压缩成一个能力闭环：Agent 负责提升工程效率，CUDA / Triton 和 GPU profiling 负责建立底层性能判断，serving benchmark 和 observability 负责把 kernel 结果接回 TTFT、TPOT、TPS、KV cache 与成本。最下方的人工验证 Gate 是整条路线的核心边界。*
+*图示说明：这张图把培养方案压缩成一个能力闭环——Agent 负责提升工程效率，CUDA / Triton 和 GPU profiling 负责建立底层性能判断，serving benchmark 和 observability 负责把 kernel 结果接回 TTFT、TPOT、TPS、KV cache 与成本。最下方的人工验证 Gate 是整个路线的核心边界。*
 
 普通工程代码会越来越便宜，但以下能力会越来越值钱：
 
@@ -59,30 +59,30 @@ CUDA / Triton kernel 实习生
 AI Agent-native 的 AI Infra / GPU Performance Engineer
 ```
 
-这意味着你不只是能写 kernel，还要能回答：
+也就是说，你不只是能写 kernel，还得能回答：
 
 - 这个 kernel 为什么慢？
 - 它是 memory-bound 还是 compute-bound？
-- Nsight 指标能不能支持你的判断？
+- Nsight 指标能不能支撑你的判断？
 - 这个优化是否真的降低了 TTFT / TPOT / cost？
-- TTFT 变高到底来自 queueing、prefill、decode 还是 KV cache 压力？
+- TTFT 变高，到底来自 queueing、prefill、decode 还是 KV cache 压力？
 - Agent 生成的代码怎么验证 correctness？
 - benchmark 数据是否公平、可复现、可解释？
-- 这个改动是否值得上线？
+- 这个改动值不值得上线？
 
 > [!important] 核心人设
-> 我会用 AI Agent 快速搭工程、生成测试和 benchmark，但 kernel 核心逻辑、correctness、profiling 结论、性能报告和最终上线判断都由我人工验证。
+> 我会用 AI Agent 快速搭工程、生成测试和 benchmark，但 kernel 核心逻辑、correctness、profiling 结论、性能报告和最终上线判断，都由我人工验证。
 
-## 为什么补 compiler-aware 视角
+## 为什么要补 compiler-aware 视角
 
 这条路线仍然是 **LLM Inference Performance / GPU Infra**，不是转成纯编译器工程师路线。补 compiler-aware 视角，是为了能把高层算子、kernel 实现、profiling 结论、serving 指标和 lowering / codegen correctness 串起来。
 
-不赌 2028 一定是推理爆发年，但按“推理工程链路继续变深、推理成本优化持续重要”来准备；即使赛道节奏变化，kernel + profiling + serving benchmark + compiler-aware 的能力组合仍然可迁移。
+不赌 2028 一定是推理爆发年，但按"推理工程链路继续变深、推理成本优化持续重要"来准备——就算赛道节奏变化，kernel + profiling + serving benchmark + compiler-aware 这套能力组合仍然可以迁移。
 
 AI 可以生成工程代码和初版 kernel，但不能替代以下判断：
 
 - benchmark 是否公平、可信、可复现；
-- 性能瓶颈是否被硬件指标支持；
+- 性能瓶颈是否被硬件指标支撑；
 - lowering / codegen 生成的代码是否经过 reference、shape、dtype 和边界条件验证；
 - 优化是否真的改善 TTFT / TPOT / TPS / cost，而不是只改善单个 toy benchmark。
 
@@ -91,13 +91,13 @@ AI 可以生成工程代码和初版 kernel，但不能替代以下判断：
 这条路线虽然定位是 **LLM Inference Performance / GPU Infra**，但它不是只拼 CUDA 语法或 vLLM 参数。真正有区分度的地方，是能判断一个 kernel 或 serving 优化在**数值上是否可靠、性能上是否真实、上线后是否可控**。这正好对应 [[第01次课-绪论与误差理论笔记]] 中的四个核心标准：复杂度、精度、稳定性、数值实验。
 
 > [!important] 数值分析在本路线中的定位
-> 数值分析不是为了刷积分题，而是为了回答：低精度计算是否稳定？reference test 的误差阈值怎么设？softmax / RMSNorm / reduction 的误差会不会被放大？benchmark 结论是否可信？Agent 生成的 kernel 是否只是“看起来能跑”？
+> 数值分析不是为了刷积分题，而是为了回答：低精度计算是否稳定？reference test 的误差阈值怎么设？softmax / RMSNorm / reduction 的误差会不会被放大？benchmark 结论是否可信？Agent 生成的 kernel 是不是只是"看起来能跑"？
 
 | 误差理论概念 | 在 GPU Performance / 推理 Infra 中的对应问题 | 项目落点 |
 |---|---|---|
 | 舍入误差 | FP16 / BF16 / FP8 / INT8 下计算结果是否可靠 | RMSNorm、Softmax、MatMul、quantization |
 | 截断误差 / 近似替代 | 用低精度、近似 kernel、quantization 替代原始计算时误差是否可接受 | INT8 dequant、FP8/INT4、近似 attention |
-| 绝对误差 / 相对误差 | correctness test 不能只看“完全相等”，要设置 `atol / rtol` | PyTorch reference test、多 dtype test |
+| 绝对误差 / 相对误差 | correctness test 不能只看"完全相等"，要设置 `atol / rtol` | PyTorch reference test、多 dtype test |
 | 有效数字 | FP32 / FP16 / BF16 的有效精度不同，决定累加策略 | FP16 输入 + FP32 accumulation |
 | 误差传播 | reduction、softmax、normalization 中局部误差如何传到输出 | row-wise reduction、stable softmax |
 | 条件数 / 病态问题 | 某些输入分布会放大误差，不能只测随机 toy case | 边界 shape、极端值、长序列 |
@@ -109,13 +109,13 @@ AI 可以生成工程代码和初版 kernel，但不能替代以下判断：
 - **Softmax**：必须解释为什么要减去 `max(x)`，并用极端输入证明 naive softmax 可能 overflow。
 - **RMSNorm**：必须说明为什么 FP16 输入常用 FP32 accumulation，以及 `eps` 对稳定性的影响。
 - **Reduction**：必须解释并行归约和 CPU 串行求和结果不完全一致的原因，测试使用合理 `rtol / atol`。
-- **MatMul / GEMM**：必须区分 FP32、TF32、FP16、BF16、Tensor Core 路径的精度差异，不只看 TFLOPS。
-- **Quantization**：必须记录 scale、zero point、dequant 误差和速度收益，不能只说“INT8 更快”。
+- **MatMul / GEMM**：必须区分 FP32、TF32、FP16、BF16、Tensor Core 路径的精度差异，不只盯着 TFLOPS。
+- **Quantization**：必须记录 scale、zero point、dequant 误差和速度收益，不能只说"INT8 更快"。
 - **Serving benchmark**：必须区分性能波动、测量误差和真实优化，避免把一次随机结果当成稳定结论。
 
 ### 数值分析进入作品集的最低要求
 
-每个 CUDA / Triton / 推理 benchmark 项目，都要留下一个小节：
+每个 CUDA / Triton / 推理 benchmark 项目，都要留出一个小节：
 
 ```text
 Numerical correctness
@@ -158,7 +158,7 @@ Numerical correctness
 
 ![[9_0_0_2.svg|900]]
 
-*图示说明：面试表达不要停在“我会写某个 kernel”，而要能从 Transformer block 中的 RMSNorm、QKV、Attention、MLP 一路讲到 prefill / decode，再落到 TTFT、TPOT、TPS、queueing、KV cache usage 和 cost / 1M tokens。这样才能证明自己理解的是 LLM 推理工程链路，而不是孤立 toy kernel。*
+*图示说明：面试表达不要停在"我会写某个 kernel"，而要能从 Transformer block 中的 RMSNorm、QKV、Attention、MLP 一路讲到 prefill / decode，再落到 TTFT、TPOT、TPS、queueing、KV cache usage 和 cost / 1M tokens。这样才能证明自己理解的是 LLM 推理工程链路，而不是孤立 toy kernel。*
 
 | 暴露点 | 必须补强的能力 | 专题入口 |
 |---|---|---|
@@ -168,7 +168,7 @@ Numerical correctness
 | speculative decoding / MTP | 解释 draft cost、verify cost、acceptance rate、平均接受长度和 serving 调度 tradeoff | [[Speculative Decoding 与 MTP 推理优化]] |
 | 跨框架与硬件边界 | 理解 PyTorch / Triton / torch.compile 与 JAX / XLA / TPU、dynamic shape、variable-length sequence 的差异 | [[JAX TPU Dynamic Shape 认知边界]] |
 | 存储层次与融合 | 用 HBM、shared memory / SRAM、register、global memory 往返解释 fusion 收益和副作用 | [[GPU 存储层次与算子融合口述]] |
-| 项目与开源表达 | 把科研、实习、issue / PR 按“问题 -> 证据 -> 结果 -> 取舍”讲清楚 | [[AI Infra 项目开源科研叙事模板]] |
+| 项目与开源表达 | 把科研、实习、issue / PR 按"问题 -> 证据 -> 结果 -> 取舍"讲清楚 | [[AI Infra 项目开源科研叙事模板]] |
 | 笔试保底 | DP、二分、树 DFS、递归爆栈、输入输出等求职风险点 | [[AI Infra 岗算法笔试保底清单]] |
 
 最低可验证能力：
@@ -183,7 +183,7 @@ Numerical correctness
 - 能快速口算 KV cache 大小和 decode 每 token 的 KV 读取量。
 - 能区分 MHA、GQA、MQA，并解释它们对 KV cache 体积和 decode 读带宽的影响。
 - 能说明 Online Softmax 如何支撑 FlashAttention 的分块精确 attention。
-- 能比较 FlashAttention V1 / V2 / V3 / V4 的主要优化方向，而不是只背公式。
+- 能比较 FlashAttention V1 / V2 / V3 / V4 的主要优化方向，而不只是背公式。
 - 能解释 MoE 的 router、top-k experts、dispatch / combine，以及它对 serving latency、负载均衡和显存的影响。
 - 能解释 prefill 为什么更偏计算密集，decode 为什么更容易受 KV cache 读带宽和调度限制。
 - 能区分 PagedAttention、RadixAttention、Prefix Cache / Prefix Attention 的作用边界。
@@ -194,7 +194,7 @@ Numerical correctness
 - 能解释 speculative decoding 的 speedup 取决于 draft cost、verify cost、acceptance rate 和平均接受长度。
 - 能说明 JAX / XLA 与 PyTorch / Triton 在编译、shape 和执行模型上的基本边界。
 - 能解释 TTFT / TPOT / ITL / TPS / RPS / queue time / GPU utilization / KV cache usage / cost per 1M tokens。
-- 能把 kernel benchmark 的收益接回 serving 指标，而不是只停留在 toy latency。
+- 能把 kernel benchmark 的收益接回 serving 指标，而不只是停留在 toy latency。
 - 能画出 Triton kernel 到 IR / lowering / PTX 的粗链路，并说明哪些环节会影响 correctness 与性能。
 - 能让 Agent 生成脚手架、测试、benchmark，但不让 Agent 决定性能结论。
 
@@ -202,7 +202,7 @@ Numerical correctness
 
 ![AI Agent Native 路线总图|935](../../图片/SVG/ai-agent-native-roadmap.svg)
 
-*图示说明：按“当前起点 → 三个阶段 → 最终目标”重绘，减少原 Mermaid 的交叉感。*
+*图示说明：按"当前起点 → 三个阶段 → 最终目标"重绘，减少原 Mermaid 的交叉感。*
 
 ## 项目总图
 
@@ -215,7 +215,7 @@ Numerical correctness
 核验日期：2026-05-06。
 
 > [!warning] 重要区分
-> 下表中的开源项目是真实存在的学习对象；作品集项目名是你未来要创建的个人仓库规划，不能在简历或面试中说成“已有开源项目”。
+> 下表中的开源项目是真实存在的学习对象；作品集项目名是你未来要创建的个人仓库规划，不能在简历或面试中说成"已有开源项目"。
 
 | 名称 | 类型 | 核验结果 | 用途 | 链接 |
 |---|---|---|---|---|
@@ -249,7 +249,7 @@ Numerical correctness
 - [vLLM metrics](https://docs.vllm.ai/en/latest/design/metrics/)：Prometheus metrics、TTFT、TPOT、queue interval、GPU cache usage、prefix cache hit rate。
 - [vLLM prefix caching](https://docs.vllm.ai/en/stable/design/prefix_caching/)：KV cache block reuse 和 shared prefix workload。
 - [vLLM disaggregated prefilling](https://docs.vllm.ai/en/v0.14.0/features/disagg_prefill/)：prefill / decode 分离与 KV transfer。
-- [SGLang PD Disaggregation](https://docs.sglang.io/docs/advanced_features/pd_disaggregation)：prefill 计算密集、decode KV cache 访存密集，以及 router / worker 拆分。
+- [SGLang PD Disaggregation](https://docs.sglang.io/docs/advanced_features/pd_disaggregation)：prefill 计算密集、decode KV cache 访问密集，以及 router / worker 拆分。
 - [FlashInfer cascade wrappers](https://docs.flashinfer.ai/api/cascade.html)：shared-prefix paged KV cache wrapper，可作为 paged KV attention baseline。
 - [TensorRT-LLM docs](https://nvidia.github.io/TensorRT-LLM/)：KV cache、chunked prefill、in-flight batching、quantization、parallelism 等工业推理能力。
 - [NVIDIA GenAI-Perf guide](https://developer.nvidia.com/blog/llm-performance-benchmarking-measuring-nvidia-nim-performance-with-genai-perf/)：TTFT、ITL、TPS、RPS 与 latency-throughput tradeoff。
@@ -258,7 +258,7 @@ Numerical correctness
 
 ![[9_0_0_3.svg|900]]
 
-*图示说明：三阶段路线的核心不是“学完更多关键词”，而是每个阶段都形成可验证产出。阶段一先证明能写基础 kernel 和 benchmark；阶段二把 kernel、Nsight、KV cache 与 serving 指标打通；阶段三把所有项目收束成作品集、开源贡献和面试叙事。*
+*图示说明：三阶段路线的核心不是"学完更多关键词"，而是每个阶段都形成可验证产出。阶段一先证明能写基础 kernel 和 benchmark；阶段二把 kernel、Nsight、KV cache 与 serving 指标打通；阶段三把所有项目收束成作品集、开源贡献和面试叙事。*
 
 目标：拿到暑期 AI Infra 相关实习面试。
 
@@ -285,7 +285,7 @@ CUDA / GPU 基础：
 - occupancy
 - CUDA event timing
 
-你必须能解释：
+你要能解释清楚：
 
 - 为什么相邻线程访问连续地址更快？
 - 为什么 shared memory transpose 比 naive transpose 快？
@@ -342,7 +342,7 @@ LLM 推理成本指标：
 | 指标 | 含义 | 为什么重要 |
 |---|---|---|
 | TTFT | Time To First Token | 用户多久看到第一个 token |
-| TPOT / ITL | 每个输出 token 间隔 | 流式输出是否顺滑 |
+| TPOT / ITL | 每个输出 token 间隔 | 流式输出是否顺畅 |
 | TPS | tokens per second | 系统吞吐 |
 | RPS | requests per second | 服务能力 |
 | GPU utilization | GPU 利用率 | 资源是否浪费 |
@@ -520,7 +520,7 @@ CUDA 细化任务、必做 kernel 和专题补课清单见 [[CUDA 学习清单]]
 
 ## 阶段 1.5：推理 Infra 桥接期
 
-适用情况：如果阶段一前四周已经完成了 CUDA 基础 kernel、Reduction / Profiling、Transpose / Memory Coalescing 和 MatMul v0，就不要继续横向堆更多 CUDA 入门 kernel。接下来四周的主线改成：
+适用情况：如果阶段一前四周已经完成了 CUDA 基础 kernel、Reduction / Profiling、Transpose / Memory Coalescing 和 MatMul v0，就不要再继续横向堆更多 CUDA 入门 kernel。接下来四周的主线改成：
 
 ```text
 kernel 能力
@@ -535,7 +535,7 @@ observability / KV cache / prefill-decode
 目标：
 
 - 把 CUDA / Triton / profiling 能力接到 LLM serving 指标上。
-- 从“会写 kernel”升级到“能解释 serving 指标为什么变化”。
+- 从"会写 kernel"升级到"能解释 serving 指标为什么变化"。
 - 提前进入 vLLM / SGLang / TensorRT-LLM 的调度、KV cache、prefill / decode、benchmark 和 observability。
 - 产出可以放进简历和面试的 benchmark report、profiling report、runbook 或 issue reproduction。
 
@@ -543,7 +543,7 @@ observability / KV cache / prefill-decode
 
 - 不跳过 correctness、benchmark、profiling 和 README。
 - 不把一次 benchmark 当成结论。
-- 不只看平均 TPS，必须看 TTFT、TPOT / ITL、p50 / p95 / p99 latency、GPU memory、KV cache 使用率和 failed requests。
+- 不只盯平均 TPS，必须看 TTFT、TPOT / ITL、p50 / p95 / p99 latency、GPU memory、KV cache 使用率和 failed requests。
 - 所有 serving 实验必须记录模型、GPU、CUDA、PyTorch、Triton、vLLM / SGLang 版本、prompt length、output length、request rate、max concurrency、warmup 和测量方式。
 
 ### 桥接期四周安排
@@ -557,7 +557,7 @@ observability / KV cache / prefill-decode
 
 ### 新增项目 3.5：llm-serving-benchmark-harness
 
-定位：从“能跑 vLLM / SGLang benchmark”升级到“能设计可信 serving benchmark”。
+定位：从"能跑 vLLM / SGLang benchmark"升级到"能设计可信 serving benchmark"。
 
 测试对象：
 
@@ -650,7 +650,7 @@ runbook 至少回答：
 
 ## 阶段二：2026 年 7 月到 2027 年 3 月
 
-目标：从“能投 AI Infra 实习”升级到“转正实习竞争力”。
+目标：从"能投 AI Infra 实习"升级到"转正实习竞争力"。
 
 这个阶段从单个 kernel 进入：
 
@@ -691,7 +691,7 @@ Transformer 深入：
 - attention FLOPs 和 memory access 分别随 sequence length、head_dim、heads 怎么变化。
 - Online Softmax 的核心是分块更新 `m_i` 和 `l_i`，避免直接对长序列 score 做不稳定的 `exp` / `sum`。
 - MLP / SwiGLU 通常是大 GEMM，理解 `intermediate_size` 对计算量和显存流量的影响。
-- MoE 的关键不是“参数更多所以更强”，而是 router 选择少量 expert；推理 infra 要关心 expert dispatch、load balance、expert parallel、all-to-all 和 batch token 分布。
+- MoE 的关键不是"参数更多所以更强"，而是 router 选择少量 expert；推理 infra 要关心 expert dispatch、load balance、expert parallel、all-to-all 和 batch token 分布。
 - prefill 阶段一次处理 prompt，GEMM / attention 计算量大；decode 每步只生成一个 token，更容易被 KV cache 读取、调度和小 batch 限制。
 - FlashAttention 用 tiling + Online Softmax 避免把完整 attention score 矩阵物化到 HBM，解决 attention 中间矩阵和显存读写问题。
 - PagedAttention 解决 KV cache 分配、碎片和 variable-length batch 管理问题。
@@ -716,23 +716,23 @@ Serving engine 深入：
 - static batching：固定 batch 做吞吐测试，简单但不能代表真实 online serving 的动态到达。
 - continuous batching：每个 decode step 都可以接入新请求，提高 GPU 利用率，但可能带来 queueing 和 tail latency 取舍。
 - chunked prefill：把长 prompt prefill 切块，降低对 decode 的阻塞，但会改变 TTFT / TPOT / scheduling tradeoff。
-- PagedAttention：通过 block table / page table 管理 KV cache，解决显存碎片、变长请求和 batch decode 访存组织问题。
+- PagedAttention：通过 block table / page table 管理 KV cache，解决显存碎片、变长请求和 batch decode 访问组织问题。
 - RadixAttention：用 radix tree 组织共享 prefix，让 system prompt、tools schema、长文档 prefix 的 KV cache 更容易复用。
 - PD disaggregation：拆分 prefill worker 和 decode worker，需要同时评估 TTFT、TPOT、KV transfer、network / NVLink / RDMA 带宽和 worker 配比。
 
 多 GPU 推理并行：
 
 - TP：按权重 / hidden 维度切分 tensor，需要 AllReduce / AllGather / ReduceScatter。
-- DP：复制模型副本分摊请求，主要考验 router、负载均衡和成本。
+- DP：复制模型副本分摊请求，主要考量 router、负载均衡和成本。
 - PP：按层切分 pipeline，关注 bubble、micro-batch 和跨 stage latency。
 - EP：MoE expert parallel，关注 expert dispatch、load balance 和 All-to-All。
-- NCCL：多 GPU collective 基础，至少能解释 AllReduce、AllGather、ReduceScatter、All-to-All 的用途。
+- NCCL：多 GPU collective 基础，至少要能解释 AllReduce、AllGather、ReduceScatter、All-to-All 的用途。
 - RDMA：跨机通信基础，先理解它为什么影响多机推理的 KV transfer、expert dispatch 和 tail latency，不要求从零实现网络栈。
 
 Compiler-aware kernel 路线：
 
 - Triton lowering / MLIR basics：理解 Triton kernel 不是黑盒，知道 IR、dialect、pass、lowering 的基本概念。
-- TVM 或 IREE 二选一入门：建立 compiler stack 地图感，不把它们同时作为深入主线。
+- TVM 或 IREE 二选一入门：建立 compiler stack 地图感，不同时作为深入主线。
 - codegen correctness：generated code 需要 reference test、shape / dtype 覆盖和边界条件验证。
 - operator fusion 直觉：fusion 可能减少访存和 launch overhead，也可能带来 register pressure、occupancy、correctness 风险。
 - 目标边界：看懂链路、能解释取舍，不从零实现完整编译器 backend。
@@ -743,9 +743,9 @@ AI Agent 进阶：
 |---|---|---|
 | Kernel Agent | 初版 CUDA / Triton 代码 | 算法正确性、边界条件、访存模式 |
 | Benchmark Agent | benchmark matrix、脚本、图表 | 测量公平性、warmup、数据可信度 |
-| Profiler Agent | 整理 Nsight 输出 | bottleneck 结论是否被指标支持 |
+| Profiler Agent | 整理 Nsight 输出 | bottleneck 结论是否被指标支撑 |
 | Reviewer Agent | correctness / performance review | 是否误判、是否过度修改 |
-| Doc Agent | README、图表、报告 | 结论是否夸大，是否能被数据支持 |
+| Doc Agent | README、图表、报告 | 结论是否夸大，是否能被数据支撑 |
 
 原则：
 
@@ -824,7 +824,7 @@ Agent 不可以改 benchmark 数据。
 - 每个算子都要判断 memory-bound / compute-bound。
 - 至少用 Online Softmax 写出 toy attention，说明它和普通 softmax 在数值稳定性、显存占用上的差异。
 - 产出 `transformer_block_shape_map.md`，把 RMSNorm、QKV projection、RoPE、attention、MLP / SwiGLU 映射到已实现 kernel 或 PyTorch reference。
-- 至少写一篇“哪些算子适合 fusion”的总结。
+- 至少写一篇"哪些算子适合 fusion"的总结。
 - 可选：实现一个 toy fusion demo，例如 bias + GELU、residual + RMSNorm 或 dequant + matmul 的简化版本，并给出 fusion 前后的 correctness 与 benchmark 对比。
 
 ### 新增项目 5.5：paged-kv-attention-lab
@@ -968,12 +968,12 @@ Agent 不可以改 benchmark 数据。
 - 能用 Nsight Compute 分析瓶颈。
 - 能搭 vLLM / SGLang benchmark。
 - 能解释 TTFT / TPOT / ITL / TPS / queueing / KV cache / cost。
-- 能区分 prefill-heavy、decode-heavy、shared-prefix、long-context 等 workload。
+- 能区分 prefill-heavy、decode-heavy、shared-prefix、long-context 等工作负载。
 - 能解释 MHA / GQA / MQA、Online Softmax / FlashAttention、MoE serving 分别影响哪类瓶颈。
 - 能说明 prefix cache、paged KV、chunked prefill、PD disaggregation 和 quantization 分别解决什么问题。
 - 能画出 Triton / MLIR / backend lowering 的粗链路。
 - 能说明 CUDA / Triton / CUTLASS / cuBLAS 在 GEMM 上各自适合什么场景。
-- 至少产出 1 篇 GEMM comparison report，而不是只跑 benchmark 数字。
+- 至少产出 1 篇 GEMM comparison report，而不只是跑 benchmark 数字。
 - 能用 AI Agent 快速生成工程代码。
 - 能人工 review Agent 生成的性能代码。
 - 有 1 到 2 个开源 issue / PR 记录。
@@ -982,7 +982,7 @@ Agent 不可以改 benchmark 数据。
 
 目标：秋招拿正式 offer。
 
-这个阶段要从“学习项目”变成“面试作品集”。
+这个阶段要从"学习项目"变成"面试作品集"。
 
 ### 高级学习点
 
@@ -1003,7 +1003,7 @@ Agent 不可以改 benchmark 数据。
 
 ### 可选高级项目：toy lowering / fusion demo
 
-这个项目是 compiler-aware 加分项，不是阶段三必做主线。fusion pass 和 toy kernel codegen 二选一即可，目标是证明你理解“算子表示 → lowering / codegen → generated kernel → correctness / benchmark”的链路。
+这个项目是 compiler-aware 加分项，不是阶段三必做主线。fusion pass 和 toy kernel codegen 二选一即可，目标是证明你理解"算子表示 → lowering / codegen → generated kernel → correctness / benchmark"的链路。
 
 可选方向一：toy fusion demo。
 
@@ -1018,7 +1018,7 @@ Agent 不可以改 benchmark 数据。
 - 用 reference test 验证 generated code 的 correctness。
 - 用少量 shape benchmark 说明 codegen 结果的性能边界。
 
-面试表达不要说“做了完整编译器”，而是强调：
+面试表达不要说"做了完整编译器"，而是强调：
 
 ```text
 我通过一个小型 lowering / fusion demo，理解了高层算子表示、kernel 生成、correctness 验证和 benchmark 之间的关系。
@@ -1129,7 +1129,7 @@ Triton > vLLM > SGLang > FlashInfer > PyTorch extension > CUTLASS
 
 ### 开源贡献冲刺模板
 
-目标：不以“硬改核心代码”为第一步，而是用 benchmark、reproduction、profiling 和文档进入开源社区。
+目标：不以"硬改核心代码"为第一步，而是用 benchmark、reproduction、profiling 和文档进入开源社区。
 
 优先切入点：
 
@@ -1181,7 +1181,7 @@ Step 4：Contribute
 
 ```text
 我有 CUDA 基础。
-我能写真实 LLM 小算子。
+我能写真正的 LLM 小算子。
 我能设计可信 serving benchmark。
 我能解释 TTFT / TPOT / queue / KV cache 为什么变化。
 我能用 Agent 加速工程，但有人工验证流程。
@@ -1207,7 +1207,7 @@ Step 4：Contribute
 我能做 Nsight profiling。
 我懂 LLM 推理系统。
 我能用数据计算推理成本。
-我能用 observability / benchmark / reproduction 证明瓶颈。
+我能用 observability / benchmark / reproduction 证明问题。
 ```
 
 ## GPU 最低成本策略
@@ -1503,7 +1503,7 @@ Step 4：Contribute
 
 所有 LLM serving benchmark 必须记录环境：
 
-- GPU 型号和数量。
+- GPU 型号、数量。
 - CUDA / driver 版本。
 - PyTorch / Triton 版本。
 - vLLM / SGLang / TensorRT-LLM 版本。
@@ -1618,4 +1618,4 @@ vllm-project/vllm
 - `FlashInfer` 用来把 Attention kernel 连接到 paged KV cache、decode attention 和 serving kernel。
 - `vLLM` / `SGLang` 用来证明自己理解推理系统，而不只是单 kernel。
 - `Triton` / `CUTLASS` 用来补齐 compiler-aware 和 GEMM / Tensor Core 体系。
-- 自拟作品集项目必须明确写成“基于这些真实开源项目的复现、benchmark、报告或小贡献”，不能写成已经存在的外部项目。
+- 自拟作品集项目必须明确写成"基于这些真实开源项目的复现、benchmark、报告或小贡献"，不能写成已经存在的外部项目。
