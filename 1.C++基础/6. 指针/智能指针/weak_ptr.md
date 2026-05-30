@@ -184,13 +184,51 @@ int main() {
 
 ---
 
+## 树结构 vs 图结构：智能指针的选择
+
+上面的 `shared_ptr + weak_ptr` 方案是**通解**，适用于任意图结构。但在特定结构中，有更优的选择：
+
+### 决策速查表
+
+| 结构 | 父→子 | 子→父 | 理由 |
+|------|------|------|------|
+| **树**（严格单亲） | `unique_ptr` | `T*`（裸指针） | 所有权严格单向，父生命周期包含子 |
+| **DAG**（多父共享子） | `shared_ptr` | `weak_ptr` | 子节点被多个父共同拥有 |
+| **图**（可能有环） | `shared_ptr` | `weak_ptr` | 需要引用计数 + 打破环 |
+
+### 树结构为什么不需要 weak_ptr？
+
+在树中，父节点的生命周期**严格包含**子节点——父析构时先销毁 `children`（`unique_ptr` 自动释放），所以子节点活着的时候，父节点**一定还活着**。既然有这个结构性保证，子→父用裸指针就是安全的，无需 `weak_ptr` 的额外开销。
+
+```cpp
+class TreeNode {
+    int value_;
+    TreeNode* parent_;                                // 不拥有，裸指针即可
+    std::vector<std::unique_ptr<TreeNode>> children_;  // 独占所有权
+public:
+    explicit TreeNode(int val, TreeNode* parent = nullptr)
+        : value_(val), parent_(parent) {}
+
+    TreeNode* addChild(int val) {
+        children_.push_back(std::make_unique<TreeNode>(val, this));
+        return children_.back().get();
+    }
+};
+// root 销毁时，整棵树自动递归释放
+```
+
+> [!tip] 什么时候必须升级为 shared_ptr + weak_ptr？
+> 当子节点可能被外部引用（如缓存、观察者）时，生命周期不再由父节点单独决定，此时需要 `shared_ptr`。所有权模型只能从严格走向宽松。
+
+---
+
 ## 关键要点
 
 1. **不增加引用计数**：`weak_ptr` 不影响对象生命周期
 2. **不能直接访问对象**：必须通过 `lock()` 获取 `shared_ptr`
 3. **主要用途**：打破 `shared_ptr` 的循环引用
 4. **安全检查**：使用 `expired()` 或 `lock()` 检查对象是否存在
-5. **常见模式**：父对象用 `shared_ptr` 指向子对象，子对象用 `weak_ptr` 指向父对象
+5. **常见模式**：父对象用 `shared_ptr` 指向子对象，子对象用 `weak_ptr` 指向父对象——这是**图结构的通解**，在树结构中可用 `unique_ptr + 裸指针` 更高效地实现（见上方对比）
 
 ---
 

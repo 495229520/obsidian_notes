@@ -26,6 +26,8 @@ status: active
 5. 能用 cuBLAS 做 baseline。
 6. 能用 Nsight Compute 分析 memory throughput、occupancy、stall reason。
 7. 能用 roofline thinking 判断 compute-bound / memory-bound。
+8. 能理解 Triton `program id`、`mask load / store`、`BLOCK_SIZE` 的最小用法。
+9. 能为 `torch-triton-rmsnorm` 建立起步任务：PyTorch reference、shape / dtype matrix、后续实现 TODO。
 
 ---
 
@@ -51,6 +53,8 @@ MatMul / GEMM 是深度学习和 LLM 推理的核心算子之一。它和前几�
 | shared memory tiled matmul | tile A/B 到 shared memory | 数据复用 |
 | register blocking toy | 一个线程算多个输出 | register reuse |
 | cuBLAS baseline | 工业库对比 | 差距解释 |
+| Triton 入门练习 | 观察 program id、mask load-store、BLOCK_SIZE | 建立 Triton kernel 心智模型 |
+| RMSNorm 起步任务 | 准备 reference、测试 shape、项目任务拆解 | 为 `torch-triton-rmsnorm` 铺路 |
 
 ---
 
@@ -123,7 +127,7 @@ MatMul / GEMM 是深度学习和 LLM 推理的核心算子之一。它和前几�
 - 自己最快版本与 cuBLAS 的差距。
 - 差距可能来自 Tensor Core、tiling 层级、指令调度、库工程优化。
 
-### Day 6-7：Nsight + README
+### Day 6-7：Nsight + Triton 入门 + README
 
 Nsight 关注：
 
@@ -133,6 +137,13 @@ Nsight 关注：
 - stall reason。
 - register count。
 - shared memory usage。
+
+Triton 入门关注：
+
+- 一个 Triton program 对应什么 tile。
+- mask 如何处理非整除边界。
+- `BLOCK_SIZE` / `num_warps` 为什么影响性能。
+- 本周只做入门阅读或最小实验，不做 Triton matmul autotune。
 
 README 必须解释：
 
@@ -187,6 +198,8 @@ TFLOPS = FLOPs / time_seconds / 1e12
 | cuBLAS baseline | 同 shape benchmark | README 有差距解释 |
 | benchmark.md | 多 M/N/K、多版本 | TFLOPS 表格 |
 | profiling.md | Nsight 指标和瓶颈判断 | 结论能被指标支持 |
+| triton_intro.md | program id、mask load-store、BLOCK_SIZE | 能解释 Triton 最小 kernel 的执行模型 |
+| rmsnorm_kickoff.md 或 tasks.md | RMSNorm reference、shape / dtype matrix、下一步任务 | `torch-triton-rmsnorm` 起步清晰 |
 
 ---
 
