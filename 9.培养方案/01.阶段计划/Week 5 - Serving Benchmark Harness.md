@@ -57,6 +57,9 @@ CUDA / Triton 在这一周仍然是支撑能力：你需要用它们理解 GPU b
 - request arrival pattern：steady / bursty / mixed。
 - vLLM vs SGLang。
 
+> [!note] 与后续成本专项的边界
+> Week 5 的主线是先把 serving benchmark harness 跑可信，所以 quantization on / off 作为可选扩展；到后续 `llm-serving-cost-benchmark` 或 quantization 成本专项时，FP16 / BF16 vs INT8 / FP8 / INT4 才是必做对比。
+
 ## 3. benchmark 配置模板
 
 每次实验都从配置文件开始，不从临时命令开始。
@@ -92,6 +95,7 @@ workload:
   prompt_length_distribution: fixed_512
   output_length_distribution: fixed_128
   shared_prefix_ratio: 0.0
+  long_context_ratio: 0.0
   streaming: false
 
 measurement:
@@ -210,6 +214,8 @@ measurement:
 - 至少覆盖低延迟、高吞吐、长上下文、共享 prefix、batching 对比五类场景。
 - 至少补充一次 static batching vs continuous batching 的解释或对比。
 - 每个实验都有环境、命令、配置和原始结果。
+- 配置中显式记录 `shared_prefix_ratio` 和 `long_context_ratio`，避免把长上下文场景只写成文字描述。
+- Week 5 可以不做 quantization 对比，但如果启用 quantization，必须记录 dtype / quantization 配置和成本口径；后续成本专项必须补齐量化对比。
 - 能解释 TTFT 低但 TPS 不高的情况。
 - 能解释 TPS 上升但 TPOT / p95 latency 变差的情况。
 - 能解释 failed requests 的原因。

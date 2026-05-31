@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 600" font-family="'Segoe UI',system-ui,sans-serif">
+  <defs>
+    <marker id="b4" markerWidth="11" markerHeight="11" refX="8" refY="3.5" orient="auto">
+      <path d="M0,0 L9,3.5 L0,7 Z" fill="#2c3e50"/>
+    </marker>
+    <style>
+      .ttl{font-size:21px;font-weight:700;fill:#1f2d3d}
+      .sub{font-size:13px;fill:#5b6b7b}
+      .cap{font-size:14px;font-weight:700;fill:#2c3e50}
+      .mono{font-family:'Consolas',monospace;font-size:12px;fill:#1f2d3d}
+      .note{font-size:12px;fill:#7a8794}
+      .edge{stroke:#2c3e50;stroke-width:2;fill:none}
+      .gl{stroke:#c7d2dd;stroke-width:1;fill:#fff}
+      .hl{fill:#ffe0a3;stroke:#e0a64a;stroke-width:1.5}
+    </style>
+  </defs>
+
+  <text x="40" y="36" class="ttl">tiled / padded：tile ↔ block 索引映射（blockIdx 在写阶段交换）</text>
+  <text x="40" y="58" class="sub">输入 tile (bx, by) 经 shared memory 转置后，写到输出 tile (by, bx)</text>
+
+  <!-- input matrix -->
+  <text x="60" y="100" class="cap">输入矩阵 (height × width)</text>
+  <g>
+    <rect class="gl" x="60" y="115" width="60" height="60"/><rect class="gl" x="120" y="115" width="60" height="60"/><rect class="gl" x="180" y="115" width="60" height="60"/><rect class="gl" x="240" y="115" width="60" height="60"/>
+    <rect class="gl" x="60" y="175" width="60" height="60"/><rect class="gl" x="120" y="175" width="60" height="60"/><rect class="hl" x="180" y="175" width="60" height="60"/><rect class="gl" x="240" y="175" width="60" height="60"/>
+    <rect class="gl" x="60" y="235" width="60" height="60"/><rect class="gl" x="120" y="235" width="60" height="60"/><rect class="gl" x="180" y="235" width="60" height="60"/><rect class="gl" x="240" y="235" width="60" height="60"/>
+  </g>
+  <text x="196" y="210" class="mono">bx=2</text>
+  <text x="196" y="224" class="mono">by=1</text>
+  <text x="60" y="312" class="note">每个格子 = 一个 32×32 tile（一个 block）</text>
+
+  <!-- shared memory -->
+  <rect x="400" y="150" width="170" height="150" rx="8" fill="#eef4fb" stroke="#b9d2ec"/>
+  <text x="416" y="172" class="cap">shared tile</text>
+  <text x="416" y="192" class="mono">[32][32]  (+1: padded)</text>
+  <text x="416" y="226" class="mono">读: tile[ty+j][tx]</text>
+  <text x="416" y="246" class="mono">= in[(y_in+j)*W + x_in]</text>
+  <line x1="408" y1="258" x2="562" y2="258" stroke="#b9d2ec"/>
+  <text x="416" y="278" class="mono">写: out[..] =</text>
+  <text x="416" y="296" class="mono">tile[tx][ty+j]</text>
+
+  <!-- output matrix -->
+  <text x="640" y="100" class="cap">输出矩阵 (width × height)</text>
+  <g>
+    <rect class="gl" x="640" y="115" width="60" height="60"/><rect class="gl" x="700" y="115" width="60" height="60"/><rect class="gl" x="760" y="115" width="60" height="60"/>
+    <rect class="gl" x="640" y="175" width="60" height="60"/><rect class="gl" x="700" y="175" width="60" height="60"/><rect class="gl" x="760" y="175" width="60" height="60"/>
+    <rect class="hl" x="700" y="235" width="60" height="60"/><rect class="gl" x="640" y="235" width="60" height="60"/><rect class="gl" x="760" y="235" width="60" height="60"/>
+    <rect class="gl" x="640" y="295" width="60" height="60"/><rect class="gl" x="700" y="295" width="60" height="60"/><rect class="gl" x="760" y="295" width="60" height="60"/>
+  </g>
+  <text x="706" y="268" class="mono">由=1</text>
+  <text x="706" y="282" class="mono">列=1</text>
+  <text x="640" y="372" class="note">输出 tile 行=bx=2、列=by=1（行列互换）</text>
+
+  <!-- arrows -->
+  <path class="edge" d="M300,205 L398,215" marker-end="url(#b4)"/>
+  <text x="312" y="198" class="note">READ · coalesced</text>
+  <path class="edge" d="M572,240 L700,250" marker-end="url(#b4)"/>
+  <text x="586" y="232" class="note">WRITE · coalesced</text>
+
+  <!-- syncthreads -->
+  <rect x="400" y="320" width="170" height="34" rx="6" fill="#fff4e9" stroke="#f3cfa0"/>
+  <text x="416" y="342" class="mono">__syncthreads()</text>
+
+  <!-- formula band -->
+  <rect x="40" y="410" width="900" height="150" rx="10" fill="#f5f7fa" stroke="#d7dee6"/>
+  <text x="56" y="436" class="cap">索引公式</text>
+  <text x="56" y="462" class="mono">读阶段:  x_in  = blockIdx.x*32 + threadIdx.x      y_in  = blockIdx.y*32 + threadIdx.y</text>
+  <text x="56" y="486" class="mono">写阶段:  x_out = blockIdx.y*32 + threadIdx.x      y_out = blockIdx.x*32 + threadIdx.y   ← blockIdx 交换</text>
+  <text x="56" y="514" class="note">关键：threadIdx.x 永远走在「连续内存」的维度上 —— 读时对应输入列、写时对应输出列，</text>
+  <text x="56" y="534" class="note">所以读和写都 coalesced。转置发生在 shared memory 内部（tile[ty][tx] 写入、tile[tx][ty] 读出）。</text>
+</svg>

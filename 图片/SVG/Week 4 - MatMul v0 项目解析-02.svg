@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 600" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="rd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#1a73e8"/>
+    </marker>
+  </defs>
+  <rect width="980" height="600" fill="#ffffff"/>
+  <text x="490" y="30" text-anchor="middle" font-size="17" font-weight="bold" fill="#202124">存储层级与数据复用：优化的本质是把数据搬到更快、更近、复用更多的层级</text>
+
+  <!-- 列标题 -->
+  <g text-anchor="middle" font-size="15" font-weight="bold">
+    <text x="180" y="66" fill="#c5221f">naive</text>
+    <text x="490" y="66" fill="#b06000">tiled</text>
+    <text x="800" y="66" fill="#137333">register</text>
+  </g>
+
+  <!-- ============ 通用三层（每列重复） ============ -->
+  <!-- naive 列 -->
+  <g>
+    <rect x="70" y="86" width="220" height="56" rx="6" fill="#fce8e6" stroke="#ea4335"/>
+    <text x="180" y="110" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#c5221f">寄存器</text>
+    <text x="180" y="129" text-anchor="middle" font-size="11" fill="#3c4043">float acc  (1 个累加器)</text>
+
+    <rect x="70" y="178" width="220" height="56" rx="6" fill="#f1f3f4" stroke="#9aa0a6" stroke-dasharray="5 4"/>
+    <text x="180" y="202" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#80868b">Shared Memory</text>
+    <text x="180" y="221" text-anchor="middle" font-size="11" fill="#80868b">未使用 ✗</text>
+
+    <rect x="70" y="270" width="220" height="70" rx="6" fill="#e8f0fe" stroke="#4285f4"/>
+    <text x="180" y="298" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1a73e8">Global Memory</text>
+    <text x="180" y="317" text-anchor="middle" font-size="11" fill="#3c4043">A 的每行被读 N 次</text>
+    <text x="180" y="332" text-anchor="middle" font-size="11" fill="#3c4043">B 的每列被读 M 次</text>
+
+    <path d="M180,270 L180,234" stroke="#1a73e8" stroke-width="2.5" fill="none" marker-end="url(#rd)"/>
+    <text x="300" y="256" font-size="11" fill="#c5221f" text-anchor="middle">复用=1</text>
+  </g>
+
+  <!-- tiled 列 -->
+  <g>
+    <rect x="380" y="86" width="220" height="56" rx="6" fill="#fef7e0" stroke="#f9ab00"/>
+    <text x="490" y="110" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#b06000">寄存器</text>
+    <text x="490" y="129" text-anchor="middle" font-size="11" fill="#3c4043">float acc  (1 个累加器)</text>
+
+    <rect x="380" y="178" width="220" height="56" rx="6" fill="#fff3d6" stroke="#f9ab00"/>
+    <text x="490" y="201" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#b06000">Shared Memory ✓</text>
+    <text x="490" y="220" text-anchor="middle" font-size="11" fill="#3c4043">As[16][16], Bs[16][16] = 2KB</text>
+
+    <rect x="380" y="270" width="220" height="70" rx="6" fill="#e8f0fe" stroke="#4285f4"/>
+    <text x="490" y="298" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1a73e8">Global Memory</text>
+    <text x="490" y="317" text-anchor="middle" font-size="11" fill="#3c4043">每个 tile 元素只读 1 次</text>
+    <text x="490" y="332" text-anchor="middle" font-size="11" fill="#3c4043">访存量 ↓ 到 1/TILE</text>
+
+    <path d="M490,270 L490,234" stroke="#1a73e8" stroke-width="2.5" fill="none" marker-end="url(#rd)"/>
+    <path d="M490,178 L490,142" stroke="#1a73e8" stroke-width="2.5" fill="none" marker-end="url(#rd)"/>
+    <text x="610" y="258" font-size="11" fill="#b06000" text-anchor="middle">协作载入</text>
+    <text x="610" y="166" font-size="11" fill="#b06000" text-anchor="middle">复用 ×16</text>
+  </g>
+
+  <!-- register 列 -->
+  <g>
+    <rect x="690" y="86" width="220" height="56" rx="6" fill="#e6f4ea" stroke="#34a853"/>
+    <text x="800" y="108" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#137333">寄存器 ✓✓</text>
+    <text x="800" y="127" text-anchor="middle" font-size="11" fill="#3c4043">acc[4][4] + regA[4] + regB[4]</text>
+
+    <rect x="690" y="178" width="220" height="56" rx="6" fill="#d7f0df" stroke="#34a853"/>
+    <text x="800" y="201" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#137333">Shared Memory ✓</text>
+    <text x="800" y="220" text-anchor="middle" font-size="11" fill="#3c4043">As[8][64], Bs[8][64] = 4KB</text>
+
+    <rect x="690" y="270" width="220" height="70" rx="6" fill="#e8f0fe" stroke="#4285f4"/>
+    <text x="800" y="298" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1a73e8">Global Memory</text>
+    <text x="800" y="317" text-anchor="middle" font-size="11" fill="#3c4043">64×64 block tile 协作载入</text>
+    <text x="800" y="332" text-anchor="middle" font-size="11" fill="#3c4043">每线程搬 2 个元素</text>
+
+    <path d="M800,270 L800,234" stroke="#1a73e8" stroke-width="2.5" fill="none" marker-end="url(#rd)"/>
+    <path d="M800,178 L800,142" stroke="#1a73e8" stroke-width="2.5" fill="none" marker-end="url(#rd)"/>
+    <text x="920" y="258" font-size="11" fill="#137333" text-anchor="middle">协作载入</text>
+    <text x="905" y="166" font-size="10.5" fill="#137333" text-anchor="middle">8 load → 16 FMA</text>
+  </g>
+
+  <!-- ============ 底部：计算/访存比 与 瓶颈 ============ -->
+  <rect x="70" y="378" width="840" height="186" rx="8" fill="#fafafa" stroke="#dadce0"/>
+  <text x="490" y="402" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#202124">计算 / 访存比（算术强度）逐级抬升 → 把瓶颈从「带宽」推向「算力」</text>
+
+  <!-- roofline 横轴示意 -->
+  <line x1="120" y1="500" x2="860" y2="500" stroke="#5f6368" stroke-width="1.5"/>
+  <text x="120" y="524" font-size="11" fill="#5f6368">低算术强度 (memory-bound)</text>
+  <text x="860" y="524" font-size="11" fill="#5f6368" text-anchor="end">高算术强度 (compute-bound)</text>
+  <line x1="560" y1="436" x2="560" y2="512" stroke="#ea4335" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <text x="560" y="430" font-size="11" fill="#ea4335" text-anchor="middle">ridge point ≈ 15 FLOP/Byte</text>
+
+  <g font-size="11.5" text-anchor="middle">
+    <circle cx="180" cy="500" r="9" fill="#ea4335"/>
+    <text x="180" y="476" fill="#c5221f" font-weight="bold">naive</text>
+    <text x="180" y="548" fill="#3c4043">0.32 TFLOPS</text>
+
+    <circle cx="330" cy="500" r="9" fill="#f9ab00"/>
+    <text x="330" y="476" fill="#b06000" font-weight="bold">tiled</text>
+    <text x="330" y="548" fill="#3c4043">0.59 TFLOPS</text>
+
+    <circle cx="620" cy="500" r="9" fill="#34a853"/>
+    <text x="620" y="476" fill="#137333" font-weight="bold">register</text>
+    <text x="620" y="548" fill="#3c4043">1.38 TFLOPS</text>
+
+    <circle cx="800" cy="500" r="9" fill="#1a73e8"/>
+    <text x="800" y="476" fill="#1a73e8" font-weight="bold">cuBLAS</text>
+    <text x="800" y="548" fill="#3c4043">2.92 TFLOPS</text>
+  </g>
+</svg>
