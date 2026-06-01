@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+<title id="title">三种 reduce Host Wrapper 公共模式</title>
+<desc id="desc">CUDA Week 2 Parallel Reduction note diagram</desc>
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#EFF6FF"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+    <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.12"/>
+  </filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+  </marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB"/>
+  </marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
+  </marker>
+  <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B"/>
+  </marker>
+  <style><![CDATA[
+    text { font-family: "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", "Inter", Arial, sans-serif; }
+    .mono { font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace; }
+    .small { font-size: 14px; fill: #64748B; }
+    .label { font-size: 15px; fill: #334155; font-weight: 600; }
+    .title { font-size: 30px; fill: #0F172A; font-weight: 800; }
+    .subtitle { font-size: 16px; fill: #64748B; }
+    .caption { font-size: 13px; fill: #64748B; }
+  ]]></style>
+</defs>
+<rect x="0" y="0" width="1280" height="720" fill="url(#bgGrad)"/>
+<text x="50" y="50" font-size="30" font-weight="800" fill="#0F172A" text-anchor="start">14 Host wrapper：三种实现只有 kernel launch 与 shared bytes 不同</text>
+<text x="52" y="78" font-size="15" font-weight="500" fill="#64748B" text-anchor="start">放在“10.5 三个 host wrapper 的共同模式”附近</text>
+<rect x="70" y="150" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="70" y="150" width="230" height="8" rx="18" fill="#2563EB" opacity="1"/>
+<text x="90" y="184" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">1. n&lt;=0 return 0</text>
+<line x1="300" y1="205" x2="370" y2="205" stroke="#334155" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="370" y="150" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="370" y="150" width="230" height="8" rx="18" fill="#059669" opacity="1"/>
+<text x="390" y="184" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">2. num_blocks = ceil(n/block)</text>
+<line x1="600" y1="205" x2="670" y2="205" stroke="#334155" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="670" y="150" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="670" y="150" width="230" height="8" rx="18" fill="#7C3AED" opacity="1"/>
+<text x="690" y="184" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">3. DeviceBuffer d_partial</text>
+<line x1="900" y1="205" x2="970" y2="205" stroke="#334155" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="970" y="150" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="970" y="150" width="230" height="8" rx="18" fill="#F59E0B" opacity="1"/>
+<text x="990" y="184" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">4. launch kernel</text>
+<path d="M 1085 255 C 1085 285 185 285 185 310" stroke="#334155" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="70" y="310" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="70" y="310" width="230" height="8" rx="18" fill="#2563EB" opacity="1"/>
+<text x="90" y="344" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">5. cudaGetLastError</text>
+<line x1="300" y1="365" x2="370" y2="365" stroke="#334155" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="370" y="310" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="370" y="310" width="230" height="8" rx="18" fill="#059669" opacity="1"/>
+<text x="390" y="344" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">6. cudaDeviceSynchronize</text>
+<line x1="600" y1="365" x2="670" y2="365" stroke="#334155" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="670" y="310" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="670" y="310" width="230" height="8" rx="18" fill="#7C3AED" opacity="1"/>
+<text x="690" y="344" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">7. cudaMemcpy D2H</text>
+<line x1="900" y1="365" x2="970" y2="365" stroke="#334155" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="970" y="310" width="230" height="105" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="970" y="310" width="230" height="8" rx="18" fill="#F59E0B" opacity="1"/>
+<text x="990" y="344" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">8. CPU final sum</text>
+<rect x="165" y="520" width="950" height="115" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<text x="195" y="555" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">launch 差异</text>
+<text x="210" y="585" font-size="13" font-weight="800" fill="#F59E0B" text-anchor="start">Naive</text>
+<text x="320" y="585" font-size="13" font-weight="500" fill="#334155" text-anchor="start" class="mono">&lt;&lt;&lt;num_blocks, threads_per_block&gt;&gt;&gt;</text>
+<text x="895" y="585" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">0 B smem</text>
+<text x="210" y="609" font-size="13" font-weight="800" fill="#059669" text-anchor="start">Shared</text>
+<text x="320" y="609" font-size="13" font-weight="500" fill="#334155" text-anchor="start" class="mono">&lt;&lt;&lt;num_blocks, threads_per_block, block*sizeof(T)&gt;&gt;&gt;</text>
+<text x="895" y="609" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">1024 B / block (float, 256)</text>
+<text x="210" y="633" font-size="13" font-weight="800" fill="#2563EB" text-anchor="start">Shuffle</text>
+<text x="320" y="633" font-size="13" font-weight="500" fill="#334155" text-anchor="start" class="mono">&lt;&lt;&lt;num_blocks, threads_per_block, warps*sizeof(T)&gt;&gt;&gt;</text>
+<text x="895" y="633" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">32 B / block (float, 256)</text>
+</svg>

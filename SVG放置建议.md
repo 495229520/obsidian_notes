@@ -1,0 +1,26 @@
+# CUDA Week 2 SVG 放置建议
+
+- `CUDA Week 2 Parallel Reduction 项目解析-01.svg`：替换现有 `![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-01.svg|1002]]`；放在 ## 1. 项目定位 的 note 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-01.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-02.svg`：替换现有 `...-02.svg`；放在 ## 14. Benchmark 标题后 / 14.1 前。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-02.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-03.svg`：替换现有 `...-03.svg`；放在 ## 10. Naive Reduce 标题后 / 10.1 前。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-03.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-04.svg`：新增；放在 ## 2. 目录结构 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-04.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-05.svg`：新增；放在 ## 3. 构建系统 中。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-05.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-06.svg`：新增；放在 ## 4. Makefile 中。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-06.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-07.svg`：新增；放在 ## 6. cuda_check.cuh 中。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-07.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-08.svg`：新增；放在 ## 7. device_buffer.cuh 中。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-08.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-09.svg`：新增；放在 ## 8 或 ## 13 Correctness Test 中。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-09.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-10.svg`：新增；放在 ## 11 Shared Memory Reduce 开头/11.4。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-10.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-11.svg`：新增；放在 ## 11.7 线程活跃度 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-11.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-12.svg`：新增；放在 ## 12.2 shuffle 数据流处。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-12.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-13.svg`：新增；放在 ## 12.4 两层归约结构 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-13.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-14.svg`：新增；放在 ## 10.5 Host wrapper 共同模式 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-14.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-15.svg`：新增；放在 ## 20 GPU 内存层次 前。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-15.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-16.svg`：新增；放在 ## 14.10 实测 benchmark 结果 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-16.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-17.svg`：新增；放在 ## 15 Nsight Compute Profiling 中。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-17.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-18.svg`：新增；放在 ## 1 note 后 或 ## 21 前。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-18.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-19.svg`：新增；放在 ## 20.4 SM 资源竞争 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-19.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-20.svg`：新增；放在 ## 17 README 推荐阅读顺序 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-20.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-21.svg`：新增；放在 ## 9.3 声明与实现分离 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-21.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-22.svg`：新增；放在 ## 8.3/8.4 或 ## 13 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-22.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-23.svg`：新增；放在 ## 9/10/11/12 之间统一索引图。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-23.svg|1000]]`
+- `CUDA Week 2 Parallel Reduction 项目解析-24.svg`：新增；放在 ## 22 关键要点总结 前。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-24.svg|1000]]`

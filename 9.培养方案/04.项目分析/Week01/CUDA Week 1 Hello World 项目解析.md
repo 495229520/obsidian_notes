@@ -13,761 +13,347 @@ status: active
 
 # CUDA Week 1 Hello World 项目解析
 
-> 这个项目是 `CUDA_learning/week01` 的 Week 1 CUDA 入门工程：用 `vector add` 打通 CUDA 项目模板、RAII 显存管理、kernel launch、correctness test、CUDA event benchmark 和 Agent workflow 约束。
+> 这个项目是 `CUDA_learning/week01`：用 `vector add` 这一个最简单的并行算子，把 **CMake 构建 → 错误检查 → 显存 RAII → kernel launch → correctness test → CUDA event benchmark → Agent workflow 约束** 这条 CUDA 工程闭环完整走一遍。kernel 本身只有一行加法，真正的内容是它周围的工程骨架——这套骨架后面 Week 2/3/4 会原样复用。
 
 项目地址：[CUDA_learning/week01](https://github.com/hosendovebelva-boop/CUDA_learning/tree/main/week01)
+
+阶段计划：[[Week 1 - CUDA + Agent workflow]]
+配套文件：[[9.培养方案/04.项目分析/Week01/exercises|渐进式练习]] · [[9.培养方案/04.项目分析/Week01/profiling|profiling 方法论]] · [[9.培养方案/04.项目分析/Week01/questions|必答题]]
 
 ---
 
 ## 1. 项目定位
 
-这个项目不是简单地写一个单文件 `.cu` 程序，而是把 CUDA Hello World 做成一个最小工程闭环：
+`vector add` 是 CUDA 里**最容易并行**的一类问题：
 
-```text
-CMake 构建
-→ CUDA 错误检查
-→ RAII 管理 GPU 显存
-→ vector add kernel
-→ correctness test
-→ CUDA event benchmark
-→ Agent workflow 约束
+```cpp
+c[i] = a[i] + b[i];
 ```
 
-它对应 [[Week 1 - CUDA + Agent workflow]] 的核心目标：
+每个输出元素只依赖同位置的两个输入，线程之间**零依赖、零通讯**。正因为算法本身没有难点，Week 1 的重点根本不在 kernel，而在**怎么把一个 CUDA kernel 工程化地包起来**：错误怎么暴露、显存谁来释放、测试和 benchmark 如何共享同一份实现、Agent 改代码的边界在哪。
 
-1. 用 CMake 组织 CUDA 项目。
-2. 用 `vector add` 验证 CUDA 执行模型。
-3. 用 correctness test 证明结果正确。
-4. 用 CUDA event benchmark 证明性能。
-5. 用 `CLAUDE.md` 约束 Agent 辅助开发边界。
+这条主线往后直接连到 Week 2：reduction 把焦点从"每个线程独立做一件事"升级到"多个线程协作产生一个标量"，开始引入 shared memory 和线程同步——但用的还是 Week 1 这套 `cuda_check / DeviceBuffer / 测试+benchmark` 骨架。
 
-一句话概括：
+衔接关系：本篇 → [[CUDA Week 2 Parallel Reduction 项目解析]] → [[CUDA Week 3 Transpose 项目解析]]。
 
-```text
-这个项目是 CUDA 入门的“工程化 Hello World”。
-```
+一句话概括：**这是 CUDA 入门的"工程化 Hello World"——kernel 是配角，工程闭环才是主角。**
 
 ---
 
-## 2. 目录结构
+## 2. 项目架构总览
 
-项目结构如下：
+整个工程是**一个静态库 + 两个消费者**的极简结构：kernel 与 host 流程编进 `vector_add_lib`，correctness test 和 benchmark 都链接同一个库，从而保证"测的代码"和"跑的代码"是同一份。
 
-```text
-week01/
-├── CMakeLists.txt
-├── CLAUDE.md
-├── Makefile
-├── README.md
-├── include/
-│   ├── cuda_check.cuh
-│   └── device_buffer.cuh
-├── src/
-│   ├── vector_add.cu
-│   └── vector_add.cuh
-├── tests/
-│   └── test_vector_add.cu
-├── benchmarks/
-│   └── bench_vector_add.cu
-└── docs/
+```mermaid
+flowchart LR
+    SRC["src/vector_add.cu<br/>kernel + host 流程"] --> LIB["vector_add_lib<br/>(静态库)"]
+    LIB --> T["test_vector_add<br/>只验正确性"]
+    LIB --> B["bench_vector_add<br/>只测时间/带宽"]
+    INC["include/<br/>cuda_check · device_buffer"] -.公共设施.-> LIB
+    style LIB fill:#eef4fb,stroke:#b9d2ec
+    style T fill:#eafaf1,stroke:#9fdcc0
+    style B fill:#fff4e9,stroke:#e0a64a
 ```
 
-各部分职责：
+目录职责：
 
-| 路径 | 职责 |
+| 路径 | 作用 |
 |---|---|
-| `CMakeLists.txt` | 定义 CUDA/C++ 构建规则 |
-| `Makefile` | 包装常用构建、测试、benchmark 命令 |
-| `CLAUDE.md` | 约束 Agent 可做、需确认、禁止的操作 |
-| `include/cuda_check.cuh` | 统一 CUDA Runtime API 错误检查 |
-| `include/device_buffer.cuh` | 用 RAII 管理 GPU device memory |
-| `src/vector_add.cuh` | 对外声明 host API 和 kernel launch 封装 |
-| `src/vector_add.cu` | 实现 kernel、launch 函数和 host 侧完整流程 |
-| `tests/test_vector_add.cu` | correctness test，只验证结果是否正确 |
-| `benchmarks/bench_vector_add.cu` | CUDA event benchmark，测 kernel 时间和有效带宽 |
+| `CMakeLists.txt` | 启用 CUDA 语言、定义库与可执行目标 |
+| `Makefile` | CMake 的便捷包装（`make` / `make test` / `make bench`） |
+| `CLAUDE.md` | 约束 Agent 可做 / 需确认 / 禁止的操作 |
+| `include/` | 与具体 kernel 无关的公共设施：错误检查、显存 RAII |
+| `src/vector_add.{cu,cuh}` | kernel、launch 封装、host 完整流程，编进 `vector_add_lib` |
+| `tests/` | correctness test，逐元素对比 CPU 参考 |
+| `benchmarks/` | CUDA event benchmark，输出时间 + 有效带宽 + 正确性 |
+| `docs/` | profiling 结果（待填） |
 
-这种结构的价值在于：测试、benchmark 和核心实现分离，但复用同一份 `vector_add_lib`，避免“测试一份代码、benchmark 另一份代码”。
+构建与运行：
+
+```bash
+cmake -S . -B build && cmake --build build   # 或直接 make
+make test     # correctness test
+make bench    # kernel 时间 + 有效带宽
+```
+
+建议阅读顺序：`CLAUDE.md → cuda_check.cuh → device_buffer.cuh → vector_add.cuh → vector_add.cu → test → bench`。这个顺序从工程约束出发，先工具封装、再核心实现、最后测试与性能。
 
 ---
 
-## 3. 构建系统：`CMakeLists.txt`
+## 3. 核心概念铺垫
 
-### 3.1 启用 CUDA 语言
+读后面代码前，先把几个执行模型概念钉死，否则只会看到 `blockIdx.x * blockDim.x` 这串索引、看不到"为什么"。
 
-```cmake
-cmake_minimum_required(VERSION 3.18)
+- **kernel（`__global__`）**：由 host（CPU）发起、在 device（GPU）上并行执行的函数。一次 launch 会产生**大量线程**，每个线程跑同一份代码、处理不同数据（SIMT 模型）。
+- **grid / block / thread**：launch 时写成 `kernel<<<blocks, threads_per_block>>>`。线程按 block 分组，block 组成 grid。线程靠 `blockIdx.x * blockDim.x + threadIdx.x` 算出自己负责的全局下标。
+- **Host ↔ Device 数据流**：GPU 有独立显存，CPU 数据必须显式 `cudaMemcpy` 拷过去（H2D）、算完再拷回来（D2H）。这条"分配 → 拷入 → 计算 → 拷回"是所有 CUDA 程序的骨架。
+- **memory-bound**：`vector add` 每个元素只做一次加法、却要读两次写一次。算术强度极低，性能几乎完全由显存带宽决定——所以 benchmark 关心的是**有效带宽**而非 FLOPS。
 
-project(cuda01 LANGUAGES CXX CUDA)
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-```
-
-**关键点**：
-
-- `LANGUAGES CXX CUDA` 表示项目同时包含普通 C++ host code 和 CUDA device code。
-- `.cu` 文件会交给 CUDA 编译链处理。
-- host 侧使用 C++20，CUDA 侧使用 CUDA C++17，适合作为入门项目。
-
-CUDA 项目的 CMake 基础可以回看 [[14.3 CMake基础]]。
-
-### 3.2 核心库与可执行文件
-
-```cmake
-add_library(vector_add_lib
-    src/vector_add.cu
-)
-
-target_include_directories(vector_add_lib
-    PUBLIC
-        include
-        src
-)
-```
-
-这里把 `src/vector_add.cu` 做成库 `vector_add_lib`。这样测试程序和 benchmark 程序都链接同一份实现。
-
-```cmake
-add_executable(test_vector_add
-    tests/test_vector_add.cu
-)
-
-target_link_libraries(test_vector_add
-    PRIVATE
-        vector_add_lib
-)
-
-add_executable(bench_vector_add
-    benchmarks/bench_vector_add.cu
-)
-
-target_link_libraries(bench_vector_add
-    PRIVATE
-        vector_add_lib
-)
-```
-
-**设计思路**：
-
-- `test_vector_add` 只负责正确性测试。
-- `bench_vector_add` 只负责性能测量。
-- 两者都复用 `vector_add_lib`，保证测试和 benchmark 指向同一份 kernel 实现。
+一句话串起来：**Week 1 把"一个 CPU 循环"翻译成"n 个 GPU 线程各做一次"，难点不在加法，而在跨越 Host/Device 边界的资源管理与错误处理。**
 
 ---
 
-## 4. CUDA 错误检查：`include/cuda_check.cuh`
+## 4. 公共基础设施
 
-CUDA Runtime API 是 C 风格接口，很多函数返回 `cudaError_t`：
+两个头文件与具体 kernel 无关，但决定了工程"可测、不泄漏、错误就地暴露"。这两个文件 Week 2/3 会**原样复用**。
 
-```cpp
-cudaMalloc(...)
-cudaMemcpy(...)
-cudaEventCreate(...)
-cudaFree(...)
-```
+### 4.1 CUDA_CHECK：让错误就地爆炸
 
-如果不检查返回值，错误可能延迟到后续同步或拷贝阶段才暴露，定位成本很高。
-
-项目中封装为：
+CUDA Runtime 是 C 风格、靠返回值报错。不检查的话，错误会延迟到很久之后的某次同步/拷贝才暴露，定位成本极高。`cuda_check.cuh` 用一个宏把"表达式 + 文件 + 行号"打包抛异常：
 
 ```cpp
-inline void check_cuda(cudaError_t status, const char* expression, const char* file, int line) {
-    if (status == cudaSuccess) {
-        return;
-    }
-
-    throw std::runtime_error(
-        std::string("CUDA error: ") + cudaGetErrorString(status) +
-        "\n  expression: " + expression +
-        "\n  location: " + file + ":" + std::to_string(line));
+inline void check_cuda(cudaError_t status, const char* expr, const char* file, int line) {
+    if (status == cudaSuccess) return;
+    throw std::runtime_error(std::string("CUDA error: ") + cudaGetErrorString(status) +
+        "\n  expression: " + expr + "\n  location: " + file + ":" + std::to_string(line));
 }
-
 #define CUDA_CHECK(expr) check_cuda((expr), #expr, __FILE__, __LINE__)
 ```
 
-**关键点**：
-
-- `cudaGetErrorString(status)` 把错误码转换成人类可读信息。
-- `#expr` 记录失败的表达式。
-- `__FILE__` 和 `__LINE__` 记录错误位置。
-- `CUDA_CHECK(expr)` 把 C 风格错误码转换成 C++ 异常。
-
-使用方式：
+`#expr` 把表达式原文转成字符串，`__FILE__/__LINE__` 定位现场，`cudaGetErrorString` 给出人类可读信息。每一次 Runtime 调用都套 `CUDA_CHECK`：
 
 ```cpp
 CUDA_CHECK(cudaMemcpy(d_a.get(), a.data(), d_a.bytes(), cudaMemcpyHostToDevice));
 CUDA_CHECK(cudaDeviceSynchronize());
 ```
 
-这符合 CUDA 入门阶段的基本要求：每次 Runtime API 调用都应该能暴露错误，而不是静默失败。
+### 4.2 DeviceBuffer：显存的 RAII
 
----
-
-## 5. RAII 显存封装：`include/device_buffer.cuh`
-
-### 5.1 为什么需要 `DeviceBuffer`
-
-裸 CUDA 写法通常是：
-
-```cpp
-float* d_a = nullptr;
-cudaMalloc(&d_a, n * sizeof(float));
-
-// 使用 d_a
-
-cudaFree(d_a);
-```
-
-这有三个问题：
-
-1. 中途 `return` 或抛异常时容易忘记 `cudaFree`。
-2. 多个指针误指向同一块显存时可能 double free。
-3. 业务逻辑里到处散落 `cudaMalloc/cudaFree`，维护成本高。
-
-所以项目用 `DeviceBuffer<T>` 做 RAII 封装。RAII 的核心思想可以回看 [[独享智能指针]]：
-
-```text
-构造函数获取资源
-析构函数释放资源
-对象生命周期就是资源生命周期
-```
-
-### 5.2 构造函数：申请 GPU 显存
+裸 `cudaMalloc/cudaFree` 一旦中途 `return` 或抛异常就会泄漏，多个指针误指向同一块显存还会 double free。`DeviceBuffer<T>` 用 RAII 把生命周期绑死，并遵循"**禁拷贝、允移动**"：
 
 ```cpp
 template <typename T>
 class DeviceBuffer {
 public:
     explicit DeviceBuffer(std::size_t count) : count_(count) {
-        if (count_ > 0) {
-            CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&ptr_), count_ * sizeof(T)));
-        }
+        if (count_ > 0) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&ptr_), count_ * sizeof(T)));
     }
-```
-
-**关键点**：
-
-- `T` 让这个类能管理 `float`、`int`、`double` 等不同类型的 device memory。
-- `count_ * sizeof(T)` 自动计算字节数。
-- `cudaMalloc` 需要 `void**`，所以这里使用 `reinterpret_cast<void**>(&ptr_)`。
-- `count_ > 0` 避免申请 0 字节显存。
-
-可以把它理解成：
-
-```text
-DeviceBuffer<float> d_a(n)
-≈ 在 GPU 上申请 n 个 float 的显存
-```
-
-### 5.3 析构函数：释放 GPU 显存
-
-```cpp
-    ~DeviceBuffer() {
-        if (ptr_ != nullptr) {
-            cudaFree(ptr_);
-        }
-    }
-```
-
-**关键点**：
-
-- 对象离开作用域时自动调用析构函数。
-- 析构函数中释放 device memory。
-- 析构函数不抛异常，因为析构阶段如果抛异常可能导致 `std::terminate`。
-
-这让 GPU 显存也拥有类似 `std::unique_ptr` 的自动生命周期管理。
-
-### 5.4 禁止拷贝：防止 double free
-
-```cpp
-    DeviceBuffer(const DeviceBuffer&) = delete;
+    ~DeviceBuffer() { if (ptr_) cudaFree(ptr_); }              // 析构自动释放，且不抛异常
+    DeviceBuffer(const DeviceBuffer&) = delete;                // 禁拷贝：避免 double free
     DeviceBuffer& operator=(const DeviceBuffer&) = delete;
+    DeviceBuffer(DeviceBuffer&& o) noexcept                    // 允移动：转移所有权
+        : ptr_(o.ptr_), count_(o.count_) { o.ptr_ = nullptr; o.count_ = 0; }
+    T* get();  std::size_t size() const;  std::size_t bytes() const;
+};
 ```
 
-如果允许拷贝，两个对象会拥有同一块 GPU 显存：
+> [!note] 为什么禁拷贝、却允移动
+> 显存指针是独占资源。拷贝会让两个对象指向同一块显存，析构时 double free——所以删掉拷贝。移动语义"接管指针 + 置空源"是正确的所有权转移，和 `std::unique_ptr` 完全同构。RAII 思想可回看 [[独享智能指针]]。
 
-```text
-a.ptr_ ──┐
-         ├── GPU memory
-b.ptr_ ──┘
-```
-
-作用域结束时两个对象都会 `cudaFree(ptr_)`，导致重复释放。因此 `DeviceBuffer` 必须是独占所有权，和 `std::unique_ptr` 一样不可复制。
-
-### 5.5 支持移动：转移所有权
-
-```cpp
-    DeviceBuffer(DeviceBuffer&& other) noexcept : ptr_(other.ptr_), count_(other.count_) {
-        other.ptr_ = nullptr;
-        other.count_ = 0;
-    }
-```
-
-移动构造的含义是：
-
-```text
-把 other 拥有的 GPU 显存转移给当前对象。
-然后把 other 置空，避免 other 析构时释放同一块显存。
-```
-
-这也是 `std::unique_ptr` 的语义：不能复制所有权，但可以移动所有权。
-
-### 5.6 `get()`、`size()`、`bytes()`
-
-```cpp
-    T* get() { return ptr_; }
-    const T* get() const { return ptr_; }
-    std::size_t size() const { return count_; }
-    std::size_t bytes() const { return count_ * sizeof(T); }
-```
-
-用途：
-
-| 方法 | 作用 |
-|---|---|
-| `get()` | 借出底层 device pointer，传给 `cudaMemcpy` 或 kernel launch |
-| `size()` | 返回元素数量 |
-| `bytes()` | 返回字节数，避免手写 `size() * sizeof(T)` |
-
-注意：`get()` 只是借出指针，不转移所有权，不能对 `get()` 返回的指针手动 `cudaFree`。
+`get()` 只是**借出**底层指针给 `cudaMemcpy` 或 kernel，不转移所有权，绝不能对它手动 `cudaFree`；`bytes()` 避免手写 `size() * sizeof(T)` 出错。
 
 ---
 
-## 6. 对外 API：`src/vector_add.cuh`
+## 5. 核心实现：kernel 与 launch
 
-这个头文件声明了两层 API。
-
-### 6.1 高层 host API
-
-```cpp
-std::vector<float> vector_add(const std::vector<float>& a, const std::vector<float>& b);
-```
-
-调用者只需要传入 CPU 侧的 `std::vector<float>`，函数内部负责：
-
-1. 申请 GPU 显存。
-2. Host to Device 拷贝。
-3. 启动 `vector_add_kernel`。
-4. Device to Host 拷回结果。
-
-这让 `tests/` 和 `benchmarks/` 可以复用同一份实现。
-
-### 6.2 低层 kernel launch 封装
-
-```cpp
-void launch_vector_add_kernel(const float* d_a,
-                              const float* d_b,
-                              float* d_c,
-                              int n,
-                              int threads_per_block = 256);
-```
-
-这个函数要求传入的是 device pointer，不能传 `std::vector::data()` 这样的 host pointer。
-
-它主要服务 benchmark：benchmark 会提前准备好 device memory，然后在 CUDA event 计时区间里重复调用 launch 函数，从而测 kernel-only 时间。
-
----
-
-## 7. 核心实现：`src/vector_add.cu`
-
-### 7.1 Kernel：每个线程处理一个元素
+### 5.1 kernel：每个线程处理一个元素
 
 ```cpp
 __global__ void vector_add_kernel(const float* a, const float* b, float* c, int n) {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (idx < n) {
-        c[idx] = a[idx] + b[idx];
-    }
+    if (idx < n) c[idx] = a[idx] + b[idx];
 }
 ```
 
-**关键点**：
-
-- `__global__` 表示这是由 CPU 侧启动、在 GPU 上执行的 kernel。
-- 每个线程都会执行同一份代码。
-- `idx` 是当前线程负责的全局数组下标。
-- `idx < n` 防止最后一个 block 中多出来的线程越界访问。
-
-CPU 写法是：
-
-```cpp
-for (int i = 0; i < n; ++i) {
-    c[i] = a[i] + b[i];
-}
-```
-
-CUDA 写法的思路是：
+把 CPU 与 CUDA 两种写法摆在一起，思路一目了然：
 
 ```text
-把 CPU 循环的每一次迭代，分配给不同 GPU thread。
+CPU：  一个线程做 n 次加法          for (i=0..n) c[i]=a[i]+b[i];
+CUDA： n 个线程各做一次加法         idx = 全局下标; c[idx]=a[idx]+b[idx];
 ```
 
-也就是：
+两个关键点：
 
-```text
-CPU：一个线程做 n 次加法
-CUDA：n 个线程各做一次加法
-```
+- **`idx` 是全局下标**：`blockIdx.x * blockDim.x + threadIdx.x` 把"第几个 block × 每 block 多少线程 + block 内第几个线程"折算成数组下标。这是 CUDA 一维索引的标准式子。
+- **`if (idx < n)` 不可省**：线程总数是 block 的整数倍，几乎总会多出一些线程，没有这个守卫它们会越界访问非法地址。
 
-### 7.2 Kernel launch：计算 block 数并启动 GPU
+### 5.2 launch：计算 block 数并启动
 
 ```cpp
-void launch_vector_add_kernel(const float* d_a,
-                              const float* d_b,
-                              float* d_c,
-                              int n,
-                              int threads_per_block) {
-    const int blocks = (n + threads_per_block - 1) / threads_per_block;
-
+void launch_vector_add_kernel(const float* d_a, const float* d_b, float* d_c,
+                              int n, int threads_per_block = 256) {
+    const int blocks = (n + threads_per_block - 1) / threads_per_block;   // 向上取整
     vector_add_kernel<<<blocks, threads_per_block>>>(d_a, d_b, d_c, n);
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());                                       // 抓 launch 配置错误
 }
 ```
 
-`blocks` 的计算是整数向上取整：
+`blocks = ceil(n / threads_per_block)` 是整数向上取整的惯用写法。以 `n=1000, threads_per_block=256` 为例：
 
 ```text
-blocks = ceil(n / threads_per_block)
+blocks = (1000 + 255) / 256 = 4
+总线程数 = 4 × 256 = 1024 > 1000
+多出的 24 个线程被 kernel 里的 if (idx < n) 拦下
 ```
 
-例如 `n = 1000`、`threads_per_block = 256`：
+> [!note] cudaGetLastError vs cudaDeviceSynchronize
+> kernel launch 是**异步**的。`cudaGetLastError()` 只能抓到**launch 配置错误**（如 block 维度非法）；kernel 执行期的运行时错误要等后面的 `cudaDeviceSynchronize()` 才会暴露。两者职责不同，都要查。
 
-```text
-blocks = 4
-总线程数 = 4 * 256 = 1024
-```
-
-多出来的 24 个线程会被 kernel 中的 `if (idx < n)` 拦住。
-
-`cudaGetLastError()` 用来检查 kernel launch 是否成功。运行期错误通常还需要后面的 `cudaDeviceSynchronize()` 暴露。
-
-### 7.3 Host 侧完整流程
+### 5.3 host 侧完整流程
 
 ```cpp
 std::vector<float> vector_add(const std::vector<float>& a, const std::vector<float>& b) {
-    if (a.size() != b.size()) {
-        throw std::invalid_argument("vector_add requires input vectors with the same size");
-    }
-
-    if (a.empty()) {
-        return {};
-    }
+    if (a.size() != b.size()) throw std::invalid_argument("size mismatch");
+    if (a.empty()) return {};
 
     const int n = static_cast<int>(a.size());
     std::vector<float> c(a.size(), 0.0f);
 
-    DeviceBuffer<float> d_a(a.size());
-    DeviceBuffer<float> d_b(b.size());
-    DeviceBuffer<float> d_c(c.size());
-
-    CUDA_CHECK(cudaMemcpy(d_a.get(), a.data(), d_a.bytes(), cudaMemcpyHostToDevice));
+    DeviceBuffer<float> d_a(a.size()), d_b(b.size()), d_c(c.size());      // 分配显存（RAII）
+    CUDA_CHECK(cudaMemcpy(d_a.get(), a.data(), d_a.bytes(), cudaMemcpyHostToDevice));  // H2D
     CUDA_CHECK(cudaMemcpy(d_b.get(), b.data(), d_b.bytes(), cudaMemcpyHostToDevice));
 
-    launch_vector_add_kernel(d_a.get(), d_b.get(), d_c.get(), n);
-    CUDA_CHECK(cudaDeviceSynchronize());
+    launch_vector_add_kernel(d_a.get(), d_b.get(), d_c.get(), n);        // 计算
+    CUDA_CHECK(cudaDeviceSynchronize());                                 // 等 GPU 完成
 
-    CUDA_CHECK(cudaMemcpy(c.data(), d_c.get(), d_c.bytes(), cudaMemcpyDeviceToHost));
-    return c;
+    CUDA_CHECK(cudaMemcpy(c.data(), d_c.get(), d_c.bytes(), cudaMemcpyDeviceToHost));  // D2H
+    return c;     // d_a/d_b/d_c 在此自动析构 cudaFree
 }
 ```
 
-这段代码实现了完整 CUDA 数据流：
+这就是所有 CUDA 程序的标准数据流。用时序图看 Host 与 Device 的交互与同步点：
 
-```text
-检查输入
-→ 准备 host 输出 c
-→ 申请 device memory
-→ H2D 拷贝输入
-→ 启动 kernel
-→ 同步等待 GPU 完成
-→ D2H 拷回结果
-→ 返回 host 输出
+```mermaid
+sequenceDiagram
+    participant H as Host (vector_add)
+    participant D as Device
+    H->>D: DeviceBuffer d_a/d_b/d_c (cudaMalloc)
+    H->>D: cudaMemcpy 输入 H2D
+    H->>D: launch_vector_add_kernel<<<blocks, 256>>>
+    Note over D: 每个线程 c[idx]=a[idx]+b[idx]
+    H->>D: cudaDeviceSynchronize()
+    D-->>H: cudaMemcpy 结果 D2H
+    Note over H: DeviceBuffer 析构自动 cudaFree
 ```
 
-这正是[[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]]] 中“分配 → 拷贝 → 计算 → 拷回”的工程实现。
+对应 [[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]] 的"分配 → 拷贝 → 计算 → 拷回"。注意：`vector_add` 把 H2D/计算/D2H 全包了，适合 `tests/`；benchmark 则需要**只测 kernel**，所以另有 `launch_vector_add_kernel` 这层只吃 device pointer 的封装（见 §7）。
 
 ---
 
-## 8. Correctness Test：`tests/test_vector_add.cu`
+## 6. Correctness Test
 
-测试文件的核心函数是：
+`tests/test_vector_add.cu` 只回答一件事：**结果对不对**。核心是把 GPU 输出逐元素对比 CPU 参考 `a[i]+b[i]`：
 
 ```cpp
 void run_case(const std::vector<float>& a, const std::vector<float>& b) {
     const std::vector<float> c = vector_add(a, b);
-
-    if (c.size() != a.size()) {
-        throw std::runtime_error("output size does not match input size");
-    }
-
-    for (std::size_t i = 0; i < c.size(); ++i) {
+    if (c.size() != a.size()) throw std::runtime_error("size mismatch");
+    for (std::size_t i = 0; i < c.size(); ++i)
         expect_close(c[i], a[i] + b[i], static_cast<int>(i));
-    }
 }
 ```
 
-测试逻辑是：
+三个测试 case 各有针对性：
 
-```text
-CUDA 输出 c[i]
-对比 CPU reference a[i] + b[i]
-```
+| Case | 规模 | 想暴露什么 |
+|---|---|---|
+| `{1,2,3}+{4,5,6}` | 极小 | 基本功能：结果应为 `{5,7,9}` |
+| `1000` | 非 block 对齐 | `1000 % 256 ≠ 0`，检验 `if (idx < n)` 是否守住边界 |
+| `1 << 20` | ~100 万 | 接近真实并行规模，验证大数据下仍正确 |
 
-### 8.1 小规模测试
-
-```cpp
-run_case({1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f});
-```
-
-验证最小例子：
-
-```text
-[1, 2, 3] + [4, 5, 6] = [5, 7, 9]
-```
-
-这是 Week 1 的基本验收。
-
-### 8.2 非 block 对齐长度测试
-
-```cpp
-std::vector<float> a(1000);
-std::vector<float> b(1000);
-```
-
-`1000` 不能被默认 block size `256` 整除，用来验证：
-
-```cpp
-if (idx < n)
-```
-
-是否正确保护最后一个 block 中多出来的线程。
-
-### 8.3 大规模测试
-
-```cpp
-a.resize(1 << 20);
-b.resize(1 << 20);
-```
-
-`1 << 20` 是约 100 万个元素，用来验证 kernel 在更接近 GPU 并行规模的数据上也能正确运行。
+非对齐长度这个 case 是重点——它是唯一能抓出"忘记边界守卫"bug 的输入。
 
 ---
 
-## 9. Benchmark：`benchmarks/bench_vector_add.cu`
+## 7. Benchmark 方法
 
-benchmark 和 correctness test 分开：
+`benchmarks/bench_vector_add.cu` 和 test 分开：test 关心对错，benchmark 关心**kernel 时间和有效带宽**。但 benchmark 仍保留最小正确性检查——"算错但很快"毫无意义。
 
-```text
-tests/test_vector_add.cu       只关心结果是否正确
-benchmarks/bench_vector_add.cu 关心 kernel 时间和有效带宽
-```
-
-但 benchmark 中仍保留最小正确性检查，因为 GPU 程序中“算错但很快”没有意义。
-
-### 9.1 结果检查
+### 7.1 只测 kernel，不含拷贝
 
 ```cpp
-bool check_result(const std::vector<float>& a, const std::vector<float>& b, const std::vector<float>& c) {
-    constexpr float tolerance = 1e-5f;
-    for (std::size_t i = 0; i < c.size(); ++i) {
-        if (std::fabs(c[i] - (a[i] + b[i])) > tolerance) {
-            return false;
-        }
-    }
-    return true;
-}
+float benchmark_kernel_once(DeviceBuffer<float>& d_a, DeviceBuffer<float>& d_b,
+                            DeviceBuffer<float>& d_c, int n, int repeat);
 ```
 
-这和测试文件的思想一致：CUDA 输出必须和 CPU reference 对齐。
+它接收**已经准备好的 device memory**，计时区间里只反复调 `launch_vector_add_kernel`，因此测的是 kernel-only 时间，**不含 H2D/D2H**。这是公平测 kernel 的前提。
 
-### 9.2 Kernel-only benchmark
-
-```cpp
-float benchmark_kernel_once(DeviceBuffer<float>& d_a,
-                            DeviceBuffer<float>& d_b,
-                            DeviceBuffer<float>& d_c,
-                            int n,
-                            int repeat)
-```
-
-这个函数接收已经准备好的 device memory，所以它测的是 kernel-only 时间，不包含 H2D 和 D2H 拷贝。
-
-### 9.3 Warm-up
+### 7.2 warm-up + CUDA event 计时
 
 ```cpp
-launch_vector_add_kernel(d_a.get(), d_b.get(), d_c.get(), n);
-CUDA_CHECK(cudaDeviceSynchronize());
-```
+launch_vector_add_kernel(...); CUDA_CHECK(cudaDeviceSynchronize());   // warm-up：摊掉冷启动
 
-第一次 kernel launch 可能包含 CUDA context 初始化、cache 状态变化、GPU 频率变化等额外开销，所以不计入统计。
-
-### 9.4 CUDA event 计时
-
-```cpp
 CUDA_CHECK(cudaEventRecord(start));
-for (int i = 0; i < repeat; ++i) {
-    launch_vector_add_kernel(d_a.get(), d_b.get(), d_c.get(), n);
-}
+for (int i = 0; i < repeat; ++i) launch_vector_add_kernel(...);
 CUDA_CHECK(cudaEventRecord(stop));
 CUDA_CHECK(cudaEventSynchronize(stop));
+return elapsed_ms / static_cast<float>(repeat);                       // 平均单次时间
 ```
 
-CUDA event 记录的是 GPU stream 时间线。这里测的是：
+- **warm-up**：第一次 launch 含 CUDA context 初始化、cache 预热、GPU 升频等一次性开销，必须排除。
+- **CUDA event** 记录的是 GPU stream 时间线，比 CPU 端 `std::chrono` 更准确地反映 kernel 真实执行时间。
+- **repeat 取均值** 抹平抖动。
 
-```text
-repeat 次 vector_add_kernel 的 GPU 执行总时间
-```
+### 7.3 有效带宽
 
-最后返回平均时间：
+`vector add` 每个元素读 2 次（`a`、`b`）+ 写 1 次（`c`）= 3 次 4 字节访存：
 
 ```cpp
-return elapsed_ms / static_cast<float>(repeat);
+const double bytes = 3.0 * n * sizeof(float);            // 读 a + 读 b + 写 c
+const double bandwidth_gbs = bytes / (kernel_ms / 1000.0) / 1e9;   // GB/s
 ```
 
-### 9.5 有效带宽计算
-
-```cpp
-const double bytes = 3.0 * static_cast<double>(n) * sizeof(float);
-const double seconds = static_cast<double>(kernel_ms) / 1000.0;
-const double bandwidth_gbs = bytes / seconds / 1.0e9;
-```
-
-`vector add` 每个元素大约访问三次内存：
-
-```text
-读取 a[i]：4 bytes
-读取 b[i]：4 bytes
-写入 c[i]：4 bytes
-```
-
-所以有效数据量约为：
-
-```text
-3 * n * sizeof(float)
-```
-
-这个指标用于观察 `vector add` 的有效显存带宽。因为 `vector add` 计算量很小，通常更接近 memory-bound kernel。
-
-### 9.6 输出格式
-
-benchmark 输出列包括：
-
-```text
-N    Kernel(ms)    Bandwidth(GB/s)    Check
-```
-
-这正好对应 Week 1 的 benchmark 验收要求。
+因为算术只有一次加法、访存却有三次，`vector add` 是典型 **memory-bound**：有效带宽（而非 FLOPS）才是衡量它的指标。输出列为 `N | Kernel(ms) | Bandwidth(GB/s) | Check`，正好对应 Week 1 的 benchmark 验收。具体方法论与待填表格见 [[9.培养方案/04.项目分析/Week01/profiling|profiling]]。
 
 ---
 
-## 10. README 推荐阅读顺序
+## 8. 常见坑
 
-README 中建议按以下顺序读项目：
+> [!warning] 忘记 `if (idx < n)` 边界守卫
+> 线程总数是 block 的整数倍，几乎总有多余线程。没有守卫，它们越界读写非法地址 → 结果错或非法内存访问。测试必须包含**非 block 对齐长度**（如 1000）才能抓到。
 
-1. `CLAUDE.md`：先看 Agent 可以做什么、不能做什么。
-2. `include/cuda_check.cuh`：理解 CUDA 错误检查。
-3. `include/device_buffer.cuh`：理解 RAII 管理 GPU 显存。
-4. `src/vector_add.cuh`：理解对外 API。
-5. `src/vector_add.cu`：重点理解 kernel、grid/block、Host/Device 拷贝。
-6. `tests/test_vector_add.cu`：理解 correctness test。
-7. `benchmarks/bench_vector_add.cu`：理解 warm-up、repeat、CUDA event、有效带宽。
+> [!warning] 把 H2D/D2H 计入 kernel 计时
+> 若在计时区间里包含 `cudaMemcpy`，测到的是"拷贝 + 计算"，掩盖 kernel 真实性能。benchmark 必须提前备好 device memory、只对 launch 计时。
 
-这个顺序是合理的，因为它从工程约束开始，再进入工具封装、核心实现、测试和性能测量。
+> [!warning] 跳过 warm-up
+> 第一次 launch 的 context 初始化开销可达毫秒级，会把均值严重拉高。必须先空跑一次并同步。
 
----
+> [!warning] benchmark 不校验正确性
+> 性能数字只有结果正确时才有意义。benchmark 输出必须带 `Check` 列——这也是仓库 CLAUDE.md 的硬性要求。
 
-## 11. Week 1 验收目标
-
-这个项目完成后，至少应该能做到：
-
-- [ ] 能用 CMake 构建 CUDA 项目。
-- [ ] 能解释 `include/`、`src/`、`tests/`、`benchmarks/` 的职责。
-- [ ] 能解释 `CUDA_CHECK` 如何暴露 CUDA Runtime API 错误。
-- [ ] 能解释 `DeviceBuffer<T>` 如何用 RAII 管理 GPU 显存。
-- [ ] 能解释 `vector_add_kernel` 中每个线程为什么只处理一个元素。
-- [ ] 能解释 `blocks = (n + threads_per_block - 1) / threads_per_block` 的向上取整意义。
-- [ ] 能解释为什么 kernel 中需要 `if (idx < n)`。
-- [ ] 能跑通小规模、非 block 对齐长度和大规模 correctness test。
-- [ ] 能用 CUDA event benchmark 得到 kernel 平均时间。
-- [ ] 能计算 `vector add` 的有效带宽。
+> [!warning] 不检查 Runtime 返回值
+> CUDA 错误会延迟暴露。每个 Runtime 调用都套 `CUDA_CHECK`，kernel launch 后查 `cudaGetLastError()` + `cudaDeviceSynchronize()`。
 
 ---
 
-## 12. 下一步学习建议
+## 9. 面试要点
 
-### 12.1 先在 1660S 上跑通项目
+- **CUDA 执行模型是什么？** host 启动 kernel，GPU 产生大量线程，每个线程跑同一份代码处理不同数据（SIMT）。线程按 block 分组、block 组成 grid。
+- **全局下标怎么算？** `idx = blockIdx.x * blockDim.x + threadIdx.x`。
+- **为什么需要 `if (idx < n)`？** 线程总数向上取整到 block 整数倍，多余线程必须被拦下，否则越界。
+- **`blocks` 为什么向上取整？** 必须覆盖所有 n 个元素，`(n + tpb - 1) / tpb` 保证至少有 n 个线程。
+- **DeviceBuffer 为什么禁拷贝、允移动？** 显存是独占资源，拷贝会 double free；移动是合法的所有权转移。
+- **vector add 是 memory-bound 还是 compute-bound？** memory-bound——3 次访存只对应 1 次加法，性能由带宽决定。
+- **benchmark 为什么要 warm-up、为什么只测 kernel？** 排除 context 初始化等一次性开销；排除 H2D/D2H 拷贝才能公平反映 kernel 本身。
+- **`cudaGetLastError` 和 `cudaDeviceSynchronize` 区别？** 前者抓 launch 配置错误，后者抓 kernel 执行期错误。
 
-在 Linux 主机上进入 `week01`：
-
-```bash
-make
-make test
-make bench
-```
-
-如果使用 CMake 原生命令：
-
-```bash
-cmake -S . -B build
-cmake --build build
-./build/test_vector_add
-./build/bench_vector_add
-```
-
-GTX 1660 Super 足够完成 Week 1 的全部目标，包括 `vector add`、correctness test、CUDA event benchmark 和基础 profiling。
-
-### 12.2 跑通后记录环境
-
-建议记录：
-
-```text
-GPU: GTX 1660 Super
-CUDA Toolkit:
-Driver:
-CMake:
-Compiler:
-Command:
-```
-
-benchmark 数据如果不记录环境，后续无法比较。
-
-### 12.3 下一阶段进入 Week 2
-
-Week 1 跑通后，进入 [[Week 2 - Reduction + Profiling]]。
-
-学习重点从“每个线程独立处理一个元素”升级到：
-
-```text
-多个线程如何协作完成 reduction
-如何使用 shared memory
-如何用 Nsight Compute 解释瓶颈
-```
+完整问答见 [[9.培养方案/04.项目分析/Week01/questions|questions]]。
 
 ---
 
-## 13. 关键要点总结
+## 10. Week 1 验收目标
 
-1. 这个项目是 CUDA Hello World 的工程化版本，不是单文件玩具程序。
-2. `vector_add_kernel` 体现了 CUDA 的核心思想：大量线程执行同一份代码、处理不同数据。
-3. `DeviceBuffer<T>` 把 `cudaMalloc/cudaFree` 封装成 RAII，符合 Modern C++ 资源管理习惯。
-4. `CUDA_CHECK` 把 C 风格错误码转换成带上下文的 C++ 异常。
-5. correctness test 和 benchmark 分离，但 benchmark 仍必须保留正确性检查。
-6. CUDA event benchmark 回答“跑多快”，后续 Nsight profiling 才能回答“为什么快或慢”。
+- [ ] 能用 CMake 构建 CUDA 项目，解释 `include/src/tests/benchmarks` 的职责分工。
+- [ ] 能解释 `CUDA_CHECK` 如何把 C 风格错误码转成带上下文的异常。
+- [ ] 能解释 `DeviceBuffer<T>` 如何用 RAII 管理显存、为什么禁拷贝允移动。
+- [ ] 能解释 `vector_add_kernel` 中每个线程只处理一个元素、`idx` 怎么算、为何要 `if (idx < n)`。
+- [ ] 能解释 `blocks = (n + tpb - 1) / tpb` 的向上取整意义。
+- [ ] 能跑通极小 / 非对齐 / 大规模三种 correctness test。
+- [ ] 能用 warm-up + CUDA event 得到 kernel 平均时间，并计算有效带宽。
 
 ---
 
-## 关联知识
+## 11. 关联知识
 
-- [[Week 1 - CUDA + Agent workflow]] - 这个项目对应的 Week 1 阶段计划
-- [[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]] - CUDA 执行模型、典型数据流和 benchmark 入门
-- [[CUDA 学习清单]] - 后续 CUDA kernel 与 profiling 学习路线
-- [[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]] - event、stream、pinned memory 和 Runtime API
-- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]] - 后续解释 kernel 性能瓶颈
-- [[独享智能指针]] - 理解 `DeviceBuffer<T>` 的 RAII 与独占所有权
-- [[14.3 CMake基础]] - 理解 CUDA 项目的 CMake 构建
+- [[Week 1 - CUDA + Agent workflow]] —— 本项目对应的阶段计划
+- [[3.1 CUDA Week 1 零基础系统入门|CUDA 零基础系统入门]] —— CUDA 执行模型、典型数据流与 benchmark 入门
+- [[CUDA Week 2 Parallel Reduction 项目解析]] —— 下一周：从独立处理升级到线程协作 + shared memory
+- [[CUDA Week 3 Transpose 项目解析]] —— 第三周：访存合并与 bank conflict
+- [[独享智能指针]] —— 理解 `DeviceBuffer<T>` 的 RAII 与独占所有权
+- [[14.3 CMake基础]] —— 理解 CUDA 项目的 CMake 构建
+- [[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]] —— event、stream、pinned memory 与 Runtime API
+- [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]] —— 后续解释 kernel 性能瓶颈
+- 本目录：[[9.培养方案/04.项目分析/Week01/exercises|exercises]] · [[9.培养方案/04.项目分析/Week01/profiling|profiling]] · [[9.培养方案/04.项目分析/Week01/questions|questions]]
 
 ---
 
@@ -775,6 +361,5 @@ Week 1 跑通后，进入 [[Week 2 - Reduction + Profiling]]。
 
 - NVIDIA CUDA C++ Programming Guide
 - NVIDIA CUDA C++ Best Practices Guide
-- NVIDIA Nsight Compute Documentation
 - 《Effective C++》Item 13：以对象管理资源
 - 《Effective Modern C++》Item 18：使用 `std::unique_ptr` 管理独占所有权资源

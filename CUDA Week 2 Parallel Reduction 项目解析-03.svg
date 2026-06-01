@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+<title id="title">Naive Reduce 数据流</title>
+<desc id="desc">CUDA Week 2 Parallel Reduction note diagram</desc>
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#EFF6FF"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+    <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.12"/>
+  </filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+  </marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB"/>
+  </marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
+  </marker>
+  <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B"/>
+  </marker>
+  <style><![CDATA[
+    text { font-family: "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", "Inter", Arial, sans-serif; }
+    .mono { font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace; }
+    .small { font-size: 14px; fill: #64748B; }
+    .label { font-size: 15px; fill: #334155; font-weight: 600; }
+    .title { font-size: 30px; fill: #0F172A; font-weight: 800; }
+    .subtitle { font-size: 16px; fill: #64748B; }
+    .caption { font-size: 13px; fill: #64748B; }
+  ]]></style>
+</defs>
+<rect x="0" y="0" width="1280" height="720" fill="url(#bgGrad)"/>
+<text x="50" y="50" font-size="30" font-weight="800" fill="#0F172A" text-anchor="start">03 Naive Reduce：只有 thread 0 工作</text>
+<text x="52" y="78" font-size="15" font-weight="500" fill="#64748B" text-anchor="start">优化替换原 03：展示 block 切片、线程空闲与 partial_sums 输出</text>
+<rect x="60" y="125" width="1120" height="70" rx="16" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<text x="82" y="165" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">input[0..n-1] in global memory</text>
+<rect x="330" y="145" width="38" height="30" rx="6" fill="#DBEAFE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="349" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">0</text>
+<rect x="372" y="145" width="38" height="30" rx="6" fill="#DBEAFE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="391" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">1</text>
+<rect x="414" y="145" width="38" height="30" rx="6" fill="#DBEAFE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="433" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">2</text>
+<rect x="456" y="145" width="38" height="30" rx="6" fill="#DBEAFE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="475" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">3</text>
+<rect x="498" y="145" width="38" height="30" rx="6" fill="#D1FAE5" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="517" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">4</text>
+<rect x="540" y="145" width="38" height="30" rx="6" fill="#D1FAE5" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="559" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">5</text>
+<rect x="582" y="145" width="38" height="30" rx="6" fill="#D1FAE5" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="601" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">6</text>
+<rect x="624" y="145" width="38" height="30" rx="6" fill="#D1FAE5" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="643" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">7</text>
+<rect x="666" y="145" width="38" height="30" rx="6" fill="#FEF3C7" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="685" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">8</text>
+<rect x="708" y="145" width="38" height="30" rx="6" fill="#FEF3C7" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="727" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">9</text>
+<rect x="750" y="145" width="38" height="30" rx="6" fill="#FEF3C7" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="769" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">10</text>
+<rect x="792" y="145" width="38" height="30" rx="6" fill="#FEF3C7" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="811" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">11</text>
+<rect x="834" y="145" width="38" height="30" rx="6" fill="#EDE9FE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="853" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">12</text>
+<rect x="876" y="145" width="38" height="30" rx="6" fill="#EDE9FE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="895" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">13</text>
+<rect x="918" y="145" width="38" height="30" rx="6" fill="#EDE9FE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="937" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">14</text>
+<rect x="960" y="145" width="38" height="30" rx="6" fill="#EDE9FE" stroke="#CBD5E1" stroke-width="1" opacity="1"/>
+<text x="979" y="166" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">15</text>
+<rect x="100" y="260" width="240" height="220" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="100" y="260" width="240" height="8" rx="18" fill="#2563EB" opacity="1"/>
+<text x="120" y="294" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Block 0</text>
+<text x="120" y="322" font-size="14" font-weight="600" fill="#334155" text-anchor="start">负责 input[0..3]</text>
+<circle cx="125" cy="355" r="18" fill="#2563EB"/>
+<text x="125" y="360" font-size="13" font-weight="800" fill="white" text-anchor="middle">T0</text>
+<circle cx="177" cy="355" r="18" fill="#E2E8F0"/>
+<text x="177" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T1</text>
+<circle cx="229" cy="355" r="18" fill="#E2E8F0"/>
+<text x="229" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T2</text>
+<circle cx="281" cy="355" r="18" fill="#E2E8F0"/>
+<text x="281" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T3</text>
+<text x="120" y="405" font-size="13" font-weight="700" fill="#0F172A" text-anchor="start" class="mono">if (threadIdx.x == 0)</text>
+<text x="120" y="430" font-size="13" font-weight="500" fill="#334155" text-anchor="start" class="mono">sum += input[i] 串行循环</text>
+<text x="120" y="454" font-size="13" font-weight="700" fill="#2563EB" text-anchor="start" class="mono">partial_sums[0] = sum</text>
+<line x1="412" y1="198" x2="220" y2="260" stroke="#2563EB" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="395" y="260" width="240" height="220" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="395" y="260" width="240" height="8" rx="18" fill="#059669" opacity="1"/>
+<text x="415" y="294" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Block 1</text>
+<text x="415" y="322" font-size="14" font-weight="600" fill="#334155" text-anchor="start">负责 input[4..7]</text>
+<circle cx="420" cy="355" r="18" fill="#059669"/>
+<text x="420" y="360" font-size="13" font-weight="800" fill="white" text-anchor="middle">T0</text>
+<circle cx="472" cy="355" r="18" fill="#E2E8F0"/>
+<text x="472" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T1</text>
+<circle cx="524" cy="355" r="18" fill="#E2E8F0"/>
+<text x="524" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T2</text>
+<circle cx="576" cy="355" r="18" fill="#E2E8F0"/>
+<text x="576" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T3</text>
+<text x="415" y="405" font-size="13" font-weight="700" fill="#0F172A" text-anchor="start" class="mono">if (threadIdx.x == 0)</text>
+<text x="415" y="430" font-size="13" font-weight="500" fill="#334155" text-anchor="start" class="mono">sum += input[i] 串行循环</text>
+<text x="415" y="454" font-size="13" font-weight="700" fill="#059669" text-anchor="start" class="mono">partial_sums[1] = sum</text>
+<line x1="580" y1="198" x2="515" y2="260" stroke="#059669" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="690" y="260" width="240" height="220" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="690" y="260" width="240" height="8" rx="18" fill="#F59E0B" opacity="1"/>
+<text x="710" y="294" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Block 2</text>
+<text x="710" y="322" font-size="14" font-weight="600" fill="#334155" text-anchor="start">负责 input[8..11]</text>
+<circle cx="715" cy="355" r="18" fill="#F59E0B"/>
+<text x="715" y="360" font-size="13" font-weight="800" fill="white" text-anchor="middle">T0</text>
+<circle cx="767" cy="355" r="18" fill="#E2E8F0"/>
+<text x="767" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T1</text>
+<circle cx="819" cy="355" r="18" fill="#E2E8F0"/>
+<text x="819" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T2</text>
+<circle cx="871" cy="355" r="18" fill="#E2E8F0"/>
+<text x="871" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T3</text>
+<text x="710" y="405" font-size="13" font-weight="700" fill="#0F172A" text-anchor="start" class="mono">if (threadIdx.x == 0)</text>
+<text x="710" y="430" font-size="13" font-weight="500" fill="#334155" text-anchor="start" class="mono">sum += input[i] 串行循环</text>
+<text x="710" y="454" font-size="13" font-weight="700" fill="#F59E0B" text-anchor="start" class="mono">partial_sums[2] = sum</text>
+<line x1="748" y1="198" x2="810" y2="260" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="985" y="260" width="240" height="220" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="985" y="260" width="240" height="8" rx="18" fill="#7C3AED" opacity="1"/>
+<text x="1005" y="294" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Block 3</text>
+<text x="1005" y="322" font-size="14" font-weight="600" fill="#334155" text-anchor="start">负责 input[12..15]</text>
+<circle cx="1010" cy="355" r="18" fill="#7C3AED"/>
+<text x="1010" y="360" font-size="13" font-weight="800" fill="white" text-anchor="middle">T0</text>
+<circle cx="1062" cy="355" r="18" fill="#E2E8F0"/>
+<text x="1062" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T1</text>
+<circle cx="1114" cy="355" r="18" fill="#E2E8F0"/>
+<text x="1114" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T2</text>
+<circle cx="1166" cy="355" r="18" fill="#E2E8F0"/>
+<text x="1166" y="360" font-size="13" font-weight="800" fill="#64748B" text-anchor="middle">T3</text>
+<text x="1005" y="405" font-size="13" font-weight="700" fill="#0F172A" text-anchor="start" class="mono">if (threadIdx.x == 0)</text>
+<text x="1005" y="430" font-size="13" font-weight="500" fill="#334155" text-anchor="start" class="mono">sum += input[i] 串行循环</text>
+<text x="1005" y="454" font-size="13" font-weight="700" fill="#7C3AED" text-anchor="start" class="mono">partial_sums[3] = sum</text>
+<line x1="916" y1="198" x2="1105" y2="260" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+<rect x="185" y="595" width="890" height="54" rx="16" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<text x="210" y="630" font-size="16" font-weight="800" fill="#0F172A" text-anchor="start">partial_sums:</text>
+<rect x="355" y="607" width="110" height="30" rx="15.0" fill="#F1F5F9" stroke="#2563EB" stroke-width="1" opacity="1"/>
+<text x="410.0" y="627.0" font-size="12" font-weight="700" fill="#2563EB" text-anchor="middle">block 0 sum</text>
+<rect x="510" y="607" width="110" height="30" rx="15.0" fill="#F1F5F9" stroke="#059669" stroke-width="1" opacity="1"/>
+<text x="565.0" y="627.0" font-size="12" font-weight="700" fill="#059669" text-anchor="middle">block 1 sum</text>
+<rect x="665" y="607" width="110" height="30" rx="15.0" fill="#F1F5F9" stroke="#F59E0B" stroke-width="1" opacity="1"/>
+<text x="720.0" y="627.0" font-size="12" font-weight="700" fill="#F59E0B" text-anchor="middle">block 2 sum</text>
+<rect x="820" y="607" width="110" height="30" rx="15.0" fill="#F1F5F9" stroke="#7C3AED" stroke-width="1" opacity="1"/>
+<text x="875.0" y="627.0" font-size="12" font-weight="700" fill="#7C3AED" text-anchor="middle">block 3 sum</text>
+<line x1="1075" y1="622" x2="1165" y2="622" stroke="#DC2626" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowOrange)"/>
+<text x="1175" y="628" font-size="15" font-weight="800" fill="#DC2626" text-anchor="start">CPU final sum</text>
+<rect x="490" y="515" width="280" height="34" rx="17.0" fill="#FEE2E2" stroke="#DC2626" stroke-width="1" opacity="1"/>
+<text x="630.0" y="537.0" font-size="13" font-weight="700" fill="#DC2626" text-anchor="middle">有效工作线程≈1/256；其余线程占资源但被 mask</text>
+</svg>

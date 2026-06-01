@@ -1042,6 +1042,8 @@ CUDA_CHECK(cudaDeviceSynchronize()); // 等待 kernel 完成并检查执行错�
 
 ## 11. Shared Memory Reduce：`src/reduce_shared.cu` 逐行精讲
 
+![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-04.svg|900]]
+
 ### 11.1 Kernel 完整源码与逐行分析
 
 ```cpp
@@ -1265,6 +1267,8 @@ Round 8 (stride=1):   T0 活跃     → warp 0 内 1 线程活跃
 ---
 
 ## 12. Warp Shuffle Reduce：`src/reduce_shuffle.cu` 逐行精讲
+
+![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-05.svg|950]]
 
 ### 12.1 `warp_reduce_sum` 设备函数完整分析
 
@@ -2295,6 +2299,8 @@ Week 3: 线程如何合并访问 global memory
 ## 20. GPU 内存层次与本项目的映射关系
 
 理解三种 reduce 实现的性能差异，需要先理解 NVIDIA GPU 的内存层次：
+
+![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-06.svg|900]]
 
 ### 20.1 内存层次金字塔
 

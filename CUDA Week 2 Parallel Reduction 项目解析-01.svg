@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+<title id="title">项目总览架构图</title>
+<desc id="desc">CUDA Week 2 Parallel Reduction note diagram</desc>
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#EFF6FF"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+    <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.12"/>
+  </filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+  </marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB"/>
+  </marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
+  </marker>
+  <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B"/>
+  </marker>
+  <style><![CDATA[
+    text { font-family: "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", "Inter", Arial, sans-serif; }
+    .mono { font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace; }
+    .small { font-size: 14px; fill: #64748B; }
+    .label { font-size: 15px; fill: #334155; font-weight: 600; }
+    .title { font-size: 30px; fill: #0F172A; font-weight: 800; }
+    .subtitle { font-size: 16px; fill: #64748B; }
+    .caption { font-size: 13px; fill: #64748B; }
+  ]]></style>
+</defs>
+<rect x="0" y="0" width="1280" height="720" fill="url(#bgGrad)"/>
+<text x="50" y="50" font-size="30" font-weight="800" fill="#0F172A" text-anchor="start">01 项目总览架构图</text>
+<text x="52" y="78" font-size="15" font-weight="500" fill="#64748B" text-anchor="start">从工程入口到三种 reduction kernel，再到 partial sums 与 CPU final sum</text>
+<rect x="55" y="130" width="260" height="170" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="55" y="130" width="260" height="8" rx="18" fill="#2563EB" opacity="1"/>
+<text x="75" y="164" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">工程入口 / Tooling</text>
+<text x="75" y="194" font-size="14" font-weight="400" fill="#334155" text-anchor="start">CMakeLists.txt → reduce_lib</text>
+<text x="75" y="215" font-size="14" font-weight="400" fill="#334155" text-anchor="start">Makefile → build/test/bench/profile</text>
+<text x="75" y="236" font-size="14" font-weight="400" fill="#334155" text-anchor="start">CLAUDE.md → Agent 约束</text>
+<rect x="55" y="360" width="260" height="190" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="55" y="360" width="260" height="8" rx="18" fill="#0891B2" opacity="1"/>
+<text x="75" y="394" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">基础设施 / include</text>
+<text x="75" y="424" font-size="14" font-weight="400" fill="#334155" text-anchor="start">CUDA_CHECK：Runtime API 错误检查</text>
+<text x="75" y="445" font-size="14" font-weight="400" fill="#334155" text-anchor="start">DeviceBuffer：RAII 显存管理</text>
+<text x="75" y="466" font-size="14" font-weight="400" fill="#334155" text-anchor="start">test_utils：输入、CPU reference、校验</text>
+<rect x="410" y="118" width="370" height="100" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="410" y="118" width="370" height="8" rx="18" fill="#7C3AED" opacity="1"/>
+<text x="430" y="152" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">统一对外 API</text>
+<text x="430" y="182" font-size="14" font-weight="400" fill="#334155" text-anchor="start">reduce_naive&lt;T&gt;(d_input, n, block)</text>
+<text x="430" y="203" font-size="14" font-weight="400" fill="#334155" text-anchor="start">reduce_shared&lt;T&gt;(d_input, n, block)</text>
+<text x="430" y="224" font-size="14" font-weight="400" fill="#334155" text-anchor="start">reduce_shuffle&lt;T&gt;(d_input, n, block)</text>
+<rect x="405" y="285" width="180" height="185" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="405" y="285" width="180" height="8" rx="18" fill="#F59E0B" opacity="1"/>
+<text x="425" y="319" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Naive Kernel</text>
+<text x="425" y="349" font-size="14" font-weight="400" fill="#334155" text-anchor="start">每个 block：只有 thread 0 工作</text>
+<text x="425" y="370" font-size="14" font-weight="400" fill="#334155" text-anchor="start">串行读 global memory</text>
+<text x="425" y="391" font-size="14" font-weight="400" fill="#334155" text-anchor="start">写 partial_sums[block]</text>
+<rect x="610" y="285" width="180" height="185" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="610" y="285" width="180" height="8" rx="18" fill="#059669" opacity="1"/>
+<text x="630" y="319" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Shared Kernel</text>
+<text x="630" y="349" font-size="14" font-weight="400" fill="#334155" text-anchor="start">global → shared memory</text>
+<text x="630" y="370" font-size="14" font-weight="400" fill="#334155" text-anchor="start">stride 128→...→1</text>
+<text x="630" y="391" font-size="14" font-weight="400" fill="#334155" text-anchor="start">每轮 __syncthreads()</text>
+<rect x="815" y="285" width="200" height="185" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="815" y="285" width="200" height="8" rx="18" fill="#2563EB" opacity="1"/>
+<text x="835" y="319" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Shuffle Kernel</text>
+<text x="835" y="349" font-size="14" font-weight="400" fill="#334155" text-anchor="start">warp 内寄存器 shuffle</text>
+<text x="835" y="370" font-size="14" font-weight="400" fill="#334155" text-anchor="start">lane0 写少量 shared</text>
+<text x="835" y="391" font-size="14" font-weight="400" fill="#334155" text-anchor="start">warp0 做最终 block reduce</text>
+<rect x="1050" y="150" width="190" height="230" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="1050" y="150" width="190" height="8" rx="18" fill="#DC2626" opacity="1"/>
+<text x="1070" y="184" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Host 汇总边界</text>
+<text x="1070" y="214" font-size="14" font-weight="400" fill="#334155" text-anchor="start">GPU 输出每 block partial sum</text>
+<text x="1070" y="235" font-size="14" font-weight="400" fill="#334155" text-anchor="start">D2H 拷回 h_partial</text>
+<text x="1070" y="256" font-size="14" font-weight="400" fill="#334155" text-anchor="start">CPU 侧最终累加</text>
+<text x="1070" y="277" font-size="14" font-weight="400" fill="#334155" text-anchor="start">不是 GPU-only 多级归约</text>
+<rect x="470" y="560" width="520" height="100" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="470" y="560" width="520" height="8" rx="18" fill="#334155" opacity="1"/>
+<text x="490" y="594" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Correctness + Benchmark + Profiling</text>
+<text x="490" y="624" font-size="14" font-weight="400" fill="#334155" text-anchor="start">tests：float/int × 边界规模</text>
+<text x="490" y="645" font-size="14" font-weight="400" fill="#334155" text-anchor="start">bench：avg/min/max/BW/status</text>
+<text x="490" y="666" font-size="14" font-weight="400" fill="#334155" text-anchor="start">ncu：throughput/occupancy/stall reason</text>
+<line x1="315" y1="215" x2="410" y2="168" stroke="#2563EB" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+<line x1="315" y1="455" x2="410" y2="220" stroke="#0891B2" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+<line x1="780" y1="168" x2="1050" y2="230" stroke="#7C3AED" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+<line x1="585" y1="380" x2="610" y2="380" stroke="#334155" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+<line x1="790" y1="380" x2="815" y2="380" stroke="#334155" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+<line x1="1015" y1="380" x2="1050" y2="285" stroke="#DC2626" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowOrange)"/>
+<line x1="880" y1="470" x2="880" y2="560" stroke="#2563EB" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+<line x1="315" y1="455" x2="470" y2="610" stroke="#0891B2" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+<rect x="438" y="238" width="270" height="34" rx="17.0" fill="#EDE9FE" stroke="#7C3AED" stroke-width="1" opacity="1"/>
+<text x="573.0" y="260.0" font-size="13" font-weight="700" fill="#7C3AED" text-anchor="middle">同一套 host wrapper / 同一套测试口径</text>
+<rect x="1080" y="420" width="160" height="34" rx="17.0" fill="#FEE2E2" stroke="#DC2626" stroke-width="1" opacity="1"/>
+<text x="1160.0" y="442.0" font-size="13" font-weight="700" fill="#DC2626" text-anchor="middle">当前实现边界</text>
+</svg>
