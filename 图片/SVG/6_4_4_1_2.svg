@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="446" viewBox="0 0 900 446">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <title>双线程消息通道总览</title>
+  <desc>后台 select 线程通过 PostMessage 向 UI 线程投递异步事件，UI 线程通过 SetEvent 唤醒阻塞在 WaitForSingleObject 的后台线程</desc>
+  <rect x="0" y="0" width="900" height="446" fill="rgb(245, 244, 237)"/>
+
+  <text x="450" y="30" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#3C3489">双线程消息通道 · 后台 select 线程 ↔ UI 线程</text>
+
+  <!-- Background thread lane header (Blue) -->
+  <rect x="50" y="70" width="260" height="70" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="180" y="94" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">CServerSocket</text>
+  <text x="180" y="116" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">后台 select 线程</text>
+
+  <!-- UI thread lane header (Purple) -->
+  <rect x="590" y="70" width="260" height="70" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="720" y="94" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">CHostMainDlg</text>
+  <text x="720" y="116" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">UI 线程 · 消息循环</text>
+
+  <!-- lane lines -->
+  <line x1="180" y1="140" x2="180" y2="380" stroke="#5F5E5A" stroke-width="0.5" stroke-dasharray="6 4"/>
+  <line x1="720" y1="140" x2="720" y2="380" stroke="#5F5E5A" stroke-width="0.5" stroke-dasharray="6 4"/>
+
+  <!-- Channel 1: PostMessage server event -->
+  <text x="450" y="180" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">① PostMessage · WM_HOST_SERVER_EVENT（异步事件）</text>
+  <polyline points="180,200 720,200" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Channel 2: PostMessage consent request -->
+  <text x="450" y="244" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">② PostMessage · WM_HOST_CONSENT_REQUEST（授权请求）</text>
+  <polyline points="180,264 720,264" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Channel 3: SetEvent back -->
+  <text x="450" y="312" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">③ SetEvent → completedEvent · 唤醒阻塞的后台线程</text>
+  <polyline points="720,332 180,332" fill="none" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="180" y="364" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">WaitForSingleObject 阻塞等待</text>
+  <text x="720" y="364" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">DoModal 处理消息</text>
+
+  <text x="450" y="402" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">①② 为非阻塞异步投递（堆指针由 unique_ptr 接管）；③ 是同步握手，必须用 PostMessage 避免死锁</text>
+</svg>

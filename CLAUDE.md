@@ -123,5 +123,6 @@ std::make_unique, nullptr, std::vector, static_cast
 | `llm-note-creator`    | "LLM笔记"、"创建LLM笔记"      | 创建LLM应用学习笔记         |
 | `remote-ctrl-note`    | "远控笔记"、"远控系统笔记"        | 远控系统项目专用笔记管理        |
 | `remote-ctrl-tutor`   | "讲解远控"、"分析远控源码"        | 基于 git 源码的远控系统讲解导师   |
+| `obsidian-svg`        | "画图"、"SVG"、"架构图"       | 创建/优化/验证 SVG + vault 资产管理 |
 
 Skills 位于 `.claude/skills/` 目录。

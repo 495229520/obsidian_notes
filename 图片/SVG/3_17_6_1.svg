@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 500" width="920" height="500">
+  <rect x="0" y="0" width="920" height="500" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <title>有界阻塞队列：双条件变量与反压</title>
+  <desc>有界队列用 notEmpty 和 notFull 两个条件变量分别阻塞消费者与生产者，满时反压生产者。</desc>
+
+  <text x="460" y="32" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
+    有界阻塞队列：双条件变量与反压
+  </text>
+  <text x="460" y="56" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
+    一把 mutex + 两个条件变量（notEmpty / notFull），满时阻塞生产者形成反压
+  </text>
+
+  <!-- 生产者 -->
+  <rect x="40" y="130" width="180" height="64" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="130" y="152" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">生产者 Producer</text>
+  <text x="130" y="174" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#0C447C">push(item)</text>
+
+  <!-- 有界队列 -->
+  <rect x="300" y="120" width="320" height="88" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="460" y="144" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">有界队列（容量 N）</text>
+  <text x="460" y="168" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#444441">当前已用 k 个槽位</text>
+  <text x="460" y="190" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#5F5E5A">满则拒绝写入、空则拒绝读取</text>
+
+  <!-- 消费者 -->
+  <rect x="700" y="130" width="180" height="64" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="790" y="152" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">消费者 Consumer</text>
+  <text x="790" y="174" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#633806">pop(item)</text>
+
+  <!-- notFull -->
+  <rect x="120" y="320" width="240" height="84" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="240" y="342" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">notFull（非满条件）</text>
+  <text x="240" y="366" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">队列满 → 生产者 wait()</text>
+  <text x="240" y="388" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">消费者 pop 后 notify_one</text>
+
+  <!-- notEmpty -->
+  <rect x="560" y="320" width="240" height="84" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="680" y="342" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">notEmpty（非空条件）</text>
+  <text x="680" y="366" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">队列空 → 消费者 wait()</text>
+  <text x="680" y="388" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">生产者 push 后 notify_one</text>
+
+  <!-- arrows -->
+  <path d="M220 162 L300 162" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="260" y="150" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#185FA5">入队</text>
+  <path d="M620 162 L700 162" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="660" y="150" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#854F0B">出队</text>
+
+  <path d="M130 194 L228 320" fill="none" stroke="#534AB7" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="150" y="262" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#534AB7">满则阻塞</text>
+  <path d="M790 194 L692 320" fill="none" stroke="#0F6E56" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="772" y="262" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#0F6E56">空则阻塞</text>
+
+  <text x="460" y="450" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
+    反压（back pressure）：队列满时阻塞生产者，迫使其放慢速度，避免内存无限膨胀
+  </text>
+</svg>
