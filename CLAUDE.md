@@ -121,8 +121,10 @@ std::make_unique, nullptr, std::vector, static_cast
 | `mermaid-to-drawio`   | "用drawio画"、"重绘mermaid" | Mermaid代码转Draw.io图形 |
 | `invest-note-creator` | "投资笔记"、"金融笔记"          | 创建投资学习笔记            |
 | `llm-note-creator`    | "LLM笔记"、"创建LLM笔记"      | 创建LLM应用学习笔记         |
+| `exam-creator`        | "出题"、"题目汇总"、"出一套题"     | 按章节生成 Obsidian 风格练习卷   |
 | `remote-ctrl-note`    | "远控笔记"、"远控系统笔记"        | 远控系统项目专用笔记管理        |
 | `remote-ctrl-tutor`   | "讲解远控"、"分析远控源码"        | 基于 git 源码的远控系统讲解导师   |
 | `obsidian-svg`        | "画图"、"SVG"、"架构图"       | 创建/优化/验证 SVG + vault 资产管理 |
+| `leetcode-solver`     | "题解"、"力扣题解"、"创建题解"   | 在 5.3 力扣下创建结构化题解笔记 + SVG |
 
 Skills 位于 `.claude/skills/` 目录。
