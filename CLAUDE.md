@@ -126,5 +126,6 @@ std::make_unique, nullptr, std::vector, static_cast
 | `remote-ctrl-tutor`   | "讲解远控"、"分析远控源码"        | 基于 git 源码的远控系统讲解导师   |
 | `obsidian-svg`        | "画图"、"SVG"、"架构图"       | 创建/优化/验证 SVG + vault 资产管理 |
 | `leetcode-solver`     | "题解"、"力扣题解"、"创建题解"   | 在 5.3 力扣下创建结构化题解笔记 + SVG |
+| `numerical-analysis`  | "数值分析"、"考点"、"必看"、"代数精度"、"出题" | 数值分析讲考点/润色笔记/仿期末出题（内嵌历年考频表） |
 
 Skills 位于 `.claude/skills/` 目录。
