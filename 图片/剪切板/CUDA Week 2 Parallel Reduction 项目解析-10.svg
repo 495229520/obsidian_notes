@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+<title id="title">Shared Memory 二分树形归约</title>
+<desc id="desc">CUDA Week 2 Parallel Reduction note diagram</desc>
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#EFF6FF"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+    <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.12"/>
+  </filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+  </marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB"/>
+  </marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
+  </marker>
+  <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B"/>
+  </marker>
+  <style><![CDATA[
+    text { font-family: "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", "Inter", Arial, sans-serif; }
+    .mono { font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace; }
+    .small { font-size: 14px; fill: #64748B; }
+    .label { font-size: 15px; fill: #334155; font-weight: 600; }
+    .title { font-size: 30px; fill: #0F172A; font-weight: 800; }
+    .subtitle { font-size: 16px; fill: #64748B; }
+    .caption { font-size: 13px; fill: #64748B; }
+  ]]></style>
+</defs>
+<rect x="0" y="0" width="1280" height="720" fill="url(#bgGrad)"/>
+<text x="50" y="50" font-size="30" font-weight="800" fill="#0F172A" text-anchor="start">10 Shared Memory Reduce：stride 从大到小的树形归约</text>
+<text x="52" y="78" font-size="15" font-weight="500" fill="#64748B" text-anchor="start">放在“11. Shared Memory Reduce”开头或 11.4 可视化处</text>
+<circle cx="180" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="180" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">3</text>
+<circle cx="290" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="290" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">1</text>
+<circle cx="400" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="400" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">4</text>
+<circle cx="510" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="510" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">1</text>
+<circle cx="620" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="620" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">5</text>
+<circle cx="730" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="730" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">9</text>
+<circle cx="840" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="840" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">2</text>
+<circle cx="950" cy="160" r="28" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+<text x="950" y="167" font-size="18" font-weight="800" fill="#2563EB" text-anchor="middle">6</text>
+<text x="70" y="166" font-size="16" font-weight="800" fill="#334155" text-anchor="start">初始</text>
+<text x="70" y="266" font-size="16" font-weight="800" fill="#059669" text-anchor="start">stride=4</text>
+<circle cx="235.0" cy="260" r="30" fill="white" stroke="#059669" stroke-width="3"/>
+<text x="235.0" y="267" font-size="18" font-weight="800" fill="#059669" text-anchor="middle">8</text>
+<circle cx="455.0" cy="260" r="30" fill="white" stroke="#059669" stroke-width="3"/>
+<text x="455.0" y="267" font-size="18" font-weight="800" fill="#059669" text-anchor="middle">10</text>
+<circle cx="675.0" cy="260" r="30" fill="white" stroke="#059669" stroke-width="3"/>
+<text x="675.0" y="267" font-size="18" font-weight="800" fill="#059669" text-anchor="middle">6</text>
+<circle cx="895.0" cy="260" r="30" fill="white" stroke="#059669" stroke-width="3"/>
+<text x="895.0" y="267" font-size="18" font-weight="800" fill="#059669" text-anchor="middle">7</text>
+<text x="70" y="386" font-size="16" font-weight="800" fill="#F59E0B" text-anchor="start">stride=2</text>
+<circle cx="345.0" cy="380" r="30" fill="white" stroke="#F59E0B" stroke-width="3"/>
+<text x="345.0" y="387" font-size="18" font-weight="800" fill="#F59E0B" text-anchor="middle">14</text>
+<circle cx="785.0" cy="380" r="30" fill="white" stroke="#F59E0B" stroke-width="3"/>
+<text x="785.0" y="387" font-size="18" font-weight="800" fill="#F59E0B" text-anchor="middle">17</text>
+<text x="70" y="506" font-size="16" font-weight="800" fill="#DC2626" text-anchor="start">stride=1</text>
+<circle cx="565.0" cy="500" r="30" fill="white" stroke="#DC2626" stroke-width="3"/>
+<text x="565.0" y="507" font-size="18" font-weight="800" fill="#DC2626" text-anchor="middle">31</text>
+<path d="M 180 190 C 180 220 235 220 235 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 620 190 C 620 220 235 220 235 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 290 190 C 290 220 455 220 455 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 730 190 C 730 220 455 220 455 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 400 190 C 400 220 675 220 675 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 840 190 C 840 220 675 220 675 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 510 190 C 510 220 895 220 895 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 950 190 C 950 220 895 220 895 255" stroke="#059669" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowGreen)"/>
+<path d="M 235 290 C 235 335 290 335 290 372" stroke="#F59E0B" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowOrange)"/>
+<path d="M 675 290 C 675 335 290 335 290 372" stroke="#F59E0B" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowOrange)"/>
+<path d="M 455 290 C 455 335 730 335 730 372" stroke="#F59E0B" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowOrange)"/>
+<path d="M 895 290 C 895 335 730 335 730 372" stroke="#F59E0B" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowOrange)"/>
+<path d="M 290 410 C 290 455 510 455 510 492" stroke="#DC2626" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowOrange)"/>
+<path d="M 730 410 C 730 455 510 455 510 492" stroke="#DC2626" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowOrange)"/>
+<rect x="845" y="425" width="310" height="150" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="845" y="425" width="310" height="8" rx="18" fill="#DC2626" opacity="1"/>
+<text x="865" y="459" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">同步点</text>
+<text x="865" y="489" font-size="14" font-weight="400" fill="#334155" text-anchor="start">加载后 __syncthreads()</text>
+<text x="865" y="510" font-size="14" font-weight="400" fill="#334155" text-anchor="start">每一轮加法后 __syncthreads()</text>
+<text x="865" y="531" font-size="14" font-weight="400" fill="#334155" text-anchor="start">barrier 必须放在 if 外</text>
+<rect x="845" y="185" width="310" height="145" rx="18" fill="white" stroke="#CBD5E1" stroke-width="1" filter="url(#shadow)" opacity="1"/>
+<rect x="845" y="185" width="310" height="8" rx="18" fill="#059669" opacity="1"/>
+<text x="865" y="219" font-size="18" font-weight="800" fill="#0F172A" text-anchor="start">Shared Memory 角色</text>
+<text x="865" y="249" font-size="14" font-weight="400" fill="#334155" text-anchor="start">sdata[tid] = input[gid] or 0</text>
+<text x="865" y="270" font-size="14" font-weight="400" fill="#334155" text-anchor="start">之后所有通信都在 shared memory</text>
+<text x="865" y="291" font-size="14" font-weight="400" fill="#334155" text-anchor="start">最后 thread 0 写 partial_sums</text>
+</svg>

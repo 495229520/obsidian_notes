@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+<title id="title">GPU 内存层次映射</title>
+<desc id="desc">CUDA Week 2 Parallel Reduction note diagram</desc>
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#EFF6FF"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+    <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.12"/>
+  </filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+  </marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB"/>
+  </marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
+  </marker>
+  <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B"/>
+  </marker>
+  <style><![CDATA[
+    text { font-family: "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", "Inter", Arial, sans-serif; }
+    .mono { font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace; }
+    .small { font-size: 14px; fill: #64748B; }
+    .label { font-size: 15px; fill: #334155; font-weight: 600; }
+    .title { font-size: 30px; fill: #0F172A; font-weight: 800; }
+    .subtitle { font-size: 16px; fill: #64748B; }
+    .caption { font-size: 13px; fill: #64748B; }
+  ]]></style>
+</defs>
+<rect x="0" y="0" width="1280" height="720" fill="url(#bgGrad)"/>
+<text x="50" y="50" font-size="30" font-weight="800" fill="#0F172A" text-anchor="start">15 GPU 内存层次与三种 reduce 的映射关系</text>
+<text x="52" y="78" font-size="15" font-weight="500" fill="#64748B" text-anchor="start">放在“20. GPU 内存层次与本项目的映射关系”前，替换文字金字塔</text>
+<rect x="180" y="130" width="920" height="70" rx="18" fill="white" stroke="#2563EB" stroke-width="2" filter="url(#shadow)" opacity="1"/>
+<text x="210" y="160" font-size="19" font-weight="800" fill="#2563EB" text-anchor="start">Registers</text>
+<text x="210" y="184" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">~1 cycle</text>
+<text x="440" y="172" font-size="15" font-weight="700" fill="#334155" text-anchor="start">Warp Shuffle：寄存器到寄存器 lane 通信</text>
+<rect x="240" y="220" width="800" height="70" rx="18" fill="white" stroke="#059669" stroke-width="2" filter="url(#shadow)" opacity="1"/>
+<text x="270" y="250" font-size="19" font-weight="800" fill="#059669" text-anchor="start">Shared Memory</text>
+<text x="270" y="274" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">~20–30 cycles</text>
+<text x="500" y="262" font-size="15" font-weight="700" fill="#334155" text-anchor="start">Shared Reduce：block 内线程共享 sdata</text>
+<rect x="300" y="310" width="680" height="70" rx="18" fill="white" stroke="#0891B2" stroke-width="2" filter="url(#shadow)" opacity="1"/>
+<text x="330" y="340" font-size="19" font-weight="800" fill="#0891B2" text-anchor="start">L1 Cache</text>
+<text x="330" y="364" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">~30–40 cycles</text>
+<text x="560" y="352" font-size="15" font-weight="700" fill="#334155" text-anchor="start">自动缓存路径，不是本项目显式控制点</text>
+<rect x="360" y="400" width="560" height="70" rx="18" fill="white" stroke="#7C3AED" stroke-width="2" filter="url(#shadow)" opacity="1"/>
+<text x="390" y="430" font-size="19" font-weight="800" fill="#7C3AED" text-anchor="start">L2 Cache</text>
+<text x="390" y="454" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">~200 cycles</text>
+<text x="620" y="442" font-size="15" font-weight="700" fill="#334155" text-anchor="start">全 GPU 共享缓存</text>
+<rect x="420" y="490" width="440" height="70" rx="18" fill="white" stroke="#F59E0B" stroke-width="2" filter="url(#shadow)" opacity="1"/>
+<text x="450" y="520" font-size="19" font-weight="800" fill="#F59E0B" text-anchor="start">Global Memory</text>
+<text x="450" y="544" font-size="13" font-weight="700" fill="#64748B" text-anchor="start">~400–800 cycles</text>
+<text x="680" y="532" font-size="15" font-weight="700" fill="#334155" text-anchor="start">Naive 线程 0 串行读 DRAM；三者都从这里加载 input</text>
+<line x1="1050" y1="150" x2="1050" y2="570" stroke="#334155" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+<text x="1080" y="370" font-size="18" font-weight="800" fill="#334155" text-anchor="start">速度↓
+容量↑</text>
+<rect x="430" y="630" width="420" height="34" rx="17.0" fill="#DBEAFE" stroke="#2563EB" stroke-width="1" opacity="1"/>
+<text x="640.0" y="652.0" font-size="13" font-weight="700" fill="#2563EB" text-anchor="middle">核心优化方向：把 block 内通信从 global/shared 尽量上移到 register</text>
+</svg>
