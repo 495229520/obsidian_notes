@@ -25,7 +25,7 @@ AI Infra Performance Engineer
 + 推理成本优化
 ```
 
-![[9_0_0_1.svg|900]]
+![[图片/9.培养方案/00.总纲/9_0_0_1.svg|900]]
 
 *图示说明：这张图把培养方案压缩成一个能力闭环——Agent 负责提升工程效率，CUDA / Triton 和 GPU profiling 负责建立底层性能判断，serving benchmark 和 observability 负责把 kernel 结果接回 TTFT、TPOT、TPS、KV cache 与成本。最下方的人工验证 Gate 是整个路线的核心边界。*
 
@@ -156,7 +156,7 @@ Numerical correctness
 
 外部 AI Infra 面试样本说明，这条路线不仅要覆盖项目产出，还要显式训练现场口算、版本比较、通信数据流和项目叙事。总纲只记录暴露面和验收标准，细节放到专题笔记中。完整排序入口见 [[00.专题清单索引]]。
 
-![[9_0_0_2.svg|900]]
+![[图片/9.培养方案/00.总纲/9_0_0_2.svg|900]]
 
 *图示说明：面试表达不要停在"我会写某个 kernel"，而要能从 Transformer block 中的 RMSNorm、QKV、Attention、MLP 一路讲到 prefill / decode，再落到 TTFT、TPOT、TPS、queueing、KV cache usage 和 cost / 1M tokens。这样才能证明自己理解的是 LLM 推理工程链路，而不是孤立 toy kernel。*
 
@@ -200,13 +200,13 @@ Numerical correctness
 
 ## 路线总图
 
-![AI Agent Native 路线总图|935](../../图片/SVG/ai-agent-native-roadmap.svg)
+![AI Agent Native 路线总图|935](../../图片/9.培养方案/00.总纲/ai-agent-native-roadmap.svg)
 
 *图示说明：按"当前起点 → 三个阶段 → 最终目标"重绘，减少原 Mermaid 的交叉感。*
 
 ## 项目总图
 
-![AI Agent Native 项目总图|894](../../图片/SVG/ai-agent-native-project-map.svg)
+![AI Agent Native 项目总图|894](../../图片/9.培养方案/00.总纲/ai-agent-native-project-map.svg)
 
 *图示说明：左侧是能力主线，中间是项目阶段，右侧是作品集收口，依赖关系更容易顺着看。*
 
@@ -256,7 +256,7 @@ Numerical correctness
 
 ## 阶段一：现在到 2026 年 7 月
 
-![[9_0_0_3.svg|900]]
+![[图片/9.培养方案/00.总纲/9_0_0_3.svg|900]]
 
 *图示说明：三阶段路线的核心不是"学完更多关键词"，而是每个阶段都形成可验证产出。阶段一先证明能写基础 kernel 和 benchmark；阶段二把 kernel、Nsight、KV cache 与 serving 指标打通；阶段三把所有项目收束成作品集、开源贡献和面试叙事。*
 

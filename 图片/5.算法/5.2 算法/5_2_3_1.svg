@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="680" viewBox="0 0 1000 680" role="img" aria-labelledby="title desc">
+  <title id="title">高精度减法的逐位借位过程</title>
+  <desc id="desc">以 205 减 47 等于 158 为例，展示竖式借位规则、sub 循环体四步代码，以及从个位到百位逐列计算时借位 t 如何在相邻列之间传递。</desc>
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="bor" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#c0504d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text { font-family: "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #24313f; }
+      .title { font-size: 26px; font-weight: 700; }
+      .subtitle { font-size: 14px; fill: #65717d; }
+      .label { font-size: 16px; font-weight: 700; }
+      .small { font-size: 13px; fill: #4d5965; }
+      .digit { font-family: Consolas, "Cascadia Mono", monospace; font-size: 28px; font-weight: 700; fill: #24313f; }
+      .res { font-family: Consolas, "Cascadia Mono", monospace; font-size: 28px; font-weight: 700; fill: #2f7d4f; }
+      .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 15px; fill: #22313f; }
+      .calc { font-family: Consolas, "Cascadia Mono", monospace; font-size: 17px; font-weight: 700; fill: #22313f; }
+      .cmt { font-size: 13px; fill: #7a8a99; }
+      .borrow { font-size: 14px; font-weight: 700; fill: #c0504d; }
+    </style>
+  </defs>
+
+  <text class="title" x="48" y="50">高精度减法：逐位借位（示例 205 − 47 = 158）</text>
+  <text class="subtitle" x="48" y="76">t 既是上一位传来的借位，也是本位算完后的差；(t + 10) % 10 一步同时处理“借”与“不借”两种情况</text>
+
+  <!-- ===== 左上：竖式借位 ===== -->
+  <text class="borrow" x="256" y="100" text-anchor="middle">不够减就向高位借 1（本位 +10）</text>
+  <path d="M 256 124 Q 294 110 332 124" fill="none" stroke="#c0504d" stroke-width="1.6" marker-end="url(#bor)"/>
+  <path d="M 180 124 Q 218 110 256 124" fill="none" stroke="#c0504d" stroke-width="1.6" marker-end="url(#bor)"/>
+
+  <!-- 被减数 A = 205 -->
+  <rect x="152" y="134" width="56" height="50" rx="8" fill="#fffaf0" stroke="#d2b46f" stroke-width="1.6"/>
+  <rect x="228" y="134" width="56" height="50" rx="8" fill="#fffaf0" stroke="#d2b46f" stroke-width="1.6"/>
+  <rect x="304" y="134" width="56" height="50" rx="8" fill="#fffaf0" stroke="#d2b46f" stroke-width="1.6"/>
+  <text class="digit" x="180" y="168" text-anchor="middle">2</text>
+  <text class="digit" x="256" y="168" text-anchor="middle">0</text>
+  <text class="digit" x="332" y="168" text-anchor="middle">5</text>
+  <text class="small" x="374" y="164">被减数 A</text>
+
+  <!-- 减数 B = 47 -->
+  <text class="digit" x="116" y="231" text-anchor="middle">−</text>
+  <rect x="228" y="196" width="56" height="50" rx="8" fill="#fffaf0" stroke="#d2b46f" stroke-width="1.6"/>
+  <rect x="304" y="196" width="56" height="50" rx="8" fill="#fffaf0" stroke="#d2b46f" stroke-width="1.6"/>
+  <text class="digit" x="256" y="230" text-anchor="middle">4</text>
+  <text class="digit" x="332" y="230" text-anchor="middle">7</text>
+  <text class="small" x="374" y="226">减数 B</text>
+
+  <line x1="148" y1="258" x2="362" y2="258" stroke="#4f5b66" stroke-width="2"/>
+
+  <!-- 差 C = 158 -->
+  <rect x="152" y="266" width="56" height="50" rx="8" fill="#dcefe4" stroke="#4d9465" stroke-width="1.8"/>
+  <rect x="228" y="266" width="56" height="50" rx="8" fill="#dcefe4" stroke="#4d9465" stroke-width="1.8"/>
+  <rect x="304" y="266" width="56" height="50" rx="8" fill="#dcefe4" stroke="#4d9465" stroke-width="1.8"/>
+  <text class="res" x="180" y="300" text-anchor="middle">1</text>
+  <text class="res" x="256" y="300" text-anchor="middle">5</text>
+  <text class="res" x="332" y="300" text-anchor="middle">8</text>
+  <text class="small" x="374" y="296">差 C</text>
+
+  <!-- ===== 右上：sub 循环体四步 ===== -->
+  <rect x="440" y="106" width="514" height="182" rx="10" fill="#fbf7ee" stroke="#cdb985" stroke-width="1.4"/>
+  <text class="label" x="460" y="134">借位的本质：变量 t 的双重身份（sub 循环体）</text>
+  <text class="mono" x="460" y="162">① t = A[i] - t;</text>
+  <text class="cmt"  x="742" y="162">// 先扣掉上一位借走的 1</text>
+  <text class="mono" x="460" y="190">② if (i&lt;B.size()) t -= B[i];</text>
+  <text class="cmt"  x="742" y="190">// 再减 B（更短则跳过）</text>
+  <text class="mono" x="460" y="218">③ C.push_back((t + 10) % 10);</text>
+  <text class="cmt"  x="742" y="218">// 写入本位结果</text>
+  <text class="mono" x="460" y="246">④ t = t &lt; 0 ? 1 : 0;</text>
+  <text class="cmt"  x="742" y="246">// 决定下一位借位</text>
+  <text class="borrow" x="460" y="276">(t + 10) % 10 ： t ≥ 0 → 直接是 t ； t &lt; 0 → 自动 +10 完成借位</text>
+
+  <!-- ===== 连接说明 ===== -->
+  <text class="small" x="500" y="332" text-anchor="middle">循环 i：个位(i=0) → 十位(i=1) → 百位(i=2)，借位 t 沿红色箭头在相邻列间传递</text>
+
+  <!-- ===== 底部：三张逐列计算卡片 ===== -->
+  <!-- card 0 : 个位 -->
+  <rect x="40" y="348" width="276" height="296" rx="12" fill="#eef5fb" stroke="#7ba5c7" stroke-width="1.5"/>
+  <text class="label" x="178" y="378" text-anchor="middle">i = 0 ｜ 个位</text>
+  <line x1="56" y1="390" x2="300" y2="390" stroke="#7ba5c7" stroke-width="1"/>
+  <text class="mono" x="58" y="418">借入 t = 0</text>
+  <text class="cmt"  x="58" y="446">A[i] − t − B[i]</text>
+  <text class="calc" x="58" y="470">5 − 0 − 7 = −2</text>
+  <text class="cmt"  x="58" y="498">(t + 10) % 10</text>
+  <text class="calc" x="58" y="522">(−2 + 10) % 10 = 8</text>
+  <rect x="58" y="540" width="128" height="28" rx="14" fill="#dcefe4" stroke="#4d9465" stroke-width="1.6"/>
+  <text class="mono" x="122" y="559" text-anchor="middle" fill="#2f7d4f" font-weight="700">C[0] = 8</text>
+  <text class="borrow" x="58" y="600">−2 &lt; 0 → 借出 t = 1</text>
+
+  <!-- card 1 : 十位 -->
+  <rect x="362" y="348" width="276" height="296" rx="12" fill="#eef5fb" stroke="#7ba5c7" stroke-width="1.5"/>
+  <text class="label" x="500" y="378" text-anchor="middle">i = 1 ｜ 十位</text>
+  <line x1="378" y1="390" x2="622" y2="390" stroke="#7ba5c7" stroke-width="1"/>
+  <text class="mono" x="380" y="418">借入 t = 1</text>
+  <text class="cmt"  x="380" y="446">A[i] − t − B[i]</text>
+  <text class="calc" x="380" y="470">0 − 1 − 4 = −5</text>
+  <text class="cmt"  x="380" y="498">(t + 10) % 10</text>
+  <text class="calc" x="380" y="522">(−5 + 10) % 10 = 5</text>
+  <rect x="380" y="540" width="128" height="28" rx="14" fill="#dcefe4" stroke="#4d9465" stroke-width="1.6"/>
+  <text class="mono" x="444" y="559" text-anchor="middle" fill="#2f7d4f" font-weight="700">C[1] = 5</text>
+  <text class="borrow" x="380" y="600">−5 &lt; 0 → 借出 t = 1</text>
+
+  <!-- card 2 : 百位 -->
+  <rect x="684" y="348" width="276" height="296" rx="12" fill="#eef5fb" stroke="#7ba5c7" stroke-width="1.5"/>
+  <text class="label" x="822" y="378" text-anchor="middle">i = 2 ｜ 百位</text>
+  <line x1="700" y1="390" x2="944" y2="390" stroke="#7ba5c7" stroke-width="1"/>
+  <text class="mono" x="702" y="418">借入 t = 1</text>
+  <text class="cmt"  x="702" y="446">A[i] − t（B 已无此位）</text>
+  <text class="calc" x="702" y="470">2 − 1 − 0 = 1</text>
+  <text class="cmt"  x="702" y="498">(t + 10) % 10</text>
+  <text class="calc" x="702" y="522">(1 + 10) % 10 = 1</text>
+  <rect x="702" y="540" width="128" height="28" rx="14" fill="#dcefe4" stroke="#4d9465" stroke-width="1.6"/>
+  <text class="mono" x="766" y="559" text-anchor="middle" fill="#2f7d4f" font-weight="700">C[2] = 1</text>
+  <text class="small" x="702" y="600">1 ≥ 0 → 借出 t = 0（无借位，结束）</text>
+
+  <!-- 借位传递箭头 -->
+  <path d="M 316 600 C 345 572, 333 452, 362 424" fill="none" stroke="#c0504d" stroke-width="1.8" marker-end="url(#bor)"/>
+  <text class="borrow" x="339" y="512" text-anchor="middle">t=1</text>
+  <path d="M 638 600 C 667 572, 655 452, 684 424" fill="none" stroke="#c0504d" stroke-width="1.8" marker-end="url(#bor)"/>
+  <text class="borrow" x="661" y="512" text-anchor="middle">t=1</text>
+
+  <!-- 结果 -->
+  <text class="label" x="500" y="666" text-anchor="middle">C 逆序输出：1 5 8  ⇒  205 − 47 = 158</text>
+</svg>

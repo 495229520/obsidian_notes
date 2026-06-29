@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200px" height="760px" viewBox="0 0 1200 760" version="1.1">
+  <title>Week 3 transpose to Week 4 matmul concept migration</title>
+  <desc>Teaching diagram linking memory access shape in transpose to data reuse and arithmetic intensity in matmul.</desc>
+  <rect x="0" y="0" width="1200" height="760" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="10" refY="5.5" orient="auto">
+      <path d="M0 0 L11 5.5 L0 11 Z" fill="#42545a"/>
+    </marker>
+    <marker id="hollowArrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" viewBox="0 0 10 10">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#8a5f22" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <text x="600" y="44" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="25" font-weight="700" fill="#263238">Week 3 -> Week 4：从访存形状到数据复用</text>
+  <text x="600" y="82" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="700" fill="#455a64">同样是二维 tile；MatMul 额外关注 K 维复用与 FLOPs / byte</text>
+
+  <rect x="42" y="126" width="318" height="515" rx="18" ry="18" fill="#fffaf0" stroke="#c8bea7" stroke-width="2"/>
+  <text x="201" y="166" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#2f3b3f">Week 3: Transpose</text>
+  <text x="201" y="198" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#607077">核心问题：读写地址是否连续？</text>
+  <rect x="87" y="238" width="90" height="54" fill="#e8f3ee" stroke="#78909c" stroke-width="1.3"/>
+  <rect x="177" y="238" width="90" height="54" fill="#e8f3ee" stroke="#78909c" stroke-width="1.3"/>
+  <rect x="87" y="292" width="90" height="54" fill="#e8f3ee" stroke="#78909c" stroke-width="1.3"/>
+  <rect x="177" y="292" width="90" height="54" fill="#e8f3ee" stroke="#78909c" stroke-width="1.3"/>
+  <text x="132" y="266" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#31535b">tile</text>
+  <text x="222" y="266" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#31535b">tile</text>
+  <text x="132" y="320" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#31535b">tile</text>
+  <text x="222" y="320" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#31535b">tile</text>
+  <path d="M103 393 L275 393" fill="none" stroke="#1d6f73" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="189" y="374" text-anchor="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#1d6f73">连续读 / coalesced load</text>
+  <path d="M189 426 L189 560" fill="none" stroke="#b85b31" stroke-width="4" stroke-dasharray="8 8" marker-end="url(#arrow)"/>
+  <text x="202" y="486" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#8f4321">跨步写暴露问题</text>
+  <text x="201" y="604" text-anchor="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#4f5e63">shared memory 的作用：</text>
+  <text x="201" y="628" text-anchor="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#4f5e63">重排访存形状</text>
+
+  <rect x="442" y="126" width="318" height="515" rx="18" ry="18" fill="#f8fbff" stroke="#b8c4d6" stroke-width="2"/>
+  <text x="601" y="166" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#2f3b3f">共同基础</text>
+  <text x="601" y="198" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#607077">二维 block / tile / shared memory</text>
+  <rect x="492" y="238" width="220" height="70" rx="10" ry="10" fill="#eef3ef" stroke="#8fa6a0" stroke-width="1.5"/>
+  <text x="602" y="265" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="16" font-weight="700" fill="#254f57">row, col</text>
+  <text x="602" y="288" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#516165">线程映射到矩阵坐标</text>
+  <rect x="492" y="338" width="220" height="70" rx="10" ry="10" fill="#fff1dc" stroke="#d48b2a" stroke-width="1.5"/>
+  <text x="602" y="365" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="16" font-weight="700" fill="#7a4a16">__shared__ tile</text>
+  <text x="602" y="388" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#6a5840">block 内线程协作</text>
+  <rect x="492" y="438" width="220" height="70" rx="10" ry="10" fill="#eee7f5" stroke="#b09cc7" stroke-width="1.5"/>
+  <text x="602" y="465" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="16" font-weight="700" fill="#5c4770">__syncthreads()</text>
+  <text x="602" y="488" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#5c5361">保护 shared memory 生命周期</text>
+  <rect x="492" y="538" width="220" height="70" rx="10" ry="10" fill="#f7eadc" stroke="#d6ad86" stroke-width="1.5"/>
+  <text x="602" y="565" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="16" font-weight="700" fill="#734821">boundary check</text>
+  <text x="602" y="588" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#6a5840">非整除尺寸不能省</text>
+
+  <rect x="840" y="126" width="318" height="515" rx="18" ry="18" fill="#fffaf0" stroke="#c8bea7" stroke-width="2"/>
+  <text x="999" y="166" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#2f3b3f">Week 4: MatMul</text>
+  <text x="999" y="198" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#607077">核心问题：A/B 数据如何复用？</text>
+  <rect x="885" y="238" width="92" height="68" fill="#e6f2f0" stroke="#78909c" stroke-width="1.3"/>
+  <rect x="977" y="238" width="92" height="68" fill="#fff1dc" stroke="#d48b2a" stroke-width="1.3"/>
+  <rect x="885" y="336" width="184" height="90" fill="#f0eef7" stroke="#9277a8" stroke-width="1.5"/>
+  <text x="931" y="272" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="15" font-weight="700" fill="#31535b">A tile</text>
+  <text x="1023" y="272" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="15" font-weight="700" fill="#7a4a16">B tile</text>
+  <text x="977" y="382" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-size="17" font-weight="700" fill="#5c4770">C tile</text>
+  <path d="M931 306 L936 336" fill="none" stroke="#1d6f73" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M1023 306 L1018 336" fill="none" stroke="#b85b31" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="977" y="474" text-anchor="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#4f5e63">shared memory 的作用：</text>
+  <text x="977" y="498" text-anchor="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#4f5e63">让 A/B tile 服务一整块 C</text>
+  <text x="977" y="558" text-anchor="middle" font-family="Menlo, Consolas, monospace" font-size="17" font-weight="700" fill="#8a4f12">FLOPs / byte ↑</text>
+  <text x="977" y="586" text-anchor="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#607077">从 memory pattern 走向 roofline thinking</text>
+
+  <path d="M365 384 L436 384" fill="none" stroke="#8a5f22" stroke-width="2.4" stroke-dasharray="8 7" marker-end="url(#hollowArrow)"/>
+  <path d="M765 384 L834 384" fill="none" stroke="#8a5f22" stroke-width="2.4" stroke-dasharray="8 7" marker-end="url(#hollowArrow)"/>
+  <rect x="170" y="678" width="860" height="44" rx="12" ry="12" fill="#eef3ef" stroke="#afbeb6" stroke-width="1.5"/>
+  <text x="600" y="696" text-anchor="middle" dominant-baseline="middle" font-family="Avenir Next, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#33464b">Week 4 入门判断：naive 看重复读取，tiled 看 shared reuse，cuBLAS 看工程差距</text>
+</svg>

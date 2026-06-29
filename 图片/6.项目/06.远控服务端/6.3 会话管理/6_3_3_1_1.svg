@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="690" viewBox="0 0 920 690">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <title>ConsentRequest 跨线程所有权与 Event 信号机制</title>
+  <desc>网络线程 new/delete 持有 ConsentRequest 堆对象，通过 PostMessage 借出指针给 UI 线程；UI 线程写 result 并 SetEvent，唤醒在 WaitForSingleObject 阻塞的网络线程。</desc>
+  <rect x="0" y="0" width="920" height="690" fill="rgb(245, 244, 237)"/>
+
+  <text x="460" y="30" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#444441">ConsentRequest 跨线程所有权与 Event 信号机制</text>
+
+  <!-- column headers -->
+  <text x="160" y="68" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">网络线程 · CServerSocket</text>
+  <text x="770" y="68" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">UI 线程 · HostMainDlg</text>
+
+  <!-- ===== Center: ConsentRequest heap object (single rect + divider lines) ===== -->
+  <rect x="350" y="120" width="240" height="232" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="470" y="140" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">ConsentRequest（堆对象）</text>
+  <line x1="350" y1="156" x2="590" y2="156" stroke="#854F0B" stroke-width="0.5"/>
+
+  <text x="470" y="176" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">peerIp / helperName /</text>
+  <text x="470" y="196" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">sessionCode / hostName（只读）</text>
+  <line x1="350" y1="214" x2="590" y2="214" stroke="#854F0B" stroke-width="0.5"/>
+
+  <text x="470" y="236" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">result : Status = Denied（默认）</text>
+  <line x1="350" y1="258" x2="590" y2="258" stroke="#854F0B" stroke-width="0.5"/>
+
+  <text x="470" y="282" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">completedEvent : HANDLE</text>
+  <text x="470" y="304" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">手动复位 · 初始未信号</text>
+  <text x="470" y="326" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">（网络线程在此阻塞）</text>
+
+  <!-- ===== Network thread boxes (blue) ===== -->
+  <rect x="40" y="95" width="240" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="160" y="113" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">① new ConsentRequest</text>
+  <text x="160" y="133" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">堆上分配，所有权诞生</text>
+
+  <rect x="40" y="250" width="240" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="160" y="268" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">③ WaitForSingleObject</text>
+  <text x="160" y="288" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">INFINITE — 阻塞挂起</text>
+
+  <rect x="40" y="380" width="240" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="160" y="398" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">⑦ 读 result · ⑧ delete</text>
+  <text x="160" y="418" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">释放对象，所有权终结</text>
+
+  <!-- ===== UI thread boxes (purple) ===== -->
+  <rect x="650" y="95" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="770" y="113" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">④ OnConsentRequest()</text>
+  <text x="770" y="133" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">收到借用指针</text>
+
+  <rect x="650" y="211" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="770" y="229" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">DoModal — 30 秒倒计时</text>
+  <text x="770" y="249" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">Allow / Deny / 超时</text>
+
+  <rect x="650" y="327" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="770" y="345" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">⑤ 写 request-&gt;result</text>
+  <text x="770" y="365" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">把用户选择写回对象</text>
+
+  <rect x="650" y="443" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="770" y="461" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">⑥ SetEvent(completedEvent)</text>
+  <text x="770" y="481" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">置信号后不再访问指针</text>
+
+  <!-- ===== Arrows ===== -->
+  <!-- N1 new -> heap -->
+  <path d="M280 123 L348 136" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="316" y="116" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#185FA5">new</text>
+
+  <!-- heap -> U1 PostMessage (dashed = borrowed pointer) -->
+  <path d="M592 136 L648 123" fill="none" stroke="#854F0B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="620" y="100" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#854F0B">② PostMessage（借指针）</text>
+
+  <!-- U3 write result -> heap result row -->
+  <path d="M648 350 L592 238" fill="none" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="628" y="300" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#534AB7">写 result</text>
+
+  <!-- U4 SetEvent -> heap event row -->
+  <path d="M648 466 L592 300" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="630" y="400" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0F6E56">置信号</text>
+
+  <!-- heap event -> N2 wake -->
+  <path d="M348 298 L282 286" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="316" y="306" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0F6E56">唤醒阻塞</text>
+
+  <!-- N3 delete -> heap bottom -->
+  <path d="M282 402 L432 352" fill="none" stroke="#185FA5" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="346" y="396" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#185FA5">delete</text>
+
+  <!-- ===== bottom note bar ===== -->
+  <rect x="40" y="560" width="840" height="86" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="60" y="584" text-anchor="start" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">所有权：ConsentRequest 仅由网络线程 new / delete；UI 线程拿到的是借用指针，只读字段、写 result，绝不释放。</text>
+  <text x="60" y="608" text-anchor="start" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">同步：completedEvent 为手动复位事件 —— 网络线程 WaitForSingleObject 阻塞，UI 线程 SetEvent 唤醒，只 signal 一次。</text>
+  <text x="60" y="632" text-anchor="start" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">约束：PostMessage 成功后网络线程必须等待，不能提前释放；UI 线程 SetEvent 之后不得再访问该指针。</text>
+</svg>

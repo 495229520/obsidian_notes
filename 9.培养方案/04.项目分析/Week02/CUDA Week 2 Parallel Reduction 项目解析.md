@@ -67,11 +67,13 @@ CMake 构建
 > [!note] 当前实现边界
 > 这个 week02 工程的三种 reduce 实现都是“GPU 每个 block 输出一个 partial sum，CPU 侧再累加 partial sums”。它已经足够用于学习 block-level reduction 和 profiling，但还不是完整的多级 GPU-only reduction。
 
-![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-01.svg|1002]]
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-01.svg|1000]]
 
 ---
 
 ## 2. 目录结构
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-04.svg|1000]]
 
 项目结构如下：
 
@@ -128,6 +130,8 @@ week02/
 ---
 
 ## 3. 构建系统：`CMakeLists.txt`
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-05.svg|1000]]
 
 ### 3.1 项目语言与标准
 
@@ -200,6 +204,8 @@ target_link_libraries(bench_reduce PRIVATE reduce_lib)
 ---
 
 ## 4. Makefile：命令入口
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-06.svg|1000]]
 
 `Makefile` 把常用命令包装成更短的入口：
 
@@ -280,6 +286,8 @@ Naive reduce
 ---
 
 ## 6. 基础设施：`include/cuda_check.cuh` 逐行精讲
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-07.svg|1000]]
 
 `cuda_check.cuh` 是整个项目的错误处理基石，Week 1 就已经建立，Week 2 继续复用。文件虽短（33 行），但包含了 CUDA 工程中最核心的安全模式。
 
@@ -393,6 +401,8 @@ CUDA_CHECK(cudaEventDestroy(start));
 ---
 
 ## 7. 基础设施：`include/device_buffer.cuh` 逐行精讲
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-08.svg|1000]]
 
 `DeviceBuffer` 是项目中 GPU 显存管理的核心抽象。它用 RAII（Resource Acquisition Is Initialization）模式封装 `cudaMalloc` / `cudaFree`，是整个项目中 C++ 工程能力最集中的一个文件。
 
@@ -610,6 +620,8 @@ std::unique_ptr<T, decltype(deleter)> ptr(nullptr, deleter);
 
 ## 8. 测试工具：`include/test_utils.cuh` 逐行精讲
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-09.svg|1000]]
+
 ### 8.1 文件结构概览
 
 `test_utils.cuh` 提供三个模板函数，构成测试的完整链路：
@@ -707,6 +719,8 @@ T sum_reference(const std::vector<T>& data, int n) {
 **最后 `static_cast<T>(acc)` 回转**：double → float 的转换会有舍入，但只发生一次（在最终结果上），而不是每次累加都舍入。
 
 ### 8.4 结果验证：`check_result<T>` 完整分析
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-22.svg|1000]]
 
 ```cpp
 template <typename T>
@@ -824,6 +838,8 @@ T reduce_naive(const T* d_input, int n, int threads_per_block = 256);
 
 ### 9.3 声明与实现分离
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-21.svg|1000]]
+
 模板函数通常需要在头文件中提供完整定义。但本项目使用了**显式实例化**技巧：
 
 ```text
@@ -855,9 +871,11 @@ template double reduce_xxx<double>(const double*, int, int);
 
 ---
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-23.svg|1000]]
+
 ## 10. Naive Reduce：`src/reduce_naive.cu` 逐行精讲
 
-![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-03.svg|921]]
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-03.svg|1000]]
 
 ### 10.1 Kernel 完整源码与逐行分析
 
@@ -1016,6 +1034,8 @@ CUDA_CHECK(cudaDeviceSynchronize()); // 等待 kernel 完成并检查执行错�
 
 ### 10.5 三个 host wrapper 的共同模式
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-14.svg|1000]]
+
 三种 reduce 实现的 host wrapper 结构完全一致：
 
 ```text
@@ -1042,7 +1062,7 @@ CUDA_CHECK(cudaDeviceSynchronize()); // 等待 kernel 完成并检查执行错�
 
 ## 11. Shared Memory Reduce：`src/reduce_shared.cu` 逐行精讲
 
-![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-04.svg|900]]
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-10.svg|1000]]
 
 ### 11.1 Kernel 完整源码与逐行分析
 
@@ -1236,6 +1256,8 @@ for (int stride = 1; stride < blockDim.x; stride *= 2) {
 
 ### 11.7 线程活跃度与 Warp Divergence
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-11.svg|1000]]
+
 ```text
 threads_per_block = 256 (8 个 warp, 每 warp 32 线程)
 
@@ -1267,8 +1289,6 @@ Round 8 (stride=1):   T0 活跃     → warp 0 内 1 线程活跃
 ---
 
 ## 12. Warp Shuffle Reduce：`src/reduce_shuffle.cu` 逐行精讲
-
-![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-05.svg|950]]
 
 ### 12.1 `warp_reduce_sum` 设备函数完整分析
 
@@ -1309,6 +1329,8 @@ __device__ T warp_reduce_sum(T val) {
 `0xffffffff` = 所有 32 个 lane 都参与，是最常见的用法。如果只有部分 lane 有有效数据，可以用更精确的 mask。
 
 ### 12.2 `__shfl_down_sync` 数据流完整可视化
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-12.svg|1000]]
 
 以 8 个 lane 为例（实际是 32，缩小展示）：
 
@@ -1387,6 +1409,8 @@ __global__ void reduce_shuffle_kernel(const T* input, T* partial_sums, int n) {
 ```
 
 ### 12.4 两层归约结构详解
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-13.svg|1000]]
 
 整个 kernel 分为三个阶段：
 
@@ -1649,7 +1673,7 @@ std::snprintf(name, sizeof(name), “shuffle<%s> n=%d”, type_name, n);
 
 ## 14. Benchmark：`benchmarks/bench_reduce.cu` 逐行精讲
 
-![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-02.svg|868]]
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-02.svg|1000]]
 
 ### 14.1 文件结构概览
 
@@ -1992,6 +2016,8 @@ N       | Kernel   |   Avg(ms) |   Min(ms) |   Max(ms) |  BW(GB/s) | Status
 
 ### 14.10 实测 benchmark 结果
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-16.svg|1000]]
+
 本次测试配置：
 
 ```text
@@ -2042,6 +2068,8 @@ Status: 全部 OK
 ---
 
 ## 15. Nsight Compute Profiling：`docs/profiling.md`
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-17.svg|1000]]
 
 Week 2 不只要求“哪个版本更快”，还要求解释“为什么更快”。`docs/profiling.md` 就是为这个目的准备的证据模板。
 
@@ -2206,6 +2234,8 @@ clean:
 
 ## 17. README 推荐阅读顺序
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-20.svg|1000]]
+
 建议按这个顺序读 week02：
 
 1. `README.md`：先理解本周目标、三种归约策略和构建命令。
@@ -2296,11 +2326,11 @@ Week 3: 线程如何合并访问 global memory
 
 ---
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-15.svg|1000]]
+
 ## 20. GPU 内存层次与本项目的映射关系
 
 理解三种 reduce 实现的性能差异，需要先理解 NVIDIA GPU 的内存层次：
-
-![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-06.svg|900]]
 
 ### 20.1 内存层次金字塔
 
@@ -2352,6 +2382,8 @@ Warp 0-7 各自 shuffle 归约 (寄存器内)
 
 ### 20.4 SM 资源竞争与 Occupancy
 
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-19.svg|1000]]
+
 每个 SM（Streaming Multiprocessor）的资源是有限的：
 
 ```text
@@ -2374,6 +2406,8 @@ GTX 1660 SUPER (sm_75, Turing):
 | 有效工作线程比 | 1/256 = 0.4% | 递减（第1轮128, ... 第8轮1） | 几乎全部 |
 
 ---
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-18.svg|1000]]
 
 ## 21. 三种实现的完整执行流程对比
 
@@ -2422,6 +2456,8 @@ num_blocks = 2048 / 256 = 8 个 block
 虽然 Shared 和 Shuffle 的步骤数接近，但 Shuffle 的每一步延迟（1 cycle）远低于 Shared 的每一步（20-30 cycles + barrier 开销）。
 
 ---
+
+![[图片/9.培养方案/04.项目分析/Week02/CUDA Week 2 Parallel Reduction 项目解析-24.svg|1000]]
 
 ## 22. 关键要点总结
 

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 520" width="940" height="520">
+  <rect x="0" y="0" width="940" height="520" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <title>Michael-Scott 无锁队列：Head/Tail 原子指针 + CAS</title>
+  <desc>带哨兵节点的单链表，Head 与 Tail 是原子指针，入队在尾部 CAS 接入新节点，出队在头部 CAS 推进 Head。</desc>
+
+  <text x="470" y="32" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
+    Michael-Scott 无锁队列（MPMC）：Head / Tail 原子指针 + CAS
+  </text>
+  <text x="470" y="56" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
+    带哨兵节点的单链表；入队尾部 CAS 接入新节点，出队头部 CAS 推进 Head
+  </text>
+
+  <!-- Head 指针 -->
+  <rect x="80" y="70" width="160" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="160" y="90" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#0C447C">Head（原子指针）</text>
+  <text x="160" y="110" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#0C447C">出队端</text>
+
+  <!-- Tail 指针 -->
+  <rect x="560" y="70" width="160" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="640" y="90" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">Tail（原子指针）</text>
+  <text x="640" y="110" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#633806">入队端</text>
+
+  <!-- 哨兵节点 -->
+  <rect x="80" y="200" width="160" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="160" y="222" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#444441">dummy（哨兵）</text>
+  <text x="160" y="244" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#5F5E5A">data 无效 · next</text>
+
+  <!-- node A -->
+  <rect x="320" y="200" width="160" height="64" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="400" y="222" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">node A</text>
+  <text x="400" y="244" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">data=A · next</text>
+
+  <!-- node B -->
+  <rect x="560" y="200" width="160" height="64" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="640" y="222" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">node B（队尾）</text>
+  <text x="640" y="244" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">data=B · next=∅</text>
+
+  <text x="840" y="232" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#5F5E5A">nullptr</text>
+
+  <!-- pointer arrows -->
+  <path d="M160 126 L160 200" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M640 126 L640 200" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M240 232 L320 232" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M480 232 L560 232" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M720 232 L808 232" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 入队 -->
+  <rect x="80" y="330" width="360" height="84" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="260" y="352" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">入队 enqueue（多生产者）</text>
+  <text x="260" y="376" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">① CAS(tail.next, ∅ → 新节点)</text>
+  <text x="260" y="398" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">② CAS 推进 Tail 指向新节点</text>
+
+  <!-- 出队 -->
+  <rect x="508" y="330" width="352" height="84" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="684" y="352" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">出队 dequeue（多消费者）</text>
+  <text x="684" y="376" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">读 head.next 的 data</text>
+  <text x="684" y="398" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">CAS(Head, head → head.next)</text>
+
+  <text x="470" y="448" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
+    多线程靠 CAS 竞争推进 Head / Tail；CAS 失败即重试。难点：ABA 问题与节点安全回收
+  </text>
+  <text x="470" y="472" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#5F5E5A">
+    回收方案：带标签指针、hazard pointer、RCU —— 详见 17.5 无锁编程
+  </text>
+</svg>

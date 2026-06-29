@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600">
+  <rect x="0" y="0" width="960" height="600" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="34" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
+    CAS 循环更新范式：无锁的「乐观读 — 算 — 提交 — 失败重算」
+  </text>
+  <text x="480" y="56" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#888">
+    compare_exchange 失败时会把 expected 刷新为内存当前值，循环天然拿到最新基准
+  </text>
+
+  <!-- left: flow -->
+  <rect x="80" y="100" width="320" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="240" y="123" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">① 读取当前值 expected = a.load()</text>
+
+  <rect x="80" y="186" width="320" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="240" y="209" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">② 基于 expected 计算 desired</text>
+
+  <!-- decision diamond -->
+  <polygon points="240,272 380,338 240,404 100,338" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.6"/>
+  <text x="240" y="328" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">③ CAS：内存值</text>
+  <text x="240" y="348" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">仍 == expected ?</text>
+
+  <rect x="80" y="452" width="320" height="46" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="240" y="475" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" fill="#085041">④ 成功：写入 desired，跳出循环 ✓</text>
+
+  <path d="M240 146 L240 184" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M240 232 L240 270" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M240 404 L240 450" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="258" y="428" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#0F6E56">是</text>
+
+  <!-- fail loop: right side of diamond back to step1 -->
+  <path d="M380 338 L440 338 L440 123 L402 123" fill="none" stroke="#B3261E"
+        stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="490" y="232" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#B3261E">否：别人改过了</text>
+  <text x="490" y="250" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#B3261E">expected 被刷新</text>
+  <text x="490" y="268" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#B3261E">→ 重算重试 ↺</text>
+
+  <!-- right: code -->
+  <rect x="560" y="100" width="340" height="398" rx="10" fill="#2B2B28" stroke="#444441" stroke-width="0.5"/>
+  <text x="584" y="128" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#C8C8C0">std::atomic&lt;int&gt; a{0};</text>
+  <text x="584" y="160" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#7FB0E0">// 原子地把 a 翻倍</text>
+  <text x="584" y="188" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#C8C8C0">int expected = a.load(</text>
+  <text x="584" y="208" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#C8C8C0">        std::memory_order_relaxed);</text>
+  <text x="584" y="240" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#E0A85F">int desired;</text>
+  <text x="584" y="268" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#E0A85F">do {</text>
+  <text x="584" y="288" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#C8C8C0">    desired = expected * 2;</text>
+  <text x="584" y="316" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#E0A85F">} while (</text>
+  <text x="584" y="336" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#C8C8C0">  !a.compare_exchange_weak(</text>
+  <text x="584" y="356" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" fill="#C8C8C0">      expected, desired));</text>
+  <text x="584" y="392" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#7FB0E0">// 失败时 expected 自动 = a 当前值，</text>
+  <text x="584" y="412" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#7FB0E0">// 无需手动 reload，直接进下一轮</text>
+  <text x="584" y="444" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#7FB0E0">// weak 允许「伪失败」，循环里</text>
+  <text x="584" y="464" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#7FB0E0">// 用 weak 通常比 strong 更快</text>
+
+  <text x="480" y="548" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
+    本质：把「读-改-写」的最后一步「写」换成「带前置条件的原子写」——条件不满足就重来
+  </text>
+</svg>

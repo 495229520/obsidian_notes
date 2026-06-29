@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="680" viewBox="0 0 1080 680" role="img" aria-labelledby="title desc">
+  <title id="title">线程通过 Linux 消息队列传递数据</title>
+  <desc id="desc">发送线程通过 msgsnd 进入内核，将用户态消息复制进消息队列；接收线程通过 msgrcv 按类型匹配消息，再由内核复制到接收缓冲区。</desc>
+  <rect width="1080" height="680" fill="rgb(245, 244, 237)"/>
+
+  <defs>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#15803d"/>
+    </marker>
+    <marker id="arrowDark" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text {
+        font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+        fill: #1f2937;
+      }
+      .title { font-size: 34px; font-weight: 800; }
+      .subtitle { font-size: 15px; fill: #475569; }
+      .h2 { font-size: 20px; font-weight: 750; }
+      .h3 { font-size: 16px; font-weight: 700; }
+      .body { font-size: 14px; }
+      .small { font-size: 12px; fill: #475569; }
+      .tiny { font-size: 11px; fill: #64748b; }
+      .kernel { fill: #edf6ff; stroke: #2563eb; stroke-width: 2.5; rx: 22; }
+      .user { fill: #fffaf0; stroke: #475569; stroke-width: 2.2; rx: 16; }
+      .queue { fill: #ecfdf5; stroke: #15803d; stroke-width: 2.2; rx: 18; }
+      .msg { fill: #ffffff; stroke: #15803d; stroke-width: 1.9; rx: 12; }
+      .side { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.7; rx: 13; }
+      .buf { fill: #fff7ed; stroke: #ea580c; stroke-width: 1.9; rx: 12; }
+      .callout { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.3; rx: 12; }
+      .blue { stroke: #2563eb; stroke-width: 3.2; fill: none; marker-end: url(#arrowBlue); }
+      .green { stroke: #15803d; stroke-width: 3.2; fill: none; marker-end: url(#arrowGreen); }
+      .dark { stroke: #334155; stroke-width: 2.3; fill: none; marker-end: url(#arrowDark); }
+      .softLine { stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 7 7; }
+      .stepBlue { fill: #2563eb; }
+      .stepGreen { fill: #15803d; }
+      .stepText { fill: #ffffff; font-size: 13px; font-weight: 800; }
+      .blueText { fill: #2563eb; font-weight: 750; }
+      .greenText { fill: #15803d; font-weight: 750; }
+    </style>
+  </defs>
+
+  <text x="540" y="46" text-anchor="middle" class="title">线程通过 Linux 消息队列传递数据</text>
+  <text x="540" y="76" text-anchor="middle" class="subtitle">用户态缓冲区中的消息先复制进内核队列，再由内核复制到接收方缓冲区；队列保留消息边界并按类型匹配</text>
+
+  <rect x="70" y="112" width="940" height="330" class="kernel"/>
+  <text x="98" y="148" class="h2">内核空间：System V Message Queue</text>
+  <text x="792" y="148" class="small">队列负责阻塞 / 唤醒 / 类型匹配</text>
+
+  <rect x="112" y="208" width="118" height="108" class="side"/>
+  <text x="171" y="238" text-anchor="middle" class="h3">入队入口</text>
+  <text x="171" y="264" text-anchor="middle" class="body">copy_from_user</text>
+  <text x="171" y="286" text-anchor="middle" class="small">复制消息正文</text>
+
+  <rect x="280" y="186" width="520" height="160" class="queue"/>
+  <text x="540" y="219" text-anchor="middle" class="h2">msg_queue 链表：按发送顺序保存完整消息</text>
+
+  <rect x="316" y="252" width="128" height="66" class="msg"/>
+  <text x="380" y="277" text-anchor="middle" class="h3">消息 1</text>
+  <text x="380" y="298" text-anchor="middle" class="body">mtype = 1</text>
+  <text x="380" y="314" text-anchor="middle" class="tiny">payload: cmd=A</text>
+
+  <rect x="476" y="252" width="128" height="66" class="msg"/>
+  <text x="540" y="277" text-anchor="middle" class="h3">消息 2</text>
+  <text x="540" y="298" text-anchor="middle" class="body">mtype = 2</text>
+  <text x="540" y="314" text-anchor="middle" class="tiny">payload: cmd=B</text>
+
+  <rect x="636" y="252" width="128" height="66" class="msg"/>
+  <text x="700" y="277" text-anchor="middle" class="h3">消息 3</text>
+  <text x="700" y="298" text-anchor="middle" class="body">mtype = 1</text>
+  <text x="700" y="314" text-anchor="middle" class="tiny">payload: data</text>
+
+  <path d="M445 285 L468 285" class="dark"/>
+  <path d="M605 285 L628 285" class="dark"/>
+  <path d="M765 285 L800 285" class="dark"/>
+  <text x="816" y="290" class="body">NULL</text>
+
+  <rect x="852" y="208" width="118" height="108" class="side"/>
+  <text x="911" y="238" text-anchor="middle" class="h3">出队出口</text>
+  <text x="911" y="264" text-anchor="middle" class="body">按 msgtyp 匹配</text>
+  <text x="911" y="286" text-anchor="middle" class="small">取走后删除节点</text>
+
+  <path d="M230 262 C248 262 256 258 275 252" class="blue"/>
+  <path d="M800 285 C818 285 830 276 848 266" class="green"/>
+
+  <rect x="304" y="362" width="208" height="48" class="callout"/>
+  <circle cx="326" cy="386" r="13" class="stepBlue"/>
+  <text x="326" y="391" text-anchor="middle" class="stepText">2</text>
+  <text x="348" y="383" class="body">内核分配 msg_msg 节点</text>
+  <text x="348" y="402" class="small">消息作为一个完整节点入链表</text>
+
+  <rect x="592" y="362" width="230" height="48" class="callout"/>
+  <circle cx="614" cy="386" r="13" class="stepGreen"/>
+  <text x="614" y="391" text-anchor="middle" class="stepText">4</text>
+  <text x="636" y="383" class="body">复制到接收缓冲区</text>
+  <text x="636" y="402" class="small">匹配节点被从队列移除</text>
+
+  <line x1="70" y1="468" x2="1010" y2="468" class="softLine"/>
+  <text x="540" y="491" text-anchor="middle" class="small">系统调用边界：线程从用户态进入内核态执行队列操作</text>
+
+  <rect x="94" y="526" width="356" height="116" class="user"/>
+  <text x="272" y="558" text-anchor="middle" class="h2">进程 P1 / 线程 A（发送方）</text>
+  <rect x="130" y="582" width="284" height="38" class="buf"/>
+  <text x="272" y="606" text-anchor="middle" class="body">struct msgbuf { mtype=1; text=... }</text>
+
+  <rect x="630" y="526" width="356" height="116" class="user"/>
+  <text x="808" y="558" text-anchor="middle" class="h2">进程 P2 / 线程 B（接收方）</text>
+  <rect x="666" y="582" width="284" height="38" class="buf"/>
+  <text x="808" y="606" text-anchor="middle" class="body">struct msgbuf recv_buf</text>
+
+  <path d="M272 526 C272 482 170 440 170 322" class="blue"/>
+  <rect x="96" y="424" width="184" height="44" class="callout"/>
+  <circle cx="118" cy="446" r="13" class="stepBlue"/>
+  <text x="118" y="451" text-anchor="middle" class="stepText">1</text>
+  <text x="140" y="442" class="blueText">msgsnd()</text>
+  <text x="140" y="461" class="small">用户态消息进入内核</text>
+
+  <path d="M911 322 C911 434 808 476 808 526" class="green"/>
+  <rect x="806" y="424" width="184" height="44" class="callout"/>
+  <circle cx="828" cy="446" r="13" class="stepGreen"/>
+  <text x="828" y="451" text-anchor="middle" class="stepText">3</text>
+  <text x="850" y="442" class="greenText">msgrcv()</text>
+  <text x="850" y="461" class="small">按 msgtyp 查找消息</text>
+
+  <path d="M710 250 C768 188 838 188 892 250" stroke="#15803d" stroke-width="2" stroke-dasharray="6 6" fill="none"/>
+  <text x="802" y="176" text-anchor="middle" class="small">msgtyp = 1 时，匹配第一条 mtype = 1 的消息</text>
+</svg>

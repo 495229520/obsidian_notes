@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="470" viewBox="0 0 860 470">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <title>ServerSocket 架构总览：UI 线程与 Worker 线程</title>
+  <desc>CServerSocket 通过 _beginthreadex 启动 Worker 线程运行 select 循环，Worker 通过 PostMessage 单向通知 UI 线程。</desc>
+  <rect x="0" y="0" width="860" height="470" fill="rgb(245, 244, 237)"/>
+
+  <!-- 线程分区背景 -->
+  <path d="M30 58 H300 V312 H30 Z" fill="#F1EFE8" stroke="none"/>
+  <path d="M540 58 H812 V382 H540 Z" fill="#F1EFE8" stroke="none"/>
+  <text x="165" y="74" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">Main UI Thread（MFC 消息循环）</text>
+  <text x="676" y="74" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">Worker Thread（网络 I/O）</text>
+
+  <!-- 节点 -->
+  <g>
+    <rect x="44" y="96" width="210" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="149" y="114" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">HostMainDlg</text>
+    <text x="149" y="134" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C" text-anchor="middle" dominant-baseline="central">MFC 主对话框</text>
+  </g>
+  <g>
+    <rect x="44" y="240" width="210" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text x="149" y="258" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">CServerSocket</text>
+    <text x="149" y="278" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489" text-anchor="middle" dominant-baseline="central">网络控制接口</text>
+  </g>
+  <g>
+    <rect x="560" y="96" width="240" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text x="680" y="114" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">Run() 循环</text>
+    <text x="680" y="134" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806" text-anchor="middle" dominant-baseline="central">select() 200ms 超时</text>
+  </g>
+  <g>
+    <rect x="560" y="212" width="240" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text x="680" y="234" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">listenSock → Accept</text>
+  </g>
+  <g>
+    <rect x="560" y="316" width="240" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="680" y="338" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">clientSock → Recv</text>
+  </g>
+
+  <!-- 连线 -->
+  <path d="M149 152 L149 240" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="162" y="196" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">Start() / Stop()</text>
+
+  <path d="M254 268 L410 268 L410 128 L560 128" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="410" y="202" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">_beginthreadex()</text>
+
+  <path d="M560 112 L254 112" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="407" y="92" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C" text-anchor="middle" dominant-baseline="central">PostMessage(WM_HOST_xxx)</text>
+
+  <path d="M680 152 L680 212" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M680 256 L680 316" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="430" y="424" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">Worker 线程独占 select() / recv()；与 UI 仅通过 PostMessage 单向通信</text>
+</svg>

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640">
+  <rect x="0" y="0" width="960" height="640" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <title>acquire / release 配对建立 happens-before</title>
+  <desc>线程 A 的 release 写与线程 B 读到该值的 acquire 配对，拼成跨线程 happens-before 链。</desc>
+
+  <text x="480" y="32" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
+    acquire / release 配对建立 happens-before
+  </text>
+  <text x="480" y="56" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
+    release 之前的写，对「读到该值的」acquire 之后全部可见
+  </text>
+
+  <!-- Thread A -->
+  <rect x="60" y="100" width="360" height="40" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="240" y="120" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">线程 A（生产者）</text>
+
+  <rect x="60" y="200" width="360" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="240" y="222" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" fill="#444441">data = 42;        // ① 普通写</text>
+
+  <rect x="60" y="304" width="360" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="240" y="326" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">② ready.store(true, release);</text>
+
+  <!-- Thread B -->
+  <rect x="540" y="100" width="360" height="40" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="720" y="120" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">线程 B（消费者）</text>
+
+  <rect x="540" y="304" width="360" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="720" y="326" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">③ while(!ready.load(acquire));</text>
+
+  <rect x="540" y="408" width="360" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="720" y="430" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" fill="#444441">④ assert(data == 42);  // 保证成立</text>
+
+  <!-- A internal order -->
+  <path d="M240 244 L240 304" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- B internal order -->
+  <path d="M720 348 L720 408" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- synchronizes-with -->
+  <path d="M420 326 C480 326 480 326 540 326" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="480" y="300" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#0F6E56">synchronizes-with</text>
+  <text x="480" y="352" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#0F6E56">（B 读到 A 写入的 true）</text>
+
+  <!-- release barrier -->
+  <line x1="60" y1="288" x2="420" y2="288" stroke="#0F6E56" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <text x="240" y="278" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#0F6E56">↑ release：上方写不可下沉</text>
+
+  <!-- acquire barrier -->
+  <line x1="540" y1="364" x2="900" y2="364" stroke="#0F6E56" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <text x="720" y="376" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#0F6E56">↓ acquire：下方读不可上浮</text>
+
+  <!-- happens-before chain -->
+  <rect x="200" y="512" width="560" height="84" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="480" y="536" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">happens-before 传递链</text>
+  <text x="480" y="560" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#3C3489">① data=42  →  ② release store  →  ③ acquire load  →  ④ read data</text>
+  <text x="480" y="580" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">三段拼接，A 的写对 B 可见，无需 seq_cst 的全局开销</text>
+</svg>

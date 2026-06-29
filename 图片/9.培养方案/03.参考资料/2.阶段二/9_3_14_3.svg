@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #243241; }
+      .title { font-size: 28px; font-weight: 700; }
+      .subtitle { font-size: 16px; fill: #607080; }
+      .head { font-size: 18px; font-weight: 700; }
+      .body { font-size: 14px; fill: #435363; }
+      .cell { font-size: 12px; font-weight: 650; text-anchor: middle; dominant-baseline: middle; }
+      .formula { font-size: 15px; fill: #334155; }
+    </style>
+  </defs>
+  <text x="56" y="54" class="title">program id 如何映射到 C tile</text>
+  <text x="56" y="83" class="subtitle">Triton program 类似 CUDA block：每个 program 负责 C 的一块输出</text>
+
+  <text x="88" y="140" class="head">C 矩阵被切成 BLOCK_M x BLOCK_N 的 tile</text>
+  <g transform="translate(88,168)">
+    <rect x="0" y="0" width="384" height="288" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+    <line x1="96" y1="0" x2="96" y2="288" stroke="#cbd5e1"/>
+    <line x1="192" y1="0" x2="192" y2="288" stroke="#cbd5e1"/>
+    <line x1="288" y1="0" x2="288" y2="288" stroke="#cbd5e1"/>
+    <line x1="0" y1="72" x2="384" y2="72" stroke="#cbd5e1"/>
+    <line x1="0" y1="144" x2="384" y2="144" stroke="#cbd5e1"/>
+    <line x1="0" y1="216" x2="384" y2="216" stroke="#cbd5e1"/>
+    <rect x="192" y="72" width="96" height="72" fill="#efe8f6" stroke="#8e6fb2" stroke-width="3"/>
+    <text x="48" y="36" class="cell">pid(0,0)</text>
+    <text x="144" y="36" class="cell">pid(0,1)</text>
+    <text x="240" y="108" class="cell">pid_m=1</text>
+    <text x="240" y="126" class="cell">pid_n=2</text>
+    <text x="336" y="252" class="cell">...</text>
+  </g>
+
+  <rect x="570" y="158" width="464" height="284" rx="8" fill="#fffaf0" stroke="#d6be82"/>
+  <text x="604" y="198" class="head">坐标公式</text>
+  <text x="604" y="238" class="formula">pid_m = tl.program_id(0)</text>
+  <text x="604" y="268" class="formula">pid_n = tl.program_id(1)</text>
+  <text x="604" y="308" class="formula">offs_m = pid_m * BLOCK_M + tl.arange(0, BLOCK_M)</text>
+  <text x="604" y="338" class="formula">offs_n = pid_n * BLOCK_N + tl.arange(0, BLOCK_N)</text>
+  <text x="604" y="386" class="body">如果 BLOCK_M=16, BLOCK_N=32:</text>
+  <text x="604" y="414" class="body">pid_m=2, pid_n=3 -> C[32:48, 96:128]</text>
+
+  <rect x="180" y="506" width="760" height="52" rx="8" fill="#e7efe3" stroke="#84a96d"/>
+  <text x="226" y="539" class="body">先看懂二维 grid 映射；grouped ordering 可以后续再加入，用来改善 cache locality。</text>
+</svg>

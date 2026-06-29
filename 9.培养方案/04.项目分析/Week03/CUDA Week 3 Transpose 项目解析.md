@@ -49,7 +49,7 @@ out[col * height + row] = in[row * width + col];
 
 整个工程是**一个静态库 + 多个消费者**的极简结构：四个 kernel 编译进 `transpose_lib`，四个正确性测试和一个 benchmark 都链接同一个库；`Makefile` 只是 CMake 的便捷包装。
 
-![[图片/SVG/CUDA Week 3 Transpose 项目解析-01.svg|880]]
+![[图片/9.培养方案/04.项目分析/CUDA Week 3 Transpose 项目解析-01.svg|880]]
 
 目录职责：
 
@@ -201,7 +201,7 @@ __global__ void transpose_naive_kernel(const float* in, float* out, int width, i
 
 一个 warp 的 32 个 lane 写到 32 个相距 `height` 的地址，几乎每个 lane 都要单独一个 transaction：
 
-![[图片/SVG/CUDA Week 3 Transpose 项目解析-02.svg|900]]
+![[图片/9.培养方案/04.项目分析/CUDA Week 3 Transpose 项目解析-02.svg|900]]
 
 用 warp 视角看这次"写"的代价：
 
@@ -258,7 +258,7 @@ __global__ void transpose_tiled_kernel(const float* in, float* out, int width, i
 
 tile ↔ block 的映射关系：
 
-![[图片/SVG/CUDA Week 3 Transpose 项目解析-04.svg|900]]
+![[图片/9.培养方案/04.项目分析/CUDA Week 3 Transpose 项目解析-04.svg|900]]
 
 这里发生的本质是**线程间通讯**：shared memory 充当媒介，"我读出来的格子是你写进去的"。两阶段的数据流和同步点：
 
@@ -295,7 +295,7 @@ bank = (row*32 + c) % 32 = c        ← 与 row 无关！
 
 **32 个 lane 全部命中同一个 bank c → 32-way bank conflict**，硬件把这一次 shared load 串行化成 32 次。
 
-![[图片/SVG/CUDA Week 3 Transpose 项目解析-03.svg|920]]
+![[图片/9.培养方案/04.项目分析/CUDA Week 3 Transpose 项目解析-03.svg|920]]
 
 串行化的代价用时间轴看最直观：
 

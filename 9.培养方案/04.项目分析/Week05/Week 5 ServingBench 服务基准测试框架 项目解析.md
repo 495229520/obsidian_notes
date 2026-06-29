@@ -68,7 +68,7 @@ week05/ServingBench/
 
 整个工程是一个**五层正交结构**：配置层定义"测什么"，harness 层把配置翻译成命令并保存产物，引擎层启动被测服务，可信测量层（vllm bench）真正算指标，产物层落地原始数据与聚合。各层之间靠 `reproduce.sh` / `Makefile` 串成一条命令。
 
-![[图片/SVG/Week 5 - Serving Benchmark Harness 项目解析-01.svg|960]]
+![[图片/9.培养方案/04.项目分析/Week05/Week 5 - Serving Benchmark Harness 项目解析-01.svg|960]]
 
 > 架构看点：最关键的是那条红色**信任边界**。边界以上（configs + harness）是项目自己写的代码，职责仅限"配置 → 命令 → 保存 → 聚合"；边界以下（引擎 + vllm bench）是官方可信组件，**指标计算完全交给 vLLM**。harness 不自己算延迟/吞吐、不改一个数。这让"benchmark 是否公平可信"这件事，归约成"配置是否固定、命令是否记录"，而不依赖一段易错的自研统计代码。
 
@@ -154,7 +154,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 合并 → 映射 → 分叉的完整数据整形管线如下：
 
-![[图片/SVG/Week 5 - Serving Benchmark Harness 项目解析-02.svg|960]]
+![[图片/9.培养方案/04.项目分析/Week05/Week 5 - Serving Benchmark Harness 项目解析-02.svg|960]]
 
 ### 4.3 防御式构造与提前校验
 

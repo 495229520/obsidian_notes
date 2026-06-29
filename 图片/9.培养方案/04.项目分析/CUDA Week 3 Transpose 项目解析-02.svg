@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 720" font-family="'Segoe UI',system-ui,sans-serif">
+  <defs>
+    <marker id="a2" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#5b6b7b"/>
+    </marker>
+    <style>
+      .ttl{font-size:21px;font-weight:700;fill:#1f2d3d}
+      .sub{font-size:13px;fill:#5b6b7b}
+      .lbl{font-size:14px;font-weight:700;fill:#2c3e50}
+      .mono{font-family:'Consolas',monospace;font-size:12px;fill:#1f2d3d}
+      .note{font-size:12px;fill:#7a8794}
+      .ok{font-size:13px;font-weight:700;fill:#1c8a52}
+      .bad{font-size:13px;font-weight:700;fill:#c0392b}
+      .th{font-size:11px;fill:#34495e}
+      .edge{stroke:#5b6b7b;stroke-width:1.4;fill:none}
+    </style>
+  </defs>
+
+  <text x="40" y="38" class="ttl">四版本访存模式对比：读都 coalesced，区别在「写」</text>
+  <text x="40" y="60" class="sub">一个 warp = 32 个连续线程同时访存。地址连续 → 合并成 1 个 transaction；地址分散 → transaction 数暴涨</text>
+
+  <!-- READ band -->
+  <rect x="40" y="84" width="900" height="96" rx="10" fill="#eafaf1" stroke="#9fdcc0"/>
+  <text x="56" y="106" class="lbl">Global READ（四版本一致）</text>
+  <text x="300" y="106" class="ok">coalesced ✓  → 1 transaction / warp</text>
+  <!-- threads -->
+  <g>
+    <circle cx="120" cy="132" r="9" fill="#2e86de"/><text x="111" y="136" class="th" fill="#fff">t0</text>
+    <circle cx="180" cy="132" r="9" fill="#2e86de"/><text x="171" y="136" class="th" fill="#fff">t1</text>
+    <circle cx="240" cy="132" r="9" fill="#2e86de"/><text x="231" y="136" class="th" fill="#fff">t2</text>
+    <circle cx="300" cy="132" r="9" fill="#2e86de"/><text x="291" y="136" class="th" fill="#fff">t3</text>
+    <text x="345" y="136" class="note">…  t31</text>
+  </g>
+  <!-- contiguous cells -->
+  <g fill="#ffffff" stroke="#9fdcc0">
+    <rect x="108" y="150" width="24" height="20"/><rect x="168" y="150" width="24" height="20"/>
+    <rect x="228" y="150" width="24" height="20"/><rect x="288" y="150" width="24" height="20"/>
+  </g>
+  <path class="edge" d="M120,141 L120,149" marker-end="url(#a2)"/>
+  <path class="edge" d="M180,141 L180,149" marker-end="url(#a2)"/>
+  <path class="edge" d="M240,141 L240,149" marker-end="url(#a2)"/>
+  <path class="edge" d="M300,141 L300,149" marker-end="url(#a2)"/>
+  <rect x="104" y="146" width="216" height="28" rx="4" fill="none" stroke="#1c8a52" stroke-dasharray="4 3"/>
+  <text x="330" y="166" class="mono">in[(y+j)*width + x] · 连续</text>
+
+  <!-- WRITE: copy -->
+  <rect x="40" y="196" width="900" height="80" rx="10" fill="#f5f7fa" stroke="#d7dee6"/>
+  <text x="56" y="220" class="lbl">copy 写</text>
+  <text x="56" y="240" class="mono">out[(y+j)*width + x]</text>
+  <text x="56" y="258" class="ok">coalesced ✓ · 1 transaction</text>
+  <g fill="#ffffff" stroke="#9fdcc0">
+    <rect x="360" y="226" width="24" height="20"/><rect x="396" y="226" width="24" height="20"/>
+    <rect x="432" y="226" width="24" height="20"/><rect x="468" y="226" width="24" height="20"/>
+    <rect x="504" y="226" width="24" height="20"/><rect x="540" y="226" width="24" height="20"/>
+  </g>
+  <rect x="356" y="222" width="176" height="28" rx="4" fill="none" stroke="#1c8a52" stroke-dasharray="4 3"/>
+  <text x="600" y="242" class="note">t0..t5 落在同一个 128B 窗口</text>
+
+  <!-- WRITE: naive -->
+  <rect x="40" y="292" width="900" height="118" rx="10" fill="#fdeef0" stroke="#f3b9c2"/>
+  <text x="56" y="316" class="lbl">naive 写</text>
+  <text x="56" y="336" class="mono">out[x*height + (y+j)]</text>
+  <text x="56" y="354" class="bad">uncoalesced ✗ · ~32 transactions</text>
+  <text x="56" y="374" class="note">相邻线程地址间隔 = height</text>
+  <!-- spread cells each in own window -->
+  <g>
+    <rect x="360" y="330" width="24" height="20" fill="#fff" stroke="#e08493"/>
+    <rect x="356" y="326" width="32" height="28" rx="4" fill="none" stroke="#c0392b"/>
+    <text x="362" y="372" class="mono">t0</text>
+
+    <rect x="452" y="330" width="24" height="20" fill="#fff" stroke="#e08493"/>
+    <rect x="448" y="326" width="32" height="28" rx="4" fill="none" stroke="#c0392b"/>
+    <text x="454" y="372" class="mono">t1</text>
+
+    <rect x="544" y="330" width="24" height="20" fill="#fff" stroke="#e08493"/>
+    <rect x="540" y="326" width="32" height="28" rx="4" fill="none" stroke="#c0392b"/>
+    <text x="546" y="372" class="mono">t2</text>
+
+    <rect x="636" y="330" width="24" height="20" fill="#fff" stroke="#e08493"/>
+    <rect x="632" y="326" width="32" height="28" rx="4" fill="none" stroke="#c0392b"/>
+    <text x="638" y="372" class="mono">t3</text>
+
+    <text x="700" y="346" class="note">…每个线程一个独立窗口</text>
+  </g>
+  <text x="404" y="346" class="bad">+H</text><text x="496" y="346" class="bad">+H</text><text x="588" y="346" class="bad">+H</text>
+
+  <!-- WRITE: tiled -->
+  <rect x="40" y="426" width="900" height="80" rx="10" fill="#f5f7fa" stroke="#d7dee6"/>
+  <text x="56" y="450" class="lbl">tiled 写</text>
+  <text x="56" y="470" class="mono">out[(y_out+j)*height + x_out]</text>
+  <text x="56" y="488" class="ok">coalesced ✓ · 1 transaction</text>
+  <g fill="#ffffff" stroke="#9fdcc0">
+    <rect x="360" y="456" width="24" height="20"/><rect x="396" y="456" width="24" height="20"/>
+    <rect x="432" y="456" width="24" height="20"/><rect x="468" y="456" width="24" height="20"/>
+    <rect x="504" y="456" width="24" height="20"/><rect x="540" y="456" width="24" height="20"/>
+  </g>
+  <rect x="356" y="452" width="176" height="28" rx="4" fill="none" stroke="#1c8a52" stroke-dasharray="4 3"/>
+  <text x="600" y="472" class="note">shared memory 先把数据转置好，再连续写</text>
+
+  <!-- WRITE: padded -->
+  <rect x="40" y="522" width="900" height="80" rx="10" fill="#f5f7fa" stroke="#d7dee6"/>
+  <text x="56" y="546" class="lbl">padded 写</text>
+  <text x="56" y="566" class="mono">同 tiled，索引不变</text>
+  <text x="56" y="584" class="ok">coalesced ✓ · 1 transaction</text>
+  <g fill="#ffffff" stroke="#9fdcc0">
+    <rect x="360" y="552" width="24" height="20"/><rect x="396" y="552" width="24" height="20"/>
+    <rect x="432" y="552" width="24" height="20"/><rect x="468" y="552" width="24" height="20"/>
+    <rect x="504" y="552" width="24" height="20"/><rect x="540" y="552" width="24" height="20"/>
+  </g>
+  <rect x="356" y="548" width="176" height="28" rx="4" fill="none" stroke="#1c8a52" stroke-dasharray="4 3"/>
+  <text x="600" y="568" class="note">padded 修的是 shared memory bank，不改 global 写模式</text>
+
+  <text x="40" y="640" class="sub">结论：global 写是否 coalesced 决定 naive 与其余三者的带宽鸿沟；tiled→padded 的差异在 shared memory 内部（见 -03）</text>
+</svg>

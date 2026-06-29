@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="700" viewBox="0 0 1120 700">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow-hollow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5" fill="none" stroke="#4f6f8f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
+      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
+      .lane-title { font: 700 17px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
+      .box-title { font: 700 16px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
+      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
+      .io { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.2; rx: 16; }
+      .queue { fill: #f0f6ff; stroke: #2f7ab8; stroke-width: 2; rx: 16; }
+      .worker { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 16; }
+      .db { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 16; }
+      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
+      .line { stroke: #4f6f8f; stroke-width: 2.1; fill: none; marker-end: url(#arrow-hollow); }
+      .dash { stroke: #8a98a8; stroke-width: 1.6; stroke-dasharray: 7 7; fill: none; }
+    </style>
+  </defs>
+
+  <text x="560" y="48" text-anchor="middle" class="title">一次需要查库的请求如何流转</text>
+  <text x="560" y="76" text-anchor="middle" class="subtitle">网络线程提交任务后立即返回事件循环，DB worker 查库后再把响应投递回所属 EventLoop</text>
+
+  <rect x="70" y="120" width="210" height="500" rx="24" fill="#f4fbf4" stroke="#b8d8b9" stroke-width="1.5"/>
+  <text x="175" y="153" text-anchor="middle" class="lane-title">EventLoop 线程</text>
+
+  <rect x="335" y="120" width="190" height="500" rx="24" fill="#f4f8ff" stroke="#b9d2ef" stroke-width="1.5"/>
+  <text x="430" y="153" text-anchor="middle" class="lane-title">DBTask 队列</text>
+
+  <rect x="580" y="120" width="210" height="500" rx="24" fill="#fffaf0" stroke="#e2c891" stroke-width="1.5"/>
+  <text x="685" y="153" text-anchor="middle" class="lane-title">DB worker</text>
+
+  <rect x="845" y="120" width="210" height="500" rx="24" fill="#fff5f5" stroke="#e5b5b5" stroke-width="1.5"/>
+  <text x="950" y="153" text-anchor="middle" class="lane-title">连接池 / MySQL</text>
+
+  <rect x="98" y="190" width="154" height="58" class="io"/>
+  <text x="175" y="214" text-anchor="middle" class="box-title">读请求</text>
+  <text x="175" y="236" text-anchor="middle" class="small">解析 SQL 任务</text>
+
+  <rect x="353" y="190" width="154" height="58" class="queue"/>
+  <text x="430" y="214" text-anchor="middle" class="box-title">入队</text>
+  <text x="430" y="236" text-anchor="middle" class="small">有界队列</text>
+
+  <rect x="608" y="280" width="154" height="58" class="worker"/>
+  <text x="685" y="304" text-anchor="middle" class="box-title">取任务</text>
+  <text x="685" y="326" text-anchor="middle" class="small">开始 DBTask</text>
+
+  <rect x="873" y="280" width="154" height="58" class="db"/>
+  <text x="950" y="304" text-anchor="middle" class="box-title">acquire</text>
+  <text x="950" y="326" text-anchor="middle" class="small">借 MySQL 连接</text>
+
+  <rect x="873" y="380" width="154" height="58" class="db"/>
+  <text x="950" y="404" text-anchor="middle" class="box-title">execute SQL</text>
+  <text x="950" y="426" text-anchor="middle" class="small">查询 / 事务</text>
+
+  <rect x="608" y="480" width="154" height="58" class="worker"/>
+  <text x="685" y="504" text-anchor="middle" class="box-title">生成结果</text>
+  <text x="685" y="526" text-anchor="middle" class="small">release 连接</text>
+
+  <rect x="98" y="480" width="154" height="58" class="io"/>
+  <text x="175" y="504" text-anchor="middle" class="box-title">回写响应</text>
+  <text x="175" y="526" text-anchor="middle" class="small">output buffer</text>
+
+  <path d="M 252 219 L 351 219" class="line"/>
+  <path d="M 430 248 C 430 292 565 309 606 309" class="line"/>
+  <path d="M 762 309 L 871 309" class="line"/>
+  <path d="M 950 338 L 950 378" class="line"/>
+  <path d="M 873 409 C 808 430 752 455 705 478" class="line"/>
+  <path d="M 608 509 C 470 548 292 546 252 509" class="line"/>
+
+  <path d="M 175 248 L 175 478" class="dash"/>
+  <text x="186" y="365" class="small">EventLoop 继续处理其他 fd</text>
+
+  <rect x="116" y="642" width="410" height="42" class="note"/>
+  <text x="321" y="668" text-anchor="middle" class="small">关键点：DB worker 不直接写 socket，只调用 queueInLoop(sendResponse)</text>
+
+  <rect x="594" y="642" width="410" height="42" class="note"/>
+  <text x="799" y="668" text-anchor="middle" class="small">关键点：连接池借出连接要用 RAII guard，异常路径也能自动归还</text>
+</svg>

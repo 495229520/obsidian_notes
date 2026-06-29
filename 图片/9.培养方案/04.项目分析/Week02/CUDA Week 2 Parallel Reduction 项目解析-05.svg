@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 580" role="img" aria-labelledby="title desc">
+  <title id="title">Warp Shuffle 两层归约架构</title>
+  <desc id="desc">256 线程 = 8 个 warp。第一层每个 warp 用 __shfl_down_sync 在寄存器内归约；每个 warp 的 lane 0 写入 shared memory；第二层 warp 0 再做一次 warp 归约得到 block partial sum。</desc>
+  <rect x="0" y="0" width="1100" height="580" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <text x="550" y="34" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#0C447C">Warp Shuffle Reduce：两层归约架构（blockDim.x = 256 = 8 warp）</text>
+  <text x="550" y="60" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12.5" font-weight="400" fill="#444441">寄存器级 warp 归约 + 少量 shared memory 跨 warp 汇总，全程只需 1 次 __syncthreads()</text>
+
+  <!-- Stage 1 label -->
+  <text x="60" y="86" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12.5" font-weight="600" fill="#3C3489">① Warp 内归约 · 寄存器级 __shfl_down_sync ×5 · warp 内天然同步，无需 barrier</text>
+
+  <!-- 8 warp boxes -->
+  <g font-family="system-ui,sans-serif">
+    <!-- W0 -->
+    <rect x="60" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="116" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 0</text>
+    <text x="116" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="76" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="116" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+    <!-- W1 -->
+    <rect x="184" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="240" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 1</text>
+    <text x="240" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="200" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="240" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+    <!-- W2 -->
+    <rect x="308" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="364" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 2</text>
+    <text x="364" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="324" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="364" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+    <!-- W3 -->
+    <rect x="432" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="488" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 3</text>
+    <text x="488" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="448" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="488" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+    <!-- W4 -->
+    <rect x="556" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="612" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 4</text>
+    <text x="612" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="572" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="612" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+    <!-- W5 -->
+    <rect x="680" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="736" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 5</text>
+    <text x="736" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="696" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="736" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+    <!-- W6 -->
+    <rect x="804" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="860" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 6</text>
+    <text x="860" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="820" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="860" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+    <!-- W7 -->
+    <rect x="928" y="104" width="112" height="116" rx="9" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.3"/>
+    <text x="984" y="128" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600" fill="#3C3489">Warp 7</text>
+    <text x="984" y="150" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="400" fill="#534AB7">32 lanes</text>
+    <rect x="944" y="176" width="80" height="26" rx="6" fill="#FFFFFF" stroke="#534AB7" stroke-width="1"/>
+    <text x="984" y="189" text-anchor="middle" dominant-baseline="central" font-size="10.5" font-weight="500" fill="#3C3489">lane0 = Σ₃₂</text>
+  </g>
+
+  <!-- lane0 -> shared arrows -->
+  <line x1="116" y1="220" x2="116" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="240" y1="220" x2="240" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="364" y1="220" x2="364" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="488" y1="220" x2="488" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="612" y1="220" x2="612" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="736" y1="220" x2="736" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="860" y1="220" x2="860" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="984" y1="220" x2="984" y2="290" stroke="#0F6E56" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <!-- Stage 2 label -->
+  <text x="60" y="248" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12.5" font-weight="600" fill="#085041">② 每个 warp 的 lane 0 写入 shared memory · 全 kernel 唯一一次 __syncthreads()</text>
+
+  <!-- shared memory bar -->
+  <rect x="60" y="290" width="980" height="56" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.3"/>
+  <g font-family="system-ui,sans-serif">
+    <rect x="86" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="116" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[0]</text>
+    <rect x="210" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="240" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[1]</text>
+    <rect x="334" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="364" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[2]</text>
+    <rect x="458" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="488" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[3]</text>
+    <rect x="582" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="612" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[4]</text>
+    <rect x="706" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="736" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[5]</text>
+    <rect x="830" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="860" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[6]</text>
+    <rect x="954" y="302" width="60" height="32" rx="6" fill="#FFFFFF" stroke="#0F6E56" stroke-width="1"/><text x="984" y="318" text-anchor="middle" dominant-baseline="central" font-size="10.5" fill="#085041">sdata[7]</text>
+  </g>
+
+  <!-- shared -> stage2 -->
+  <path d="M550 346 V378 Q550 386 550 392" fill="none" stroke="#5F5E5A" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="668" y="368" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#5F5E5A">warp 0 读取 8 个 warp sum（lane 8-31 取 0）</text>
+
+  <!-- Stage 3 label -->
+  <text x="60" y="370" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12.5" font-weight="600" fill="#3C3489">③ Warp 0 跨 warp 汇总</text>
+
+  <!-- Stage 2 box -->
+  <rect x="320" y="394" width="460" height="84" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.4"/>
+  <text x="550" y="420" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="#3C3489">Warp 0：第二次 warp_reduce_sum</text>
+  <text x="550" y="446" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11.5" font-weight="400" fill="#3C3489">读 sdata[0..7] → __shfl_down_sync 再归约 → 8 个 warp sum 合并为 1</text>
+
+  <!-- stage2 -> final -->
+  <line x1="550" y1="478" x2="550" y2="510" stroke="#5F5E5A" stroke-width="1.9" marker-end="url(#arrow)"/>
+
+  <!-- final pill -->
+  <rect x="385" y="510" width="330" height="44" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.3"/>
+  <text x="550" y="532" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#0C447C">线程 0 → partial_sums[blockIdx.x]</text>
+</svg>

@@ -66,7 +66,7 @@ week04/MatMul/
 
 整个工程是一个**正交分层**结构：四个版本共享同一套基础设施和同一组 host 封装签名，只在 `__global__` kernel 这一层不同。这样 benchmark 才能用一个 `LaunchFunc` 把四者塞进同一张表对比。
 
-![[图片/SVG/Week 4 - MatMul v0 项目解析-01.svg|900]]
+![[图片/9.培养方案/04.项目分析/Week04/Week 4 - MatMul v0 项目解析-01.svg|900]]
 
 > 架构看点：每一列（naive/tiled/register/cuBLAS）都走同一条调用栈 `matmul_X() → launch_X() → __global__ kernel`，host 封装做的事完全一样（H2D 拷贝 → 启动 → D2H 拷回）；唯一变量是最底下那块红色 kernel。基础设施（紫色）被四列共享，这让"版本对比"成为一个干净的受控实验。
 
@@ -185,7 +185,7 @@ ridge point = 峰值算力 / 峰值带宽 ≈ 5.03 TFLOPS / 336 GB/s ≈ 15 FLOP
 
 四个版本的差异可以压缩成一句话：**同一份 A/B 数据，到底被搬到哪一层存储、被复用多少次。** 越靠近 ALU 的存储（寄存器 > shared > global）越快、越小，优化就是把高频访问的数据往上搬。
 
-![[图片/SVG/Week 4 - MatMul v0 项目解析-02.svg|900]]
+![[图片/9.培养方案/04.项目分析/Week04/Week 4 - MatMul v0 项目解析-02.svg|900]]
 
 | 版本 | A/B 住在哪 | 每个 global 元素被复用 | 计算/访存比 | 工作点 |
 |---|---|---|---|---|
@@ -425,7 +425,7 @@ for (int kk = 0; kk < BK; ++kk) {
 
 这是整个项目最精华的几行。每个 `kk`：从 shared 读 **4 个 A + 4 个 B（8 次 shared load）**，做 **4×4 = 16 次乘加**。计算/访存比从 tiled 的 ~1:2 提升到 **2:1**——`regA[i]`、`regB[j]` 一旦进了寄存器，就在 4 次 FMA 里被复用，shared memory 带宽不再是瓶颈。
 
-![[图片/SVG/Week 4 - MatMul v0 项目解析-03.svg|820]]
+![[图片/9.培养方案/04.项目分析/Week04/Week 4 - MatMul v0 项目解析-03.svg|820]]
 
 > 外积视角：`regA` 是一列（4×1），`regB` 是一行（1×4），它们的外积正好填满 4×4 的 `acc` 网格。把内层 `kk` 累加起来，就得到这个 micro-tile 的完整结果。这就是所有高性能 GEMM 的核心 pattern：**用寄存器把内积变外积，最大化复用。**
 

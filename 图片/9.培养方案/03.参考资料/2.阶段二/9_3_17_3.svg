@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560">
+  <rect x="0" y="0" width="1200" height="560" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#334155" stroke-width="1.8"/>
+    </marker>
+    <style>
+      .title { font: 700 30px Arial, 'PingFang SC', sans-serif; fill: #111827; }
+      .label { font: 700 20px Arial, 'PingFang SC', sans-serif; fill: #111827; }
+      .small { font: 15px Arial, 'PingFang SC', sans-serif; fill: #374151; }
+      .tiny { font: 12px Arial, 'PingFang SC', sans-serif; fill: #4b5563; }
+      .cell { fill: #ffffff; stroke: #64748b; stroke-width: 1.4; }
+      .scalar { fill: #fee2e2; stroke: #dc2626; stroke-width: 2; }
+      .vec { fill: #dcfce7; stroke: #16a34a; stroke-width: 2; }
+      .warn { fill: #fff7ed; stroke: #ea580c; stroke-width: 2; rx: 8; }
+      .line { stroke: #334155; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #64748b; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    </style>
+  </defs>
+
+  <text x="56" y="55" class="title">vectorized load：快路径必须带 alignment 和 fallback</text>
+  <text x="56" y="88" class="small">`float4` 的意义是一次搬连续数据，但地址、边界和 row stride 都必须满足条件。</text>
+
+  <text x="80" y="140" class="label">scalar load</text>
+  <rect x="80" y="165" width="48" height="48" class="scalar"/>
+  <rect x="138" y="165" width="48" height="48" class="scalar"/>
+  <rect x="196" y="165" width="48" height="48" class="scalar"/>
+  <rect x="254" y="165" width="48" height="48" class="scalar"/>
+  <text x="96" y="195" class="tiny">x0</text>
+  <text x="154" y="195" class="tiny">x1</text>
+  <text x="212" y="195" class="tiny">x2</text>
+  <text x="270" y="195" class="tiny">x3</text>
+  <text x="80" y="245" class="small">多条标量 load，容易写，但指令更多。</text>
+
+  <path d="M350 190 H505" class="line"/>
+
+  <text x="540" y="140" class="label">float4 load</text>
+  <rect x="540" y="165" width="232" height="48" class="vec" rx="6"/>
+  <line x1="598" y1="165" x2="598" y2="213" class="dash"/>
+  <line x1="656" y1="165" x2="656" y2="213" class="dash"/>
+  <line x1="714" y1="165" x2="714" y2="213" class="dash"/>
+  <text x="564" y="195" class="tiny">x</text>
+  <text x="622" y="195" class="tiny">y</text>
+  <text x="680" y="195" class="tiny">z</text>
+  <text x="738" y="195" class="tiny">w</text>
+  <text x="540" y="245" class="small">一次读取连续 4 个 float，适合规整路径。</text>
+
+  <rect x="860" y="135" width="270" height="150" class="warn"/>
+  <text x="890" y="172" class="label">必须检查</text>
+  <text x="890" y="207" class="small">1. 地址满足 float4 对齐</text>
+  <text x="890" y="234" class="small">2. col + 3 不越界</text>
+  <text x="890" y="261" class="small">3. 不跨 row 误读</text>
+
+  <text x="80" y="345" class="label">非整除 shape 的 fallback</text>
+  <rect x="80" y="375" width="812" height="56" fill="#ffffff" stroke="#334155" stroke-width="2" rx="8"/>
+  <rect x="96" y="389" width="44" height="28" class="cell"/>
+  <rect x="145" y="389" width="44" height="28" class="cell"/>
+  <rect x="194" y="389" width="44" height="28" class="cell"/>
+  <rect x="243" y="389" width="44" height="28" class="cell"/>
+  <rect x="292" y="389" width="44" height="28" class="cell"/>
+  <rect x="341" y="389" width="44" height="28" class="cell"/>
+  <rect x="390" y="389" width="44" height="28" class="cell"/>
+  <rect x="439" y="389" width="44" height="28" class="cell"/>
+  <rect x="488" y="389" width="44" height="28" class="cell"/>
+  <rect x="537" y="389" width="44" height="28" class="cell"/>
+  <rect x="586" y="389" width="44" height="28" class="cell"/>
+  <rect x="635" y="389" width="44" height="28" class="cell"/>
+  <rect x="684" y="389" width="44" height="28" class="cell"/>
+  <rect x="733" y="389" width="44" height="28" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+  <rect x="782" y="389" width="44" height="28" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="95" y="465" class="small">边界处不足 4 个元素时，用 scalar fallback + bounds check；不要为了快路径越界读取。</text>
+  <text x="80" y="515" class="tiny">报告字段建议：vectorized_load=true/false、alignment_rule、fallback_rule、global_load_efficiency、correctness_status。</text>
+</svg>

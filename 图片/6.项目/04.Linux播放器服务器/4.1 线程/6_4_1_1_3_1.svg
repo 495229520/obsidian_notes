@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="760" viewBox="0 0 1600 760" role="img" aria-labelledby="title desc">
+  <title id="title">传统线程池与易播线程池对比</title>
+  <desc id="desc">上半部分展示传统队列、互斥量、条件变量线程池；下半部分展示易播线程池用本地 socket 传递任务指针，并用 epoll 可读事件唤醒 worker。</desc>
+  <rect width="1600" height="760" fill="rgb(245, 244, 237)" />
+
+  <defs>
+    <marker id="arrow-trad" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 2 2 L 10 6 L 2 10" fill="none" stroke="#6e6657" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+    <marker id="arrow-eplayer" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 2 2 L 10 6 L 2 10" fill="none" stroke="#2f6f9f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+    <style>
+      text {
+        font-family: "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+        fill: #2d2a24;
+        letter-spacing: 0;
+      }
+      .title { font-size: 30px; font-weight: 700; }
+      .subtitle { font-size: 16px; fill: #6e695f; }
+      .band-title { font-size: 21px; font-weight: 700; }
+      .band-subtitle { font-size: 14px; fill: #6c675f; }
+      .node-title { font-size: 16px; font-weight: 700; }
+      .node-code { font-family: Consolas, "Courier New", monospace; font-size: 14px; }
+      .node-small { font-size: 13px; fill: #5f5a52; }
+      .badge { font-size: 13px; font-weight: 700; fill: #ffffff; }
+      .note-title { font-size: 15px; font-weight: 700; }
+      .note-text { font-size: 13px; fill: #5d584f; }
+    </style>
+  </defs>
+
+  <text x="800" y="48" text-anchor="middle" class="title">传统线程池 vs 易播线程池：任务存储与唤醒方式不同</text>
+  <text x="800" y="76" text-anchor="middle" class="subtitle">两者目标相同：worker 没任务时睡眠，有任务时被唤醒；区别在于“任务放在哪里”和“谁负责唤醒”。</text>
+
+  <rect x="42" y="112" width="1516" height="250" rx="18" fill="#eee9df" stroke="#cfc6b6" stroke-width="1.6" stroke-dasharray="7 7" />
+  <text x="800" y="145" text-anchor="middle" class="band-title">传统 queue + mutex + condition_variable 线程池</text>
+  <text x="800" y="169" text-anchor="middle" class="band-subtitle">用户态队列保存任务；mutex 保护队列；condition_variable 负责睡眠与唤醒</text>
+
+  <rect x="74" y="212" width="156" height="72" rx="10" fill="#fbfaf5" stroke="#c9c1b4" stroke-width="1.5" />
+  <text x="152" y="242" text-anchor="middle" class="node-title">生产者</text>
+  <text x="152" y="267" text-anchor="middle" class="node-code">AddTask()</text>
+
+  <rect x="278" y="212" width="156" height="72" rx="10" fill="#fbfaf5" stroke="#c9c1b4" stroke-width="1.5" />
+  <text x="356" y="243" text-anchor="middle" class="node-title">加锁</text>
+  <text x="356" y="267" text-anchor="middle" class="node-code">lock mutex</text>
+
+  <rect x="482" y="212" width="176" height="72" rx="10" fill="#fbfaf5" stroke="#c9c1b4" stroke-width="1.5" />
+  <text x="570" y="243" text-anchor="middle" class="node-title">压入队列</text>
+  <text x="570" y="267" text-anchor="middle" class="node-code">std::queue</text>
+
+  <rect x="706" y="212" width="190" height="72" rx="10" fill="#fbfaf5" stroke="#c9c1b4" stroke-width="1.5" />
+  <text x="801" y="243" text-anchor="middle" class="node-title">通知 worker</text>
+  <text x="801" y="267" text-anchor="middle" class="node-code">pthread_cond_signal</text>
+
+  <rect x="944" y="198" width="216" height="100" rx="10" fill="#fbfaf5" stroke="#c9c1b4" stroke-width="1.5" />
+  <text x="1052" y="231" text-anchor="middle" class="node-title">worker 醒来</text>
+  <text x="1052" y="256" text-anchor="middle" class="node-code">pthread_cond_wait</text>
+  <text x="1052" y="280" text-anchor="middle" class="node-small">条件变量是睡眠点</text>
+
+  <rect x="1208" y="212" width="144" height="72" rx="10" fill="#fbfaf5" stroke="#c9c1b4" stroke-width="1.5" />
+  <text x="1280" y="243" text-anchor="middle" class="node-title">取任务</text>
+  <text x="1280" y="267" text-anchor="middle" class="node-code">pop()</text>
+
+  <rect x="1400" y="212" width="124" height="72" rx="10" fill="#fbfaf5" stroke="#c9c1b4" stroke-width="1.5" />
+  <text x="1462" y="255" text-anchor="middle" class="node-title">执行任务</text>
+
+  <path d="M 230 248 L 278 248" fill="none" stroke="#6e6657" stroke-width="2" marker-end="url(#arrow-trad)" />
+  <path d="M 434 248 L 482 248" fill="none" stroke="#6e6657" stroke-width="2" marker-end="url(#arrow-trad)" />
+  <path d="M 658 248 L 706 248" fill="none" stroke="#6e6657" stroke-width="2" marker-end="url(#arrow-trad)" />
+  <path d="M 896 248 L 944 248" fill="none" stroke="#6e6657" stroke-width="2" marker-end="url(#arrow-trad)" />
+  <path d="M 1160 248 L 1208 248" fill="none" stroke="#6e6657" stroke-width="2" marker-end="url(#arrow-trad)" />
+  <path d="M 1352 248 L 1400 248" fill="none" stroke="#6e6657" stroke-width="2" marker-end="url(#arrow-trad)" />
+
+  <circle cx="570" cy="318" r="18" fill="#8b7862" />
+  <text x="570" y="323" text-anchor="middle" class="badge">存</text>
+  <text x="600" y="323" class="note-title">任务存储在用户态队列</text>
+  <circle cx="1052" cy="318" r="18" fill="#8b7862" />
+  <text x="1052" y="323" text-anchor="middle" class="badge">醒</text>
+  <text x="1082" y="323" class="note-title">条件变量负责唤醒</text>
+
+  <rect x="42" y="414" width="1516" height="286" rx="18" fill="#e8f1f5" stroke="#aac5d5" stroke-width="1.6" stroke-dasharray="7 7" />
+  <text x="800" y="447" text-anchor="middle" class="band-title">易播 local socket + epoll 线程池</text>
+  <text x="800" y="471" text-anchor="middle" class="band-subtitle">代码中没有显式任务队列和条件变量；local socket 缓冲区承担读写通道，epoll 可读事件负责唤醒 worker</text>
+
+  <rect x="74" y="530" width="156" height="72" rx="10" fill="#fbfdff" stroke="#91b7cc" stroke-width="1.5" />
+  <text x="152" y="560" text-anchor="middle" class="node-title">调用者</text>
+  <text x="152" y="585" text-anchor="middle" class="node-code">AddTask()</text>
+
+  <rect x="278" y="516" width="180" height="100" rx="10" fill="#fbfdff" stroke="#91b7cc" stroke-width="1.5" />
+  <text x="368" y="548" text-anchor="middle" class="node-title">封装任务</text>
+  <text x="368" y="573" text-anchor="middle" class="node-code">new CFunction</text>
+  <text x="368" y="596" text-anchor="middle" class="node-small">得到 CFunctionBase*</text>
+
+  <rect x="506" y="516" width="198" height="100" rx="10" fill="#fbfdff" stroke="#91b7cc" stroke-width="1.5" />
+  <text x="605" y="548" text-anchor="middle" class="node-title">发送指针字节</text>
+  <text x="605" y="573" text-anchor="middle" class="node-code">client.Send(data)</text>
+  <text x="605" y="596" text-anchor="middle" class="node-small">thread_local CLocalSocket</text>
+
+  <rect x="752" y="516" width="198" height="100" rx="10" fill="#fbfdff" stroke="#91b7cc" stroke-width="1.5" />
+  <text x="851" y="548" text-anchor="middle" class="node-title">内核缓冲区</text>
+  <text x="851" y="573" text-anchor="middle" class="node-code">local socket</text>
+  <text x="851" y="596" text-anchor="middle" class="node-small">保存任务指针字节</text>
+
+  <rect x="998" y="516" width="198" height="100" rx="10" fill="#fbfdff" stroke="#91b7cc" stroke-width="1.5" />
+  <text x="1097" y="548" text-anchor="middle" class="node-title">worker 醒来</text>
+  <text x="1097" y="573" text-anchor="middle" class="node-code">epoll_wait()</text>
+  <text x="1097" y="596" text-anchor="middle" class="node-small">EPOLLIN 是唤醒点</text>
+
+  <rect x="1244" y="516" width="176" height="100" rx="10" fill="#fbfdff" stroke="#91b7cc" stroke-width="1.5" />
+  <text x="1332" y="548" text-anchor="middle" class="node-title">还原任务</text>
+  <text x="1332" y="573" text-anchor="middle" class="node-code">Recv + memcpy</text>
+  <text x="1332" y="596" text-anchor="middle" class="node-small">取回 CFunctionBase*</text>
+
+  <rect x="1468" y="516" width="92" height="100" rx="10" fill="#fbfdff" stroke="#91b7cc" stroke-width="1.5" />
+  <text x="1514" y="552" text-anchor="middle" class="node-title">执行</text>
+  <text x="1514" y="577" text-anchor="middle" class="node-code">(*base)()</text>
+  <text x="1514" y="600" text-anchor="middle" class="node-small">delete</text>
+
+  <path d="M 230 566 L 278 566" fill="none" stroke="#2f6f9f" stroke-width="2" marker-end="url(#arrow-eplayer)" />
+  <path d="M 458 566 L 506 566" fill="none" stroke="#2f6f9f" stroke-width="2" marker-end="url(#arrow-eplayer)" />
+  <path d="M 704 566 L 752 566" fill="none" stroke="#2f6f9f" stroke-width="2" marker-end="url(#arrow-eplayer)" />
+  <path d="M 950 566 L 998 566" fill="none" stroke="#2f6f9f" stroke-width="2" marker-end="url(#arrow-eplayer)" />
+  <path d="M 1196 566 L 1244 566" fill="none" stroke="#2f6f9f" stroke-width="2" marker-end="url(#arrow-eplayer)" />
+  <path d="M 1420 566 L 1468 566" fill="none" stroke="#2f6f9f" stroke-width="2" marker-end="url(#arrow-eplayer)" />
+
+  <path d="M 1097 516 C 1097 490 1030 490 1030 466" fill="none" stroke="#2f6f9f" stroke-width="1.8" marker-end="url(#arrow-eplayer)" />
+  <text x="966" y="496" text-anchor="middle" class="note-text">socket 可读</text>
+
+  <circle cx="851" cy="650" r="18" fill="#2f6f9f" />
+  <text x="851" y="655" text-anchor="middle" class="badge">存</text>
+  <text x="881" y="655" class="note-title">任务指针字节存入 socket 缓冲区</text>
+  <circle cx="1097" cy="650" r="18" fill="#2f6f9f" />
+  <text x="1097" y="655" text-anchor="middle" class="badge">醒</text>
+  <text x="1127" y="655" class="note-title">epoll 看到 EPOLLIN 后唤醒 worker</text>
+
+  <rect x="600" y="706" width="400" height="34" rx="17" fill="#fff8e8" stroke="#d7b56d" stroke-width="1.4" />
+  <text x="800" y="728" text-anchor="middle" class="note-title">本质区别：传统模型用“队列 + 条件变量”，易播模型用“socket 缓冲区 + epoll 事件”</text>
+</svg>

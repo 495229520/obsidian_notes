@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 800" width="100%" height="100%" style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  
+  <text x="450" y="40" text-anchor="middle" font-size="24" font-weight="bold" fill="currentColor">随着上下文的增长，实际会发生什么</text>
+
+  <g transform="translate(0, 10)">
+    <text x="20" y="70" font-size="15" fill="currentColor">上下文窗口（例如 128k tokens）</text>
+    
+    <clipPath id="bar-clip">
+      <rect x="20" y="85" width="860" height="30" rx="6" />
+    </clipPath>
+    
+    <g clip-path="url(#bar-clip)">
+      <rect x="20" y="85" width="20" height="30" fill="#171717" />
+      <rect x="40" y="85" width="90" height="30" fill="#A3A3A3" />
+      <rect x="130" y="85" width="80" height="30" fill="#737373" />
+      <rect x="210" y="85" width="270" height="30" fill="#7DD3FC" />
+      <rect x="480" y="85" width="200" height="30" fill="#34D399" />
+      <rect x="680" y="85" width="200" height="30" fill="none" stroke="#D1D5DB" stroke-width="2" />
+    </g>
+    
+    <rect x="710" y="85" width="130" height="30" rx="6" fill="#FCE7F3" stroke="#FCA5A5" stroke-dasharray="4" stroke-width="1.5" />
+    <text x="775" y="105" text-anchor="middle" font-size="14" font-weight="500" fill="#991B1B">← 输出 (Output)</text>
+    <rect x="20" y="85" width="860" height="30" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1" />
+
+    <g transform="translate(0, 130)" font-size="14" fill="currentColor">
+      <rect x="20" y="0" width="14" height="14" rx="3" fill="#A3A3A3" />
+      <text x="42" y="12">系统提示词</text>
+      
+      <rect x="135" y="0" width="14" height="14" rx="3" fill="#737373" />
+      <text x="157" y="12">工具定义</text>
+      
+      <rect x="245" y="0" width="14" height="14" rx="3" fill="#7DD3FC" />
+      <text x="267" y="12">对话 / 文档</text>
+      
+      <rect x="375" y="0" width="14" height="14" rx="3" fill="#34D399" />
+      <text x="397" y="12">工具结果</text>
+    </g>
+  </g>
+
+  <g transform="translate(0, 30)">
+    <rect x="20" y="160" width="420" height="120" rx="12" fill="#F5F3FF" stroke="#A5B4FC" stroke-width="2" />
+    <text x="230" y="195" text-anchor="middle" font-size="18" font-weight="bold" fill="#4338CA">KV 缓存 = O(n) VRAM</text>
+    <text x="230" y="225" text-anchor="middle" font-size="15" fill="#4F46E5">每个 token 都会在每层和每个注意力头上增加 K 和 V。</text>
+    <text x="230" y="250" text-anchor="middle" font-size="15" fill="#4F46E5">128k 上下文 → 通常仅缓存就需要 8-32 GB。</text>
+
+    <rect x="460" y="160" width="420" height="120" rx="12" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="2" />
+    <text x="670" y="195" text-anchor="middle" font-size="18" font-weight="bold" fill="#B91C1C">解码延迟 = 每个 token O(n)</text>
+    <text x="670" y="225" text-anchor="middle" font-size="15" fill="#DC2626">每个新 token 都要读取整个 KV 缓存。</text>
+    <text x="670" y="250" text-anchor="middle" font-size="15" fill="#DC2626">长上下文 → 更慢的每秒 token 生成速度。</text>
+
+    <rect x="20" y="300" width="420" height="120" rx="12" fill="#F0F9FF" stroke="#7DD3FC" stroke-width="2" />
+    <text x="230" y="335" text-anchor="middle" font-size="18" font-weight="bold" fill="#0369A1">预填充成本 = O(n²) 注意力</text>
+    <text x="230" y="365" text-anchor="middle" font-size="15" fill="#0284C7">每个 token 都会关注它之前所有的 token。</text>
+    <text x="230" y="390" text-anchor="middle" font-size="15" fill="#0284C7">长提示词 → 较高的 TTFT（首个 token 延迟）。</text>
+
+    <rect x="460" y="300" width="420" height="120" rx="12" fill="#FFF7ED" stroke="#FDBA74" stroke-width="2" />
+    <text x="670" y="335" text-anchor="middle" font-size="18" font-weight="bold" fill="#C2410C">输出预算缩减</text>
+    <text x="670" y="365" text-anchor="middle" font-size="15" fill="#D97706">输入 + 输出 ≤ 最大窗口容量。</text>
+    <text x="670" y="390" text-anchor="middle" font-size="15" fill="#D97706">更长的提示词 → 更少的文本生成空间。</text>
+  </g>
+
+  <g transform="translate(0, 50)">
+    <rect x="20" y="420" width="860" height="260" rx="16" fill="rgba(150, 150, 150, 0.04)" stroke="currentColor" stroke-opacity="0.2" stroke-width="2" />
+    <text x="450" y="460" text-anchor="middle" font-size="20" font-weight="bold" fill="currentColor">对异步 Agent 基础设施设计的影响</text>
+
+    <rect x="40" y="485" width="260" height="175" rx="12" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="2" />
+    <text x="170" y="520" text-anchor="middle" font-size="18" font-weight="bold" fill="#047857">请求批处理</text>
+    <text x="170" y="555" text-anchor="middle" font-size="15" fill="#059669">预填充 (Prefill) 是可批处理的。</text>
+    <text x="170" y="585" text-anchor="middle" font-size="15" fill="#059669">解码 (Decode) 在每个序列中</text>
+    <text x="170" y="605" text-anchor="middle" font-size="15" fill="#059669">是串行的。</text>
+    <text x="170" y="635" text-anchor="middle" font-size="15" fill="#059669">分离预填充与解码的 worker</text>
+    <text x="170" y="655" text-anchor="middle" font-size="15" fill="#059669">= 显著提升效率。</text>
+
+    <rect x="320" y="485" width="260" height="175" rx="12" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="2" />
+    <text x="450" y="520" text-anchor="middle" font-size="18" font-weight="bold" fill="#047857">缓存淘汰策略</text>
+    <text x="450" y="555" text-anchor="middle" font-size="15" fill="#059669">如果上下文在任务中途</text>
+    <text x="450" y="575" text-anchor="middle" font-size="15" fill="#059669">填满，系统必须进行</text>
+    <text x="450" y="595" text-anchor="middle" font-size="15" fill="#059669">截断或总结。</text>
+    <text x="450" y="630" text-anchor="middle" font-size="15" fill="#059669">丢失早期的上下文</text>
+    <text x="450" y="650" text-anchor="middle" font-size="15" fill="#059669">会破坏 Agent 状态。</text>
+
+    <rect x="600" y="485" width="260" height="175" rx="12" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="2" />
+    <text x="730" y="520" text-anchor="middle" font-size="18" font-weight="bold" fill="#047857">分块预填充</text>
+    <text x="730" y="555" text-anchor="middle" font-size="15" fill="#059669">大提示词被分块处理，</text>
+    <text x="730" y="575" text-anchor="middle" font-size="15" fill="#059669">以便与正在进行的</text>
+    <text x="730" y="595" text-anchor="middle" font-size="15" fill="#059669">解码交替进行。</text>
+    <text x="730" y="635" text-anchor="middle" font-size="15" fill="#059669">这有助于减少</text>
+    <text x="730" y="655" text-anchor="middle" font-size="15" fill="#059669">GPU 停顿 (Stalls)。</text>
+  </g>
+
+</svg>

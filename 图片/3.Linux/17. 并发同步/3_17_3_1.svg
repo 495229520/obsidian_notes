@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 690" width="900" height="690">
+  <rect x="0" y="0" width="900" height="690" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <title>futex：用户态快路径 + 内核态慢路径</title>
+  <desc>无竞争时仅靠用户态原子 CAS 即可持锁返回，不进内核；有竞争时才通过 futex 系统调用陷入内核排队睡眠。</desc>
+
+  <text x="450" y="32" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
+    futex：用户态快路径 + 内核态慢路径
+  </text>
+  <text x="450" y="56" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
+    无竞争不进内核（快），有竞争才陷入内核排队（慢）
+  </text>
+
+  <!-- lock() 入口 -->
+  <rect x="320" y="96" width="260" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="450" y="118" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#0C447C">线程调用 lock()</text>
+
+  <!-- 用户态原子 CAS -->
+  <rect x="300" y="200" width="300" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="450" y="220" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#0C447C">用户态原子操作</text>
+  <text x="450" y="240" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#0C447C">CAS：futex 字 0 → 1</text>
+
+  <!-- 快路径 -->
+  <rect x="70" y="316" width="320" height="80" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="230" y="336" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">CAS 成功 = 无竞争</text>
+  <text x="230" y="358" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">直接持锁返回</text>
+  <text x="230" y="378" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#085041">全程用户态，零系统调用</text>
+
+  <!-- 慢路径：CAS 失败 -->
+  <rect x="510" y="316" width="320" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="670" y="336" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">CAS 失败 = 已被占用</text>
+  <text x="670" y="356" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#633806">存在竞争</text>
+
+  <!-- 慢路径：FUTEX_WAIT -->
+  <rect x="510" y="432" width="320" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="670" y="452" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">futex(FUTEX_WAIT) 系统调用</text>
+  <text x="670" y="472" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#633806">陷入内核</text>
+
+  <!-- 内核等待队列 -->
+  <rect x="510" y="548" width="320" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="670" y="568" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#444441">内核 futex 等待队列</text>
+  <text x="670" y="588" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" fill="#444441">线程睡眠，让出 CPU</text>
+
+  <!-- arrows -->
+  <path d="M450 140 L450 200" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M380 256 L250 316" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="268" y="286" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#0F6E56">快路径</text>
+  <path d="M520 256 L650 316" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="632" y="286" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#854F0B">慢路径</text>
+  <path d="M670 372 L670 432" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M670 488 L670 548" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="450" y="636" text-anchor="middle" dominant-baseline="central"
+        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
+    unlock：CAS 1 → 0；若等待队列非空，才发 futex(FUTEX_WAKE) 唤醒一个等待者
+  </text>
+</svg>

@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 z" fill="#475569"/>
+    </marker>
+    <marker id="arrR" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 z" fill="#dc2626"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="960" height="700" fill="#f8fafc"/>
+  <text x="480" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">ServingBench 分层架构 · 配置驱动 / 包装可信指标 / 原始数据不落地改</text>
+
+  <!-- Orchestration band (left spine) -->
+  <rect x="24" y="70" width="150" height="560" rx="10" fill="#e2e8f0" stroke="#94a3b8"/>
+  <text x="99" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="#334155">编排层</text>
+  <text x="99" y="120" text-anchor="middle" font-size="12" fill="#475569">reproduce.sh</text>
+  <text x="99" y="140" text-anchor="middle" font-size="12" fill="#475569">Makefile</text>
+  <text x="99" y="168" text-anchor="middle" font-size="11" fill="#64748b">启动→健康检查</text>
+  <text x="99" y="184" text-anchor="middle" font-size="11" fill="#64748b">→跑→聚合→关闭</text>
+  <text x="99" y="214" text-anchor="middle" font-size="11" fill="#64748b">把下面每一层</text>
+  <text x="99" y="230" text-anchor="middle" font-size="11" fill="#64748b">串成一条命令</text>
+
+  <!-- Layer 1: configs -->
+  <rect x="200" y="70" width="736" height="96" rx="10" fill="#ede9fe" stroke="#8b5cf6"/>
+  <text x="216" y="92" font-size="14" font-weight="700" fill="#6d28d9">① 配置层 configs/  —— 实验的唯一真相来源</text>
+  <rect x="216" y="104" width="210" height="48" rx="6" fill="#fff" stroke="#a78bfa"/>
+  <text x="321" y="124" text-anchor="middle" font-size="12" font-weight="600" fill="#5b21b6">benchmark_config.yaml</text>
+  <text x="321" y="142" text-anchor="middle" font-size="11" fill="#7c3aed">base 模板（全字段默认）</text>
+  <rect x="446" y="104" width="474" height="48" rx="6" fill="#fff" stroke="#a78bfa"/>
+  <text x="683" y="122" text-anchor="middle" font-size="12" font-weight="600" fill="#5b21b6">low_latency / high_throughput / long_context / shared_prefix / batching_compare</text>
+  <text x="683" y="140" text-anchor="middle" font-size="11" fill="#7c3aed">场景文件：只写与 base 的差异（+ smoke_* 缩小版）</text>
+
+  <!-- Layer 2: harness -->
+  <rect x="200" y="186" width="736" height="150" rx="10" fill="#dbeafe" stroke="#3b82f6"/>
+  <text x="216" y="208" font-size="14" font-weight="700" fill="#1d4ed8">② Harness 层 harness/  —— 轻量 Python：配置→命令→保存→聚合</text>
+
+  <rect x="216" y="220" width="220" height="100" rx="6" fill="#fff" stroke="#60a5fa"/>
+  <text x="326" y="240" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">config.py</text>
+  <text x="326" y="260" text-anchor="middle" font-size="11" fill="#1e3a8a">dataclass 镜像 schema</text>
+  <text x="326" y="278" text-anchor="middle" font-size="11" fill="#1e3a8a">_deep_merge(base, scenario)</text>
+  <text x="326" y="296" text-anchor="middle" font-size="11" fill="#1e3a8a">_validate() 提前报错</text>
+  <text x="326" y="314" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">to_vllm_args() 映射唯一来源</text>
+
+  <rect x="450" y="220" width="220" height="100" rx="6" fill="#fff" stroke="#60a5fa"/>
+  <text x="560" y="240" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">run_benchmark.py</text>
+  <text x="560" y="260" text-anchor="middle" font-size="11" fill="#1e3a8a">build_command()</text>
+  <text x="560" y="278" text-anchor="middle" font-size="11" fill="#1e3a8a">warmup 丢弃 + repeats</text>
+  <text x="560" y="296" text-anchor="middle" font-size="11" fill="#1e3a8a">subprocess 调 CLI</text>
+  <text x="560" y="314" text-anchor="middle" font-size="11" fill="#1e3a8a">打印命令→可复制复现</text>
+
+  <rect x="684" y="220" width="236" height="46" rx="6" fill="#fff" stroke="#60a5fa"/>
+  <text x="802" y="240" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">datasets.py</text>
+  <text x="802" y="258" text-anchor="middle" font-size="11" fill="#1e3a8a">生成 shared-prefix/long-context JSONL</text>
+
+  <rect x="684" y="274" width="236" height="46" rx="6" fill="#fff" stroke="#60a5fa"/>
+  <text x="802" y="294" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">summarize.py</text>
+  <text x="802" y="312" text-anchor="middle" font-size="11" fill="#1e3a8a">原始 JSON→CSV + Markdown 表</text>
+
+  <!-- Trust boundary -->
+  <line x1="200" y1="356" x2="936" y2="356" stroke="#dc2626" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="206" y="372" font-size="12" font-weight="700" fill="#dc2626">⟶ 信任边界：以下由 vLLM 官方计算/提供，harness 不自己算指标、不改数据</text>
+
+  <!-- Layer 3: engine -->
+  <rect x="200" y="384" width="360" height="130" rx="10" fill="#dcfce7" stroke="#22c55e"/>
+  <text x="216" y="406" font-size="14" font-weight="700" fill="#15803d">③ 引擎层 scripts/ （唯一区分 vLLM / SGLang 处）</text>
+  <rect x="216" y="418" width="160" height="42" rx="6" fill="#fff" stroke="#4ade80"/>
+  <text x="296" y="438" text-anchor="middle" font-size="12" font-weight="600" fill="#166534">serve_vllm.sh</text>
+  <text x="296" y="454" text-anchor="middle" font-size="10.5" fill="#15803d">vllm serve（--backend vllm）</text>
+  <rect x="384" y="418" width="160" height="42" rx="6" fill="#fff" stroke="#4ade80"/>
+  <text x="464" y="438" text-anchor="middle" font-size="12" font-weight="600" fill="#166534">serve_sglang.sh</text>
+  <text x="464" y="454" text-anchor="middle" font-size="10.5" fill="#15803d">OpenAI 兼容（--backend openai）</text>
+  <rect x="216" y="470" width="328" height="34" rx="6" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="380" y="491" text-anchor="middle" font-size="11.5" fill="#166534">OpenAI 兼容 Server · /health · /v1/completions</text>
+
+  <!-- Layer 3b: vllm bench -->
+  <rect x="576" y="384" width="360" height="130" rx="10" fill="#fef9c3" stroke="#eab308"/>
+  <text x="592" y="406" font-size="14" font-weight="700" fill="#a16207">④ 可信测量 vllm bench（外部 CLI）</text>
+  <rect x="592" y="418" width="328" height="42" rx="6" fill="#fff" stroke="#facc15"/>
+  <text x="756" y="438" text-anchor="middle" font-size="12" font-weight="600" fill="#854d0e">continuous：vllm bench serve（在线打活 server）</text>
+  <text x="756" y="454" text-anchor="middle" font-size="10.5" fill="#a16207">TTFT/TPOT/ITL/E2E + TPS/RPS</text>
+  <rect x="592" y="470" width="328" height="34" rx="6" fill="#fff" stroke="#facc15"/>
+  <text x="756" y="491" text-anchor="middle" font-size="11.5" fill="#854d0e">static：vllm bench throughput（离线固定 batch，仅峰值 tokens/s）</text>
+
+  <!-- Layer 4: results -->
+  <rect x="200" y="534" width="736" height="96" rx="10" fill="#ffedd5" stroke="#f97316"/>
+  <text x="216" y="556" font-size="14" font-weight="700" fill="#c2410c">⑤ 产物层 results/  —— 原始数据 + 聚合</text>
+  <rect x="216" y="568" width="300" height="50" rx="6" fill="#fff" stroke="#fb923c"/>
+  <text x="366" y="588" text-anchor="middle" font-size="12" font-weight="600" fill="#9a3412">results/raw/*.json</text>
+  <text x="366" y="606" text-anchor="middle" font-size="11" fill="#c2410c">vllm bench 原样输出（不手改）</text>
+  <rect x="560" y="568" width="360" height="50" rx="6" fill="#fff" stroke="#fb923c"/>
+  <text x="740" y="588" text-anchor="middle" font-size="12" font-weight="600" fill="#9a3412">benchmark_results.csv + Markdown 表</text>
+  <text x="740" y="606" text-anchor="middle" font-size="11" fill="#c2410c">summarize.py 追加一行/文件 + 派生 cost/1M</text>
+
+  <!-- vertical arrows -->
+  <line x1="568" y1="166" x2="568" y2="186" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <line x1="436" y1="270" x2="450" y2="270" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <line x1="560" y1="336" x2="560" y2="384" stroke="#dc2626" stroke-width="1.8" marker-end="url(#arrR)"/>
+  <text x="566" y="372" font-size="10.5" fill="#dc2626">subprocess 调用</text>
+  <line x1="560" y1="514" x2="560" y2="534" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <line x1="516" y1="593" x2="560" y2="593" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <!-- engine <-> bench HTTP -->
+  <line x1="560" y1="446" x2="576" y2="446" stroke="#854d0e" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="540" y="378" font-size="10.5" fill="#854d0e"> </text>
+  <!-- orchestration arrow -->
+  <line x1="174" y1="350" x2="200" y2="350" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arr)"/>
+</svg>
