@@ -47,11 +47,11 @@ AI 不是只消耗 GPU。
 
 ### 第二梯队：稳定型补投
 
-| 公司 | 切入岗位 |
-|---|---|
-| Solidigm / Micron / Western Digital | SSD firmware、NVMe driver / validation、storage performance |
-| Cisco / HPE Juniper / Marvell | 网络系统软件（吃 RDMA / NVMe-oF 积累） |
-| 国内大厂 AI Infra 团队（阿里 / 字节 / 腾讯 / 华为等） | 端侧 RDMA 性能分析、GPU 互联 / 数据路径、HPC 高性能网络——S3 的 verbs / ibv_perftest / DCQCN 证据直接对口；注意瞄准实习与校招版本，社招 JD 只用来校准技能方向 |
+| 公司                                   | 切入岗位                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Solidigm / Micron / Western Digital  | SSD firmware、NVMe driver / validation、storage performance                                                  |
+| Cisco / HPE Juniper / Marvell        | 网络系统软件（吃 RDMA / NVMe-oF 积累）                                                                                |
+
 
 ### 高成长冲刺
 

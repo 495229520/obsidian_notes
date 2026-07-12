@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="860" viewBox="0 0 920 860">
+  <title>一次 pread 的冷/热两条路径</title>
+  <desc>对比 page cache 命中（热路径，约 1 微秒）与未命中（冷路径，约 20-100 微秒）时一次 pread 经过的层次。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="920" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="460" y="32" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">一次 pread 的冷 / 热两条路径</text>
+
+  <text x="250" y="70" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">热路径：命中 page cache</text>
+  <text x="670" y="70" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">冷路径：未命中 page cache</text>
+
+  <!-- 左列：热路径 -->
+  <rect x="90" y="100" width="320" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="250" y="122" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">用户程序 pread()</text>
+
+  <rect x="90" y="204" width="320" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="250" y="226" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">系统调用进入内核</text>
+
+  <rect x="90" y="308" width="320" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="250" y="330" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">page cache 查找：命中</text>
+
+  <rect x="90" y="412" width="320" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="250" y="434" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">memcpy 到用户缓冲区</text>
+
+  <rect x="90" y="516" width="320" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="250" y="538" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">返回 ≈ 1 µs</text>
+
+  <line x1="250" y1="144" x2="250" y2="200" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="248" x2="250" y2="304" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="352" x2="250" y2="408" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="456" x2="250" y2="512" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="250" y="590" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">不产生任何设备 I/O</text>
+  <text x="250" y="612" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">iostat：r/s = 0</text>
+
+  <!-- 右列：冷路径 -->
+  <rect x="510" y="100" width="320" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="670" y="122" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">用户程序 pread()</text>
+
+  <rect x="510" y="204" width="320" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="670" y="226" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">系统调用进入内核</text>
+
+  <rect x="510" y="308" width="320" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="670" y="330" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">page cache 查找：未命中</text>
+
+  <rect x="510" y="412" width="320" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="670" y="434" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">块层 blk-mq：组装 bio、排队</text>
+
+  <rect x="510" y="516" width="320" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="670" y="538" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">NVMe 设备读 + DMA</text>
+
+  <rect x="510" y="620" width="320" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="670" y="642" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">装入 page cache 再 memcpy</text>
+
+  <rect x="510" y="724" width="320" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="670" y="746" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">返回 ≈ 20-100 µs</text>
+
+  <line x1="670" y1="144" x2="670" y2="200" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="248" x2="670" y2="304" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="352" x2="670" y2="408" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="456" x2="670" y2="512" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="560" x2="670" y2="616" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="664" x2="670" y2="720" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="460" y="796" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">同一行代码，唯一差别是数据是否已在 page cache —— 延迟差 1-2 个数量级</text>
+  <text x="460" y="818" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">热路径瓶颈在 CPU（syscall + 拷贝），冷路径瓶颈在设备；且冷读完成后数据自动变热</text>
+</svg>

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="960" viewBox="0 0 940 960">
+  <title>read 全路径：七层与唯一短路点</title>
+  <desc>一次 read 从用户程序经系统调用、VFS、文件系统、page cache、块层、NVMe 驱动到 SSD 设备的完整分层路径，page cache 命中时短路返回。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="940" height="960" fill="rgb(245, 244, 237)"/>
+
+  <text x="470" y="34" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">read 全路径：七层与唯一短路点</text>
+
+  <!-- 主流程（自上而下） -->
+  <rect x="70" y="80" width="360" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="250" y="102" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">用户程序 read() / pread()</text>
+
+  <rect x="70" y="184" width="360" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="250" y="206" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">① 系统调用边界（用户态→内核态）</text>
+  <text x="470" y="206" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">≈ 100 ns：热路径固定成本</text>
+
+  <rect x="70" y="288" width="360" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="250" y="310" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">② VFS：统一接口、按 fd 分发</text>
+  <text x="470" y="310" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">接口层，性能上几乎透明</text>
+
+  <rect x="70" y="392" width="360" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="250" y="414" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">③ 文件系统 ext4/xfs：偏移→块号</text>
+  <text x="470" y="414" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">inode / extent 元数据也走缓存</text>
+
+  <rect x="70" y="496" width="360" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="250" y="518" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">④ Page Cache（唯一短路点）</text>
+
+  <rect x="560" y="490" width="330" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="725" y="508" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">命中：memcpy 后直接返回</text>
+  <text x="725" y="530" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">≈ 1 µs，下面三层全部不发生</text>
+
+  <line x1="434" y1="518" x2="554" y2="518" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="494" y="502" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">命中</text>
+
+  <rect x="70" y="600" width="360" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="250" y="622" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">⑤ 块层 blk-mq：bio 合并 / 排队</text>
+  <text x="470" y="622" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">iostat 的 r/s、await、aqu-sz 统计于此</text>
+
+  <rect x="70" y="704" width="360" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="250" y="726" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">⑥ NVMe 驱动：写 SQ、敲 doorbell</text>
+  <text x="470" y="726" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">queue pair 模型，每核可独立队列</text>
+
+  <rect x="70" y="808" width="360" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="250" y="830" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">⑦ NVMe SSD：读 NAND + DMA 返回</text>
+  <text x="470" y="830" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">≈ 20-100 µs：冷读延迟主体</text>
+
+  <line x1="250" y1="124" x2="250" y2="180" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="228" x2="250" y2="284" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="332" x2="250" y2="388" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="436" x2="250" y2="492" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="540" x2="250" y2="596" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="264" y="568" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806" text-anchor="start" dominant-baseline="central">未命中</text>
+  <line x1="250" y1="648" x2="250" y2="700" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="250" y1="752" x2="250" y2="804" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="470" y="896" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">冷读延迟 = 各层之和，主体在第⑦层设备；热读止于第④层，瓶颈变成 syscall + 拷贝</text>
+  <text x="470" y="918" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">p99 毛刺多来自⑤⑥⑦的排队与设备内部行为，用 iostat / blktrace / biolatency 分层定位</text>
+</svg>

@@ -13,6 +13,9 @@ status: active
 > [!goal] 本周目标
 > 建立存储实验的最小闭环：一台带本地 NVMe 的 Linux 环境、一个带 `CLAUDE.md` 的 `linux-io-lab` 仓库、一组能证明 page cache 存在的冷/热读延迟数据。本周结束时，你要能用自己的数据回答"page cache 命中和不命中差几个数量级"。
 
+> [!note] 前置知识
+> 动手前先通读 [[S-Week 1 - 前置知识 - 环境搭建 + Page Cache 基线]]（一篇打通本周所需背景）；个别点想挖细再看专题：[[S-Week 1 - Linux I O 路径专题 - VFS 到 NVMe 全路径]]、[[S-Week 1 - Page Cache 与 readahead 专题]]。实验完成后的分析写入项目分析目录。
+
 ## 学习目标
 
 完成这一周后，应该能回答五个问题：
