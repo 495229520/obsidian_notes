@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>区间动态规划动画 · 填表 / 回文 / 戳气球 / 合并石子</title>
+<style>
+:root{
+  /* Warm-paper teaching system: 8px rhythm, restrained semantic colors, one shadow depth. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.68;padding:34px 40px 52px;text-wrap:pretty}
+button,input{font:inherit}code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:2px 6px;border-radius:4px}
+.wrap{max-width:1380px;margin:0 auto}
+header h1{font-size:27px;font-weight:600;letter-spacing:0}
+header p{font-size:14.5px;color:var(--muted);margin-top:7px}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:26px}
+.tab{font-size:14px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:3px;align-items:flex-start;justify-content:center;min-height:68px}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px)}
+.tab:focus-visible,.ctrl:focus-visible,.dot:focus-visible,.scrubber:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.tab .t{font-weight:600;color:var(--ink)}.tab .s{font-size:11px;color:var(--faint);font-family:var(--mono)}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 4px 14px rgba(62,61,57,.18)}
+.tab.on .t,.tab.on .s{color:var(--paper)}.tab.on .s{opacity:.78}
+.layout{display:grid;grid-template-columns:minmax(0,810px) minmax(400px,1fr);gap:32px;margin-top:30px;align-items:start}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:28px;min-height:630px;display:flex;flex-direction:column;box-shadow:0 1px 4px rgba(60,55,40,.05);overflow:hidden}
+.vcap{font-size:14px;color:var(--muted);margin-bottom:14px}.vcap b{color:var(--ink)}
+.right{display:flex;flex-direction:column;gap:20px}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:25px 27px;min-height:292px;box-shadow:0 1px 4px rgba(60,55,40,.05)}
+.desc-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.desc-head .st{font-size:21px;font-weight:600}
+.act{margin-top:18px;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:12px 15px;border-radius:7px}
+.desc-body{margin-top:14px;font-size:16px;color:var(--muted)}.desc-body b{color:var(--ink)}
+.desc-body .bl{color:var(--blue);font-weight:600}.desc-body .gr{color:var(--green);font-weight:600}.desc-body .br{color:var(--brown);font-weight:600}.desc-body .dg{color:var(--danger);font-weight:600}
+.chip{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray)}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg)}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg)}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg)}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg)}
+.codebox{background:#2E2C27;border-radius:8px;padding:21px 23px;font-family:var(--mono);font-size:13px;line-height:1.72;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 3px 10px rgba(46,44,39,.19);min-height:260px}
+.codebox .cmt{color:#8F8B80}.codebox .kw{color:#E3A44C}.codebox .fn{color:#8EC5EA}.codebox .num{color:#A6D6A8}
+.stage-note{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:auto;padding-top:14px;min-height:36px}
+.stage-note .ok{color:var(--green);font-weight:700}.stage-note .bad{color:var(--danger);font-weight:700}
+
+/* Shared interval table. */
+.matrix-shell{display:grid;grid-template-columns:38px 1fr;grid-template-rows:32px 1fr;gap:6px;margin:14px auto 8px;width:min(100%,520px)}
+.corner{grid-column:1;grid-row:1;font-family:var(--mono);font-size:10px;color:var(--faint);display:flex;align-items:end;justify-content:end;padding:0 4px 3px 0}
+.col-heads{grid-column:2;grid-row:1;display:grid;gap:6px}.row-heads{grid-column:1;grid-row:2;display:grid;gap:6px}
+.mhead{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.matrix{grid-column:2;grid-row:2;display:grid;gap:6px}
+.mcell{height:54px;border:1.5px solid var(--grid);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;position:relative;font-family:var(--mono);font-size:15px;font-weight:700;color:var(--faint);opacity:.22;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.mcell.valid{opacity:1}.mcell.ready{border-color:var(--green);background:var(--greenbg);color:var(--green)}
+.mcell.current{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.07);z-index:2;box-shadow:0 4px 12px rgba(24,95,165,.14)}
+.mcell.source{border-color:var(--brown);background:var(--brownbg);color:var(--brown)}
+.mcell.best{border-color:var(--green);background:var(--greenbg);color:var(--green);transform:scale(1.07);z-index:2}
+.mcell .interval{position:absolute;left:4px;top:2px;font-size:8px;font-weight:500;color:currentColor;opacity:.68}
+.formula-strip{margin-top:15px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:11px 13px;font-family:var(--mono);font-size:12px;color:var(--muted);min-height:44px;transition:all var(--dur) var(--ease)}
+.formula-strip.good{border-color:var(--green);background:var(--greenbg);color:var(--green)}.formula-strip.focus{border-color:var(--blue);background:var(--bluebg);color:var(--blue)}
+
+/* Traversal scene. */
+.scan-legend{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:16px}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:1px solid var(--line)}
+.swatch.ready{background:var(--greenbg);border-color:var(--green)}.swatch.now{background:var(--bluebg);border-color:var(--blue)}
+
+/* Sequence and pointer. */
+.sequence{position:relative;display:grid;grid-template-columns:repeat(var(--count),52px);gap:9px;width:max-content;max-width:100%;margin:10px auto 24px;padding-top:30px}
+.token{width:52px;height:52px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:19px;font-weight:800;color:var(--ink);position:relative;transition:all var(--dur) var(--ease)}
+.token small{position:absolute;bottom:-21px;font-size:9px;font-weight:500;color:var(--faint)}
+.token.edge{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-3px)}
+.token.last{border-color:var(--brown);background:var(--brownbg);color:var(--brown);transform:translateY(-3px)}
+.token.boundary{border-style:dashed;color:var(--faint)}.token.dim{opacity:.35}
+.slider-pointer{position:absolute;top:0;left:0;opacity:0;transform:translateX(-50%);font-family:var(--mono);font-size:10px;font-weight:800;color:var(--brown);transition:left var(--dur) var(--ease),opacity .2s var(--ease)}
+
+/* Candidate comparison. */
+.split-stage{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:18px;align-items:start;margin-top:6px}
+.candidate-list{display:grid;gap:7px}
+.candidate{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:9px 11px;font-family:var(--mono);font-size:11px;color:var(--faint);opacity:.35;transition:all var(--dur) var(--ease)}
+.candidate.seen{opacity:1}.candidate.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateX(-3px)}.candidate.best{border-color:var(--green);background:var(--greenbg);color:var(--green);opacity:1}
+.interval-bar{display:grid;grid-template-columns:repeat(var(--count),1fr);gap:4px;margin:12px 0 10px}
+.segment{height:28px;border:1px solid var(--grid);background:var(--gray);font-family:var(--mono);font-size:10px;color:var(--faint);display:flex;align-items:center;justify-content:center;transition:all var(--dur) var(--ease)}
+.segment:first-child{border-radius:6px 0 0 6px}.segment:last-child{border-radius:0 6px 6px 0}
+.segment.left{background:var(--brownbg);border-color:var(--brown);color:var(--brown)}.segment.right{background:var(--bluebg);border-color:var(--blue);color:var(--blue)}.segment.pivot{background:var(--greenbg);border-color:var(--green);color:var(--green);transform:translateY(-3px)}
+.prefix-row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0 4px}.prefix-cell{border:1px solid var(--line);border-radius:6px;background:var(--paper);padding:7px 4px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted)}.prefix-cell b{display:block;font-size:15px;color:var(--ink)}
+
+.controls{margin-top:26px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(60,55,40,.05);min-height:74px}
+.ctrl{width:46px;height:46px;flex:0 0 46px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);cursor:pointer;font-size:21px;display:flex;align-items:center;justify-content:center;transition:all .18s var(--ease)}
+.ctrl:hover:not(:disabled){border-color:var(--ink);transform:translateY(-1px)}.ctrl:active:not(:disabled){transform:translateY(1px)}.ctrl:disabled{opacity:.32;cursor:not-allowed}.ctrl.primary{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.timeline{display:flex;flex:1;min-width:180px;align-items:center;gap:12px}.scrubber{width:100%;accent-color:var(--ink);cursor:pointer}.dots{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}.dot{width:9px;height:9px;border-radius:50%;border:1px solid var(--line);background:var(--paper);cursor:pointer;padding:0;transition:all .18s var(--ease)}.dot:hover{border-color:var(--muted);transform:scale(1.2)}.dot.done{background:var(--line);border-color:var(--line)}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3)}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:58px;text-align:center}
+@media(max-width:1180px){.layout{grid-template-columns:1fr}.right{display:grid;grid-template-columns:1fr 1fr}.viz{min-height:600px}.codebox{min-height:280px}}
+@media(max-width:760px){body{font-size:15px;padding:20px 14px 32px}header h1{font-size:22px}header p{font-size:13px}.tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:20px}.tab{font-size:12.5px;padding:9px 10px;min-height:60px}.tab .s{font-size:9.5px}.right{display:flex}.viz{padding:15px;min-height:590px}.vcap{font-size:12px}.desc-card{padding:18px 20px;min-height:230px}.desc-head .st{font-size:17px}.act{font-size:12px;margin-top:14px;padding:9px 12px}.desc-body{font-size:14px;margin-top:10px}.codebox{font-size:10.5px;padding:14px 16px;min-height:0}.mcell{height:42px;font-size:12px}.matrix-shell{grid-template-columns:28px 1fr;gap:4px}.matrix,.col-heads,.row-heads{gap:4px}.sequence{grid-template-columns:repeat(var(--count),42px);gap:5px}.token{width:42px;height:44px;font-size:15px}.split-stage{grid-template-columns:1fr}.candidate-list{grid-template-columns:repeat(2,1fr)}.controls{padding:12px 10px;flex-wrap:wrap}.ctrl{width:44px;flex-basis:44px}.timeline{order:5;width:100%;flex-basis:100%}.dots{display:none}}
+@media(max-width:440px){.tabs{grid-template-columns:1fr}.mcell{height:36px}.candidate-list{grid-template-columns:1fr}.prefix-row{gap:3px}.prefix-cell{font-size:9px}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>区间动态规划 · 先解决小区间，再拼出完整答案</h1>
+    <p>从填表顺序到三类经典模型：两端收缩、枚举最后一次操作、枚举中间断点。</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <main class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </main>
+  <div class="controls">
+    <button class="ctrl" id="btnPrev" aria-label="上一步" title="上一步">‹</button>
+    <button class="ctrl primary" id="btnPlay" aria-label="播放动画" title="播放或暂停">▶</button>
+    <button class="ctrl" id="btnNext" aria-label="下一步" title="下一步">›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <div class="timeline"><input class="scrubber" id="scrubber" type="range" min="0" max="1" step="1" value="0" aria-label="动画进度"><span class="readout" id="readout"></span></div>
+  </div>
+</div>
+<script>
+const viz=document.getElementById('viz');
+const byId=id=>document.getElementById(id);
+
+function matrixHtml(prefix,n,valid){
+  const heads=Array.from({length:n},(_,i)=>`<span class="mhead">${i}</span>`).join('');
+  const cells=[];
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)cells.push(`<div class="mcell${valid(i,j)?' valid':''}" id="${prefix}-${i}-${j}"><span class="interval">${valid(i,j)?`[${i},${j}]`:''}</span><span class="value"></span></div>`);
+  return `<div class="matrix-shell"><span class="corner">i＼j</span><div class="col-heads" style="grid-template-columns:repeat(${n},1fr)">${heads}</div><div class="row-heads" style="grid-template-rows:repeat(${n},1fr)">${heads}</div><div class="matrix" style="grid-template-columns:repeat(${n},1fr)">${cells.join('')}</div></div>`;
+}
+function paintMatrix(prefix,n,values,state={}){
+  const ready=new Set((state.ready||[]).map(pair=>pair.join(','))),source=new Set((state.source||[]).map(pair=>pair.join(',')));
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+    const cell=byId(`${prefix}-${i}-${j}`);if(!cell)continue;
+    const key=`${i},${j}`,value=values?.[i]?.[j];cell.querySelector('.value').textContent=value??'';
+    cell.className='mcell'+(cell.querySelector('.interval').textContent?' valid':'')+(ready.has(key)?' ready':'')+(source.has(key)?' source':'')+(state.current?.[0]===i&&state.current?.[1]===j?' current':'')+(state.best?.[0]===i&&state.best?.[1]===j?' best':'');
+  }
+}
+function setFormula(id,text,kind=''){const el=byId(id);el.textContent=text;el.className='formula-strip'+(kind?' '+kind:'')}
+function movePointer(prefix,index){const pointer=byId(prefix+'-pointer'),target=byId(`${prefix}-token-${index}`),row=byId(prefix+'-sequence');if(!pointer||!target||!row||index==null){if(pointer)pointer.style.opacity=0;return}pointer.style.opacity=1;pointer.style.left=(target.offsetLeft+target.offsetWidth/2)+'px'}
+function valuesFrom(entries,n){const out=Array.from({length:n},()=>Array(n).fill(''));entries.forEach(([i,j,v])=>out[i][j]=v);return out}
+function pairsByLength(n,maxLen){const out=[];for(let len=1;len<=maxLen;len++)for(let left=0;left+len-1<n;left++)out.push([left,left+len-1]);return out}
+
+const orderScene=(()=>{
+  const n=5,empty=valuesFrom([],n);
+  const steps=[
+    {len:0,chip:'状态是一个区间',chipC:'c0',title:'二维表的每个有效格都代表一个闭区间',desc:'横坐标是右端点，纵坐标是左端点。只有 <b>left ≤ right</b> 的右上三角区域有意义；最终答案通常位于右上角。'},
+    {len:1,chip:'len = 1',chipC:'cb',title:'先初始化所有单点区间，它们不依赖其他状态',desc:'单点区间是最小子问题。回文问题中它们的答案是 1；合并问题中它们的代价通常是 0。'},
+    {len:2,chip:'len = 2',chipC:'cb',title:'第二条对角线只读取长度 1 的区间',desc:'此时任何转移来源都已经准备好。按对角线向右上方推进，就是“区间长度从小到大”。'},
+    {len:3,chip:'len = 3',chipC:'cb',title:'大区间继续复用已经求出的更短区间',desc:'无论是向内收缩，还是在中间切开，来源的长度都严格小于当前区间。'},
+    {len:4,chip:'len = 4',chipC:'cb',title:'填表顺序解决的是依赖先后，而不是题目答案',desc:'区间 DP 最常见的错误，是转移式写对了，却在来源格尚未计算时就读取默认值。'},
+    {len:5,chip:'完整区间',chipC:'cg',title:'最后到达右上角，得到整个区间的答案',desc:'若状态定义为闭区间，完整答案位置是 <span class="gr">dp[0][n-1]</span>；开区间模型则要按自己的边界定义定位答案。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> len = <span class="num">1</span>; len &lt;= n; ++len) {
+    <span class="kw">for</span> (<span class="kw">int</span> left = <span class="num">0</span>;
+         left + len - <span class="num">1</span> &lt; n; ++left) {
+        <span class="kw">int</span> right = left + len - <span class="num">1</span>;
+        <span class="cmt">// shorter intervals are ready</span>
+        dp[left][right] = ...;
+    }
+}`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>填表顺序</b>：沿右上三角的对角线，从短区间走向长区间</div>${matrixHtml('order',n,(i,j)=>i<=j)}<div class="formula-strip" id="order-formula"></div><div class="scan-legend"><span><i class="swatch ready"></i>已经求出</span><span><i class="swatch now"></i>当前长度</span></div><div class="stage-note" id="order-note"></div>`}
+  function paint(s){const ready=s.len?pairsByLength(n,s.len-1):[],current=s.len?pairsByLength(n,s.len).filter(([i,j])=>j-i+1===s.len):[];paintMatrix('order',n,empty,{ready,current:null});current.forEach(([i,j])=>byId(`order-${i}-${j}`).classList.add('current'));setFormula('order-formula',s.len?`len = ${s.len}：本轮计算 ${current.map(([i,j])=>`[${i},${j}]`).join('、')}`:'有效状态满足 left ≤ right；依赖方向指向更短区间',s.len===n?'good':s.len?'focus':'');byId('order-note').innerHTML=s.len===n?'<span class="ok">答案落在 dp[0][4]</span>':'先短后长，确保转移来源可用'}
+  return{id:'order',label:'填表顺序',sub:'按长度走对角线',steps,mount,paint,code};
+})();
+
+const palindromeScene=(()=>{
+  const s='bbbab',n=s.length;
+  const entries=[[0,0,1],[1,1,1],[2,2,1],[3,3,1],[4,4,1],[0,1,2],[1,2,2],[2,3,1],[3,4,1],[0,2,3],[1,3,2],[2,4,3],[0,3,3],[1,4,3],[0,4,4]];
+  const full=valuesFrom(entries,n);
+  const steps=[
+    {count:5,current:null,source:[],edge:[],formula:'dp[i][i] = 1',chip:'base',chipC:'c0',title:'单个字符本身就是长度为 1 的回文子序列',desc:'状态定义为 <b>dp[left][right] = s[left..right] 内最长回文子序列长度</b>。先把主对角线初始化为 1。'},
+    {count:9,current:[0,1],source:[],edge:[0,1],formula:"s[0] == s[1]：dp[0][1] = 0 + 2 = 2",chip:'两端相等',chipC:'cb',title:'区间 [0,1] 的两个 b 可以一起进入答案',desc:'长度为 2 时内部是空区间，按 0 处理，再加上两端两个字符。'},
+    {count:12,current:[0,2],source:[[1,1]],edge:[0,2],formula:'dp[0][2] = dp[1][1] + 2 = 3',chip:'向内收缩',chipC:'ch',title:'区间 bbb 两端相等，读取内部区间 [1,1]',desc:'两端相等时，当前问题直接缩成内部区间；棕色来源格已经在更短长度中算好。'},
+    {count:12,current:[1,3],source:[[2,3],[1,2]],edge:[1,3],formula:'dp[1][3] = max(dp[2][3], dp[1][2]) = 2',chip:'两端不等',chipC:'cb',title:'区间 bba 两端不同，只能丢掉一端再取较大值',desc:'不能同时把 b 与 a 放进同一个回文两端，所以比较“去左端”和“去右端”两个更短区间。'},
+    {count:14,current:[0,3],source:[[1,3],[0,2]],edge:[0,3],formula:'dp[0][3] = max(2, 3) = 3',chip:'保留更优侧',chipC:'cb',title:'区间 bbba 继续比较两个长度为 3 的来源',desc:'dp[0][2] 保存了 bbb，因此优于 dp[1][3] 的长度 2。DP 只保留数值，不必保存所有子序列。'},
+    {count:15,current:[0,4],source:[[1,3]],edge:[0,4],formula:'dp[0][4] = dp[1][3] + 2 = 4',chip:'答案 4',chipC:'cg',title:'完整区间 bbbab 两端都是 b，内部答案 2 再加 2',desc:'最终得到长度 4，例如 <span class="gr">bbbb</span>。答案位于右上角 dp[0][4]，总复杂度为 O(n²)。'}
+  ];
+  const code=`<span class="kw">if</span> (left == right) {
+    dp[left][right] = <span class="num">1</span>;
+} <span class="kw">else if</span> (s[left] == s[right]) {
+    dp[left][right] =
+        (len == <span class="num">2</span> ? <span class="num">0</span> : dp[left + <span class="num">1</span>][right - <span class="num">1</span>]) + <span class="num">2</span>;
+} <span class="kw">else</span> {
+    dp[left][right] = std::max(
+        dp[left + <span class="num">1</span>][right],
+        dp[left][right - <span class="num">1</span>]
+    );
+}`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>最长回文子序列</b>：两端相等向内收缩，不等则丢一端取较大值</div><div class="sequence" id="pal-sequence" style="--count:${n}"><span class="slider-pointer" id="pal-pointer"></span>${[...s].map((ch,i)=>`<div class="token" id="pal-token-${i}">${ch}<small>${i}</small></div>`).join('')}</div>${matrixHtml('pal',n,(i,j)=>i<=j)}<div class="formula-strip" id="pal-formula"></div><div class="stage-note" id="pal-note"></div>`}
+  function paint(step){const values=valuesFrom(entries.slice(0,step.count),n),ready=entries.slice(0,step.count).map(([i,j])=>[i,j]);paintMatrix('pal',n,values,{ready,source:step.source,current:step.current,best:step.chipC==='cg'?step.current:null});[...s].forEach((_,i)=>byId(`pal-token-${i}`).className='token'+(step.edge.includes(i)?' edge':'')+(step.edge.length&&i>step.edge[0]&&i<step.edge[1]?' dim':''));movePointer('pal',step.edge.length?step.edge[1]:null);const pointer=byId('pal-pointer');if(step.edge.length)pointer.textContent='right';setFormula('pal-formula',step.formula,step.chipC==='cg'?'good':'focus');byId('pal-note').innerHTML=step.chipC==='cg'?'<span class="ok">bbbab 的最长回文子序列长度为 4</span>':'蓝色是当前区间，棕色是转移来源'}
+  return{id:'palindrome',label:'回文区间',sub:'两端收缩 · O(n²)',steps,mount,paint,code};
+})();
+
+const balloonsScene=(()=>{
+  const points=[1,3,1,5,8,1],n=points.length;
+  const entries=[[0,1,0],[1,2,0],[2,3,0],[3,4,0],[4,5,0],[0,2,3],[1,3,15],[2,4,40],[3,5,40],[0,3,30],[1,4,135],[2,5,48],[0,4,159],[1,5,159]];
+  const base=valuesFrom(entries,n);
+  const candidates=[162,52,75,167];
+  const steps=[
+    {last:null,seen:0,best:-1,current:null,source:[],formula:'dp[left][right]：开区间 (left, right) 的最大分数',chip:'反着想',chipC:'c0',title:'不要枚举第一个戳谁，而要枚举区间内最后一个气球',desc:'第一个操作会改变相邻关系；最后一个操作发生时，区间内部已经清空，它的左右邻居一定是固定边界。'},
+    {last:null,seen:0,best:-1,current:[0,5],source:[[0,4],[1,5]],formula:'目标 dp[0][5]；所有更短开区间已经求出',chip:'先短后长',chipC:'cb',title:'给原数组两侧补值为 1 的边界，再按开区间长度填表',desc:'points = [1,3,1,5,8,1]。目标开区间是 (0,5)，其中四个真实气球都要被戳完。'},
+    {last:1,seen:1,best:0,current:[0,5],source:[[0,1],[1,5]],formula:'last=1：0 + 159 + 1×3×1 = 162',chip:'last = 1',chipC:'ch',title:'假设值 3 的气球最后被戳，左右两段先独立清空',desc:'左段 dp[0][1] 为空，右段 dp[1][5] 已求得 159；最后一次得分由固定边界与 last 三者相乘。'},
+    {last:2,seen:2,best:0,current:[0,5],source:[[0,2],[2,5]],formula:'last=2：3 + 48 + 1×1×1 = 52',chip:'last = 2',chipC:'ch',title:'改让值 1 的气球最后被戳，候选分数只有 52',desc:'每个 last 都把原区间拆成两个互不干扰的小开区间；当前只是在所有候选中取最大值。'},
+    {last:3,seen:3,best:0,current:[0,5],source:[[0,3],[3,5]],formula:'last=3：30 + 40 + 1×5×1 = 75',chip:'last = 3',chipC:'ch',title:'值 5 最后被戳时，左右子区间贡献 30 与 40',desc:'这里“最后一个”不是最终答案中的固定选择，而是当前区间转移时枚举的决策。'},
+    {last:4,seen:4,best:3,current:[0,5],source:[[0,4],[4,5]],formula:'last=4：159 + 0 + 1×8×1 = 167',chip:'last = 4',chipC:'cg',title:'值 8 最后被戳得到 167，超过此前最大值 162',desc:'最大候选成为 dp[0][5]。枚举区间 O(n²)，每个区间再枚举 last，因此总时间 O(n³)。'},
+    {last:4,seen:4,best:3,current:[0,5],source:[[0,4],[4,5]],formula:'dp[0][5] = max(162, 52, 75, 167) = 167',chip:'答案 167',chipC:'cg',title:'“枚举最后一次操作”把动态邻居变成了固定边界',desc:'这是戳气球模型最关键的逆向思维：先确定最后发生的操作，再复用两个已经求好的小区间。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> len = <span class="num">2</span>; len &lt;= n + <span class="num">1</span>; ++len) {
+    <span class="kw">for</span> (<span class="kw">int</span> left = <span class="num">0</span>; left + len &lt;= n + <span class="num">1</span>; ++left) {
+        <span class="kw">int</span> right = left + len;
+        <span class="kw">for</span> (<span class="kw">int</span> last = left + <span class="num">1</span>; last &lt; right; ++last) {
+            dp[left][right] = std::max(
+                dp[left][right],
+                dp[left][last] + dp[last][right]
+                + points[left] * points[last] * points[right]
+            );
+        }
+    }
+}`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>戳气球</b>：开区间状态 + 枚举最后一个被戳的气球</div><div class="sequence" id="balloon-sequence" style="--count:${n}"><span class="slider-pointer" id="balloon-pointer">last</span>${points.map((v,i)=>`<div class="token${i===0||i===n-1?' boundary':''}" id="balloon-token-${i}">${v}<small>${i===0||i===n-1?'边界':i}</small></div>`).join('')}</div><div class="split-stage"><div><div class="interval-bar" id="balloon-bar" style="--count:${n}">${points.map((v,i)=>`<div class="segment" id="balloon-seg-${i}">${v}</div>`).join('')}</div>${matrixHtml('balloon',n,(i,j)=>i<j)}</div><div class="candidate-list">${candidates.map((v,i)=>`<div class="candidate" id="balloon-cand-${i}">last=${i+1} → ${v}</div>`).join('')}</div></div><div class="formula-strip" id="balloon-formula"></div><div class="stage-note" id="balloon-note"></div>`}
+  function paint(step){const values=base.map(row=>row.slice());if(step.chipC==='cg')values[0][5]=167;paintMatrix('balloon',n,values,{ready:entries.map(([i,j])=>[i,j]),source:step.source,current:step.current,best:step.chipC==='cg'?[0,5]:null});points.forEach((_,i)=>{byId(`balloon-token-${i}`).className='token'+(i===0||i===n-1?' boundary':'')+(i===step.last?' last':'');const seg=byId(`balloon-seg-${i}`);seg.className='segment'+(step.last!=null&&i<step.last?' left':'')+(step.last!=null&&i>step.last?' right':'')+(i===step.last?' pivot':'')});movePointer('balloon',step.last);candidates.forEach((_,i)=>byId(`balloon-cand-${i}`).className='candidate'+(i<step.seen?' seen':'')+(i===step.seen-1&&step.chipC!=='cg'?' on':'')+(i===step.best&&step.chipC==='cg'?' best':''));setFormula('balloon-formula',step.formula,step.chipC==='cg'?'good':'focus');byId('balloon-note').innerHTML=step.chipC==='cg'?'<span class="ok">最大分数 167</span>':'棕色与蓝色分别表示 last 左右两个子区间'}
+  return{id:'balloons',label:'戳气球',sub:'枚举最后一次 · O(n³)',steps,mount,paint,code};
+})();
+
+const stonesScene=(()=>{
+  const stones=[4,3,3,4],prefix=[0,4,7,10,14],n=4;
+  const entries=[[0,0,0],[1,1,0],[2,2,0],[3,3,0],[0,1,7],[1,2,6],[2,3,7],[0,2,16],[1,3,16]];
+  const base=valuesFrom(entries,n),candidates=[30,28,30];
+  const steps=[
+    {mid:null,seen:0,best:-1,current:null,source:[],formula:'dp[i][j]：把闭区间 [i,j] 合成一堆的最小代价',chip:'拆成两段',chipC:'c0',title:'合并石子要枚举最后一次合并前的断点',desc:'最后一次操作一定把两个已经各自合好的相邻区间合在一起，因此可以枚举 mid，把大区间拆成左右两段。'},
+    {mid:null,seen:0,best:-1,current:[0,3],source:[[0,2],[1,3]],formula:'sum(0,3) = prefix[4] - prefix[0] = 14',chip:'前缀和',chipC:'cb',title:'无论从哪个断点合并，最后一次合并的额外代价都是区间总和',desc:'前缀和只负责 O(1) 求当前区间和；真正决定最优答案的是左右子区间代价与断点选择。'},
+    {mid:0,seen:1,best:0,current:[0,3],source:[[0,0],[1,3]],formula:'mid=0：dp[0][0] + dp[1][3] + 14 = 30',chip:'mid = 0',chipC:'ch',title:'断在第 0 堆后面：左边单堆代价 0，右边三堆代价 16',desc:'候选总代价等于“合左段 + 合右段 + 最后把两段合在一起”。'},
+    {mid:1,seen:2,best:1,current:[0,3],source:[[0,1],[2,3]],formula:'mid=1：dp[0][1] + dp[2][3] + 14 = 28',chip:'mid = 1',chipC:'cg',title:'从中间断开，两边代价都是 7，候选值降到 28',desc:'这一步找到更小值：先把 4+3 与 3+4 分别合并，再做最终合并。'},
+    {mid:2,seen:3,best:1,current:[0,3],source:[[0,2],[3,3]],formula:'mid=2：dp[0][2] + dp[3][3] + 14 = 30',chip:'mid = 2',chipC:'ch',title:'断在第 2 堆后面得到 30，不能改善当前最优值',desc:'枚举完所有 mid 后，dp[0][3] 取三个候选中的最小值 28。'},
+    {mid:1,seen:3,best:1,current:[0,3],source:[[0,1],[2,3]],formula:'dp[0][3] = min(30, 28, 30) = 28',chip:'答案 28',chipC:'cg',title:'合并类区间 DP 的统一形式是左右代价再加当前区间代价',desc:'区间数为 O(n²)，每个区间枚举 O(n) 个断点，总时间 O(n³)，二维状态表占 O(n²) 空间。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> len = <span class="num">2</span>; len &lt;= n; ++len) {
+    <span class="kw">for</span> (<span class="kw">int</span> left = <span class="num">0</span>; left + len - <span class="num">1</span> &lt; n; ++left) {
+        <span class="kw">int</span> right = left + len - <span class="num">1</span>;
+        <span class="kw">int</span> sum = prefix[right + <span class="num">1</span>] - prefix[left];
+        <span class="kw">for</span> (<span class="kw">int</span> mid = left; mid &lt; right; ++mid) {
+            dp[left][right] = std::min(
+                dp[left][right],
+                dp[left][mid] + dp[mid + <span class="num">1</span>][right] + sum
+            );
+        }
+    }
+}`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>合并石子</b>：枚举断点，把一个闭区间拆成两个已求解子区间</div><div class="prefix-row">${prefix.map((v,i)=>`<div class="prefix-cell"><span>pre[${i}]</span><b>${v}</b></div>`).join('')}</div><div class="interval-bar" id="stone-bar" style="--count:${n}">${stones.map((v,i)=>`<div class="segment" id="stone-seg-${i}">${v}</div>`).join('')}</div><div class="split-stage"><div>${matrixHtml('stone',n,(i,j)=>i<=j)}</div><div class="candidate-list">${candidates.map((v,i)=>`<div class="candidate" id="stone-cand-${i}">mid=${i} → ${v}</div>`).join('')}</div></div><div class="formula-strip" id="stone-formula"></div><div class="stage-note" id="stone-note"></div>`}
+  function paint(step){const values=base.map(row=>row.slice());if(step.chipC==='cg'&&step.seen===3)values[0][3]=28;paintMatrix('stone',n,values,{ready:entries.map(([i,j])=>[i,j]),source:step.source,current:step.current,best:step.chipC==='cg'&&step.seen===3?[0,3]:null});stones.forEach((_,i)=>{const seg=byId(`stone-seg-${i}`);seg.className='segment'+(step.mid!=null&&i<=step.mid?' left':'')+(step.mid!=null&&i>step.mid?' right':'')});candidates.forEach((_,i)=>byId(`stone-cand-${i}`).className='candidate'+(i<step.seen?' seen':'')+(i===step.seen-1&&step.chipC!=='cg'?' on':'')+(i===step.best&&step.chipC==='cg'?' best':''));setFormula('stone-formula',step.formula,step.chipC==='cg'?'good':'focus');byId('stone-note').innerHTML=step.chipC==='cg'&&step.seen===3?'<span class="ok">最小合并代价 28</span>':'前缀和负责区间总和，DP 负责选择断点'}
+  return{id:'stones',label:'合并石子',sub:'枚举断点 · O(n³)',steps,mount,paint,code};
+})();
+
+const SCENES=[orderScene,palindromeScene,balloonsScene,stonesScene];
+const tabsBox=byId('tabs'),dotsBox=byId('dots'),stTitle=byId('stTitle'),stChip=byId('stChip'),stAct=byId('stAct'),stDesc=byId('stDesc'),codeBox=byId('codeBox'),readout=byId('readout'),scrubber=byId('scrubber'),btnPrev=byId('btnPrev'),btnNext=byId('btnNext'),btnPlay=byId('btnPlay');
+SCENES.forEach((scene,index)=>{const button=document.createElement('button');button.className='tab';button.innerHTML=`<span class="t">${scene.label}</span><span class="s">${scene.sub}</span>`;button.onclick=()=>{stop();switchScene(index)};tabsBox.appendChild(button)});
+let sceneIndex=0,current=0,dotEls=[],timer=null;const intervalMs=3200;
+function switchScene(index){sceneIndex=index;current=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));SCENES[sceneIndex].mount();codeBox.innerHTML=SCENES[sceneIndex].code;dotsBox.innerHTML='';dotEls=[];SCENES[sceneIndex].steps.forEach((step,i)=>{const dot=document.createElement('button');dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',`第 ${i+1} 步：${step.title}`);dot.onclick=()=>{stop();go(i)};dotsBox.appendChild(dot);dotEls.push(dot)});scrubber.max=SCENES[sceneIndex].steps.length-1;go(0)}
+function go(index){const scene=SCENES[sceneIndex],steps=scene.steps;current=Math.max(0,Math.min(steps.length-1,index));const step=steps[current];scene.paint(step);stTitle.textContent=scene.label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===current);dot.classList.toggle('done',i<current)});scrubber.value=current;readout.textContent=(current+1)+' / '+steps.length;btnPrev.disabled=current===0;btnNext.disabled=current===steps.length-1;if(current===steps.length-1)stop();history.replaceState(null,'','#scene='+scene.id+'&step='+current)}
+function play(){if(current===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='Ⅱ';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{current<SCENES[sceneIndex].steps.length-1?go(current+1):stop()},intervalMs)}
+function stop(){if(timer){clearInterval(timer);timer=null}btnPlay.textContent='▶';btnPlay.setAttribute('aria-label','播放动画')}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(current-1)};btnNext.onclick=()=>{stop();go(current+1)};scrubber.oninput=event=>{stop();go(Number(event.target.value))};
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(current+1)}else if(event.key==='ArrowLeft'){stop();go(current-1)}else if(event.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){event.preventDefault();timer?stop():play()}});
+window.addEventListener('resize',()=>SCENES[sceneIndex].paint(SCENES[sceneIndex].steps[current]));
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+<script src="./算法动画题单.js" data-topic="22"></script>
+</body>
+</html>

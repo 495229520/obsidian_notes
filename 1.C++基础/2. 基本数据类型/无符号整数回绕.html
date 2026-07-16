@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无符号整数回绕 · int 遇上 unsigned 的隐式转换陷阱</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;      /* signed 眼镜 */
+  --brown:#854F0B;--brownbg:#FAEEDA;    /* unsigned 眼镜 */
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --danger:#B3402F;--dangerbg:#F6E0DB;  /* 回绕警告 */
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.layout{display:grid;grid-template-columns:560px 1fr;gap:26px;margin-top:24px;align-items:start;}
+@media(max-width:1020px){.layout{grid-template-columns:1fr;}}
+
+/* ---------- 左：可视化 ---------- */
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:18px;}
+.viz .cap{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;}
+
+/* 32 位条 */
+.bitgrid{display:flex;flex-direction:column;gap:4px;}
+.bytebar{display:flex;gap:2px;}
+.bytebar .blab{width:34px;font-family:var(--mono);font-size:9px;color:var(--faint);display:flex;align-items:center;}
+.bit{flex:1;height:26px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;border-radius:3px;background:var(--gray);color:var(--faint);transition:all var(--dur) var(--ease);}
+.bit.one{background:var(--ink);color:var(--paper);}
+
+/* 两副眼镜 */
+.glasses{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.lens{border:1px solid var(--grid);border-radius:10px;padding:10px 14px;transition:all var(--dur) var(--ease);}
+.lens .ln{font-size:11px;font-weight:600;margin-bottom:2px;}
+.lens .lv{font-family:var(--mono);font-size:19px;font-weight:700;transition:all var(--dur) var(--ease);}
+.lens.signed .ln{color:var(--blue);}
+.lens.signed .lv{color:var(--blue);}
+.lens.unsigned .ln{color:var(--brown);}
+.lens.unsigned .lv{color:var(--brown);}
+.lens.hot{box-shadow:0 0 0 2px currentColor;}
+.lens.signed.hot{background:var(--bluebg);color:var(--blue);}
+.lens.unsigned.hot{background:var(--brownbg);color:var(--brown);}
+
+/* 数轴磁带 */
+.tapebox{position:relative;padding:26px 0 20px;}
+.tape{position:relative;height:38px;border:1px solid var(--line);border-radius:8px;background:linear-gradient(90deg,var(--greenbg),var(--paper) 30%,var(--paper) 70%,var(--dangerbg));overflow:visible;}
+.tape .tl{position:absolute;top:100%;margin-top:4px;font-family:var(--mono);font-size:10px;color:var(--faint);}
+.tape .tl.l{left:0;}
+.tape .tl.r{right:0;}
+.marker{position:absolute;top:-22px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;transition:left var(--dur) var(--ease),opacity 200ms;z-index:3;}
+.marker .mv{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--paper);background:var(--brown);border-radius:5px;padding:1px 7px;white-space:nowrap;}
+.marker .ma{color:var(--brown);font-size:13px;line-height:.8;}
+.wraparc{position:absolute;left:0;right:0;top:-4px;text-align:center;font-size:12px;font-weight:600;color:var(--danger);opacity:0;transition:opacity 300ms var(--ease);}
+.wraparc.show{opacity:1;}
+.zero{position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--green);}
+.tape .zl{position:absolute;left:4px;top:2px;font-family:var(--mono);font-size:10px;color:var(--green);}
+
+/* ---------- 右 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.codecard{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 18px;font-family:var(--mono);font-size:13px;line-height:1.9;color:var(--ink);}
+.codecard .cm{color:var(--faint);}
+.codecard .ka{color:var(--blue);font-weight:700;}
+.codecard .kb{color:var(--brown);font-weight:700;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:170px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cs{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .s{color:var(--blue);font-weight:600;}
+.desc-body .h{color:var(--brown);font-weight:600;}
+.desc-body .d{color:var(--danger);font-weight:600;}
+
+.free{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 18px;}
+.free .lbl{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.free .row{display:flex;gap:10px;flex-wrap:wrap;}
+.act{font:inherit;font-family:var(--mono);font-size:13px;font-weight:500;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid;transition:all .15s var(--ease);}
+.act:active{transform:scale(.96);}
+.act.m{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.act.m:hover{background:#f0d2ca;}
+.act.p{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.act.p:hover{background:#cfeee2;}
+.act.reset{color:var(--muted);border-color:var(--line);background:var(--paper);margin-left:auto;font-family:inherit;}
+.freeout{margin-top:10px;font-size:13px;color:var(--muted);min-height:22px;}
+.freeout b{color:var(--ink);}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>无符号整数回绕 · int 遇上 unsigned 的隐式转换陷阱</h1>
+    <p><code>500 - 1000u</code> 为什么不是 −500 —— 隐式转换 + 模 2³² 回绕的全过程　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="layout">
+    <!-- 左：可视化 -->
+    <section class="viz">
+      <div>
+        <div class="cap"><span>内存里的 32 位（内存不认识"负数"，只有位型）</span></div>
+        <div class="bitgrid" id="bitgrid"></div>
+      </div>
+
+      <div>
+        <div class="cap"><span>同一串位，两副眼镜两种读法</span></div>
+        <div class="glasses">
+          <div class="lens signed" id="lensS"><div class="ln">按 int（补码）读</div><div class="lv" id="lvS"></div></div>
+          <div class="lens unsigned" id="lensU"><div class="ln">按 unsigned int 读</div><div class="lv" id="lvU"></div></div>
+        </div>
+      </div>
+
+      <div class="tapebox">
+        <div class="cap" style="margin-bottom:24px;"><span>unsigned int 的取值数轴（两端其实是相连的）</span></div>
+        <div class="tape">
+          <div class="zero"></div><span class="zl">0</span>
+          <div class="marker" id="marker"><span class="mv" id="markerV"></span><span class="ma">▼</span></div>
+          <div class="wraparc" id="wraparc">⟲ 越过 0，从另一端绕回来 —— 回绕（wrap around）！</div>
+          <span class="tl l">0</span><span class="tl r">4294967295 (2³²−1)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右 -->
+    <section class="right">
+      <div class="codecard">
+        <span class="cm">// 出自笔记 2.1 §6.2</span><br>
+        int <span class="ka">a</span>{ 500 };<br>
+        unsigned int <span class="kb">b</span>{ 1000 };<br>
+        auto c = <span class="ka">a</span> - <span class="kb">b</span>;&nbsp;&nbsp;<span class="cm">// c = -500 ?</span>
+      </div>
+
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+
+      <div class="free">
+        <div class="lbl">自由操作 —— 在当前值上继续加减，亲手触发回绕：</div>
+        <div class="row">
+          <button class="act m" id="actMinus">− 1000</button>
+          <button class="act p" id="actPlus">+ 1000</button>
+          <button class="act reset" id="actReset">↺ 复位</button>
+        </div>
+        <div class="freeout" id="freeOut"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+/* ---------- 32 位条（4 字节 × 8 位） ---------- */
+const bitgrid=document.getElementById('bitgrid');
+const bitEls=[];
+for(let by=0;by<4;by++){
+  const bar=document.createElement('div');bar.className='bytebar';
+  const lab=document.createElement('span');lab.className='blab';lab.textContent='B'+(3-by);bar.appendChild(lab);
+  for(let i=0;i<8;i++){const b=document.createElement('div');b.className='bit';b.textContent='0';bar.appendChild(b);bitEls.push(b);}
+  bitgrid.appendChild(bar);
+}
+const lvS=document.getElementById('lvS'),lvU=document.getElementById('lvU');
+const lensS=document.getElementById('lensS'),lensU=document.getElementById('lensU');
+const marker=document.getElementById('marker'),markerV=document.getElementById('markerV'),wraparc=document.getElementById('wraparc');
+
+const MAX=4294967296; // 2^32
+function fmt(n){return n.toLocaleString('en-US');}
+function render(val,hot){ // val: uint32
+  const bits=(val>>>0).toString(2).padStart(32,'0');
+  bitEls.forEach((b,i)=>{b.textContent=bits[i];b.classList.toggle('one',bits[i]==='1');});
+  lvS.textContent=fmt(val|0);
+  lvU.textContent=fmt(val>>>0);
+  lensS.classList.toggle('hot',hot==='s'||hot==='both');
+  lensU.classList.toggle('hot',hot==='u'||hot==='both');
+  // 数轴位置（按比例，边缘留 2%）
+  const pct=Math.min(98,Math.max(2,(val>>>0)/MAX*100));
+  marker.style.left=pct+'%';
+  markerV.textContent=fmt(val>>>0);
+}
+function flashWrap(){wraparc.classList.add('show');setTimeout(()=>wraparc.classList.remove('show'),2200);}
+
+/* ---------- 步骤 ---------- */
+const STEPS=[
+  { title:'步骤 0 · 一道"送分题"', chip:'问题', chipC:'c0', val:500, hot:null,
+    desc:'<span class="s">int a = 500</span>，<span class="h">unsigned b = 1000</span>，<code>a - b</code> 直觉上就是 <b>−500</b>。此刻内存里 a 的位型很平常——低位那几个 1 凑出 500。' },
+  { title:'步骤 1 · 隐式转换先动手', chip:'int → unsigned', chipC:'ch', val:500, hot:'u',
+    desc:'混合运算时，<b>同宽度的 signed 和 unsigned 相遇，signed 一方被转成 unsigned</b>（惯常算术转换）。注意：<b>位型一个 bit 都没变</b>，只是换了副<span class="h">无符号眼镜</span>来读。整个算式从此按无符号规则进行。' },
+  { title:'步骤 2 · 500 − 1000，借位借到天上', chip:'模 2³² 回绕', chipC:'cd', val:4294966796, hot:'u', wrap:true,
+    desc:'无符号世界里<b>没有负数</b>。500 − 1000 不够减，结果按<b>模 2³²</b> 计算：500 − 1000 + 2³² = <b class="h">4294966796</b>。看数轴——越过 0 后从最右端绕回来，落在离顶端只差 500 的地方。' },
+  { title:'步骤 3 · 换回眼镜看位型', chip:'同位不同读', chipC:'cs', val:4294966796, hot:'both',
+    desc:'现在的位型是 <code>0xFFFFFE0C</code>。按<span class="s">补码</span>读它就是 <b class="s">−500</b>，按<span class="h">无符号</span>读就是 <b class="h">4294966796</b> —— <b>内存里从来没有"负数"，只有解释方式</b>。这也是为什么 <code>printf("%d")</code> 还能把它打印成 −500。' },
+  { title:'步骤 4 · 陷阱现场', chip:'翻车姿势', chipC:'cd', val:4294966796, hot:'u',
+    desc:'<code>if (a - b &lt; 0)</code> —— <b class="d">永远为 false</b>，无符号数怎么比都 ≥ 0；<code>for (unsigned i = n; i &gt;= 0; --i)</code> —— <b class="d">死循环</b>，i 减到 0 再减就绕回 2³²−1。这类 bug 编译能过、逻辑全错。' },
+  { title:'步骤 5 · 工程上怎么防', chip:'三条习惯', chipC:'cg', val:4294966796, hot:'both',
+    desc:'① 参与算术/比较前显式转换：<code>static_cast&lt;int&gt;(b)</code>，把意图写在明面上；② 表示"数量"可以用 unsigned，但<b>做差、比较尽量用有符号</b>；③ 打开 <code>-Wsign-compare</code>（VS 的 C4018），让编译器替你盯梢。' },
+];
+
+/* ---------- 控制 ---------- */
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const dotsBox=document.getElementById('dots');const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(i);};dotsBox.appendChild(d);dotEls.push(d);});
+
+let cur=0, freeVal=null;
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur];
+  freeVal=null;
+  render(s.val,s.hot);
+  if(s.wrap)flashWrap();
+  stTitle.textContent=s.title;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(STEPS.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===STEPS.length-1;
+  document.getElementById('freeOut').textContent='';
+  if(cur===STEPS.length-1)stop();
+}
+
+/* ---------- 自由操作 ---------- */
+const freeOut=document.getElementById('freeOut');
+function curVal(){return freeVal!==null?freeVal:STEPS[cur].val;}
+function apply(delta){
+  stop();
+  const before=curVal()>>>0;
+  const after=(before+delta)>>>0;
+  const wrapped=delta<0?before<(-delta):before+delta>0xFFFFFFFF;
+  freeVal=after;
+  render(after,'both');
+  if(wrapped){
+    flashWrap();
+    freeOut.innerHTML='<b>'+fmt(before)+(delta<0?' − ':' + ')+fmt(Math.abs(delta))+' → '+fmt(after)+'</b>　越过了'+(delta<0?' 0':' 2³²−1')+'，回绕！';
+  }else{
+    freeOut.innerHTML=fmt(before)+(delta<0?' − ':' + ')+fmt(Math.abs(delta))+' = <b>'+fmt(after)+'</b>　（没跨边界，一切正常）';
+  }
+}
+document.getElementById('actMinus').onclick=()=>apply(-1000);
+document.getElementById('actPlus').onclick=()=>apply(1000);
+document.getElementById('actReset').onclick=()=>{stop();go(0);};
+
+/* ---------- 播放 ---------- */
+let timer=null,ms=2600;
+function play(){if(cur===STEPS.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const m=location.hash.match(/step=(\d+)/);go(m?+m[1]:0);
+</script>
+</body>
+</html>

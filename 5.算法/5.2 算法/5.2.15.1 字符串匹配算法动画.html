@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>字符串匹配动画 · 朴素 / 前缀函数 / KMP / Rabin-Karp</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.72;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ---- 字符串匹配画布（持久 DOM）---- */
+.matcharea{position:relative;height:200px;margin:6px 0 2px;}
+.mtag{position:absolute;left:6px;font-family:var(--mono);font-size:11px;color:var(--faint);font-weight:600;}
+.mrow{display:flex;gap:8px;}
+.mtrack{transition:transform var(--dur) var(--ease);}
+.mcell{width:46px;height:46px;flex:0 0 46px;display:flex;align-items:center;justify-content:center;position:relative;font-family:var(--mono);font-weight:700;font-size:18px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);color:var(--muted);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.mcell .mi{position:absolute;top:-17px;left:0;right:0;text-align:center;font-size:10px;color:var(--faint);font-weight:400;}
+.mcell.mt{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.mcell.cmp{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.15);}
+.mcell.cmpj{background:var(--brownbg);border-color:var(--brown);color:var(--brown);box-shadow:0 0 0 4px rgba(154,91,14,.16);}
+.mcell.bad{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);box-shadow:0 0 0 4px rgba(179,64,47,.18);}
+.mcell.ok{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.2);}
+.mcell.win{background:var(--bluebg);border-color:var(--blue);color:var(--blue);}
+.mcell.past{opacity:.3;}
+.mcell.picell{height:34px;font-size:15px;border-radius:7px;}
+.mcell.picell.empty{color:var(--faint);border-style:dashed;}
+.mcell.pop{animation:mpop .55s var(--ease);}
+@keyframes mpop{0%{transform:translateY(0);}42%{transform:translateY(-12px);}100%{transform:translateY(0);}}
+.mbadge{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;line-height:1;transition:left var(--dur) var(--ease),opacity .2s;z-index:3;}
+.mbadge.bi{color:var(--blue);}.mbadge.bj{color:var(--brown);}
+.mbadge .tri{font-size:9px;display:block;}
+.mread{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:6px;min-height:22px;}
+.mread b{color:var(--ink);}
+.mread .ok{color:var(--green);font-weight:700;}.mread .no{color:var(--danger);font-weight:700;}
+.hashpanel{display:flex;gap:12px;justify-content:center;align-items:center;margin:6px 0 2px;flex-wrap:wrap;}
+.hashbox{font-family:var(--mono);font-size:14px;color:var(--muted);background:var(--paper);border:1.5px solid var(--line);border-radius:9px;padding:9px 14px;transition:all var(--dur) var(--ease);}
+.hashbox b{color:var(--ink);font-size:16px;}
+.hashbox.pat{border-color:var(--green);background:var(--greenbg);color:var(--green);}.hashbox.pat b{color:var(--green);}
+.hashbox.hit{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.16);}.hashbox.hit b{color:var(--green);}
+.legend{display:flex;gap:14px;justify-content:center;font-size:11px;color:var(--faint);font-family:var(--mono);margin-top:auto;padding-top:12px;flex-wrap:wrap;}
+.legend .gr{color:var(--green);}.legend .bl{color:var(--blue);}.legend .dg{color:var(--danger);}.legend .br{color:var(--brown);}
+
+/* ---- 右侧 ---- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:210px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.desc-body{margin-top:13px;font-size:13.5px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;} .codebox .fn{color:#8EC5EA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.38;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:48px;text-align:center;}
+@media(max-width:720px){body{padding:20px 14px 32px;}.viz{padding:16px;}.mcell{width:38px;flex-basis:38px;font-size:15px;}.controls{padding:12px;gap:8px}.dots{order:4;width:100%}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>字符串匹配动画 · 从朴素到 KMP 与滚动哈希</h1>
+    <p>朴素匹配 / 前缀函数 π / KMP / Rabin-Karp　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const X0=58,STEP=54,CELL=46;
+function popEl(id){const el=document.getElementById(id);if(!el)return;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
+
+/* text + 滑动 pattern 两行画布（朴素 / KMP 共用） */
+function buildMatcher(prefix,textArr,patArr,cap){
+  let t='<div class="mrow" style="position:absolute;left:'+X0+'px;top:30px">';
+  textArr.forEach((c,i)=>{t+='<div class="mcell" id="'+prefix+'t'+i+'"><span class="mi">'+i+'</span>'+c+'</div>';});
+  t+='</div>';
+  let p='<div class="mtrack" id="'+prefix+'track" style="position:absolute;left:'+X0+'px;top:118px"><div class="mrow">';
+  patArr.forEach((c,j)=>{p+='<div class="mcell" id="'+prefix+'p'+j+'">'+c+'</div>';});
+  p+='</div></div>';
+  const labs='<div class="mtag" style="top:42px">text</div><div class="mtag" style="top:130px">pat</div>';
+  const badges='<div class="mbadge bi" id="'+prefix+'bi" style="top:6px"><span>i</span><span class="tri">▼</span></div>'+
+               '<div class="mbadge bj" id="'+prefix+'bj" style="top:170px"><span class="tri">▲</span><span>j</span></div>';
+  viz.innerHTML='<div class="vcap">'+cap+'</div><div class="matcharea" id="'+prefix+'area">'+labs+t+p+badges+'</div>'+
+    '<div class="mread" id="'+prefix+'read"></div>'+
+    '<div class="legend"><span class="gr">已匹配前缀</span><span class="bl">正在比较</span><span class="dg">失配</span></div>';
+}
+function paintMatch(prefix,textArr,patArr,st){
+  const s=st.s,j=st.j||0,m=patArr.length,n=textArr.length;
+  const cmpP=(st.cmp!=null)?st.cmp:null,cmpT=(cmpP!=null)?s+cmpP:null,found=(st.found!=null)?st.found:null;
+  for(let ti=0;ti<n;ti++){
+    let cls='mcell';
+    if(found!=null&&ti>=found&&ti<found+m)cls+=' ok';
+    else if(cmpT!=null&&ti===cmpT)cls+=(st.bad?' bad':' cmp');
+    else if(ti>=s&&ti<s+j)cls+=' mt';
+    else if(ti<s)cls+=' past';
+    document.getElementById(prefix+'t'+ti).className=cls;
+  }
+  for(let pj=0;pj<m;pj++){
+    let cls='mcell';
+    if(found!=null)cls+=' ok';
+    else if(cmpP!=null&&pj===cmpP)cls+=(st.bad?' bad':' cmp');
+    else if(pj<j)cls+=' mt';
+    document.getElementById(prefix+'p'+pj).className=cls;
+  }
+  document.getElementById(prefix+'track').style.transform='translateX('+(s*STEP)+'px)';
+  const bi=document.getElementById(prefix+'bi'),bj=document.getElementById(prefix+'bj');
+  const iIdx=(cmpT!=null)?cmpT:(s+j),jIdx=(cmpP!=null)?cmpP:j;
+  bi.style.left=(X0+iIdx*STEP+CELL/2)+'px';bi.style.opacity=(found!=null)?.3:1;
+  bj.style.left=(X0+(s+jIdx)*STEP+CELL/2)+'px';bj.style.opacity=(found!=null)?.3:1;
+  let read;
+  if(found!=null)read='<span class="ok">命中！</span> pattern 出现在 text 下标 <b>'+found+'</b>';
+  else if(cmpP!=null){read='比较 text['+cmpT+']=<b>'+textArr[cmpT]+'</b> 与 pattern['+cmpP+']=<b>'+patArr[cmpP]+'</b> → '+(st.bad?'<span class="no">失配</span>':'<span class="ok">相等</span>');}
+  else read='已匹配前缀长度 j = <b>'+j+'</b>　·　text 指针 i 停在 <b>'+(s+j)+'</b>';
+  document.getElementById(prefix+'read').innerHTML=read;
+}
+
+/* ========== 场景 1：朴素匹配 ========== */
+const naiveScene=(()=>{
+  const T='ABABABAC'.split(''),P='ABABAC'.split('');
+  return{
+    id:'naive',label:'朴素匹配',sub:'每个起点重来',
+    code:'<span class="kw">for</span>(<span class="kw">int</span> s=0; s+m&lt;=n; ++s){\n'+
+      '    <span class="kw">int</span> j=0;\n'+
+      '    <span class="kw">while</span>(j&lt;m &amp;&amp; text[s+j]==pat[j]) ++j;\n'+
+      '    <span class="kw">if</span>(j==m) ans.push_back(s); <span class="cmt">// 命中</span>\n'+
+      '}   <span class="cmt">// 最坏 O(nm)</span>',
+    steps:[
+      {s:0,j:0,cmp:0,chip:'对齐 s=0',chipC:'c0',
+       act:'▸ pattern 对齐到 text 的每个起点，逐字符比较',
+       desc:'朴素法把 pattern 依次对齐 text 的<b>每一个起点 s</b>，从左到右逐字符比。现在 s=0，先比 <span class="bl">text[0]=A 与 pattern[0]=A</span>。'},
+      {s:0,j:5,cmp:5,bad:true,chip:'s=0 匹配 5 个后失配',chipC:'cd',
+       act:'▸ ABABA 都匹配，但第 6 个 C≠B 失配',
+       desc:'前 5 个字符 <span class="gr">ABABA</span> 全部匹配，第 6 个 <span class="dg">pattern[5]=C 与 text[5]=B 失配</span>。朴素法此时只能整体右移、从头再来。'},
+      {s:1,j:0,cmp:0,bad:true,chip:'s=1 整体右移 1',chipC:'cd',
+       act:'▸ text 指针退回 s+1，pattern 从头比，刚才的信息丢弃',
+       desc:'pattern 整体右移一格到 s=1，text 指针<b>退回</b>。<span class="dg">text[1]=B 与 pattern[0]=A</span> 立刻失配。注意：刚才验证过 text[2..4]=ABA，这里却被<b>白白重新扫描</b>。'},
+      {s:2,j:6,found:2,chip:'s=2 命中',chipC:'cg',
+       act:'▸ s=2 处 6 个字符全部匹配，返回下标 2',
+       desc:'右移到 s=2，text[2..7]=<span class="gr">ABABAC</span> 与 pattern 完全一致，返回下标 <b>2</b>。'},
+      {s:2,j:6,found:2,chip:'最坏 O(nm)',chipC:'ch',
+       act:'▸ 文本/模式高度重复时，每次右移都重比长前缀',
+       desc:'朴素法最坏 <b>O(nm)</b>：像本例这样前缀高度重复时，每次右移只挪一格，却要把重叠部分反复重比。<b>KMP 正是用前缀函数记住重叠、一次跳过</b> —— 见后两个主题。'},
+    ],
+    build(){buildMatcher('nv',T,P,'<b>朴素匹配</b>：pattern 逐个起点对齐 text，失配就整体右移一格重来');},
+    render(s){paintMatch('nv',T,P,s);}
+  };
+})();
+
+/* ========== 场景 2：前缀函数 π ========== */
+const prefixScene=(()=>{
+  const P='ABABAC'.split(''),m=P.length;
+  function pattern(){return P;}
+  const steps=[
+    {i:null,j:null,act:'init',pi:[0,null,null,null,null,null],activePi:0,
+     chip:'π[0] = 0',chipC:'c0',
+     act:'▸ π[i] = pattern[0..i] 的最长「相等真前后缀」长度',
+     read:'单字符没有真前后缀，π[0] 恒为 <b>0</b>',
+     desc:'前缀函数 π 是 KMP 的预处理。<b>π[i]</b> = 子串 pattern[0..i] 里，<b>最长的、既是前缀又是后缀、且不等于自身</b> 的长度。π[0] 恒为 0。'},
+    {i:1,j:0,act:'ne',pi:[0,0,null,null,null,null],activePi:1,
+     chip:'i=1: B≠A → π[1]=0',chipC:'cd',
+     act:'▸ 比较 pattern[1] 与 pattern[j=0]，不等且 j=0',
+     read:'pattern[1]=<b>B</b> ≠ pattern[0]=<b>A</b>，j 已是 0 → π[1]=<b>0</b>',
+     desc:'j = π[0] = 0。比较新字符 <span class="bl">pattern[1]=B</span> 与前缀指针 <span class="br">pattern[0]=A</span>：不等，且 j=0 无法再退 → π[1]=0。'},
+    {i:2,j:0,act:'eq',pi:[0,0,1,null,null,null],activePi:2,
+     chip:'i=2: A=A → π[2]=1',chipC:'cg',
+     act:'▸ pattern[2]=A 与 pattern[0]=A 相等 → j=1',
+     read:'相等 → j 增到 1，π[2]=<b>1</b>（前缀 "a" = 后缀 "a"）',
+     desc:'j=0。<span class="bl">pattern[2]=A</span> 与 <span class="br">pattern[0]=A</span> 相等 → j 增到 1，π[2]=1。此刻 "aba" 的最长相等真前后缀是 "a"。'},
+    {i:3,j:1,act:'eq',pi:[0,0,1,2,null,null],activePi:3,
+     chip:'i=3: B=B → π[3]=2',chipC:'cg',
+     act:'▸ pattern[3]=B 与 pattern[1]=B 相等 → j=2',
+     read:'相等 → j=2，π[3]=<b>2</b>（前缀 "ab" = 后缀 "ab"）',
+     desc:'j=π[2]=1。<span class="bl">pattern[3]=B</span> 与 <span class="br">pattern[1]=B</span> 相等 → j 增到 2，π[3]=2。相等前后缀扩展到 "ab"。'},
+    {i:4,j:2,act:'eq',pi:[0,0,1,2,3,null],activePi:4,
+     chip:'i=4: A=A → π[4]=3',chipC:'cg',
+     act:'▸ pattern[4]=A 与 pattern[2]=A 相等 → j=3',
+     read:'j=3，π[4]=<b>3</b>　·　"ababa" 最长相等真前后缀 = <b>aba</b>',
+     desc:'j=π[3]=2。<span class="bl">pattern[4]=A</span> 与 <span class="br">pattern[2]=A</span> 相等 → j=3，π[4]=3。此时 pattern[0..4]="ababa"，最长相等真前后缀正是 <b>"aba"</b>（长度 3）—— 与笔记示例一致。'},
+    {i:5,j:3,act:'retreat',pi:[0,0,1,2,3,null],activePi:5,
+     chip:'i=5: C≠B → j←π[2]=1',chipC:'cd',
+     act:'▸ 失配 → j = π[j−1]，而不是直接归零',
+     read:'pattern[5]=<b>C</b> ≠ pattern[3]=<b>B</b> → j 回退到 π[2]=<b>1</b>',
+     desc:'j=π[4]=3。<span class="dg">pattern[5]=C 与 pattern[3]=B 不等</span>，且 j&gt;0 → <b>回退 j = π[j−1] = π[2] = 1</b>。这就是「失配不归零、按 π 回退」的核心逻辑。'},
+    {i:5,j:1,act:'retreat',pi:[0,0,1,2,3,null],activePi:5,
+     chip:'i=5: C≠B → j←π[0]=0',chipC:'cd',
+     act:'▸ 仍失配，继续沿 π 回退',
+     read:'pattern[5]=<b>C</b> ≠ pattern[1]=<b>B</b> → j 回退到 π[0]=<b>0</b>',
+     desc:'回退后 j=1。<span class="dg">pattern[5]=C 与 pattern[1]=B</span> 仍不等 → 再回退 j=π[0]=0。回退可能连续发生多次，直到匹配或 j=0。'},
+    {i:5,j:0,act:'ne',pi:[0,0,1,2,3,0],activePi:5,
+     chip:'i=5: C≠A, j=0 → π[5]=0',chipC:'c0',
+     act:'▸ j=0 仍不等 → π[5]=0',
+     read:'pattern[5]=<b>C</b> ≠ pattern[0]=<b>A</b>，j=0 → π[5]=<b>0</b>',
+     desc:'j=0。<span class="dg">pattern[5]=C 与 pattern[0]=A</span> 不等且无法再退 → π[5]=0。前缀函数构造完成。'},
+    {i:null,j:null,act:'done',pi:[0,0,1,2,3,0],activePi:null,
+     chip:'π = [0,0,1,2,3,0]',chipC:'cg',
+     act:'▸ 构造 O(m)，π 直接驱动 KMP 匹配阶段',
+     read:'π = [0, 0, 1, 2, 3, 0]',
+     desc:'构造总复杂度 <b>O(m)</b>。π 既用于自身构造时的回退，也原样驱动 KMP 匹配阶段 —— <b>两处失配回退逻辑完全相同</b>，这正是 KMP 的精妙之处。'},
+  ];
+  return{
+    id:'prefix',label:'前缀函数 π',sub:'KMP 的预处理',
+    code:'pi[0]=0;\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=1; i&lt;m; ++i){\n'+
+      '    <span class="kw">int</span> j=pi[i-1];\n'+
+      '    <span class="kw">while</span>(j&gt;0 &amp;&amp; pat[i]!=pat[j])\n'+
+      '        j=pi[j-1];       <span class="cmt">// 失配回退</span>\n'+
+      '    <span class="kw">if</span>(pat[i]==pat[j]) ++j;\n'+
+      '    pi[i]=j;\n'+
+      '}',
+    steps,
+    build(){
+      let pr='<div class="mrow" style="position:absolute;left:'+X0+'px;top:34px">';
+      P.forEach((c,k)=>{pr+='<div class="mcell" id="pfp'+k+'"><span class="mi">'+k+'</span>'+c+'</div>';});
+      pr+='</div>';
+      let pi='<div class="mrow" style="position:absolute;left:'+X0+'px;top:120px">';
+      P.forEach((c,k)=>{pi+='<div class="mcell picell empty" id="pfpi'+k+'">·</div>';});
+      pi+='</div>';
+      const labs='<div class="mtag" style="top:46px">pat</div><div class="mtag" style="top:126px">π</div>';
+      const badges='<div class="mbadge bi" id="pfbi" style="top:10px"><span>i</span><span class="tri">▼</span></div>'+
+                   '<div class="mbadge bj" id="pfbj" style="top:88px"><span class="tri">▲</span><span>j</span></div>';
+      viz.innerHTML='<div class="vcap"><b>前缀函数 π</b>：pattern 自我匹配，π[i]=最长相等真前后缀长度</div>'+
+        '<div class="matcharea" id="pfarea" style="height:172px">'+labs+pr+pi+badges+'</div>'+
+        '<div class="mread" id="pfread"></div>'+
+        '<div class="legend"><span class="bl">当前字符 i</span><span class="br">前缀指针 j</span><span class="gr">相等/已确定</span><span class="dg">失配回退</span></div>';
+    },
+    render(st){
+      P.forEach((c,k)=>{
+        let cls='mcell';
+        if(st.i!=null&&k===st.i)cls+=(st.act==='eq'?' ok':(st.act==='ne'||st.act==='retreat')?' bad':' cmp');
+        else if(st.j!=null&&k===st.j)cls+=' cmpj';
+        else if(st.j!=null&&k<st.j)cls+=' mt';
+        document.getElementById('pfp'+k).className=cls;
+      });
+      for(let k=0;k<m;k++){
+        const el=document.getElementById('pfpi'+k),v=st.pi[k];
+        el.textContent=(v==null?'·':v);
+        el.className='mcell picell'+(v==null?' empty':'')+(k===st.activePi?' ok':'');
+      }
+      if(st.act==='eq'&&st.i!=null)popEl('pfp'+st.i);
+      if(st.activePi!=null&&st.act!=='init')popEl('pfpi'+st.activePi);
+      const bi=document.getElementById('pfbi'),bj=document.getElementById('pfbj');
+      if(st.i!=null){bi.style.opacity=1;bi.style.left=(X0+st.i*STEP+CELL/2)+'px';}else bi.style.opacity=0;
+      if(st.j!=null){bj.style.opacity=1;bj.style.left=(X0+st.j*STEP+CELL/2)+'px';}else bj.style.opacity=0;
+      document.getElementById('pfread').innerHTML=st.read||'';
+    }
+  };
+})();
+
+/* ========== 场景 3：KMP ========== */
+const kmpScene=(()=>{
+  const T='ABABABAC'.split(''),P='ABABAC'.split('');
+  return{
+    id:'kmp',label:'KMP',sub:'i 不回退，j 按 π 退',
+    code:'<span class="kw">int</span> j=0;\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=0; i&lt;n; ++i){\n'+
+      '    <span class="kw">while</span>(j&gt;0 &amp;&amp; text[i]!=pat[j])\n'+
+      '        j=pi[j-1];       <span class="cmt">// i 不退, j 退</span>\n'+
+      '    <span class="kw">if</span>(text[i]==pat[j]) ++j;\n'+
+      '    <span class="kw">if</span>(j==m){ ans.push_back(i-m+1); j=pi[j-1]; }\n'+
+      '}',
+    steps:[
+      {s:0,j:0,cmp:0,chip:'i、j 从 0 开始',chipC:'c0',
+       act:'▸ π=[0,0,1,2,3,0]；i 只前进，j 按 π 回退',
+       desc:'KMP 用前缀函数 <b>π=[0,0,1,2,3,0]</b> 驱动匹配。text 指针 <b>i 只前进不回退</b>，pattern 指针 j 失配时按 π 回退。先比 text[0] 与 pattern[0]。'},
+      {s:0,j:5,chip:'已匹配 ABABA (j=5)',chipC:'cb',
+       act:'▸ 一路匹配到 j=5',
+       desc:'i 一路前进，text[0..4] 与 pattern[0..4] 都是 <span class="gr">ABABA</span>，j 到达 5。下一步要比 text[5] 与 pattern[5]。'},
+      {s:0,j:5,cmp:5,bad:true,chip:'i=5 失配 (C≠B)',chipC:'cd',
+       act:'▸ text[5]=B ≠ pattern[5]=C 失配',
+       desc:'<span class="dg">text[5]=B ≠ pattern[5]=C 失配</span>。朴素法会让 i 退回、pattern 右移一格；KMP 不这样 —— 它查 π 来决定 pattern 的新位置。'},
+      {s:2,j:3,chip:'j←π[4]=3，模式串前进 2',chipC:'ch',
+       act:'▸ i 停在 5 不动；pattern 前进 2，复用前缀 ABA',
+       desc:'令 <b>j = π[4] = 3</b>：模式串整体<b>前进 2 格</b>，已知的前缀 <span class="gr">ABA</span>(pattern[0..2]) 直接对齐到 text[2..4]，<b>无需重比</b>。关键：<b>i 仍停在 5 不回退</b>。'},
+      {s:2,j:3,cmp:3,chip:'text[5] 对 pattern[3]',chipC:'cb',
+       act:'▸ 复用重叠后，继续比 text[5] 与 pattern[3]',
+       desc:'现在比较 <span class="bl">text[5]=B 与 pattern[3]=B</span>，相等 → j=4。text[5] 至始至终<b>只被访问一次</b>，这正是朴素法在 s=1 处白白重扫 ABA 所浪费掉的。'},
+      {s:2,j:6,found:2,chip:'j=6 命中 found=2',chipC:'cg',
+       act:'▸ text[6]、text[7] 依次匹配，j=6=m 命中',
+       desc:'继续 text[6]=A、text[7]=C 依次匹配，j 达到 6=m，命中，返回 <b>i−m+1 = 2</b>。若要找所有出现位置，命中后再 <code>j=π[j−1]</code> 继续（可处理重叠匹配）。'},
+      {s:2,j:6,found:2,chip:'O(n+m)',chipC:'cg',
+       act:'▸ i 从不回退 → 总比较次数 O(n+m)',
+       desc:'i 单调前进、j 的总回退量不超过总前进量，因此匹配阶段 <b>O(n)</b>，加上构造 π 的 O(m)，合计 <b>O(n+m)</b>。对比朴素法：同一组串，KMP 用 π 一步跳过了重复比较。'},
+    ],
+    build(){buildMatcher('km',T,P,'<b>KMP</b>：i 不回退，失配时 j←π[j−1]，模式串按重叠前缀整体前进');},
+    render(s){paintMatch('km',T,P,s);}
+  };
+})();
+
+/* ========== 场景 4：Rabin-Karp（滚动哈希） ========== */
+const rkScene=(()=>{
+  const T='CABCAB'.split(''),M=3,PAT_HASH=123;
+  const steps=[
+    {left:0,whash:312,match:false,found:null,enter:null,
+     chip:'窗口 0 = "CAB"',chipC:'c0',
+     act:'▸ 先算出 pattern 哈希与首窗口哈希',
+     formula:'window0 = C·10² + A·10 + B = 3·100 + 1·10 + 2 = <b>312</b>',
+     desc:'Rabin-Karp 把长度 m 的窗口映射成一个数。取 base=10、A=1 B=2 C=3。pattern "ABC" 的哈希是 <b>123</b>；首窗口 "CAB" 的哈希是 <b>312</b>。312 ≠ 123，不是。'},
+    {left:1,whash:123,match:true,found:1,enter:3,
+     chip:'滚动 → 窗口 1 = "ABC"',chipC:'cg',
+     act:'▸ O(1) 更新：去掉最高位 C，接入新字符 C',
+     formula:'window1 = (312 − <b>C</b>·100)·10 + <b>C</b> = (312−300)·10 + 3 = <b>123</b>',
+     desc:'窗口右移一格：<b>去掉最高位</b> text[0]=C（减 3·100），整体<b>乘 base</b>（进位），再<b>接入新字符</b> text[3]=C。得 123 = pattern 哈希 → <b>哈希命中</b>！但还要<span class="gr">核对子串</span> "ABC"=="ABC" ✓ → 下标 <b>1</b>。'},
+    {left:2,whash:231,match:false,found:null,enter:4,
+     chip:'滚动 → 窗口 2 = "BCA"',chipC:'c0',
+     act:'▸ 每次滚动都是 O(1)，与窗口长度无关',
+     formula:'window2 = (123 − <b>A</b>·100)·10 + <b>A</b> = (123−100)·10 + 1 = <b>231</b>',
+     desc:'继续滚动：去掉 text[1]=A、接入 text[4]=A，得 231 ≠ 123，跳过。<b>关键</b>：不管窗口多长，每次更新都是 <b>O(1)</b>，这就是「滚动」哈希省时的来源。'},
+    {left:3,whash:312,match:false,found:null,enter:5,
+     chip:'滚动 → 窗口 3 = "CAB"',chipC:'c0',
+     act:'▸ 去掉 text[2]=B，接入 text[5]=B',
+     formula:'window3 = (231 − <b>B</b>·100)·10 + <b>B</b> = (231−200)·10 + 2 = <b>312</b>',
+     desc:'最后一个窗口 "CAB" 哈希 312 ≠ 123，跳过。扫描结束，pattern 只在下标 1 出现一次。'},
+    {left:1,whash:123,match:true,found:1,enter:null,
+     chip:'O(n+m) 平均 · 需防碰撞',chipC:'cg',
+     act:'▸ 哈希命中 ≠ 字符串相等，必须二次核对',
+     formula:'不同子串可能同哈希（碰撞）→ 命中后 text.compare(l,m,pat) 核对',
+     desc:'平均 <b>O(n+m)</b>。<b>单哈希可能碰撞</b>：不同子串偶尔得到相同哈希值，所以命中后必须<b>逐字符核对</b>一次才能确认。工程/竞赛里常用<b>双哈希</b>（两组 base/mod）把碰撞概率压到可忽略。'},
+  ];
+  return{
+    id:'rk',label:'Rabin-Karp',sub:'滚动哈希',
+    code:'<span class="cmt">// 窗口哈希 O(1) 滚动更新</span>\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> r=m; r&lt;n; ++r){\n'+
+      '    <span class="kw">int</span> l=r-m;\n'+
+      '    win=(win - val(text[l])*P) % MOD;  <span class="cmt">// 去最高位</span>\n'+
+      '    win=(win*B + val(text[r])) % MOD;  <span class="cmt">// 接新字符</span>\n'+
+      '    <span class="kw">if</span>(win==patHash &amp;&amp;\n'+
+      '       text.compare(l+1,m,pat)==0)      <span class="cmt">// 防碰撞核对</span>\n'+
+      '        ans.push_back(l+1);\n'+
+      '}',
+    steps,
+    build(){
+      let t='<div class="mrow" style="position:absolute;left:'+X0+'px;top:34px">';
+      T.forEach((c,i)=>{t+='<div class="mcell" id="rkt'+i+'"><span class="mi">'+i+'</span>'+c+'</div>';});
+      t+='</div>';
+      viz.innerHTML='<div class="vcap"><b>Rabin-Karp</b>：滚动哈希 O(1) 更新窗口哈希（base=10，A=1 B=2 C=3）</div>'+
+        '<div class="matcharea" id="rkarea" style="height:96px"><div class="mtag" style="top:46px">text</div>'+t+'</div>'+
+        '<div class="hashpanel"><div class="hashbox pat">pattern "ABC" → hash <b>123</b></div><div class="hashbox" id="rkwin">window → hash <b>?</b></div></div>'+
+        '<div class="mread" id="rkform"></div><div class="mread" id="rkcmp" style="min-height:22px"></div>'+
+        '<div class="legend"><span class="bl">当前窗口</span><span class="gr">命中并核对</span></div>';
+    },
+    render(st){
+      T.forEach((c,i)=>{
+        let cls='mcell';
+        const inWin=i>=st.left&&i<st.left+M;
+        if(st.found!=null&&st.match&&i>=st.found&&i<st.found+M)cls+=' ok';
+        else if(inWin)cls+=' win';
+        document.getElementById('rkt'+i).className=cls;
+      });
+      if(st.enter!=null)popEl('rkt'+st.enter);
+      const win=document.getElementById('rkwin');
+      win.innerHTML='window "'+T.slice(st.left,st.left+M).join('')+'" → hash <b>'+st.whash+'</b>';
+      win.className='hashbox'+(st.match?' hit':'');
+      document.getElementById('rkform').innerHTML=st.formula;
+      document.getElementById('rkcmp').innerHTML=st.match
+        ?'<span class="ok">window hash == pattern hash</span> → 核对子串确认命中'
+        :'window hash <b>'+st.whash+'</b> ≠ pattern hash <b>'+PAT_HASH+'</b> → 跳过';
+    }
+  };
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[naiveScene,prefixScene,kmpScene,rkScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+const SC=()=>SCENES[si];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SC().build();codeBox.innerHTML=SC().code;
+  dotsBox.innerHTML='';dotEls=[];
+  SC().steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.chip;d.setAttribute('aria-label','第 '+idx+' 步：'+s.chip);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SC().steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SC().render(s);
+  stTitle.textContent=SC().label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;
+  stAct.innerHTML=s.act;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+  history.replaceState(null,'','#scene='+SC().id+'&step='+cur);
+}
+let timer=null,ms=2800;
+function play(){const steps=SC().steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SC().steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="15"></script>
+</body>
+</html>

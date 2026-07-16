@@ -103,5 +103,7 @@ void* addr = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
 
 - [[S-Week 3 - fio 对照与 Benchmark Matrix]]
 - [[S-Week 5 - io_uring 异步 IO]]
+- [[S-Week 4 - 前置知识 - mmap 与读路径对比]]
+- [[mmap 与读路径对比专题]]
 - [[1.3 进程的虚拟地址空间]]
 - [[146. LRU 缓存]]（缓存逐出思想同源）

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>贪心算法动画 · 区间调度 / 跳跃游戏 / 跳跃游戏II / 分发糖果</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.72;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ---- 索引单元格 ---- */
+.cwrap{margin:6px 0 4px;}
+.cellrow{display:flex;gap:8px;justify-content:center;position:relative;padding:26px 0 48px;flex-wrap:wrap;}
+.cell{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:18px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--muted);position:relative;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.cell.active{background:var(--panel);border-color:var(--muted);color:var(--ink);}
+.cell.reach{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.cell.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.15);}
+.cell.excl{opacity:.32;}
+.cell.ok{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.2);}
+.cell.layer{background:var(--bluebg);border-color:var(--blue);color:var(--blue);}
+.cell.next{background:var(--brownbg);border-color:var(--brown);color:var(--brown);}
+.cell.pop{animation:pop .55s var(--ease);}
+@keyframes pop{0%{transform:translateY(0);}42%{transform:translateY(-12px);}100%{transform:translateY(0);}}
+.cell .idx{position:absolute;top:-19px;left:0;right:0;text-align:center;font-size:10px;color:var(--faint);font-weight:400;}
+.cbadge{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .25s;line-height:1.05;pointer-events:none;z-index:3;}
+.cbadge .tri{font-size:9px;display:block;}
+.cbadge.a{color:var(--blue);}.cbadge.b{color:var(--brown);}.cbadge.g{color:var(--green);}
+
+.rowlab{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:6px 0 0;}
+.passbar{text-align:center;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--brown);min-height:22px;margin-top:8px;}
+.mread{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:6px;min-height:22px;}
+.mread b{color:var(--ink);}.mread .ok{color:var(--green);font-weight:700;}.mread .no{color:var(--danger);font-weight:700;}
+
+/* ---- 区间调度时间轴 ---- */
+.timeline{position:relative;height:222px;margin:12px 0 2px;}
+.ivbar{position:absolute;height:26px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;gap:7px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted);transition:all var(--dur) var(--ease);box-shadow:0 1px 2px rgba(60,55,40,.05);}
+.ivbar.cur{border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.15);}
+.ivbar.pick{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.ivbar.skip{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);opacity:.6;}
+.ivrank{font-weight:700;background:var(--paper);border:1px solid currentColor;border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;font-size:10px;}
+.ivaxis{position:absolute;left:24px;right:8px;height:1.5px;background:var(--line);}
+.ivtick{position:absolute;width:1px;height:6px;background:var(--line);transform:translateX(-50%);}
+.ivticklab{position:absolute;font-family:var(--mono);font-size:10px;color:var(--faint);transform:translateX(-50%);}
+.ivmarker{position:absolute;top:0;height:176px;border-left:2px dashed var(--brown);transition:left var(--dur) var(--ease),opacity .25s;z-index:2;}
+.ivmklab{position:absolute;top:-2px;left:5px;font-family:var(--mono);font-size:10px;color:var(--brown);font-weight:700;white-space:nowrap;}
+
+.legend{display:flex;gap:14px;justify-content:center;font-size:11px;color:var(--faint);font-family:var(--mono);margin-top:auto;padding-top:12px;flex-wrap:wrap;}
+.legend .gr{color:var(--green);}.legend .bl{color:var(--blue);}.legend .dg{color:var(--danger);}.legend .br{color:var(--brown);}
+
+/* ---- 右侧 ---- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:210px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.desc-body{margin-top:13px;font-size:13.5px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;} .codebox .fn{color:#8EC5EA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.38;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:48px;text-align:center;}
+@media(max-width:720px){body{padding:20px 14px 32px;}.viz{padding:16px;}.cell{width:44px;height:44px;font-size:15px;}.controls{padding:12px;gap:8px}.dots{order:4;width:100%}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>贪心算法动画 · 四种「局部最优 → 全局最优」的套路</h1>
+    <p>区间调度 / 跳跃游戏 / 跳跃游戏 II / 分发糖果　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+/* 通用单元格助手（持久 DOM，靠 class 过渡） */
+function buildCells(container,values,badges){
+  let h='<div class="cellrow" id="crow">';
+  values.forEach((v,i)=>{h+='<div class="cell" id="c'+i+'"><span class="idx">'+i+'</span><span class="v">'+v+'</span></div>';});
+  badges.forEach(b=>{h+='<div class="cbadge '+b.cls+'" id="bdg-'+b.name+'" style="opacity:0"><span class="tri">▲</span>'+b.label+'</div>';});
+  h+='</div>';container.innerHTML=h;
+}
+function setCell(i,cls,val){const el=document.getElementById('c'+i);el.className='cell '+cls;if(val!=null)el.querySelector('.v').textContent=val;}
+function popCell(i){const el=document.getElementById('c'+i);if(!el)return;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
+function moveBadges(list){
+  const occ={};
+  list.forEach(p=>{const el=document.getElementById('bdg-'+p.name);if(!el)return;
+    if(p.at==null){el.style.opacity=0;return;}
+    const cell=document.getElementById('c'+p.at);let top=cell.offsetTop+cell.offsetHeight+8;if(occ[p.at])top+=21;occ[p.at]=1;
+    el.style.left=(cell.offsetLeft+cell.offsetWidth/2)+'px';el.style.top=top+'px';el.style.opacity=1;});
+}
+function setId(id,cls){const el=document.getElementById(id);if(el)el.className=cls;}
+function popId(id){const el=document.getElementById(id);if(!el)return;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
+
+/* ========== 场景 1：区间调度（按结束时间排序） ========== */
+const intervalScene=(()=>{
+  const IV=[{s:1,e:3,rank:1},{s:2,e:4,rank:2},{s:3,e:5,rank:3},{s:0,e:6,rank:4},{s:5,e:7,rank:5}];
+  const origin=24,unit=66;
+  const steps=[
+    {cur:null,picked:[],skipped:[],lastEnd:null,chip:'目标：最多互不重叠区间',chipC:'c0',
+     act:'▸ 按「结束时间」从小到大排序，再依次挑选',
+     read:'先按结束时间排序：[1,3] [2,4] [3,5] [0,6] [5,7]',
+     desc:'给定若干区间，选出<b>最多</b>互不重叠的。贪心策略：<b>按结束时间排序</b>，每次选「结束最早、且不与已选冲突」的区间。<b>结束越早，给后面留的空间越多</b>。'},
+    {cur:0,picked:[0],skipped:[],lastEnd:3,chip:'选 ① [1,3]',chipC:'cg',
+     act:'▸ 结束最早的 [1,3]：start=1 ≥ lastEnd → 选',
+     read:'选中 [1,3]，lastEnd = <b>3</b>，count = 1',
+     desc:'结束最早的是 [1,3]。它 start=1 ≥ lastEnd(−∞)，<span class="gr">选中</span>。更新 <span class="br">lastEnd = 3</span>（右侧虚线），后面只能选 start ≥ 3 的区间。'},
+    {cur:1,picked:[0],skipped:[1],lastEnd:3,chip:'跳过 ② [2,4]',chipC:'cd',
+     act:'▸ [2,4]：start=2 < lastEnd=3 → 冲突，跳过',
+     read:'[2,4] 的 start=2 < lastEnd=3 → <span class="no">冲突，跳过</span>',
+     desc:'下一个 [2,4] 的 start=2 < lastEnd=3，与已选的 [1,3] <span class="dg">重叠</span> → 跳过。贪心不回头，直接看下一个。'},
+    {cur:2,picked:[0,2],skipped:[1],lastEnd:5,chip:'选 ③ [3,5]',chipC:'cg',
+     act:'▸ [3,5]：start=3 ≥ lastEnd=3 → 选',
+     read:'选中 [3,5]，lastEnd = <b>5</b>，count = 2',
+     desc:'[3,5] 的 start=3 ≥ lastEnd=3（端点相接不算重叠）→ <span class="gr">选中</span>。lastEnd 前移到 5。'},
+    {cur:3,picked:[0,2],skipped:[1,3],lastEnd:5,chip:'跳过 ④ [0,6]',chipC:'cd',
+     act:'▸ [0,6]：start=0 < 5 → 跳过（这正是反例的关键）',
+     read:'[0,6] 的 start=0 < lastEnd=5 → <span class="no">跳过</span>',
+     desc:'[0,6] 很长、start 又最早。<b>若按「开始时间最早」贪心，会先选它，结果只能要 1 个</b>；而按结束时间排序时它被正确跳过 —— 这就是为什么排序依据不能选错。'},
+    {cur:4,picked:[0,2,4],skipped:[1,3],lastEnd:7,chip:'选 ⑤ [5,7]',chipC:'cg',
+     act:'▸ [5,7]：start=5 ≥ lastEnd=5 → 选，count=3',
+     read:'选中 [5,7]，lastEnd = <b>7</b>，count = <b>3</b>',
+     desc:'最后 [5,7] 的 start=5 ≥ lastEnd=5 → <span class="gr">选中</span>。共选出 <b>[1,3] · [3,5] · [5,7]</b> 三个。'},
+    {cur:null,picked:[0,2,4],skipped:[1,3],lastEnd:7,chip:'O(n log n) · 交换论证',chipC:'cg',
+     act:'▸ 结束最早的区间一定属于某个最优解',
+     read:'答案 = 3 个：[1,3] [3,5] [5,7]',
+     desc:'正确性（交换论证）：把任一最优解的第一个区间换成「结束最早」的那个，仍不冲突且数量不减 → 存在以它开头的最优解。复杂度 <b>O(n log n)</b>，瓶颈在排序。'},
+  ];
+  return{
+    id:'interval',label:'区间调度',sub:'按结束时间排序',
+    code:'<span class="fn">sort</span>(iv.begin(), iv.end(),\n'+
+      '  [](<span class="kw">auto</span>&a,<span class="kw">auto</span>&b){ <span class="kw">return</span> a[1]&lt;b[1]; }); <span class="cmt">// 按结束</span>\n'+
+      '<span class="kw">int</span> cnt=0, lastEnd=INT_MIN;\n'+
+      '<span class="kw">for</span>(<span class="kw">auto</span>&it : iv)\n'+
+      '    <span class="kw">if</span>(it[0] &gt;= lastEnd){  <span class="cmt">// 不冲突就选</span>\n'+
+      '        ++cnt; lastEnd = it[1];\n'+
+      '    }',
+    steps,
+    build(){
+      let bars='';
+      IV.forEach((v,k)=>{const x=origin+v.s*unit,w=(v.e-v.s)*unit,y=8+k*33;
+        bars+='<div class="ivbar" id="iv'+k+'" style="left:'+x+'px;top:'+y+'px;width:'+w+'px"><span class="ivrank">'+v.rank+'</span><span>['+v.s+','+v.e+']</span></div>';});
+      let ticks='';for(let t=0;t<=8;t++){ticks+='<div class="ivtick" style="left:'+(origin+t*unit)+'px;top:176px"></div><div class="ivticklab" style="left:'+(origin+t*unit)+'px;top:184px">'+t+'</div>';}
+      viz.innerHTML='<div class="vcap"><b>区间调度</b>：按结束时间排序，选「结束最早且不冲突」的区间（LC 435 / 会议室）</div>'+
+        '<div class="timeline" id="tl"><div class="ivaxis" style="top:176px"></div>'+ticks+bars+
+        '<div class="ivmarker" id="ivmk" style="opacity:0"><span class="ivmklab">lastEnd</span></div></div>'+
+        '<div class="mread" id="ivread"></div>'+
+        '<div class="legend"><span class="bl">当前考察</span><span class="gr">选中</span><span class="dg">冲突跳过</span><span class="br">lastEnd 边界</span></div>';
+    },
+    render(st){
+      IV.forEach((v,k)=>{let cls='ivbar';if(st.picked.includes(k))cls+=' pick';else if(st.skipped.includes(k))cls+=' skip';if(st.cur===k)cls+=' cur';document.getElementById('iv'+k).className=cls;});
+      const mk=document.getElementById('ivmk');
+      if(st.lastEnd==null)mk.style.opacity=0;else{mk.style.opacity=1;mk.style.left=(origin+st.lastEnd*unit)+'px';}
+      document.getElementById('ivread').innerHTML=st.read;
+    }
+  };
+})();
+
+/* ========== 场景 2：跳跃游戏（维护最远可达） ========== */
+const jumpScene=(()=>{
+  const nums=[2,3,1,1,4];
+  const steps=[
+    {i:null,far:0,chip:'farthest = 可达最远下标',chipC:'c0',
+     act:'▸ 维护一个只增不减的覆盖边界 farthest',
+     read:'初始 farthest = 0（只有下标 0 一定可达）',
+     desc:'nums[i] 表示从 i 最多向右跳几步，问能否到达末尾。贪心：维护 <b>farthest = 当前所有可达位置能进一步到达的最远下标</b>，一次扫描即可。'},
+    {i:0,far:2,chip:'i=0：跳力 2',chipC:'cb',
+     act:'▸ farthest = max(0, 0+2) = 2',
+     read:'i=0：farthest = max(0, 0+nums[0]=2) = <b>2</b>',
+     desc:'在下标 0，能跳到 0+2=2。<span class="gr">覆盖范围扩展到 [0,2]</span>。只要 i 落在覆盖范围内就说明它可达，可以用它继续扩展。'},
+    {i:1,far:4,chip:'i=1：跳力 3',chipC:'cb',
+     act:'▸ i=1 ≤ 2 可达；farthest = max(2, 1+3) = 4',
+     read:'i=1 ≤ farthest：farthest = max(2, 1+3) = <b>4</b>',
+     desc:'i=1 在覆盖内（可达），用它更新：farthest = max(2, 1+3) = 4。<span class="gr">覆盖范围已到 [0,4]，正好包含末尾</span>。'},
+    {i:1,far:4,done:true,chip:'farthest ≥ n−1 → true',chipC:'cg',
+     act:'▸ farthest=4 ≥ n−1=4 → 可达终点',
+     read:'<span class="ok">farthest ≥ 末尾下标 → 返回 true</span>',
+     desc:'farthest=4 已覆盖末尾下标 4，<span class="gr">提前返回 true</span>。全程 i 单调前进、farthest 单调不减。'},
+    {i:null,far:4,done:true,chip:'O(n) · 反例见说明',chipC:'ch',
+     act:'▸ 关键守卫：i > farthest 立即失败',
+     read:'反例 [3,2,1,0,4]：扫到 i=4 时 4 > farthest=3 → false',
+     desc:'正确性（反证）：某刻若 <b>i > farthest</b>，说明前面所有可达位置都跳不到 i，后面更够不到 → 一定失败。如 <b>[3,2,1,0,4]</b>：farthest 卡在 3，i=4 时越界 → 返回 false。复杂度 <b>O(n)</b>。'},
+  ];
+  return{
+    id:'jump',label:'跳跃游戏',sub:'维护最远可达',
+    code:'<span class="kw">int</span> farthest=0;\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=0; i&lt;n; ++i){\n'+
+      '    <span class="kw">if</span>(i &gt; farthest) <span class="kw">return</span> <span class="kw">false</span>; <span class="cmt">// 够不到</span>\n'+
+      '    farthest = max(farthest, i+nums[i]); <span class="cmt">// 扩展覆盖</span>\n'+
+      '    <span class="kw">if</span>(farthest &gt;= n-1) <span class="kw">return</span> <span class="kw">true</span>;\n'+
+      '}',
+    steps,
+    build(){
+      viz.innerHTML='<div class="vcap"><b>跳跃游戏</b>：维护 farthest = 当前可达能到的最远下标（LC 55）</div>'+
+        '<div class="cwrap" id="cw"></div>'+
+        '<div class="mread" id="jgread"></div>'+
+        '<div class="legend"><span class="gr">可达覆盖区</span><span class="bl">当前 i</span><span class="br">farthest 边界</span></div>';
+      buildCells(document.getElementById('cw'),nums,[{name:'i',cls:'a',label:'i'},{name:'far',cls:'b',label:'far'}]);
+    },
+    render(st){
+      nums.forEach((v,idx)=>{let cls='active';if(idx<=st.far)cls='reach';else cls='excl';if(idx===st.i)cls='cur';if(st.done&&idx===nums.length-1)cls='ok';setCell(idx,cls);});
+      moveBadges([{name:'i',at:st.i},{name:'far',at:st.far}]);
+      document.getElementById('jgread').innerHTML=st.read;
+    }
+  };
+})();
+
+/* ========== 场景 3：跳跃游戏 II（分层覆盖） ========== */
+const jump2Scene=(()=>{
+  const nums=[2,3,1,1,4];
+  const steps=[
+    {i:null,curEnd:0,far:0,jumps:0,chip:'curEnd 本层边界 / farthest 下一层',chipC:'c0',
+     act:'▸ 分层：curEnd 是本次跳跃的边界，farthest 是下一层能到的最远',
+     read:'jumps=0，curEnd=0，farthest=0',
+     desc:'求<b>最少</b>跳数。把每次跳跃看成 BFS 的一层：<span class="bl">curEnd</span> 是当前这跳能覆盖的边界，<span class="br">farthest</span> 记录本层内所有位置能到的最远。走到 curEnd 就必须起跳，层数即最少跳数。'},
+    {i:0,curEnd:2,far:2,jumps:1,chip:'i=0 到达 curEnd → 起跳',chipC:'cb',
+     act:'▸ farthest=max(0,0+2)=2；i==curEnd → jumps=1, curEnd=2',
+     read:'i=0：farthest=2；i==curEnd(0) → 起跳 jumps=<b>1</b>，curEnd=2',
+     desc:'i=0 时 farthest=2。i 恰好等于本层边界 curEnd(0) → <b>起跳</b>：jumps=1，把 curEnd 推到 farthest=2。<span class="bl">第 1 跳覆盖 [0,2]</span>。'},
+    {i:1,curEnd:2,far:4,jumps:1,chip:'i=1：扩展下一层',chipC:'ch',
+     act:'▸ farthest=max(2,1+3)=4；i≠curEnd，先不跳',
+     read:'i=1：farthest=max(2, 1+3)=<b>4</b>（下一层已能到末尾）',
+     desc:'i=1 仍在本层内（i≠curEnd）。它把 <span class="br">farthest 扩展到 4</span>，意味着「第 2 跳」将能覆盖到下标 4。此刻先不加跳数，继续走到本层边界。'},
+    {i:2,curEnd:4,far:4,jumps:2,chip:'i=2 到达 curEnd → 起跳',chipC:'cb',
+     act:'▸ i==curEnd(2) → jumps=2, curEnd=farthest=4',
+     read:'i=2：i==curEnd(2) → 起跳 jumps=<b>2</b>，curEnd=4',
+     desc:'走到本层边界 i=2 → 第 2 次<b>起跳</b>：jumps=2，curEnd 推到 4。<span class="bl">第 2 跳覆盖到末尾</span>。注意我们从没真的枚举「跳到哪」，只在边界处结算。'},
+    {i:4,curEnd:4,far:4,jumps:2,done:true,chip:'到达末尾 · jumps=2',chipC:'cg',
+     act:'▸ 到达 n−1，最少跳数 = 2',
+     read:'<span class="ok">到达末尾，最少跳数 = 2</span>',
+     desc:'循环到 n−1 结束（末尾不需要再起跳）。最少 <b>2</b> 跳：0→(1 或 2)→4。'},
+    {i:null,curEnd:4,far:4,jumps:2,done:true,chip:'O(n) 一次扫描',chipC:'cg',
+     act:'▸ 每层在覆盖范围内选下一跳最远，层数=最少跳数',
+     read:'层数即答案；无需回溯、无需枚举每一跳',
+     desc:'贪心正确性：每一层都取「能到的最远」作为下一层边界，覆盖范围扩张最快，因此层数最少。等价于 BFS 分层，但用两个边界变量 <b>O(n)</b> 一次扫描完成。'},
+  ];
+  return{
+    id:'jump2',label:'跳跃游戏 II',sub:'分层覆盖求最少跳',
+    code:'<span class="kw">int</span> jumps=0, curEnd=0, farthest=0;\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=0; i&lt;n-1; ++i){\n'+
+      '    farthest = max(farthest, i+nums[i]);\n'+
+      '    <span class="kw">if</span>(i == curEnd){       <span class="cmt">// 到达本层边界</span>\n'+
+      '        ++jumps; curEnd = farthest; <span class="cmt">// 起跳到下一层</span>\n'+
+      '    }\n'+
+      '}',
+    steps,
+    build(){
+      viz.innerHTML='<div class="vcap"><b>跳跃游戏 II</b>：curEnd 本层边界、farthest 下一层最远，走到边界就起跳（LC 45）</div>'+
+        '<div class="cwrap" id="cw"></div>'+
+        '<div class="mread" id="j2read"></div>'+
+        '<div class="legend"><span class="bl">本层覆盖</span><span class="br">下一层可达</span><span class="gr">当前 i</span></div>';
+      buildCells(document.getElementById('cw'),nums,[{name:'i',cls:'g',label:'i'},{name:'ce',cls:'a',label:'curEnd'},{name:'far',cls:'b',label:'far'}]);
+    },
+    render(st){
+      nums.forEach((v,idx)=>{let cls='active';if(idx<=st.curEnd)cls='layer';else if(idx<=st.far)cls='next';else cls='excl';if(idx===st.i)cls='cur';if(st.done&&idx===nums.length-1)cls='ok';setCell(idx,cls);});
+      moveBadges([{name:'i',at:st.i},{name:'ce',at:st.curEnd},{name:'far',at:st.far}]);
+      document.getElementById('j2read').innerHTML='jumps = <b>'+st.jumps+'</b>　·　'+st.read;
+    }
+  };
+})();
+
+/* ========== 场景 4：分发糖果（两次扫描 + max） ========== */
+const candyScene=(()=>{
+  const R=[1,2,3,1,2];
+  const steps=[
+    {i:null,c:[1,1,1,1,1],pass:'',hi:[],chip:'①每人≥1 ②相邻高分更多',chipC:'c0',
+     act:'▸ 先每人 1 颗，再做左、右两次扫描',
+     read:'初始每人 1 颗糖：[1,1,1,1,1]',
+     desc:'相邻孩子中评分高的要拿更多糖，求最小总数。<b>一次扫描无法同时满足左右两个方向</b>，于是拆成<b>两次扫描</b>：左→右管「右比左高」，右→左管「左比右高」，每位取两者 max。'},
+    {i:1,c:[1,2,1,1,1],pass:'→ 从左到右',pop:1,hi:[0,1],chip:'L→R：r[1]>r[0]',chipC:'cb',
+     act:'▸ rating 2 > 1 → candy[1] = candy[0]+1 = 2',
+     read:'r[1]=2 &gt; r[0]=1 → c[1] = c[0]+1 = <b>2</b>',
+     desc:'左→右扫描：只要 r[i] &gt; r[i−1]，就让 c[i] = c[i−1]+1。这一趟只保证<b>上升段</b>（右比左高）的约束。'},
+    {i:2,c:[1,2,3,1,1],pass:'→ 从左到右',pop:2,hi:[1,2],chip:'L→R：r[2]>r[1]',chipC:'cb',
+     act:'▸ rating 3 > 2 → candy[2] = 3',
+     read:'r[2]=3 &gt; r[1]=2 → c[2] = c[1]+1 = <b>3</b>',
+     desc:'继续上升：c[2]=3。到这里 1&lt;2&lt;3 的上升段被正确地递增分配。'},
+    {i:3,c:[1,2,3,1,1],pass:'→ 从左到右',hi:[2,3],chip:'L→R：r[3]<r[2] 保持',chipC:'c0',
+     act:'▸ rating 1 > 3 ? 否 → candy[3] 保持 1',
+     read:'r[3]=1 &gt; r[2]=3 ? 否 → c[3] 保持 <b>1</b>',
+     desc:'r[3]=1 不大于左邻，左→右这趟不管它（下降方向留给右→左处理），c[3] 保持 1。'},
+    {i:4,c:[1,2,3,1,2],pass:'→ 从左到右',pop:4,hi:[3,4],chip:'L→R 完成',chipC:'cb',
+     act:'▸ rating 2 > 1 → candy[4]=2；左扫结果 [1,2,3,1,2]',
+     read:'r[4]=2 &gt; r[3]=1 → c[4]=2　·　左扫完成 [1,2,3,1,2]',
+     desc:'c[4]=2。左→右完成：<b>[1,2,3,1,2]</b>。此时只保证了所有「右比左高」的约束，下降段还没管。'},
+    {i:3,c:[1,2,3,1,2],pass:'← 从右到左',hi:[3,4],chip:'R→L：r[3]<r[4] 保持',chipC:'c0',
+     act:'▸ rating 1 > 2 ? 否 → candy[3] 保持 1',
+     read:'r[3]=1 &gt; r[4]=2 ? 否 → c[3] 保持 <b>1</b>',
+     desc:'右→左扫描开始。r[3]=1 不大于右邻 r[4]=2，不需增加，c[3] 保持 1。'},
+    {i:2,c:[1,2,3,1,2],pass:'← 从右到左',pop:2,hi:[2,3],chip:'R→L：取 max 保住 3',chipC:'cg',
+     act:'▸ r[2]>r[3] → candy[2]=max(3, 1+1) = 3',
+     read:'r[2]=3 &gt; r[3]=1 → c[2]=max(c[2]=3, c[3]+1=2) = <b>3</b>',
+     desc:'<b>关键一步</b>：r[2]=3 &gt; r[3]=1，需要 c[2] ≥ c[3]+1=2；但左扫已给它 3。<b>必须取 max</b> 保住 3，否则直接覆盖成 2 会破坏左边「1&lt;2&lt;3」的约束。'},
+    {i:0,c:[1,2,3,1,2],pass:'← 从右到左',hi:[0,1],chip:'R→L：其余无需增加',chipC:'c0',
+     act:'▸ r[1]<r[2]、r[0]<r[1] → 都保持',
+     read:'r[1]=2&gt;r[2]=3? 否 → 2　·　r[0]=1&gt;r[1]=2? 否 → 1',
+     desc:'i=1、i=0 都不大于右邻，保持原值。右→左扫描结束，两个方向的约束都已满足。'},
+    {i:null,c:[1,2,3,1,2],pass:'',hi:[],settled:true,chip:'总数 = 9 · O(n)',chipC:'cg',
+     act:'▸ 每位取两向 max，求和 = 9',
+     read:'总糖果 = 1+2+3+1+2 = <b>9</b>',
+     desc:'最终 <b>[1,2,3,1,2]</b>，总数 <span class="gr">9</span>。每个相邻关系只涉及两个孩子，左扫保证上升边、右扫保证下降边、max 合并两向约束，因此得到满足全部局部约束的<b>最小</b>总数。两趟扫描各 <b>O(n)</b>。'},
+  ];
+  function badgeAt(bid,idx,dy){const b=document.getElementById(bid);if(idx==null){b.style.opacity=0;return;}const cell=document.getElementById('rt'+idx);b.style.left=(cell.offsetLeft+cell.offsetWidth/2)+'px';b.style.top=(cell.offsetTop+dy)+'px';b.style.opacity=1;}
+  return{
+    id:'candy',label:'分发糖果',sub:'两次扫描 + max',
+    code:'vector&lt;int&gt; c(n, 1);\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=1; i&lt;n; ++i)          <span class="cmt">// 左 → 右</span>\n'+
+      '    <span class="kw">if</span>(r[i]&gt;r[i-1]) c[i]=c[i-1]+1;\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=n-2; i&gt;=0; --i)       <span class="cmt">// 右 → 左</span>\n'+
+      '    <span class="kw">if</span>(r[i]&gt;r[i+1])\n'+
+      '        c[i]=max(c[i], c[i+1]+1); <span class="cmt">// 取max保留两向约束</span>',
+    steps,
+    build(){
+      let rr='<div class="cellrow" id="rrow" style="padding-bottom:20px">';
+      R.forEach((v,i)=>rr+='<div class="cell" id="rt'+i+'"><span class="idx">'+i+'</span><span class="v">'+v+'</span></div>');
+      rr+='<div class="cbadge a" id="cdi" style="opacity:0"><span class="tri">▼</span>i</div></div>';
+      let cc='<div class="cellrow" id="crow2" style="padding:8px 0 26px">';
+      R.forEach((v,i)=>cc+='<div class="cell" id="cd'+i+'"><span class="v">1</span></div>');
+      cc+='</div>';
+      viz.innerHTML='<div class="vcap"><b>分发糖果</b>：左→右、右→左两次扫描，每位取 max 合并约束（LC 135）</div>'+
+        '<div class="rowlab">rating（评分，固定）</div>'+rr+'<div class="rowlab">candy（糖果数，更新中）</div>'+cc+
+        '<div class="passbar" id="cpass"></div><div class="mread" id="cread"></div>'+
+        '<div class="legend"><span class="bl">正在更新 / 比较</span><span class="gr">最终值</span></div>';
+    },
+    render(st){
+      R.forEach((v,i)=>{
+        let rc='active';if(st.hi&&st.hi.includes(i))rc=(i===st.i?'cur':'reach');setId('rt'+i,'cell '+rc);
+        let cc='active';if(st.settled)cc='ok';else if(i===st.i)cc='cur';
+        const cell=document.getElementById('cd'+i);cell.className='cell '+cc;cell.querySelector('.v').textContent=st.c[i];
+      });
+      if(st.pop!=null)popId('cd'+st.pop);
+      const bi=document.getElementById('cdi');if(st.i!=null){bi.style.opacity=1;const cell=document.getElementById('rt'+st.i);bi.style.left=(cell.offsetLeft+cell.offsetWidth/2)+'px';bi.style.top=(cell.offsetTop-24)+'px';}else bi.style.opacity=0;
+      document.getElementById('cpass').innerHTML=st.pass||'';
+      document.getElementById('cread').innerHTML=st.read||'';
+    }
+  };
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[intervalScene,jumpScene,jump2Scene,candyScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+const SC=()=>SCENES[si];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SC().build();codeBox.innerHTML=SC().code;
+  dotsBox.innerHTML='';dotEls=[];
+  SC().steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.chip;d.setAttribute('aria-label','第 '+idx+' 步：'+s.chip);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);requestAnimationFrame(()=>SC().render(SC().steps[cur]));
+}
+function go(i){
+  const steps=SC().steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SC().render(s);
+  stTitle.textContent=SC().label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;
+  stAct.innerHTML=s.act;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+  history.replaceState(null,'','#scene='+SC().id+'&step='+cur);
+}
+let timer=null,ms=2800;
+function play(){const steps=SC().steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SC().steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>SC().render(SC().steps[cur]));
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="17"></script>
+</body>
+</html>

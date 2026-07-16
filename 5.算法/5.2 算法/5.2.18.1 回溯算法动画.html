@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回溯算法动画 · 选择树 / 子集组合 / 排列 / 切割 / 括号 / 棋盘 / 网格</title>
+<style>
+:root{
+  /* Warm-paper teaching system: 8px rhythm, restrained semantic color, one shadow depth. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.68;padding:34px 40px 52px;text-wrap:pretty}
+button{font:inherit}code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:2px 6px;border-radius:4px}
+.wrap{max-width:1380px;margin:0 auto}
+header h1{font-size:27px;font-weight:600;letter-spacing:0}
+header p{font-size:14.5px;color:var(--muted);margin-top:7px}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:26px}
+.tab{font-size:14px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:3px;align-items:flex-start;justify-content:center;min-height:68px}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px)}
+.tab:focus-visible,.ctrl:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.tab .t{font-weight:600;color:var(--ink)}.tab .s{font-size:11px;color:var(--faint);font-family:var(--mono)}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 4px 14px rgba(62,61,57,.18)}
+.tab.on .t,.tab.on .s{color:var(--paper)}.tab.on .s{opacity:.78}
+.layout{display:grid;grid-template-columns:minmax(0,790px) minmax(400px,1fr);gap:32px;margin-top:30px;align-items:start}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:28px;min-height:640px;display:flex;flex-direction:column;box-shadow:0 1px 4px rgba(60,55,40,.05);overflow:hidden}
+.vcap{font-size:14px;color:var(--muted);margin-bottom:14px}.vcap b{color:var(--ink)}
+.right{display:flex;flex-direction:column;gap:20px}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:25px 27px;min-height:292px;box-shadow:0 1px 4px rgba(60,55,40,.05)}
+.desc-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.desc-head .st{font-size:21px;font-weight:600}
+.act{margin-top:18px;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:12px 15px;border-radius:7px}
+.desc-body{margin-top:14px;font-size:16px;color:var(--muted)}
+.desc-body b{color:var(--ink)}.desc-body .bl{color:var(--blue);font-weight:600}.desc-body .gr{color:var(--green);font-weight:600}.desc-body .br{color:var(--brown);font-weight:600}.desc-body .dg{color:var(--danger);font-weight:600}
+.chip{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray)}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg)}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg)}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg)}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg)}
+.codebox{background:#2E2C27;border-radius:8px;padding:21px 23px;font-family:var(--mono);font-size:13px;line-height:1.72;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 3px 10px rgba(46,44,39,.19);min-height:260px}
+.codebox .cmt{color:#8F8B80}.codebox .kw{color:#E3A44C}.codebox .fn{color:#8EC5EA}.codebox .num{color:#A6D6A8}
+.stage-note{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:auto;padding-top:14px;min-height:36px}
+.stage-note .ok{color:var(--green);font-weight:700}.stage-note .bad{color:var(--danger);font-weight:700}
+
+/* Generic selection tree. */
+.tree-stage{position:relative;height:345px;margin-top:2px}.tree-lines{position:absolute;inset:0;width:100%;height:100%}.tree-lines line{stroke:var(--line);stroke-width:1.5;transition:stroke var(--dur) var(--ease),stroke-width var(--dur) var(--ease)}
+.tree-lines line.on{stroke:var(--blue);stroke-width:3}.tree-node{position:absolute;width:76px;height:52px;transform:translate(-50%,-50%);border:2px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--muted);opacity:.46;transition:all var(--dur) var(--ease)}
+.tree-node.seen{opacity:1}.tree-node.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translate(-50%,-50%) scale(1.08)}.tree-node.answer{border-color:var(--green);background:var(--greenbg);color:var(--green)}.tree-node.undo{border-color:var(--brown);background:var(--brownbg);color:var(--brown);opacity:.75}
+.state-strip{display:grid;grid-template-columns:1fr 1fr;gap:12px}.state-box{border:1px solid var(--grid);border-radius:8px;background:var(--paper);padding:12px 14px;min-height:82px}.state-box .label{font-family:var(--mono);font-size:11px;color:var(--faint)}.path-row,.stack-row{display:flex;gap:7px;align-items:center;min-height:38px;margin-top:6px}.path-chip,.stack-chip{min-width:34px;height:34px;border:1.5px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;opacity:.22;transition:all var(--dur) var(--ease)}.path-chip.show,.stack-chip.show{opacity:1;border-color:var(--blue);background:var(--bluebg);color:var(--blue)}
+
+/* Subsets and combinations. */
+.subset-tree{position:relative;height:290px}.subset-node{position:absolute;width:74px;height:46px;transform:translate(-50%,-50%);border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;opacity:.34;transition:all var(--dur) var(--ease)}.subset-node.seen{opacity:1}.subset-node.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translate(-50%,-50%) scale(1.08)}.subset-node.record{border-color:var(--green);background:var(--greenbg);color:var(--green)}.subset-node.prune{border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}
+.pool-line{display:grid;grid-template-columns:repeat(3,64px);gap:10px;justify-content:center;position:relative;padding-top:26px}.pool-cell{height:52px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:17px;font-weight:700;transition:all var(--dur) var(--ease)}.pool-cell.before{opacity:.28}.pool-cell.current{border-color:var(--blue);background:var(--bluebg);color:var(--blue)}.pool-pointer{position:absolute;top:0;left:0;opacity:0;transform:translateX(-50%);font-family:var(--mono);font-size:11px;color:var(--blue);transition:left var(--dur) var(--ease),opacity .18s}
+.answer-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.answer-col{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:10px 12px;min-height:72px}.answer-col b{font-size:12px}.answer-line{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:5px;min-height:20px}
+
+/* Moving-token scenes. */
+.token-stage{position:relative;height:250px;margin-top:4px;border:1px solid var(--grid);border-radius:8px;background:var(--paper)}.lane-label{position:absolute;left:14px;font-family:var(--mono);font-size:11px;color:var(--faint)}.lane-label.pool{top:20px}.lane-label.path{top:132px}.lane-rule{position:absolute;left:82px;right:18px;height:1px;background:var(--grid)}.lane-rule.pool{top:52px}.lane-rule.path{top:164px}.move-token{position:absolute;width:62px;height:54px;border:2px solid var(--line);border-radius:8px;background:var(--panel);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:18px;font-weight:800;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}.move-token.used{border-color:var(--blue);background:var(--bluebg);color:var(--blue)}.move-token.just{transform:scale(1.09);box-shadow:0 0 0 4px rgba(24,95,165,.12)}.move-token.skip{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);opacity:.5}.slot-mark{position:absolute;width:62px;height:54px;top:139px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;font-family:var(--mono);font-size:9px;color:var(--faint)}
+.used-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.used-cell{border:1px solid var(--line);border-radius:6px;background:var(--paper);padding:8px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);transition:all var(--dur) var(--ease)}.used-cell.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue)}.used-cell.skip{border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}
+.result-banner{margin-top:12px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--muted);min-height:45px;transition:all var(--dur) var(--ease)}.result-banner.ok{border-color:var(--green);background:var(--greenbg);color:var(--green)}
+
+/* Palindrome partitioning. */
+.string-row{display:grid;grid-template-columns:repeat(3,78px);gap:12px;justify-content:center;margin-top:22px}.char-cell{height:74px;border:2px solid var(--line);border-radius:8px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);transition:all var(--dur) var(--ease)}.char-cell b{font-size:25px}.char-cell small{font-size:10px;color:var(--faint)}.char-cell.candidate{border-color:var(--brown);background:var(--brownbg);color:var(--brown);transform:translateY(-3px)}.char-cell.valid{border-color:var(--blue);background:var(--bluebg);color:var(--blue)}.char-cell.invalid{border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}.char-cell.done{opacity:.5}
+.segment-track{position:relative;height:96px;margin-top:24px}.segment-chip{position:absolute;top:18px;height:50px;border:1.5px solid var(--blue);border-radius:7px;background:var(--bluebg);color:var(--blue);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;opacity:0;transform:scale(.85);transition:left var(--dur) var(--ease),width var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}.segment-chip.show{opacity:1;transform:scale(1)}
+.partition-results{display:grid;grid-template-columns:1fr 1fr;gap:10px}.partition-result{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:11px 12px;font-family:var(--mono);font-size:12px;color:var(--faint);opacity:.34;transition:all var(--dur) var(--ease)}.partition-result.show{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--green)}
+
+/* Parentheses. */
+.paren-slots{display:grid;grid-template-columns:repeat(6,56px);gap:8px;justify-content:center;margin-top:24px}.paren-slot{height:64px;border:1.5px dashed var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:27px;font-weight:800;color:var(--blue);transition:all var(--dur) var(--ease)}.paren-slot.fill{border-style:solid;border-color:var(--blue);background:var(--bluebg)}
+.paren-meters{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:26px}.meter{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:12px}.meter-head{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}.meter-track{height:8px;border-radius:4px;background:var(--grid);margin-top:9px;overflow:hidden}.meter-fill{height:100%;width:0;background:var(--blue);transition:width var(--dur) var(--ease)}.meter.right .meter-fill{background:var(--brown)}
+.choice-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.choice-box{border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:12px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);transition:all var(--dur) var(--ease)}.choice-box.allow{border-color:var(--green);background:var(--greenbg);color:var(--green)}.choice-box.block{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);opacity:.62}
+
+/* N queens. */
+.queen-wrap{display:grid;grid-template-columns:minmax(0,380px) 1fr;gap:24px;align-items:center;margin-top:10px}.queen-board{display:grid;grid-template-columns:repeat(4,1fr);aspect-ratio:1;border:2px solid var(--ink);background:var(--ink);gap:2px}.queen-cell{position:relative;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:25px;font-weight:700;transition:background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease)}.queen-cell.dark{background:var(--gray)}.queen-cell.attack{background:var(--dangerbg);color:var(--danger);opacity:.72}.queen-cell.probe{box-shadow:inset 0 0 0 3px var(--danger)}.queen-cell.queen{background:var(--bluebg);color:var(--blue);opacity:1}.queen-cell.queen::after{content:"Q";width:38px;height:38px;border:2px solid currentColor;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--panel)}
+.queen-state{display:flex;flex-direction:column;gap:11px}.queen-row{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:11px 12px;font-family:var(--mono);font-size:12px;color:var(--faint);transition:all var(--dur) var(--ease)}.queen-row.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue)}.queen-row.done{border-color:var(--green);background:var(--greenbg);color:var(--green)}.queen-row.back{border-color:var(--brown);background:var(--brownbg);color:var(--brown)}
+
+/* Word search. */
+.word-target{display:flex;justify-content:center;gap:7px;margin-top:4px}.word-letter{width:44px;height:40px;border-bottom:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease)}.word-letter.on{border-color:var(--blue);color:var(--blue);background:var(--bluebg)}.word-letter.done{border-color:var(--green);color:var(--green);background:var(--greenbg)}
+.grid-board{display:grid;grid-template-columns:repeat(4,76px);gap:8px;justify-content:center;margin-top:28px}.grid-cell{height:68px;border:2px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:21px;font-weight:800;color:var(--muted);position:relative;transition:all var(--dur) var(--ease)}.grid-cell.path{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-3px)}.grid-cell.path::after{content:attr(data-step);position:absolute;right:5px;bottom:3px;font-size:9px;color:var(--blue)}.grid-cell.probe{border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}.grid-cell.restored{border-color:var(--green);background:var(--greenbg);color:var(--green)}
+.grid-legend{display:flex;justify-content:center;gap:10px;margin-top:20px;flex-wrap:wrap}.legend-chip{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:6px;padding:5px 8px;color:var(--faint);background:var(--paper)}.legend-chip.on{border-color:var(--blue);color:var(--blue);background:var(--bluebg)}
+
+.controls{margin-top:26px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(60,55,40,.05)}
+.ctrl{width:48px;height:44px;flex:0 0 48px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s}
+.ctrl:hover:not(:disabled){background:var(--gray);border-color:var(--muted)}.ctrl:active:not(:disabled){transform:scale(.94)}.ctrl:disabled{opacity:.35;cursor:default}.ctrl.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.dots{display:flex;gap:8px;margin:0 auto;flex-wrap:wrap;justify-content:center}.dot{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease)}.dot:hover{border-color:var(--muted);transform:scale(1.2)}.dot.done{background:var(--line);border-color:var(--line)}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3)}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:58px;text-align:center}
+@media(max-width:1180px){.tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}.right{display:grid;grid-template-columns:1fr 1fr}.codebox{min-height:280px}}
+@media(max-width:720px){body{font-size:15px;padding:20px 14px 32px}header h1{font-size:22px}header p{font-size:13px}.tabs{gap:8px;margin-top:20px}.tab{font-size:12.5px;padding:9px 10px;min-height:60px}.tab .s{font-size:9.5px}.right{display:flex}.viz{padding:16px;min-height:600px}.vcap{font-size:12px}.desc-card{padding:18px 20px;min-height:230px}.desc-head .st{font-size:17px}.act{font-size:12px;margin-top:14px;padding:9px 12px}.desc-body{font-size:14px;margin-top:10px}.codebox{font-size:10.5px;padding:14px 16px;min-height:0}.tree-node{width:60px;height:44px;font-size:11px}.state-strip{grid-template-columns:1fr}.answer-columns{grid-template-columns:1fr}.token-stage{height:250px}.move-token,.slot-mark{width:52px}.string-row{grid-template-columns:repeat(3,64px);gap:8px}.char-cell{height:64px}.paren-slots{grid-template-columns:repeat(6,minmax(0,46px));gap:5px}.paren-slot{height:54px}.queen-wrap{grid-template-columns:1fr}.queen-board{max-width:330px;width:100%;margin:0 auto}.queen-state{display:grid;grid-template-columns:1fr 1fr}.grid-board{grid-template-columns:repeat(4,minmax(0,64px));gap:6px}.grid-cell{height:58px}.controls{padding:12px 10px}.ctrl{width:44px;flex-basis:44px}.dots{order:5;width:100%;margin-top:3px}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>回溯算法 · 在选择树上做选择，再恢复现场</h1>
+    <p>从通用选择树到子集、排列、切割、生成、棋盘和网格路径，逐步观察 path、选择列表与辅助状态如何同步变化。</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <main class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </main>
+  <div class="controls">
+    <button class="ctrl" id="btnPrev" aria-label="上一步" title="上一步">‹</button>
+    <button class="ctrl primary" id="btnPlay" aria-label="播放动画" title="播放或暂停">▶</button>
+    <button class="ctrl" id="btnNext" aria-label="下一步" title="下一步">›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+<script>
+const viz=document.getElementById('viz');
+const byId=id=>document.getElementById(id);
+const setText=(id,value)=>{byId(id).textContent=value};
+const esc=value=>String(value).replace(/[&<>]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[char]));
+
+const treeScene=(()=>{
+  const nodes=[
+    {id:'root',label:'[]',x:50,y:10},{id:'a',label:'[A]',x:28,y:34},{id:'b',label:'[B]',x:72,y:34},
+    {id:'ab',label:'[A,B]',x:16,y:64},{id:'ac',label:'[A,C]',x:40,y:64},{id:'ba',label:'[B,A]',x:62,y:64},{id:'bc',label:'[B,C]',x:86,y:64}
+  ];
+  const edges=[['root','a'],['root','b'],['a','ab'],['a','ac'],['b','ba'],['b','bc']];
+  const steps=[
+    {active:'root',seen:['root'],path:[],stack:['root'],answer:null,undo:null,edge:null,chip:'选择树',chipC:'c0',title:'把问题看成一棵树：节点是 path，边是一次选择',desc:'每一层只处理当前可选项。递归负责进入下一层，函数返回后再恢复到进入这条边之前的状态。'},
+    {active:'a',seen:['root','a'],path:['A'],stack:['root','A'],answer:null,undo:null,edge:'root-a',chip:'做选择',chipC:'cb',title:'选择 A：加入 path，再递归进入下一层',desc:'先执行 <b>push</b>，再进入子问题。此时调用栈多一层，下一层看到的是已经包含 A 的状态。'},
+    {active:'ab',seen:['root','a','ab'],path:['A','B'],stack:['root','A','B'],answer:null,undo:null,edge:'a-ab',chip:'递归深入',chipC:'cb',title:'继续选择 B，path 变成 [A, B]',desc:'深度优先搜索会先把一条分支走到底，而不是在同一层来回切换。'},
+    {active:'ab',seen:['root','a','ab'],path:['A','B'],stack:['root','A','B'],answer:'ab',undo:null,edge:'a-ab',chip:'记录答案',chipC:'cg',title:'满足结束条件：复制当前 path 到结果集',desc:'记录答案时要保存 path 的副本。随后当前调用返回，准备撤销刚才的选择 B。'},
+    {active:'a',seen:['root','a','ab'],path:['A'],stack:['root','A'],answer:'ab',undo:'ab',edge:'a-ab',chip:'撤销选择',chipC:'ch',title:'pop B：恢复到选择 B 之前的状态',desc:'撤销不是“额外优化”，而是回溯正确性的核心。兄弟分支必须从同一份父状态出发。'},
+    {active:'ac',seen:['root','a','ab','ac'],path:['A','C'],stack:['root','A','C'],answer:null,undo:'ab',edge:'a-ac',chip:'尝试兄弟分支',chipC:'cb',title:'父状态恢复后，同一层继续尝试 C',desc:'A 仍在 path 中，B 已被清除，所以新分支得到 [A, C]，不会携带上一条路径的残留状态。'},
+    {active:'ac',seen:['root','a','ab','ac'],path:['A','C'],stack:['root','A','C'],answer:'ac',undo:null,edge:'a-ac',chip:'形成闭环',chipC:'cg',title:'选择、递归、撤销构成一个严格对称的循环',desc:'每一条边都经历同样的过程：<span class="bl">做选择</span> → 递归 → <span class="br">撤销选择</span>。这就是所有回溯结构的共同骨架。'}
+  ];
+  const code=`<span class="kw">void</span> <span class="fn">backtrack</span>(State&amp; state) {
+    <span class="kw">if</span> (isComplete(state)) {
+        result.push_back(path);
+        <span class="kw">return</span>;
+    }
+
+    <span class="kw">for</span> (<span class="kw">auto</span> choice : choices(state)) {
+        choose(choice);      <span class="cmt">// 做选择</span>
+        backtrack(state);    <span class="cmt">// 递归</span>
+        undo(choice);        <span class="cmt">// 恢复现场</span>
+    }
+}`;
+  function mount(){
+    let svg='<svg class="tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none">';
+    edges.forEach(([from,to])=>{const a=nodes.find(n=>n.id===from),b=nodes.find(n=>n.id===to);svg+=`<line id="edge-${from}-${to}" x1="${a.x}" y1="${a.y+7}" x2="${b.x}" y2="${b.y-7}"></line>`});
+    svg+='</svg>';
+    let html=svg;nodes.forEach(n=>html+=`<div class="tree-node" id="tree-${n.id}" style="left:${n.x}%;top:${n.y}%">${n.label}</div>`);
+    viz.innerHTML=`<div class="vcap"><b>通用结构</b>：同一份 path 在递归前后被原地修改和恢复</div><div class="tree-stage">${html}</div><div class="state-strip"><div class="state-box"><div class="label">path</div><div class="path-row">${[0,1,2].map(i=>`<span class="path-chip" id="path-${i}"></span>`).join('')}</div></div><div class="state-box"><div class="label">call stack</div><div class="stack-row">${[0,1,2].map(i=>`<span class="stack-chip" id="stack-${i}"></span>`).join('')}</div></div></div><div class="stage-note" id="tree-note"></div>`;
+  }
+  function paint(s){
+    nodes.forEach(n=>{const el=byId('tree-'+n.id);el.className='tree-node'+(s.seen.includes(n.id)?' seen':'')+(s.active===n.id?' active':'')+(s.answer===n.id?' answer':'')+(s.undo===n.id?' undo':'')});
+    edges.forEach(([a,b])=>byId('edge-'+a+'-'+b).classList.toggle('on',s.edge===a+'-'+b));
+    [0,1,2].forEach(i=>{const p=byId('path-'+i);p.textContent=s.path[i]||'';p.classList.toggle('show',i<s.path.length);const f=byId('stack-'+i);f.textContent=s.stack[i]||'';f.classList.toggle('show',i<s.stack.length)});
+    byId('tree-note').innerHTML=s.undo?'<span class="bad">撤销完成：兄弟分支不会继承 B</span>':s.answer?'<span class="ok">当前 path 已复制进 result</span>':'DFS 始终先沿一条分支向下';
+  }
+  return{id:'tree',label:'选择树',sub:'choose → recurse → undo',steps,mount,paint,code};
+})();
+
+const subsetScene=(()=>{
+  const nodes=[{id:'r',t:'[]',x:50,y:12},{id:'1',t:'[1]',x:24,y:38},{id:'2',t:'[2]',x:50,y:38},{id:'3',t:'[3]',x:76,y:38},{id:'12',t:'[1,2]',x:14,y:72},{id:'13',t:'[1,3]',x:36,y:72},{id:'23',t:'[2,3]',x:62,y:72}];
+  const steps=[
+    {active:'r',seen:['r'],record:'r',start:0,subs:['[]'],comb:[],prune:null,chip:'子集',chipC:'cg',title:'子集在进入每个节点时都记录 path',desc:'空路径也是答案，所以函数一开始就把 <b>[]</b> 放进结果。下一层只能从 startIndex 之后继续选。'},
+    {active:'1',seen:['r','1'],record:'1',start:1,subs:['[]','[1]'],comb:[],prune:null,chip:'startIndex = 1',chipC:'cb',title:'选择 1 后，下一层只能查看下标 1 及其后面',desc:'startIndex 防止回头选择 1，也避免把 [1,2] 与 [2,1] 当作两个子集。'},
+    {active:'12',seen:['r','1','12'],record:'12',start:2,subs:['[]','[1]','[1,2]'],comb:['[1,2]'],prune:null,chip:'path.size() = 2',chipC:'cg',title:'[1,2] 对子集是节点答案，对 k=2 组合是完整答案',desc:'两种结构共用选择树；区别只在记录时机：子集每个节点都记录，组合只在长度达到 k 时记录。'},
+    {active:'13',seen:['r','1','12','13'],record:'13',start:3,subs:['[]','[1]','[1,2]','[1,3]'],comb:['[1,2]','[1,3]'],prune:null,chip:'同层继续',chipC:'cb',title:'撤销 2 后选择 3，得到同一父节点的另一条分支',desc:'循环变量继续向右走，startIndex 同步变成 3，保证每个组合只按递增下标生成一次。'},
+    {active:'2',seen:['r','1','12','13','2'],record:'2',start:2,subs:['[]','[1]','[1,2]','[1,3]','[2]'],comb:['[1,2]','[1,3]'],prune:null,chip:'回到根',chipC:'ch',title:'第一棵子树走完，撤销 1，再从根选择 2',desc:'path 恢复为空后，根层继续枚举。此时下标 0 已经不会再出现。'},
+    {active:'23',seen:['r','1','12','13','2','23'],record:'23',start:3,subs:['[]','[1]','[1,2]','[1,3]','[2]','[2,3]'],comb:['[1,2]','[1,3]','[2,3]'],prune:null,chip:'组合完成',chipC:'cg',title:'选择 3，记录最后一个长度为 2 的组合 [2,3]',desc:'对于 n=3、k=2，所有合法组合已经生成，且没有重复顺序。'},
+    {active:'3',seen:['r','1','12','13','2','23','3'],record:'3',start:3,subs:['[]','[1]','[1,2]','[1,3]','[2]','[2,3]','[3]'],comb:['[1,2]','[1,3]','[2,3]'],prune:'3',chip:'剩余不足',chipC:'cd',title:'组合需要 2 个数，但从 3 开始只剩 1 个，直接剪枝',desc:'循环上界写成 <b>n - need + 1</b>，可以在进入不可能成功的分支前就停止；子集仍然可以记录 [3]。'}
+  ];
+  const code=`<span class="cmt">// 子集：每个节点都记录</span>
+result.push_back(path);
+
+<span class="cmt">// 组合：只在长度达到 k 时记录</span>
+<span class="kw">if</span> (path.size() == k) {
+    result.push_back(path);
+    <span class="kw">return</span>;
+}
+
+<span class="kw">int</span> need = k - path.size();
+<span class="kw">for</span> (<span class="kw">int</span> i = start; i &lt;= n - need + <span class="num">1</span>; ++i) {
+    path.push_back(i);
+    backtrack(i + <span class="num">1</span>);
+    path.pop_back();
+}`;
+  function mount(){
+    let tree='';nodes.forEach(n=>tree+=`<div class="subset-node" id="sub-${n.id}" style="left:${n.x}%;top:${n.y}%">${n.t}</div>`);
+    viz.innerHTML=`<div class="vcap"><b>子集与组合</b>：同一棵树，不同的答案记录时机</div><div class="subset-tree">${tree}</div><div class="pool-line"><span class="pool-pointer" id="sub-pointer">start</span>${[1,2,3].map((n,i)=>`<div class="pool-cell" id="sub-pool-${i}">${n}</div>`).join('')}</div><div class="answer-columns"><div class="answer-col"><b>子集 · 每个节点</b><div class="answer-line" id="subset-out"></div></div><div class="answer-col"><b>组合 k=2 · 固定深度</b><div class="answer-line" id="combine-out"></div></div></div>`;
+  }
+  function paint(s){
+    nodes.forEach(n=>{const el=byId('sub-'+n.id);el.className='subset-node'+(s.seen.includes(n.id)?' seen':'')+(s.active===n.id?' active':'')+(s.record===n.id?' record':'')+(s.prune===n.id?' prune':'')});
+    [0,1,2].forEach(i=>{const cell=byId('sub-pool-'+i);cell.className='pool-cell'+(i<s.start?' before':'')+(i===s.start&&i<3?' current':'')});
+    const pointer=byId('sub-pointer');if(s.start<3){const target=byId('sub-pool-'+s.start);pointer.style.opacity=1;pointer.style.left=(target.offsetLeft+target.offsetWidth/2)+'px'}else pointer.style.opacity=0;
+    setText('subset-out',s.subs.join('  '));setText('combine-out',s.comb.join('  ')||'尚未达到长度 2');
+  }
+  return{id:'subset',label:'子集 / 组合',sub:'startIndex + 记录时机',steps,mount,paint,code};
+})();
+
+function movingTokenScene(config){
+  return(()=>{
+    const steps=config.steps;
+    function mount(){
+      const slotLeft=[26,46,66];
+      let slots=slotLeft.map((x,i)=>`<div class="slot-mark" style="left:calc(${x}% - 31px)">${i}</div>`).join('');
+      let tokens=config.tokens.map((t,i)=>`<div class="move-token" id="${config.prefix}-token-${t.id}">${t.label}</div>`).join('');
+      let used=config.tokens.map(t=>`<div class="used-cell" id="${config.prefix}-used-${t.id}">${config.usedLabel(t)}</div>`).join('');
+      viz.innerHTML=`<div class="vcap"><b>${config.caption}</b>：${config.captionText}</div><div class="token-stage"><span class="lane-label pool">候选池</span><span class="lane-label path">path</span><span class="lane-rule pool"></span><span class="lane-rule path"></span>${slots}${tokens}</div><div class="used-row">${used}</div><div class="result-banner" id="${config.prefix}-result"></div>`;
+    }
+    function paint(s){
+      const stage=viz.querySelector('.token-stage');
+      const poolXs=[.28,.5,.72],pathXs=[.26,.46,.66];
+      config.tokens.forEach((token,idx)=>{
+        const el=byId(`${config.prefix}-token-${token.id}`),pathIndex=s.path.indexOf(token.id),inPath=pathIndex>=0;
+        const x=stage.clientWidth*(inPath?pathXs[pathIndex]:poolXs[idx])-el.offsetWidth/2;
+        el.style.left=x+'px';el.style.top=(inPath?139:26)+'px';
+        el.className='move-token'+(inPath?' used':'')+(s.hot===token.id?' just':'')+(s.skip===token.id?' skip':'');
+        const usedEl=byId(`${config.prefix}-used-${token.id}`);usedEl.className='used-cell'+(inPath?' on':'')+(s.skip===token.id?' skip':'');usedEl.textContent=config.usedText(token,inPath,s.skip===token.id);
+      });
+      const result=byId(config.prefix+'-result');result.textContent=s.result||config.defaultResult;result.classList.toggle('ok',!!s.result);
+    }
+    return{id:config.id,label:config.label,sub:config.sub,steps,mount,paint,code:config.code};
+  })();
+}
+
+const permutationScene=movingTokenScene({
+  id:'permutation',label:'排列',sub:'used + 每层从头扫描',prefix:'perm',caption:'排列',captionText:'顺序有意义，每一层都从所有未使用元素中选一个',
+  tokens:[{id:'1',label:'1'},{id:'2',label:'2'},{id:'3',label:'3'}],usedLabel:t=>'used['+(Number(t.id)-1)+'] = false',usedText:(t,on)=>'used['+(Number(t.id)-1)+'] = '+(on?'true':'false'),defaultResult:'尚未达到完整长度',
+  steps:[
+    {path:[],hot:null,skip:null,result:null,chip:'used = F F F',chipC:'c0',title:'排列每一层都从下标 0 开始扫描',desc:'不能使用 startIndex，因为 [1,2] 与 [2,1] 是不同顺序；只需要跳过当前路径里已经使用的位置。'},
+    {path:['1'],hot:'1',skip:null,result:null,chip:'选择 1',chipC:'cb',title:'把 1 放入第一个位置，并标记 used[0]',desc:'used 表示“同一条路径中不能重复使用这个数组位置”，不是全局永久占用。'},
+    {path:['1','2'],hot:'2',skip:null,result:null,chip:'选择 2',chipC:'cb',title:'下一层仍从头扫描：跳过 used[0]，选择 2',desc:'每深入一层，候选池少一个元素，path 多一个位置。'},
+    {path:['1','2','3'],hot:'3',skip:null,result:'记录答案 [1, 2, 3]',chip:'长度 = n',chipC:'cg',title:'path 长度等于 nums 长度，记录完整排列',desc:'结束条件在固定深度触发。记录后返回上一层，准备恢复 3 的 used 标记。'},
+    {path:['1','2'],hot:'3',skip:null,result:null,chip:'撤销 3',chipC:'ch',title:'pop 3，并把 used[2] 恢复为 false',desc:'path 与 used 必须成对恢复；只恢复其中一个会让候选池与路径内容不一致。'},
+    {path:['1'],hot:'2',skip:null,result:null,chip:'撤销 2',chipC:'ch',title:'继续返回：撤销 2，重新开放位置 1',desc:'现在父状态只保留 1，下一次循环可以在第二个位置选择 3。'},
+    {path:['1','3'],hot:'3',skip:null,result:null,chip:'兄弟分支',chipC:'cb',title:'在第二个位置选择 3，生成不同顺序的分支',desc:'排列树允许每层重新扫描全部元素，used 保证同一条枝上没有重复位置。'}
+  ],
+  code:`<span class="kw">if</span> (path.size() == nums.size()) {
+    result.push_back(path);
+    <span class="kw">return</span>;
+}
+
+<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; nums.size(); ++i) {
+    <span class="kw">if</span> (used[i]) <span class="kw">continue</span>;
+    used[i] = <span class="kw">true</span>;
+    path.push_back(nums[i]);
+    backtrack();
+    path.pop_back();
+    used[i] = <span class="kw">false</span>;
+}`
+});
+
+const partitionScene=(()=>{
+  const steps=[
+    {candidate:null,kind:null,ranges:[],answers:0,chip:'start = 0',chipC:'c0',title:'切割问题的选择是“当前片段在哪里结束”',desc:'字符串 aab 从 start=0 开始，循环枚举 end，并只让回文片段进入下一层。'},
+    {candidate:[0,0],kind:'valid',ranges:[],answers:0,chip:'检查 "a"',chipC:'cb',title:'区间 [0,0] 是回文，可以作为第一段',desc:'合法性判断发生在递归之前；通过后才把子串加入 path。'},
+    {candidate:null,kind:null,ranges:[[0,0,'a']],answers:0,chip:'path = [a]',chipC:'cb',title:'选择第一个 a，下一层从 start=1 继续切',desc:'start 直接跳到 end+1，因此已切出的字符不会再次使用。'},
+    {candidate:[1,1],kind:'valid',ranges:[[0,0,'a']],answers:0,chip:'检查 "a"',chipC:'cb',title:'第二段选择单个 a，仍然是回文',desc:'当前 path 的第一段保持不变，只检查剩余后缀。'},
+    {candidate:null,kind:null,ranges:[[0,0,'a'],[1,1,'a'],[2,2,'b']],answers:1,chip:'start = 3',chipC:'cg',title:'切到字符串末尾，记录 [a, a, b]',desc:'start 等于字符串长度时得到一套完整切割方案。'},
+    {candidate:[1,2],kind:'invalid',ranges:[[0,0,'a']],answers:1,chip:'检查 "ab"',chipC:'cd',title:'同层继续尝试更长片段 ab，但它不是回文',desc:'当前片段不合法就直接 continue，不进入下一层；这是一种基于约束的剪枝。'},
+    {candidate:[0,1],kind:'valid',ranges:[],answers:1,chip:'检查 "aa"',chipC:'cb',title:'回到根后把结束位置扩到 1，片段 aa 合法',desc:'不同切点形成不同分支。aa 作为一个整体进入 path，下一层从 b 开始。'},
+    {candidate:null,kind:null,ranges:[[0,1,'aa'],[2,2,'b']],answers:2,chip:'第二个答案',chipC:'cg',title:'选择 b 后再次到达末尾，记录 [aa, b]',desc:'完整结果只有 [a,a,b] 与 [aa,b]；非法的 ab 分支从未展开。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> end = start; end &lt; s.size(); ++end) {
+    <span class="kw">if</span> (!isPalindrome(s, start, end))
+        <span class="kw">continue</span>;          <span class="cmt">// 非法片段剪枝</span>
+
+    path.push_back(s.substr(start, end - start + <span class="num">1</span>));
+    backtrack(end + <span class="num">1</span>);   <span class="cmt">// 切下一段</span>
+    path.pop_back();
+}
+
+<span class="kw">if</span> (start == s.size())
+    result.push_back(path);`;
+  function mount(){
+    viz.innerHTML=`<div class="vcap"><b>回文切割</b>：枚举 end，合法片段才进入递归</div><div class="string-row">${['a','a','b'].map((c,i)=>`<div class="char-cell" id="char-${i}"><b>${c}</b><small>index ${i}</small></div>`).join('')}</div><div class="segment-track">${[0,1,2].map(i=>`<div class="segment-chip" id="segment-${i}"></div>`).join('')}</div><div class="partition-results"><div class="partition-result" id="part-result-1">[ "a", "a", "b" ]</div><div class="partition-result" id="part-result-2">[ "aa", "b" ]</div></div><div class="stage-note" id="part-note"></div>`;
+  }
+  function paint(s){
+    [0,1,2].forEach(i=>{const cell=byId('char-'+i);let cls='char-cell';if(s.candidate&&i>=s.candidate[0]&&i<=s.candidate[1])cls+=' candidate '+s.kind;else if(s.ranges.some(r=>i>=r[0]&&i<=r[1]))cls+=' done';cell.className=cls});
+    const row=viz.querySelector('.string-row');s.ranges.forEach((range,i)=>{const first=byId('char-'+range[0]),last=byId('char-'+range[1]),chip=byId('segment-'+i);chip.textContent=range[2];chip.style.left=(row.offsetLeft+first.offsetLeft)+'px';chip.style.width=(last.offsetLeft+last.offsetWidth-first.offsetLeft)+'px';chip.classList.add('show')});
+    for(let i=s.ranges.length;i<3;i++)byId('segment-'+i).classList.remove('show');
+    byId('part-result-1').classList.toggle('show',s.answers>=1);byId('part-result-2').classList.toggle('show',s.answers>=2);
+    byId('part-note').innerHTML=s.kind==='invalid'?'<span class="bad">ab 不是回文：不递归</span>':s.answers?'<span class="ok">到达末尾：复制 path</span>':'候选片段通过回文检查后才能选择';
+  }
+  return{id:'partition',label:'切割',sub:'end + 合法片段剪枝',steps,mount,paint,code};
+})();
+
+const parenthesesScene=(()=>{
+  const steps=[
+    {path:'',left:0,right:0,probe:')',answer:false,chip:'n = 3',chipC:'c0',title:'空前缀不能先放右括号',desc:'只有 rightCount 小于 leftCount 时才能添加右括号；否则前缀立即失效，不需要生成完整字符串再检查。'},
+    {path:'(',left:1,right:0,probe:'(',answer:false,chip:'left < n',chipC:'cb',title:'左括号数量还没到 n，可以选择左括号',desc:'选择后 leftCount 增加，当前余额为 1，后续既可以继续开括号，也可以闭合。'},
+    {path:'((',left:2,right:0,probe:')',answer:false,chip:'right < left',chipC:'cb',title:'选择第二个左括号，右括号分支开始可用',desc:'任意前缀都满足右括号数不超过左括号数，意味着括号栈永远不会提前为空。'},
+    {path:'(()',left:2,right:1,probe:'(',answer:false,chip:'余额 = 1',chipC:'ch',title:'添加右括号，闭合最近的一个左括号',desc:'rightCount 增加，但仍小于 leftCount，因此前缀 (() 合法。'},
+    {path:'(()(',left:3,right:1,probe:')',answer:false,chip:'left = n',chipC:'cb',title:'最后一个左括号用完，之后只能继续闭合',desc:'leftCount 已达到 n，左分支被剪掉；选择列表只剩右括号。'},
+    {path:'(()()',left:3,right:2,probe:')',answer:false,chip:'继续闭合',chipC:'ch',title:'右括号仍少于左括号，可以继续添加',desc:'始终维护计数不变量，比事后用栈检查所有候选更早剪掉非法路径。'},
+    {path:'(()())',left:3,right:3,probe:null,answer:true,chip:'长度 = 2n',chipC:'cg',title:'长度达到 6，记录完整答案 (()())',desc:'因为每个前缀都合法且左右括号数量相等，最终字符串一定合法。'}
+  ];
+  const code=`<span class="kw">if</span> (path.size() == <span class="num">2</span> * n) {
+    result.push_back(path);
+    <span class="kw">return</span>;
+}
+
+<span class="kw">if</span> (leftCount &lt; n) {
+    path.push_back(<span class="num">'('</span>);
+    backtrack(leftCount + <span class="num">1</span>, rightCount);
+    path.pop_back();
+}
+
+<span class="kw">if</span> (rightCount &lt; leftCount) {
+    path.push_back(<span class="num">')'</span>);
+    backtrack(leftCount, rightCount + <span class="num">1</span>);
+    path.pop_back();
+}`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>括号生成</b>：让每个前缀合法，而不是最后再过滤</div><div class="paren-slots">${[0,1,2,3,4,5].map(i=>`<div class="paren-slot" id="paren-${i}"></div>`).join('')}</div><div class="paren-meters"><div class="meter"><div class="meter-head"><span>leftCount</span><b id="left-count">0 / 3</b></div><div class="meter-track"><div class="meter-fill" id="left-fill"></div></div></div><div class="meter right"><div class="meter-head"><span>rightCount</span><b id="right-count">0 / 3</b></div><div class="meter-track"><div class="meter-fill" id="right-fill"></div></div></div></div><div class="choice-pair"><div class="choice-box" id="choice-left">添加 (</div><div class="choice-box" id="choice-right">添加 )</div></div><div class="stage-note" id="paren-note"></div>`}
+  function paint(s){[0,1,2,3,4,5].forEach(i=>{const el=byId('paren-'+i);el.textContent=s.path[i]||'';el.classList.toggle('fill',i<s.path.length)});setText('left-count',s.left+' / 3');setText('right-count',s.right+' / 3');byId('left-fill').style.width=(s.left/3*100)+'%';byId('right-fill').style.width=(s.right/3*100)+'%';byId('choice-left').className='choice-box '+(s.left<3?'allow':'block');byId('choice-right').className='choice-box '+(s.right<s.left?'allow':'block');byId('paren-note').innerHTML=s.answer?'<span class="ok">左右计数相等，完整答案成立</span>':s.probe===')'&&s.right===0&&s.left===0?'<span class="bad">rightCount < leftCount 不成立，剪掉右分支</span>':'不变量：rightCount ≤ leftCount ≤ n'}
+  return{id:'parentheses',label:'括号生成',sub:'前缀合法性',steps,mount,paint,code};
+})();
+
+const queensScene=(()=>{
+  const steps=[
+    {queens:[],row:0,probe:null,back:null,chip:'row = 0',chipC:'c0',title:'按行递归：每一层只决定当前行放在哪一列',desc:'列、主对角线和副对角线用三个布尔数组记录，冲突判断不需要扫描整张棋盘。'},
+    {queens:[1],row:1,probe:null,back:null,chip:'Q(0,1)',chipC:'cb',title:'第 0 行选择第 1 列，并标记对应列和两条对角线',desc:'进入下一层后，所有受这个皇后攻击的位置立即从选择列表中排除。'},
+    {queens:[1,3],row:2,probe:null,back:null,chip:'Q(1,3)',chipC:'cb',title:'第 1 行只有第 3 列可用，继续向下',desc:'辅助数组让合法性检查保持常数时间，选择后同步更新三类占用状态。'},
+    {queens:[1,3],row:2,probe:[2,0],back:null,chip:'无合法列',chipC:'cd',title:'第 2 行所有列都冲突，这条分支走不通',desc:'递归没有可选项，会自然返回上一层；这不是完整答案，因此不能记录。'},
+    {queens:[],row:0,probe:null,back:1,chip:'连续撤销',chipC:'ch',title:'撤销第 1 行与第 0 行的皇后，恢复三组标记',desc:'当前分支没有其他列可试，于是逐层返回。棋盘字符和 col、diag1、diag2 必须一起恢复。'},
+    {queens:[2],row:1,probe:null,back:null,chip:'Q(0,2)',chipC:'cb',title:'根层改选第 2 列，进入新的主分支',desc:'恢复后的棋盘与初始状态一致，新分支不会受到上一条失败路径影响。'},
+    {queens:[2,0],row:2,probe:null,back:null,chip:'Q(1,0)',chipC:'cb',title:'第 1 行选择第 0 列，列与对角线均不冲突',desc:'当前路径可写成列序列 [2,0]，每深入一层追加一个列号。'},
+    {queens:[2,0,3],row:3,probe:null,back:null,chip:'Q(2,3)',chipC:'cb',title:'第 2 行选择第 3 列，继续保持三类约束',desc:'被攻击格子只负责解释选择列表；真正的状态仍由三个布尔数组维护。'},
+    {queens:[2,0,3,1],row:4,probe:null,back:null,chip:'row = n',chipC:'cg',title:'第 3 行选择第 1 列，放满 4 行并记录答案',desc:'row 等于 n 表示每行都有一个皇后，当前棋盘是合法解 [2,0,3,1]。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> c = <span class="num">0</span>; c &lt; n; ++c) {
+    <span class="kw">int</span> d1 = row - c + n - <span class="num">1</span>;
+    <span class="kw">int</span> d2 = row + c;
+    <span class="kw">if</span> (col[c] || diag1[d1] || diag2[d2])
+        <span class="kw">continue</span>;
+
+    board[row][c] = <span class="num">'Q'</span>;
+    col[c] = diag1[d1] = diag2[d2] = <span class="kw">true</span>;
+    backtrack(row + <span class="num">1</span>);
+    col[c] = diag1[d1] = diag2[d2] = <span class="kw">false</span>;
+    board[row][c] = <span class="num">'.'</span>;
+}`;
+  function mount(){let board='';for(let r=0;r<4;r++)for(let c=0;c<4;c++)board+=`<div class="queen-cell ${(r+c)%2?'dark':''}" id="q-${r}-${c}"></div>`;viz.innerHTML=`<div class="vcap"><b>N 皇后</b>：行是递归层，列与两类对角线是剪枝状态</div><div class="queen-wrap"><div class="queen-board">${board}</div><div class="queen-state">${[0,1,2,3].map(r=>`<div class="queen-row" id="qrow-${r}">row ${r} · waiting</div>`).join('')}</div></div><div class="stage-note" id="queen-note"></div>`}
+  function attacked(queens,r,c){for(let qr=0;qr<queens.length;qr++){const qc=queens[qr];if(qc===c||Math.abs(qr-r)===Math.abs(qc-c))return true}return false}
+  function paint(s){for(let r=0;r<4;r++)for(let c=0;c<4;c++){const el=byId(`q-${r}-${c}`),placed=s.queens[r]===c,isAttack=r===s.row&&attacked(s.queens,r,c);el.className='queen-cell'+((r+c)%2?' dark':'')+(isAttack?' attack':'')+(s.probe&&s.probe[0]===r&&s.probe[1]===c?' probe':'')+(placed?' queen':'')};for(let r=0;r<4;r++){const row=byId('qrow-'+r);row.className='queen-row'+(r<s.queens.length?' done':'')+(r===s.row&&r<4?' on':'')+(s.back===r?' back':'');row.textContent=r<s.queens.length?`row ${r} · col ${s.queens[r]}`:r===s.row?'row '+r+' · choosing':'row '+r+' · waiting'}byId('queen-note').innerHTML=s.row===4?'<span class="ok">四行全部完成：记录棋盘</span>':s.probe?'<span class="bad">当前行无可用列：返回上一层</span>':'红色格子被已有皇后攻击，直接跳过'}
+  return{id:'queens',label:'N 皇后',sub:'row + col / diag 剪枝',steps,mount,paint,code};
+})();
+
+const gridScene=(()=>{
+  const board=[['A','B','C','E'],['S','F','C','S'],['A','D','E','E']],word='ABCCED';
+  const steps=[
+    {path:[],probe:null,restored:false,chip:'word = ABCCED',chipC:'c0',title:'从每个格子尝试作为起点，路径只能走上下左右',desc:'当前字符必须与 word[index] 相等；越界、字符不匹配或格子已在当前路径中都会立即失败。'},
+    {path:[[0,0]],probe:null,restored:false,chip:'匹配 A',chipC:'cb',title:'起点 (0,0) 匹配 A，临时标记为已访问',desc:'标记只在当前递归路径内有效，防止同一个格子被重复使用。'},
+    {path:[[0,0],[0,1]],probe:null,restored:false,chip:'匹配 B',chipC:'cb',title:'向右移动到 (0,1)，匹配第二个字符 B',desc:'index 与路径长度同步增加，下一层需要寻找 C。'},
+    {path:[[0,0],[0,1]],probe:[1,1],restored:false,chip:'检查 F',chipC:'cd',title:'向下试探 F，但当前需要 C，立即返回',desc:'字符不匹配在修改棋盘之前就被剪掉，因此无需恢复这个候选格。'},
+    {path:[[0,0],[0,1],[0,2]],probe:null,restored:false,chip:'匹配 C',chipC:'cb',title:'改走右侧 (0,2)，匹配第一个 C',desc:'失败方向不会污染路径，当前递归层可以继续枚举其他邻居。'},
+    {path:[[0,0],[0,1],[0,2],[1,2]],probe:null,restored:false,chip:'匹配 C',chipC:'cb',title:'向下到 (1,2)，匹配第二个 C',desc:'路径中的四个格子都被临时占用，其他方向不能再次走进它们。'},
+    {path:[[0,0],[0,1],[0,2],[1,2],[2,2]],probe:null,restored:false,chip:'匹配 E',chipC:'cb',title:'继续向下到 (2,2)，匹配 E',desc:'还剩最后一个字符 D，选择列表继续是四个相邻格。'},
+    {path:[[0,0],[0,1],[0,2],[1,2],[2,2],[2,1]],probe:null,restored:false,chip:'完整匹配',chipC:'cg',title:'向左到 (2,1) 匹配 D，找到完整单词',desc:'index 到达最后一个字符，当前搜索可以返回 true。'},
+    {path:[],probe:null,restored:true,chip:'恢复现场',chipC:'ch',title:'调用返回前恢复所有临时标记，棋盘内容保持不变',desc:'单词搜索允许其他起点复用这些格子，所以与岛屿染色不同，访问标记必须撤销。'}
+  ];
+  const code=`<span class="kw">if</span> (board[row][col] != word[index])
+    <span class="kw">return false</span>;
+<span class="kw">if</span> (index == word.size() - <span class="num">1</span>)
+    <span class="kw">return true</span>;
+
+<span class="kw">char</span> saved = board[row][col];
+board[row][col] = <span class="num">'#'</span>;  <span class="cmt">// 临时占用</span>
+<span class="kw">bool</span> found = dfs(down) || dfs(up)
+          || dfs(right) || dfs(left);
+board[row][col] = saved; <span class="cmt">// 恢复现场</span>
+<span class="kw">return</span> found;`;
+  function mount(){let cells='';board.forEach((row,r)=>row.forEach((c,col)=>cells+=`<div class="grid-cell" id="g-${r}-${col}">${c}</div>`));viz.innerHTML=`<div class="vcap"><b>单词搜索</b>：网格 DFS 的访问标记只属于当前路径</div><div class="word-target">${[...word].map((c,i)=>`<div class="word-letter" id="word-${i}">${c}</div>`).join('')}</div><div class="grid-board">${cells}</div><div class="grid-legend"><span class="legend-chip" id="grid-path">当前路径</span><span class="legend-chip" id="grid-probe">字符检查</span><span class="legend-chip" id="grid-restore">返回后恢复</span></div><div class="stage-note" id="grid-note"></div>`}
+  function paint(s){for(let r=0;r<3;r++)for(let c=0;c<4;c++){const el=byId(`g-${r}-${c}`),idx=s.path.findIndex(p=>p[0]===r&&p[1]===c),probe=s.probe&&s.probe[0]===r&&s.probe[1]===c;el.className='grid-cell'+(idx>=0?' path':'')+(probe?' probe':'')+(s.restored?' restored':'');el.dataset.step=idx>=0?idx+1:''}for(let i=0;i<word.length;i++){const el=byId('word-'+i);el.className='word-letter'+(i<s.path.length?' on':'')+(s.path.length===word.length?' done':'')}byId('grid-path').classList.toggle('on',s.path.length>0);byId('grid-probe').classList.toggle('on',!!s.probe);byId('grid-restore').classList.toggle('on',s.restored);byId('grid-note').innerHTML=s.restored?'<span class="ok">棋盘恢复：其他起点仍可使用所有格子</span>':s.probe?'<span class="bad">F ≠ C：不进入下一层</span>':s.path.length===word.length?'<span class="ok">ABCCED 完整匹配</span>':'路径中的格子临时不可重复使用'}
+  return{id:'grid',label:'网格搜索',sub:'访问标记 + 恢复',steps,mount,paint,code};
+})();
+
+const dedupScene=movingTokenScene({
+  id:'dedup',label:'剪枝 / 去重',sub:'同层去重 ≠ 同枝禁用',prefix:'dedup',caption:'排列去重',captionText:'排序后区分“同一层的重复入口”和“同一条路径的不同位置”',
+  tokens:[{id:'1a',label:'1a'},{id:'1b',label:'1b'},{id:'2',label:'2'}],usedLabel:t=>t.id+' · available',usedText:(t,on,skip)=>t.id+' · '+(skip?'same-layer skip':on?'used in path':'available'),defaultResult:'排序后：1a, 1b, 2',
+  steps:[
+    {path:[],hot:null,skip:null,result:null,chip:'排序',chipC:'c0',title:'先排序，让相同值在数组中相邻',desc:'只有相邻后，才能用前一个相同元素的 used 状态判断当前元素属于同层重复还是同枝选择。'},
+    {path:['1a'],hot:'1a',skip:null,result:null,chip:'根层选 1a',chipC:'cb',title:'同一层先让第一个 1 作为分支入口',desc:'第一个 1 被使用后，进入下一层；它的 used 状态现在是 true。'},
+    {path:['1a','1b'],hot:'1b',skip:null,result:null,chip:'同枝允许',chipC:'cb',title:'下一层可以选择 1b，因为前一个相同值已在当前路径中',desc:'used[0] 为 true，说明 1b 不是同层重复入口，而是放在另一个排列位置，应该保留。'},
+    {path:['1a','1b','2'],hot:'2',skip:null,result:'记录值排列 [1, 1, 2]',chip:'完整答案',chipC:'cg',title:'补上 2，得到唯一值排列 [1,1,2]',desc:'虽然底层位置是 1a 与 1b，答案按值看只有一份。'},
+    {path:[],hot:null,skip:'1b',result:null,chip:'根层检查 1b',chipC:'cd',title:'回到根层时，1a 已撤销；此时跳过 1b',desc:'nums[i] 等于 nums[i-1] 且 used[i-1] 为 false，说明两个 1 正在争夺同一层的分支入口，会生成重复答案。'},
+    {path:['2'],hot:'2',skip:null,result:null,chip:'继续枚举',chipC:'cb',title:'跳过重复入口后继续选择 2，进入新的值分支',desc:'去重只跳过当前层多余的相同入口，不会禁止路径里出现两个值相同但位置不同的元素。'}
+  ],
+  code:`<span class="cmt">// nums 已排序</span>
+<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; nums.size(); ++i) {
+    <span class="kw">if</span> (used[i]) <span class="kw">continue</span>;
+
+    <span class="kw">if</span> (i &gt; <span class="num">0</span> &amp;&amp; nums[i] == nums[i - <span class="num">1</span>]
+        &amp;&amp; !used[i - <span class="num">1</span>])
+        <span class="kw">continue</span>; <span class="cmt">// 同层重复入口</span>
+
+    used[i] = <span class="kw">true</span>;
+    path.push_back(nums[i]);
+    backtrack();
+    path.pop_back();
+    used[i] = <span class="kw">false</span>;
+}`
+});
+
+const SCENES=[treeScene,subsetScene,permutationScene,partitionScene,parenthesesScene,queensScene,gridScene,dedupScene];
+const tabsBox=byId('tabs'),dotsBox=byId('dots'),stTitle=byId('stTitle'),stChip=byId('stChip'),stAct=byId('stAct'),stDesc=byId('stDesc'),codeBox=byId('codeBox'),readout=byId('readout'),btnPrev=byId('btnPrev'),btnNext=byId('btnNext'),btnPlay=byId('btnPlay');
+SCENES.forEach((scene,index)=>{const button=document.createElement('button');button.className='tab';button.innerHTML=`<span class="t">${scene.label}</span><span class="s">${scene.sub}</span>`;button.onclick=()=>{stop();switchScene(index)};tabsBox.appendChild(button)});
+let sceneIndex=0,current=0,dotEls=[],timer=null;const intervalMs=3000;
+function switchScene(index){sceneIndex=index;current=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));SCENES[sceneIndex].mount();codeBox.innerHTML=SCENES[sceneIndex].code;dotsBox.innerHTML='';dotEls=[];SCENES[sceneIndex].steps.forEach((step,i)=>{const dot=document.createElement('button');dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',`第 ${i+1} 步：${step.title}`);dot.onclick=()=>{stop();go(i)};dotsBox.appendChild(dot);dotEls.push(dot)});go(0)}
+function go(index){const scene=SCENES[sceneIndex],steps=scene.steps;current=Math.max(0,Math.min(steps.length-1,index));const step=steps[current];scene.paint(step);stTitle.textContent=scene.label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===current);dot.classList.toggle('done',i<current)});readout.textContent=(current+1)+' / '+steps.length;btnPrev.disabled=current===0;btnNext.disabled=current===steps.length-1;if(current===steps.length-1)stop();history.replaceState(null,'','#scene='+scene.id+'&step='+current)}
+function play(){if(current===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='Ⅱ';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{current<SCENES[sceneIndex].steps.length-1?go(current+1):stop()},intervalMs)}
+function stop(){if(timer){clearInterval(timer);timer=null}btnPlay.textContent='▶';btnPlay.setAttribute('aria-label','播放动画')}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(current-1)};btnNext.onclick=()=>{stop();go(current+1)};
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(current+1)}else if(event.key==='ArrowLeft'){stop();go(current-1)}else if(event.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){event.preventDefault();timer?stop():play()}});
+window.addEventListener('resize',()=>SCENES[sceneIndex].paint(SCENES[sceneIndex].steps[current]));
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+<script src="./算法动画题单.js" data-topic="18"></script>
+</body>
+</html>

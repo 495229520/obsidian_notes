@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>并查集动画 · find / 路径压缩 / 按秩合并 / 省份数量 / 冗余连接 / 岛屿网格</title>
+<style>
+:root{
+  /* Same teaching-tool system as the algorithm animation collection. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:232px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}
+
+/* 图区域 */
+.grapharea{position:relative;height:238px;margin:0 8px;}
+.grapharea.short{height:186px;}
+.gedge{position:absolute;height:2px;background:currentColor;color:var(--line);transform-origin:left center;transition:color var(--dur) var(--ease),height var(--dur) var(--ease),opacity var(--dur) var(--ease),left var(--dur) var(--ease),top var(--dur) var(--ease),width var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gedge.dir::after{content:'';position:absolute;right:-8px;top:50%;margin-top:-5px;border-left:8px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent;}
+.gedge.hot{color:var(--brown);height:3px;}
+.gedge.done{color:var(--green);height:3px;}
+.gedge.bad{color:var(--danger);height:3px;}
+.gedge.off{opacity:0;}
+.gedge.pp{color:var(--brown);}
+.gedge.pp.hotp{color:var(--danger);height:3px;}
+.gnode{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2px solid var(--line);background:var(--paper);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);z-index:1;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gnode .nv{font-size:16px;font-weight:800;line-height:1;}
+.gnode .nsub{position:absolute;bottom:-19px;font-size:10px;color:var(--faint);font-weight:700;font-family:var(--mono);}
+.gnode.inq{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.gnode.done{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.gnode.rootn{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.gnode.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.14);box-shadow:0 0 0 4px rgba(24,95,165,.16);z-index:2;}
+
+/* 数组单元格 */
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:12px 0 6px;}
+.cellrow{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap;}
+.cell{position:relative;width:46px;height:38px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease);}
+.cell.wide{width:66px;}
+.cell .cw{position:absolute;bottom:-15px;font-size:9px;color:var(--faint);font-weight:400;}
+.cell.on{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.cell.ok{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.cell.hot{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.cell.bad{color:var(--danger);background:var(--dangerbg);border-color:var(--danger);text-decoration:line-through;}
+.cell.dim{opacity:.35;}
+
+/* 邻接矩阵 */
+.mxwrap{display:grid;gap:3px;justify-content:center;margin-top:10px;font-family:var(--mono);}
+.mx{width:30px;height:26px;border:1px solid var(--grid);border-radius:5px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease);}
+.mx.h{border:none;background:transparent;color:var(--faint);font-weight:400;font-size:10px;}
+.mx.v1{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.mx.lo{opacity:.25;}
+.mx.past{opacity:.4;}
+.mx.cur{color:var(--brown);background:var(--brownbg);border-color:var(--brown);transform:scale(1.18);box-shadow:0 0 0 3px rgba(154,91,14,.18);}
+
+/* 网格 */
+.ggrid{display:grid;gap:5px;justify-content:center;margin-top:10px;}
+.gc{width:50px;height:46px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--muted);position:relative;transition:all var(--dur) var(--ease);}
+.gc .gi{position:absolute;bottom:1px;right:4px;font-size:8px;color:var(--faint);font-weight:400;}
+.gc.water{background:var(--gray);color:var(--faint);border-color:var(--grid);}
+.gc.land{background:var(--brownbg);color:var(--brown);border-color:var(--brown);}
+.gc.ca{background:var(--bluebg);color:var(--blue);border-color:var(--blue);}
+.gc.cb{background:var(--greenbg);color:var(--green);border-color:var(--green);}
+.gc.cur{transform:scale(1.12);box-shadow:0 0 0 4px rgba(24,95,165,.16);border-color:var(--blue);z-index:2;}
+
+.op-note{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:auto;padding-top:12px;min-height:34px;}
+.op-note b{color:var(--ink);}.op-note .bl{color:var(--blue);}.op-note .gr{color:var(--green);}.op-note .dg{color:var(--danger);}.op-note .br{color:var(--brown);}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.viz{min-height:478px;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:232px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;min-height:448px;}.tab{flex:1 1 128px;}.grapharea{height:212px;margin:0;}.gnode{width:40px;height:40px;margin:-20px 0 0 -20px;}.gnode .nv{font-size:14px;}.cell{width:40px;}.gc{width:42px;height:40px;}.mx{width:24px;height:22px;}.controls{padding:12px;gap:8px;}.dots{order:4;width:100%;}.codebox{font-size:11px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>并查集动画 · 从 parent 数组到三大应用</h1>
+    <p>基础模型 / 路径压缩 / 按秩合并 / 省份数量 / 冗余连接 / 岛屿网格　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ============ 通用图绘制（build once + mutate） ============ */
+function graphMarkup(prefix,G,caption,extra,short){
+  let html='';
+  G.edges.forEach((e,i)=>{html+='<span class="gedge'+(e.dir?' dir':'')+'" id="'+prefix+'e'+i+'"></span>';});
+  html+=(extra||'');
+  G.nodes.forEach(n=>{
+    html+='<div class="gnode" id="'+prefix+'n'+n.id+'" style="left:'+n.x+'%;top:'+n.y+'%"><span class="nv">'+n.id+'</span><span class="nsub" id="'+prefix+'s'+n.id+'"></span></div>';
+  });
+  return '<div class="vcap">'+caption+'</div><div class="grapharea'+(short?' short':'')+'" id="'+prefix+'area">'+html+'</div>';
+}
+function layoutGraph(prefix,G){
+  const area=document.getElementById(prefix+'area');if(!area)return;
+  const w=area.clientWidth,h=area.clientHeight;
+  G.edges.forEach((e,i)=>{
+    const na=G.nodes.find(n=>n.id===e.a),nb=G.nodes.find(n=>n.id===e.b);
+    const x1=na.x/100*w,y1=na.y/100*h,x2=nb.x/100*w,y2=nb.y/100*h;
+    const dx=x2-x1,dy=y2-y1;
+    const line=document.getElementById(prefix+'e'+i);
+    line.style.left=x1+'px';line.style.top=y1+'px';
+    line.style.width=Math.hypot(dx,dy)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';
+  });
+}
+function paintGraph(prefix,G,s){
+  const cls=s.cls||{},sub=s.sub||{},emap=s.emap||{};
+  G.nodes.forEach(n=>{
+    const el=document.getElementById(prefix+'n'+n.id);
+    let c='gnode';if(cls[n.id])c+=' '+cls[n.id];if(s.active===n.id)c+=' active';
+    el.className=c;
+    document.getElementById(prefix+'s'+n.id).textContent=(sub[n.id]!==undefined?sub[n.id]:'');
+  });
+  G.edges.forEach((e,i)=>{
+    document.getElementById(prefix+'e'+i).className='gedge'+(e.dir?' dir':'')+(emap[i]?' '+emap[i]:'');
+  });
+}
+/* parent 指针层（动态几何，重定向自带补间） */
+function ptrMarkup(prefix,G){
+  let s='';G.nodes.forEach(n=>s+='<span class="gedge dir pp" id="'+prefix+'p'+n.id+'" style="opacity:0"></span>');
+  return s;
+}
+function paintPtrs(prefix,G,parent,pmap){
+  const area=document.getElementById(prefix+'area');if(!area)return;
+  const w=area.clientWidth,h=area.clientHeight,R=25;
+  G.nodes.forEach(n=>{
+    const line=document.getElementById(prefix+'p'+n.id);
+    const p=parent[n.id];
+    line.className='gedge dir pp'+(pmap&&pmap[n.id]?' '+pmap[n.id]:'');
+    if(p===undefined||p===n.id){line.style.opacity=0;return;}
+    const pa=G.nodes.find(x=>x.id===p);
+    const x1=n.x/100*w,y1=n.y/100*h,x2=pa.x/100*w,y2=pa.y/100*h;
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    line.style.opacity=1;
+    line.style.left=(x1+ux*R)+'px';line.style.top=(y1+uy*R)+'px';
+    line.style.width=Math.max(0,len-R-33)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';
+  });
+}
+/* 数组单元格 */
+function cellsMarkup(prefix,n,labels,wide){
+  let s='';for(let i=0;i<n;i++)s+='<div class="cell'+(wide?' wide':'')+'" id="'+prefix+i+'"><span class="cv" id="'+prefix+'v'+i+'">·</span>'+(labels?'<span class="cw">'+labels[i]+'</span>':'')+'</div>';
+  return '<div class="cellrow">'+s+'</div>';
+}
+function paintCells(prefix,n,vals,marks,wide){
+  for(let i=0;i<n;i++){
+    const has=i<vals.length&&vals[i]!==null&&vals[i]!==undefined;
+    document.getElementById(prefix+i).className='cell'+(wide?' wide':'')+(has&&marks&&marks[i]?' '+marks[i]:'');
+    document.getElementById(prefix+'v'+i).textContent=has?String(vals[i]):'·';
+  }
+}
+/* parent 数组默认着色：根=蓝，非根=棕 */
+function parMarks(par){return par.reduce((m,v,i)=>{if(v==='—'){m[i]='dim';}else{m[i]=(Number(v)===i?'on':'hot');}return m;},{});}
+
+/* ========== 场景 1：基础模型 find ========== */
+const modelScene=(()=>{
+  const G={nodes:[{id:0,x:14,y:30},{id:1,x:36,y:30},{id:2,x:58,y:30},{id:3,x:80,y:30},{id:4,x:80,y:75},{id:5,x:58,y:75}],edges:[]};
+  const code='<span class="cmt">// parent[x] == x  →  x 是根（集合代表元）</span>\n'+
+    '<span class="kw">int</span> <span class="fn">findRoot</span>(<span class="kw">int</span> x){\n'+
+    '    <span class="kw">while</span> (parent[x] != x)\n'+
+    '        x = parent[x];      <span class="cmt">// 沿父指针上爬</span>\n'+
+    '    <span class="kw">return</span> x;               <span class="cmt">// 朴素版：最坏 O(n)</span>\n'+
+    '}\n'+
+    '<span class="cmt">// 同一集合 ⟺ findRoot(x) == findRoot(y)</span>';
+  const steps=[
+    {par:[0,1,2,3,4,5],pmap:{},cls:{0:'rootn',1:'rootn',2:'rootn',3:'rootn',4:'rootn',5:'rootn'},active:null,chip:'parent 数组 = 森林',chipC:'c0',title:'初始 iota：每个节点自成一个集合',
+     note:'parent[x] == x 的节点是根（蓝色）',
+     desc:'并查集只用一个 <code>parent</code> 数组就表示了一片<b>森林</b>：<b class="bl">parent[x]==x → x 是根</b>（集合代表元）；否则 parent[x] 是它的父节点。初始 <code>iota</code> 让每人指向自己——6 个节点 6 个集合。它<b>不关心路径细节，只关心属于哪个集合</b>。'},
+    {par:[0,0,1,3,4,5],pmap:{2:'hotp'},cls:{0:'rootn',3:'rootn',4:'rootn',5:'rootn'},active:2,chip:'find(2) 出发',chipC:'cb',title:'挂接后 2→1→0，find(2) 沿父指针上爬',
+     note:'parent[2]=1 ≠ 2 → 继续向上',
+     desc:'现在 <code>parent=[0,0,1,...]</code>：<b>2→1→0</b> 构成一棵树。查询 <b>find(2)</b>：parent[2]=1 不是自己，说明 2 不是根，<b>继续向上爬</b>。'},
+    {par:[0,0,1,3,4,5],pmap:{1:'hotp'},cls:{0:'rootn',3:'rootn',4:'rootn',5:'rootn'},active:0,chip:'到达根 0',chipC:'cg',title:'爬过 1 到达根 0：find(2) = 0',
+     note:'find(2) = 0 → 2 属于以 0 为代表的集合',
+     desc:'parent[1]=0，parent[0]=0——<b>0 是根</b>，find(2) 返回 0。判断连通就一句话：<code>connected(x,y) = find(x)==find(y)</code>。根是谁不重要，重要的是<b>同一集合的根相同</b>。'},
+    {par:[0,0,1,2,3,5],pmap:{1:'hotp',2:'hotp',3:'hotp',4:'hotp'},cls:{0:'rootn',5:'rootn'},active:4,chip:'链式退化 O(n)',chipC:'cd',title:'合并顺序差 → 树退化成链，find(4) 走 4 步',
+     note:'4→3→2→1→0，一步一步爬',
+     desc:'如果合并时随便挂，树可能退化成<b class="dg">一条链</b>：find(4) 要走 <b>4 步</b>，n 个节点最坏 <b>O(n)</b>——反复查询直接超时。这就是必须引入两个优化的原因：<b>路径压缩</b>（下一场景）和<b>按秩合并</b>（再下一场景）。'},
+    {par:[0,0,1,2,3,5],pmap:{},cls:{0:'rootn',5:'rootn'},active:null,chip:'两大优化预告',chipC:'cg',title:'压缩改树形，按秩控树高',
+     note:'优化后单次操作均摊 O(α(n)) ≈ 常数',
+     desc:'两个优化各管一头：<b>路径压缩</b>在 find 时把沿途节点直接挂到根（事后补救）；<b>按秩合并</b>在 unite 时让矮树挂高树（事前预防）。合体后单次操作均摊 <b>O(α(n))</b>，α 是反阿克曼函数，实际可当常数。'},
+  ];
+  let curPar=[0,1,2,3,4,5];
+  function mount(){
+    viz.innerHTML=graphMarkup('md',G,'<b>基础模型</b>：parent 数组即森林（箭头指向父节点，蓝 = 根）',ptrMarkup('md',G))+
+      '<div class="collbl">parent 数组</div>'+cellsMarkup('mda',6,['0','1','2','3','4','5'])+
+      '<div class="op-note" id="mdnote"></div>';
+    requestAnimationFrame(()=>paintPtrs('md',G,curPar,{}));
+  }
+  function paint(s){
+    paintGraph('md',G,s);curPar=s.par;
+    paintPtrs('md',G,s.par,s.pmap);
+    paintCells('mda',6,s.par,parMarks(s.par));
+    document.getElementById('mdnote').innerHTML=s.note;
+  }
+  return{id:'model',label:'基础模型',sub:'parent 数组 + find',steps,mount,paint,layout:()=>paintPtrs('md',G,curPar,{}),code};
+})();
+
+/* ========== 场景 2：路径压缩 ========== */
+const compressScene=(()=>{
+  const G={nodes:[{id:0,x:50,y:14},{id:1,x:30,y:42},{id:2,x:30,y:70},{id:3,x:30,y:96},{id:4,x:70,y:42}],edges:[]};
+  const code='<span class="kw">int</span> <span class="fn">find</span>(<span class="kw">int</span> x){\n'+
+    '    <span class="kw">if</span> (parent_[x] != x) {\n'+
+    '        parent_[x] = <span class="fn">find</span>(parent_[x]); <span class="cmt">// 递归到根，回程改挂</span>\n'+
+    '    }\n'+
+    '    <span class="kw">return</span> parent_[x];   <span class="cmt">// 返回的永远是根</span>\n'+
+    '}\n'+
+    '<span class="cmt">// 压缩只改树形，不改集合划分</span>';
+  const steps=[
+    {par:[0,0,1,2,0],pmap:{},cls:{0:'rootn'},active:null,chip:'压缩前的长链',chipC:'c0',title:'3→2→1→0 是一条链，find(3) 要走 3 步',
+     note:'目标：查一次 find(3)，顺手压扁整条链',
+     desc:'这棵树里 <b>3→2→1→0</b> 是链（4 还挂在 0 下）。朴素 find(3) 每次都要爬 3 步。<b>路径压缩</b>的思路：反正这趟已经找到根了，<b>回程把沿途节点全部直接挂到根下面</b>，让下次一步到位。'},
+    {par:[0,0,1,2,0],pmap:{3:'hotp',2:'hotp',1:'hotp'},cls:{0:'rootn'},active:0,chip:'递归下探',chipC:'cb',title:'find(3) → find(2) → find(1) → 到根 0',
+     note:'递归栈：find(3) ⇒ find(2) ⇒ find(1) ⇒ 0',
+     desc:'<code>find(3)</code> 发现 parent[3]=2 不是根，递归 <code>find(2)</code>；再递归 <code>find(1)</code>；parent[1]=0 是根，递归触底返回 <b>0</b>。红色路径就是这趟递归走过的链。'},
+    {par:[0,0,0,2,0],pmap:{2:'hotp'},cls:{0:'rootn'},active:2,chip:'回程改挂 ①',chipC:'ch',title:'回程：parent_[2] = find(parent_[2]) = 0',
+     note:'看 2 的箭头从 1 滑向根 0',
+     desc:'递归返回途中执行 <code>parent_[x] = find(parent_[x])</code>：<b>2 的父指针从 1 改挂到根 0</b>——注意箭头整根滑过去。1 本来就挂在 0 下，不用动。'},
+    {par:[0,0,0,0,0],pmap:{3:'hotp'},cls:{0:'rootn'},active:3,chip:'回程改挂 ②',chipC:'ch',title:'parent_[3] = 0，链被压成星形',
+     note:'树高从 3 压到 1，变成“菊花”形',
+     desc:'最外层返回时 <b>3 也直接挂到 0</b>。整棵树被压成<b>星形</b>：所有节点直连根。压缩<b>不改变集合划分</b>（还是同一伙人），只改树的形状——这也是为什么压缩后 <code>rank_</code> 只能当“近似高度”用。'},
+    {par:[0,0,0,0,0],pmap:{},cls:{0:'rootn',1:'done',2:'done',3:'done',4:'done'},active:null,chip:'再查一步到根',chipC:'cg',title:'下次 find(3) 一步到根，均摊接近 O(1)',
+     note:'一次深查询，造福后续所有查询',
+     desc:'现在再查 find(3)、find(2) 都<b>一步到根</b>。路径压缩是“懒优化”：谁被查过谁受益，越查越平。递归写法最常见，一行 <code>parent_[x]=find(parent_[x])</code> 完成查找 + 压缩两件事。'},
+  ];
+  let curPar=[0,0,1,2,0];
+  function mount(){
+    viz.innerHTML=graphMarkup('cp',G,'<b>路径压缩</b>：find 回程把沿途节点直接挂到根',ptrMarkup('cp',G))+
+      '<div class="collbl">parent 数组</div>'+cellsMarkup('cpa',5,['0','1','2','3','4'])+
+      '<div class="op-note" id="cpnote"></div>';
+    requestAnimationFrame(()=>paintPtrs('cp',G,curPar,{}));
+  }
+  function paint(s){
+    paintGraph('cp',G,s);curPar=s.par;
+    paintPtrs('cp',G,s.par,s.pmap);
+    paintCells('cpa',5,s.par,parMarks(s.par));
+    document.getElementById('cpnote').innerHTML=s.note;
+  }
+  return{id:'compress',label:'路径压缩',sub:'find 回程改挂根',steps,mount,paint,layout:()=>paintPtrs('cp',G,curPar,{}),code};
+})();
+
+/* ========== 场景 3：按秩合并 ========== */
+const rankScene=(()=>{
+  const G={nodes:[{id:0,x:20,y:22},{id:1,x:10,y:62},{id:2,x:38,y:52},{id:3,x:38,y:88},{id:4,x:70,y:28},{id:5,x:70,y:70}],edges:[]};
+  const code='<span class="kw">bool</span> <span class="fn">unite</span>(<span class="kw">int</span> x, <span class="kw">int</span> y){\n'+
+    '    <span class="kw">int</span> rx = <span class="fn">find</span>(x), ry = <span class="fn">find</span>(y);\n'+
+    '    <span class="kw">if</span> (rx == ry) <span class="kw">return</span> <span class="kw">false</span>;\n'+
+    '    <span class="kw">if</span> (rank_[rx] &lt; rank_[ry]) swap(rx, ry);\n'+
+    '    parent_[ry] = rx;          <span class="cmt">// 矮树挂到高树下</span>\n'+
+    '    <span class="kw">if</span> (rank_[rx] == rank_[ry])\n'+
+    '        ++rank_[rx];           <span class="cmt">// 只有同秩才 +1</span>\n'+
+    '    --count_;\n    <span class="kw">return</span> <span class="kw">true</span>;\n}';
+  const steps=[
+    {par:[0,0,2,2,4,5],rank:[1,0,1,0,0,0],pmap:{},cls:{0:'rootn',2:'rootn',4:'rootn',5:'rootn'},active:null,chip:'rank = 树高近似',chipC:'c0',title:'两棵秩 1 的树 + 两个秩 0 的单点',
+     note:'{0,1} rank1 · {2,3} rank1 · {4} {5} rank0',
+     desc:'合并两个集合时挂谁到谁下面，决定了树会不会越长越高。<b>rank</b> 记录树高的近似值。当前局面：两棵高度 1 的树 {0,1}、{2,3}，两个单点 {4}、{5}。'},
+    {par:[0,0,2,2,4,4],rank:[1,0,1,0,1,0],pmap:{5:'hotp'},cls:{0:'rootn',2:'rootn',4:'rootn'},active:5,chip:'同秩合并 rank+1',chipC:'cb',title:'unite(4,5)：秩 0 == 秩 0 → rank[4] 变 1',
+     note:'两棵同高的树合并，高度必然 +1',
+     desc:'<code>unite(4,5)</code>：两个单点秩相同（0==0），5 挂到 4 下，<b>rank[4] 加到 1</b>。<b>为什么同秩才 +1</b>：矮树挂进高树，高树的高度不变；只有<b>两棵同高的树合并</b>，新树才会长高一层。'},
+    {par:[0,0,0,2,4,4],rank:[2,0,1,0,1,0],pmap:{2:'hotp'},cls:{0:'rootn',4:'rootn'},active:2,chip:'再来一次同秩',chipC:'cb',title:'unite(0,2)：秩 1 == 秩 1 → rank[0] 变 2',
+     note:'现在 3→2→0 深度 2，rank[0]=2',
+     desc:'<code>unite(0,2)</code>：两棵秩 1 的树合并，2 挂到 0 下，<b>rank[0] 升到 2</b>。注意 3 现在要走 <b>3→2→0</b> 两步到根——这是同秩合并不可避免的加深。'},
+    {par:[4,0,0,2,4,4],rank:[2,0,1,0,1,0],pmap:{0:'hotp'},cls:{4:'rootn'},active:0,chip:'反例：高挂矮',chipC:'cd',title:'❌ 若让高树根 0 挂到矮树根 4 下',
+     note:'find(3) 变 3→2→0→4 三步，树高 3',
+     desc:'<b class="dg">反例</b>：合并 {0..3}（高 2）和 {4,5}（高 1）时，如果不看秩、让<b>高树根 0 挂到矮树根 4</b> 下：find(3) 变成 <b>3→2→0→4</b> 三步，树高涨到 3。每次都这么挂，树高线性增长，退回 O(n)。'},
+    {par:[0,0,0,2,0,4],rank:[2,0,1,0,1,0],pmap:{4:'hotp'},cls:{0:'rootn'},active:4,chip:'✅ 矮挂高',chipC:'cg',title:'按秩：rank[0]=2 > rank[4]=1 → 4 挂到 0',
+     note:'树高保持 2 不变，rank 不等时不加',
+     desc:'<b class="gr">按秩合并</b>：rank[0]=2 大于 rank[4]=1，所以<b>矮树根 4 挂到高树根 0 下</b>（看 4 的箭头滑向 0）。最深路径 5→4→0 还是 2 步——<b>高度没有增加，rank 不等所以不加</b>。'},
+    {par:[0,0,0,2,0,4],rank:[2,0,1,0,1,0],pmap:{},cls:{0:'rootn',1:'done',2:'done',3:'done',4:'done',5:'done'},active:null,chip:'O(α(n))',chipC:'cg',title:'按秩保证树高 O(log n)，配合压缩到 O(α(n))',
+     note:'count_ 只在成功合并（rx≠ry）时 −1',
+     desc:'按秩合并单独就能把树高控制在 <b>O(log n)</b>；配合路径压缩，均摊 <b>O(α(n))</b> ≈ 常数。另一个细节：<code>count_</code> 只在 <b>rx≠ry 成功合并</b>时减一——同集合重复 unite 返回 false，分量数不变。这正是下一场景计数的基础。'},
+  ];
+  let curPar=[0,0,2,2,4,5];
+  function mount(){
+    viz.innerHTML=graphMarkup('rk',G,'<b>按秩合并</b>：矮树挂到高树下，同秩合并才加 rank',ptrMarkup('rk',G))+
+      '<div class="collbl">parent 数组</div>'+cellsMarkup('rka',6,['0','1','2','3','4','5'])+
+      '<div class="collbl">rank 数组</div>'+cellsMarkup('rkr',6,['0','1','2','3','4','5'])+
+      '<div class="op-note" id="rknote"></div>';
+    requestAnimationFrame(()=>paintPtrs('rk',G,curPar,{}));
+  }
+  function paint(s){
+    paintGraph('rk',G,s);curPar=s.par;
+    paintPtrs('rk',G,s.par,s.pmap);
+    paintCells('rka',6,s.par,parMarks(s.par));
+    paintCells('rkr',6,s.rank,s.rank.reduce((m,v,i)=>{m[i]=(v>0?'ok':'dim');return m;},{}));
+    document.getElementById('rknote').innerHTML=s.note;
+  }
+  return{id:'rank',label:'按秩合并',sub:'矮挂高 · 同秩+1',steps,mount,paint,layout:()=>paintPtrs('rk',G,curPar,{}),code};
+})();
+
+/* ========== 场景 4：省份数量 547 ========== */
+const provScene=(()=>{
+  const G={nodes:[{id:0,x:16,y:28},{id:1,x:42,y:20},{id:2,x:30,y:72},{id:3,x:70,y:28},{id:4,x:70,y:76}],edges:[]};
+  const M=[[1,1,0,0,0],[1,1,1,0,0],[0,1,1,0,0],[0,0,0,1,1],[0,0,0,1,1]];
+  const code='<span class="kw">int</span> <span class="fn">findCircleNum</span>(<span class="kw">auto</span>&amp; isConnected){\n'+
+    '    <span class="kw">int</span> n = isConnected.size();\n'+
+    '    UnionFind uf(n);            <span class="cmt">// count_ = n</span>\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; n; ++i)\n'+
+    '        <span class="kw">for</span> (<span class="kw">int</span> j = i + 1; j &lt; n; ++j)  <span class="cmt">// 只扫上三角</span>\n'+
+    '            <span class="kw">if</span> (isConnected[i][j] == 1)\n'+
+    '                uf.<span class="fn">unite</span>(i, j);  <span class="cmt">// 成功合并 count-1</span>\n'+
+    '    <span class="kw">return</span> uf.<span class="fn">count</span>();\n}';
+  const steps=[
+    {par:[0,1,2,3,4],cur:null,past:[],pmap:{},cls:{0:'rootn',1:'rootn',2:'rootn',3:'rootn',4:'rootn'},cnt:5,chip:'LC 547',chipC:'c0',title:'邻接矩阵输入，只扫上三角',
+     note:'初始 count = 5（每城市一个省份）',
+     desc:'省份数量 = 无向图<b>连通分量计数</b>。输入是邻接矩阵 <code>isConnected</code>。只扫<b>上三角</b>（i&lt;j）：矩阵对称、扫两遍是浪费；对角线 i==j 是“自己连自己”，没有合并意义。初始每个城市自成省份，count=5。'},
+    {par:[0,0,2,3,4],cur:[0,1],past:[],pmap:{1:'hotp'},cls:{0:'rootn',2:'rootn',3:'rootn',4:'rootn',1:'done'},cnt:4,chip:'(0,1)=1 → unite',chipC:'cb',title:'城市 0、1 相连：合并，count=4',
+     note:'unite(0,1) 成功 → count 5→4',
+     desc:'扫到 <code>isConnected[0][1]=1</code>：合并 0、1。unite 内部先 find 双方的根再挂接，成功合并 <b>count 减一</b>。'},
+    {par:[0,0,0,3,4],cur:[1,2],past:[[0,1],[0,2],[0,3],[0,4]],pmap:{2:'hotp'},cls:{0:'rootn',3:'rootn',4:'rootn',1:'done',2:'done'},cnt:3,chip:'(1,2)=1 → unite',chipC:'cb',title:'跳过 4 个 0 后，(1,2)=1：2 并入 0 的集合',
+     note:'find(1)=0 → 2 挂到根 0，count=3',
+     desc:'第 0 行剩下的 (0,2)(0,3)(0,4) 都是 0，直接跳过（变淡）。扫到 <code>(1,2)=1</code>：<b>find(1)=0</b>，所以 2 挂到<b>根 0</b> 下（不是挂到 1！合并的永远是根）。{0,1,2} 连成一个省份。'},
+    {par:[0,0,0,3,3],cur:[3,4],past:[[0,1],[0,2],[0,3],[0,4],[1,2],[1,3],[1,4],[2,3],[2,4]],pmap:{4:'hotp'},cls:{0:'rootn',3:'rootn',1:'done',2:'done',4:'inq'},cnt:2,chip:'(3,4)=1 → unite',chipC:'cb',title:'中间全是 0；(3,4)=1：合并成第二个省份',
+     note:'unite(3,4) → count=2',
+     desc:'(1,3)(1,4)(2,3)(2,4) 都是 0——城市 {0,1,2} 和 {3,4} 之间没有任何连接。扫到 <code>(3,4)=1</code>，合并成第二个省份，count=2。'},
+    {par:[0,0,0,3,3],cur:null,past:[[0,1],[0,2],[0,3],[0,4],[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]],pmap:{},cls:{0:'rootn',3:'rootn',1:'done',2:'done',4:'inq'},cnt:2,chip:'return count()',chipC:'cg',title:'扫描结束：uf.count() = 2 个省份',
+     note:'答案 = 2：{0,1,2} 和 {3,4}',
+     desc:'上三角扫完，直接 <code>return uf.count()</code> = <b>2</b>。DFS 也能解这题（对每个未访问城市启动一次），但并查集的优势是<b>边到来时持续维护</b>——如果城市关系动态增加，不用重新遍历整张图。'},
+  ];
+  let curPar=[0,1,2,3,4];
+  function mxMarkup(){
+    let s='<div class="mx h"></div>';
+    for(let j=0;j<5;j++)s+='<div class="mx h">'+j+'</div>';
+    for(let i=0;i<5;i++){
+      s+='<div class="mx h">'+i+'</div>';
+      for(let j=0;j<5;j++)s+='<div class="mx" id="pvm'+i+'-'+j+'">'+M[i][j]+'</div>';
+    }
+    return '<div class="collbl">isConnected 邻接矩阵（只扫上三角 i&lt;j）</div><div class="mxwrap" style="grid-template-columns:repeat(6,30px)">'+s+'</div>';
+  }
+  function mount(){
+    viz.innerHTML=graphMarkup('pv',G,'<b>省份数量</b>：矩阵上三角逐格喂给 unite，读 count()',ptrMarkup('pv',G),true)+
+      mxMarkup()+'<div class="op-note" id="pvnote"></div>';
+    requestAnimationFrame(()=>paintPtrs('pv',G,curPar,{}));
+  }
+  function paint(s){
+    paintGraph('pv',G,s);curPar=s.par;
+    paintPtrs('pv',G,s.par,s.pmap);
+    for(let i=0;i<5;i++)for(let j=0;j<5;j++){
+      const el=document.getElementById('pvm'+i+'-'+j);
+      let c='mx';
+      if(j<=i)c+=' lo';
+      else{
+        if(M[i][j]===1)c+=' v1';
+        if(s.past.some(p=>p[0]===i&&p[1]===j))c+=' past';
+        if(s.cur&&s.cur[0]===i&&s.cur[1]===j)c+=' cur';
+      }
+      el.className=c;
+    }
+    document.getElementById('pvnote').innerHTML='省份数 count = <b>'+s.cnt+'</b>';
+  }
+  return{id:'province',label:'省份数量',sub:'LC 547 · 分量计数',steps,mount,paint,layout:()=>paintPtrs('pv',G,curPar,{}),code};
+})();
+
+/* ========== 场景 5：冗余连接 684 ========== */
+const cycleScene=(()=>{
+  const G={nodes:[{id:1,x:32,y:15},{id:2,x:12,y:62},{id:3,x:58,y:48},{id:4,x:32,y:88}],
+    edges:[{a:1,b:2},{a:1,b:3},{a:2,b:4},{a:3,b:4}]};
+  const code='vector&lt;<span class="kw">int</span>&gt; <span class="fn">findRedundantConnection</span>(<span class="kw">auto</span>&amp; edges){\n'+
+    '    UnionFind uf(edges.size() + 1); <span class="cmt">// 1-based 开 n+1!</span>\n'+
+    '    <span class="kw">for</span> (<span class="kw">auto</span>&amp; e : edges) {\n'+
+    '        <span class="kw">if</span> (!uf.<span class="fn">unite</span>(e[0], e[1]))  <span class="cmt">// 已连通 → 成环</span>\n'+
+    '            <span class="kw">return</span> e;\n'+
+    '    }\n'+
+    '    <span class="kw">return</span> {};\n}';
+  const steps=[
+    {par:['—',1,2,3,4],list:['1-2','1-3','2-4','3-4'],lm:{},emap:{0:'off',1:'off',2:'off',3:'off'},cls:{1:'rootn',2:'rootn',3:'rootn',4:'rootn'},active:null,chip:'LC 684',chipC:'c0',title:'4 个点 4 条边：必有一条边多余',
+     note:'树 = 连通 + 无环，n 个点最多 n−1 条边',
+     desc:'边一条条到来，找出<b>让图成环的那条边</b>。原理：树有 n−1 条边，现在 4 点 4 边，<b>必有一条冗余</b>。判环开关就是 unite 的返回值：<b>两端原本已连通，再加边必成环</b>。<b class="dg">注意</b>：本题节点 1-based，并查集要开 <code>n+1</code>，下标 0 空置（数组里显示 —）。'},
+    {par:['—',1,1,3,4],list:['1-2','1-3','2-4','3-4'],lm:{0:'ok'},emap:{0:'done',1:'off',2:'off',3:'off'},cls:{1:'rootn',3:'rootn',4:'rootn',2:'done'},active:2,chip:'加边 (1,2) ✓',chipC:'cb',title:'1、2 不连通 → 正常合并',
+     note:'unite(1,2) = true，安全',
+     desc:'第一条边 <b>(1,2)</b>：find(1)=1、find(2)=2 不同根，合并成功。这条边被采纳（绿色）。'},
+    {par:['—',1,1,1,4],list:['1-2','1-3','2-4','3-4'],lm:{0:'ok',1:'ok'},emap:{0:'done',1:'done',2:'off',3:'off'},cls:{1:'rootn',4:'rootn',2:'done',3:'done'},active:3,chip:'加边 (1,3) ✓',chipC:'cb',title:'3 并入 1 的集合',
+     note:'当前集合 {1,2,3} 和 {4}',
+     desc:'边 <b>(1,3)</b>：3 还是单点，合并成功。现在 {1,2,3} 已连通。'},
+    {par:['—',1,1,1,1],list:['1-2','1-3','2-4','3-4'],lm:{0:'ok',1:'ok',2:'ok'},emap:{0:'done',1:'done',2:'done',3:'off'},cls:{1:'rootn',2:'done',3:'done',4:'done'},active:4,chip:'加边 (2,4) ✓',chipC:'cb',title:'find(2)=1，4 挂入 → 全图连通，已是树',
+     note:'3 条边连 4 个点，恰好是一棵树',
+     desc:'边 <b>(2,4)</b>：find(2)=<b>1</b>（不是 2！合并根），find(4)=4，合并成功。此刻 4 点 3 边<b>恰好构成一棵树</b>——再加任何一条边都必然成环。'},
+    {par:['—',1,1,1,1],list:['1-2','1-3','2-4','3-4'],lm:{0:'ok',1:'ok',2:'ok',3:'bad'},emap:{0:'done',1:'done',2:'done',3:'bad'},cls:{1:'rootn',2:'done',3:'done',4:'done'},active:null,chip:'(3,4) 成环 ✗',chipC:'cd',title:'find(3)=find(4)=1 → unite 返回 false',
+     note:'返回 [3, 4]：这就是冗余边',
+     desc:'边 <b>(3,4)</b>：find(3)=1，find(4)=1——<b class="dg">同根！两点已经连通</b>，这条边一加，1-3-4-2-1 就成了环。unite 返回 false，立即 <code>return edge</code> = <b>[3,4]</b>。'},
+    {par:['—',1,1,1,1],list:['1-2','1-3','2-4','3-4'],lm:{0:'ok',1:'ok',2:'ok',3:'bad'},emap:{0:'done',1:'done',2:'done',3:'bad'},cls:{1:'rootn',2:'done',3:'done',4:'done'},active:null,chip:'判环开关',chipC:'cg',title:'unite 的 bool 返回值就是判环器',
+     note:'Kruskal 用的是同一招（见 5.2.26 动画）',
+     desc:'总结这个套路：<b>加边前两端已连通 ⟺ 这条边成环</b>。它就是 Kruskal 最小生成树里“跳过成环边”的判断，也适用于“最后一条成环边”“动态判环”各种变体。整趟只用了并查集两个操作，均摊近 O(1) 每条边。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('cy',G,'<b>冗余连接</b>：逐条加边，unite 返回 false 的边就是环')+
+      '<div class="collbl">边列表（按输入顺序）</div>'+cellsMarkup('cyl',4,null,true)+
+      '<div class="collbl">parent 数组（0 空置）</div>'+cellsMarkup('cya',5,['0','1','2','3','4'])+
+      '<div class="op-note" id="cynote"></div>';
+    requestAnimationFrame(()=>layoutGraph('cy',G));
+  }
+  function paint(s){
+    paintGraph('cy',G,s);
+    paintCells('cyl',4,s.list,Object.assign(s.list.reduce((m,_,i)=>{m[i]='dim';return m;},{}),s.lm),true);
+    paintCells('cya',5,s.par,parMarks(s.par.map((v,i)=>v==='—'?'—':v)));
+    document.getElementById('cynote').innerHTML=s.note;
+  }
+  return{id:'cycle',label:'冗余连接',sub:'LC 684 · 加边判环',steps,mount,paint,layout:()=>layoutGraph('cy',G),code};
+})();
+
+/* ========== 场景 6：岛屿网格映射 ========== */
+const gridScene=(()=>{
+  // 3×4：land ids 0,1,4,7,10,11 · water 2,3,5,6,8,9
+  const LAND=[0,1,4,7,10,11];
+  const code='<span class="kw">int</span> <span class="fn">id</span>(<span class="kw">int</span> r, <span class="kw">int</span> c, <span class="kw">int</span> cols){ <span class="kw">return</span> r * cols + c; }\n'+
+    'UnionFind uf(rows * cols);   <span class="cmt">// 水格也占一个集合</span>\n'+
+    '<span class="kw">for</span> (每个陆地格 (r,c)) {\n'+
+    '    <span class="kw">if</span> (右邻是陆地) uf.<span class="fn">unite</span>(id, id+1);\n'+
+    '    <span class="kw">if</span> (下邻是陆地) uf.<span class="fn">unite</span>(id, id+cols); <span class="cmt">// 只查右/下</span>\n'+
+    '}\n'+
+    '<span class="kw">return</span> uf.<span class="fn">count</span>() - water;   <span class="cmt">// 减掉水格集合!</span>';
+  const steps=[
+    {ca:[],cb:[],cur:null,cnt:12,chip:'二维 → 一维',chipC:'c0',title:'id = r * cols + c，每个格子先自成集合',
+     note:'count = 12（含 6 个水格），water = 6',
+     desc:'并查集是一维的，网格是二维的——桥梁是 <b>id = r×cols + c</b>（格子里的数字就是编号）。<code>UnionFind uf(12)</code> 把 12 个格子<b>全部</b>初始化成集合，包括水格——所以最后要减掉。'},
+    {ca:[0,1,4],cb:[],cur:0,cnt:10,chip:'扫 (0,0)：两次合并',chipC:'cb',title:'0 号格右邻 1、下邻 4 都是陆地 → unite ×2',
+     note:'count 12→10　·　只查右、下，避免重复',
+     desc:'扫描到 <b>(0,0)</b>（id 0）：右邻 id <b>1</b> 是陆地 → unite(0,1)；下邻 id <b>4</b> 是陆地 → unite(0,4)。count 减 2。<b>只检查右、下</b>两个方向：左、上在之前的格子里已经查过了，四方向会重复合并（不错但浪费）。'},
+    {ca:[0,1,4],cb:[],cur:4,cnt:10,chip:'无陆地邻居跳过',chipC:'ch',title:'(0,1)、(1,0) 的右/下都不是陆地',
+     note:'没有可合并的邻居，count 不变',
+     desc:'扫 <b>(0,1)</b>：右是水、下是水；扫 <b>(1,0)</b>：右水、下水——都没有合并动作。岛屿 A（蓝色 {0,1,4}）已经完整。水格不参与 unite，它们保持单点集合。'},
+    {ca:[0,1,4],cb:[7,11],cur:7,cnt:9,chip:'扫 (1,3)',chipC:'cb',title:'7 号格下邻 11 是陆地 → unite(7,11)',
+     note:'count 10→9',
+     desc:'扫到 <b>(1,3)</b>（id 7）：右越界，下邻 id <b>11</b> 是陆地 → unite(7,11)。第二个岛屿（绿色）开始成形。'},
+    {ca:[0,1,4],cb:[7,10,11],cur:10,cnt:8,chip:'扫 (2,2)',chipC:'cb',title:'10 号格右邻 11 → unite，两块并成岛 B',
+     note:'count 9→8',
+     desc:'扫 <b>(2,2)</b>（id 10）：右邻 id <b>11</b> 是陆地 → unite(10,11)。find(11) 已经和 7 同根，所以 {7,10,11} 连成完整的岛 B。'},
+    {ca:[0,1,4],cb:[7,10,11],cur:null,cnt:8,chip:'count − water',chipC:'cg',title:'8 个集合 − 6 个水格 = 2 座岛',
+     note:'count() − water = 8 − 6 = <b>2</b>',
+     desc:'扫描结束 count=8：岛 A、岛 B，再加 <b>6 个水格单点集合</b>——它们不该算岛，所以答案是 <code>count() − water</code> = <b>2</b>。若是<b>动态加陆地</b>（LC 305）：不预先入集合，用 active 数组标记；每加一块新陆地先 +1，再和已激活的邻居合并。'},
+  ];
+  function mount(){
+    let cells='';
+    for(let r=0;r<3;r++)for(let c=0;c<4;c++){const id=r*4+c;cells+='<div class="gc" id="gdg'+id+'"><span>'+id+'</span><span class="gi">'+r+','+c+'</span></div>';}
+    viz.innerHTML='<div class="vcap"><b>岛屿网格</b>：格子里的数字 = 一维编号 r×cols+c（棕 = 陆地，灰 = 水）</div>'+
+      '<div class="ggrid" style="grid-template-columns:repeat(4,50px)">'+cells+'</div>'+
+      '<div class="collbl">合并只发生在相邻陆地之间（右 / 下）</div>'+
+      '<div class="op-note" id="gdnote"></div>';
+  }
+  function paint(s){
+    for(let id=0;id<12;id++){
+      const el=document.getElementById('gdg'+id);
+      let c='gc';
+      if(!LAND.includes(id))c+=' water';
+      else if(s.ca.includes(id))c+=' ca';
+      else if(s.cb.includes(id))c+=' cb';
+      else c+=' land';
+      if(s.cur===id)c+=' cur';
+      el.className=c;
+    }
+    document.getElementById('gdnote').innerHTML='count = <b>'+s.cnt+'</b>　·　water = 6'+(s.cnt===8&&!s.cur?'　→　岛屿数 = <span class="gr">2</span>':'');
+  }
+  return{id:'grid',label:'岛屿网格',sub:'r*cols+c 映射',steps,mount,paint,layout:()=>{},code};
+})();
+
+/* ============ 引擎（与动画合集同款） ============ */
+const SCENES=[modelScene,compressScene,rankScene,provScene,cycleScene,gridScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2900;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((tab,idx)=>tab.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>SCENES[si].layout());
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(+hashStep[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="25"></script>
+</body>
+</html>

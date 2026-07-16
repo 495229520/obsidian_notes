@@ -106,5 +106,7 @@ status: active
 
 - [[S-Week 5 - io_uring 异步 IO]]
 - [[S-Week 7 - 简历化与投递启动]]
+- [[S-Week 6 - 前置知识 - MVP 收口与报告]]
+- [[benchmark 报告与可复现工程专题]]
 - [[AI Infra 存储与 GPU 数据路径系统工程师培养方案]]（benchmark 可信度标准）
 - [[Week 5 - Serving Benchmark Harness]]（报告方法论同源）

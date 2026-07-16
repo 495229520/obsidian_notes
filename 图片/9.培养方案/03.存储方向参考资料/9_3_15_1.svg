@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="600" viewBox="0 0 880 600">
+  <title>group commit：多提交线程汇聚到单 writer 攒批</title>
+  <desc>三个提交线程把请求放入 MPSC 有界队列，writer 单线程取批、一次 append、一次 fdatasync，然后按批次序号集体唤醒等待线程。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="880" height="600" fill="rgb(245, 244, 237)"/>
+
+  <text x="440" y="34" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">group commit：多提交线程 → 单 writer 攒批</text>
+
+  <!-- 提交线程 -->
+  <rect x="60" y="90" width="210" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="165" y="112" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">线程 A：put(k1) 等应答</text>
+
+  <rect x="60" y="194" width="210" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="165" y="216" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">线程 B：put(k2) 等应答</text>
+
+  <rect x="60" y="298" width="210" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="165" y="320" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">线程 C：put(k3) 等应答</text>
+
+  <!-- MPSC 队列 -->
+  <rect x="330" y="180" width="190" height="72" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="425" y="204" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">MPSC 有界队列</text>
+  <text x="425" y="228" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489" text-anchor="middle" dominant-baseline="central">有界 = 天然背压</text>
+
+  <polyline points="270,112 300,112 300,196 324,196" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="270" y1="216" x2="324" y2="216" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="270,320 300,320 300,236 324,236" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- writer -->
+  <rect x="580" y="180" width="240" height="72" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="700" y="204" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">writer 单线程</text>
+  <text x="700" y="228" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">取一批 → 序列化 → 一次 append</text>
+
+  <line x1="520" y1="216" x2="574" y2="216" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="550" y="164" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489" text-anchor="middle" dominant-baseline="central">攒批：max_batch / max_wait 先到先触发</text>
+
+  <!-- fsync -->
+  <rect x="580" y="312" width="240" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="700" y="330" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">一次 fdatasync</text>
+  <text x="700" y="352" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806" text-anchor="middle" dominant-baseline="central">整批共享这一次设备 flush</text>
+  <line x1="700" y1="252" x2="700" y2="308" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 集体唤醒 -->
+  <rect x="580" y="428" width="240" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="700" y="446" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">按批次序号集体唤醒</text>
+  <text x="700" y="468" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">notify_all + 世代号谓词</text>
+  <line x1="700" y1="368" x2="700" y2="424" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 应答返回 -->
+  <polyline points="574,456 165,456 165,346" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="370" y="440" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">应答返回各提交线程（每条延迟 += 攒批等待）</text>
+
+  <!-- 底部注释 -->
+  <text x="60" y="540" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">吞吐 ≈ 每批平均条数 B ÷ 单次 fsync 时间；B 随并发提交自然增大 —— 高并发时吞吐上升、单条延迟略增</text>
+</svg>

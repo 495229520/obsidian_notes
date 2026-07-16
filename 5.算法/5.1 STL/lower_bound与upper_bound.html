@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lower_bound 与 upper_bound · 二分收缩全过程</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;      /* l 指针 / <x 区 */
+  --green:#0F6E56;--greenbg:#E1F5EE;    /* 满足性质区 / 答案 */
+  --brown:#854F0B;--brownbg:#FAEEDA;    /* r 指针 / mid */
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:480ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.layout{display:grid;grid-template-columns:560px 1fr;gap:26px;margin-top:24px;align-items:start;}
+@media(max-width:1020px){.layout{grid-template-columns:1fr;}}
+
+/* ---------- 左 ---------- */
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:18px 20px;}
+.viz .cap{font-size:12px;color:var(--muted);margin-bottom:26px;display:flex;justify-content:space-between;}
+.arena{position:relative;padding:0 0 54px;}
+.cells{display:flex;gap:4px;}
+.cell{width:64px;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-size:17px;font-weight:700;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease);position:relative;}
+.cell .ci{font-size:9px;font-weight:400;color:var(--faint);}
+.cell.lt{background:var(--bluebg);color:var(--blue);border-color:var(--blue);}    /* 不满足性质（< x 或 ≤ x） */
+.cell.ge{background:var(--greenbg);color:var(--green);border-color:var(--green);} /* 满足性质 */
+.cell.dead{opacity:.3;}
+.cell.mid{box-shadow:0 0 0 3px var(--brown);}
+.cell.ans{box-shadow:0 0 0 3px var(--green);animation:pulse .8s var(--ease);}
+@keyframes pulse{0%{transform:scale(1.1);}100%{transform:scale(1);}}
+.cell.endmark{border-style:dashed;background:transparent;color:var(--faint);font-size:11px;font-weight:400;}
+/* l/r/mid 指针 */
+.bptr{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;transition:left var(--dur) var(--ease),opacity var(--dur);}
+.bptr .a{font-size:12px;line-height:.9;}
+.bptr .l{font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;border-radius:4px;padding:1px 7px;}
+.bptr.pl{bottom:26px;}.bptr.pl .a{color:var(--blue);}.bptr.pl .l{background:var(--blue);}
+.bptr.pr{bottom:26px;}.bptr.pr .a{color:var(--brown);}.bptr.pr .l{background:var(--brown);}
+.bptr.pm{bottom:0;}.bptr.pm .a{color:var(--green);}.bptr.pm .l{background:var(--green);}
+.judge{margin-top:6px;font-family:var(--mono);font-size:13px;color:var(--muted);min-height:24px;}
+.judge b{color:var(--ink);}
+.banner{margin-top:10px;font-size:12px;font-weight:600;border-radius:6px;padding:4px 10px;border:1px dashed;opacity:0;transition:opacity var(--dur) var(--ease);}
+.banner.show{opacity:1;}
+.banner.good{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+
+/* ---------- 右 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:180px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cs{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .lo{color:var(--blue);font-weight:600;}
+.desc-body .g{color:var(--green);font-weight:600;}
+.desc-body .h{color:var(--brown);font-weight:600;}
+
+.free{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 18px;}
+.free .lbl{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.free .row{display:flex;gap:10px;flex-wrap:wrap;}
+.act{font:inherit;font-family:var(--mono);font-size:13px;font-weight:500;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid;transition:all .15s var(--ease);color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.act:hover:not(:disabled){background:#cfeee2;}
+.act:active{transform:scale(.96);}
+.act:disabled{opacity:.4;cursor:default;}
+.freeout{margin-top:10px;font-size:13px;color:var(--muted);min-height:22px;}
+.freeout b{color:var(--ink);font-family:var(--mono);}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>lower_bound 与 upper_bound · 二分收缩全过程</h1>
+    <p>在有序数组 <code>{0,1,1,1,8,9,9}</code> 上找 8 —— 看 [l, r) 区间怎么一步步夹住答案　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="layout">
+    <!-- 左 -->
+    <section class="viz">
+      <div class="cap"><span id="capTxt">蓝 = 不满足性质　绿 = 满足性质（答案是绿区第一个）</span></div>
+      <div class="arena">
+        <div class="cells" id="cells"></div>
+        <div class="bptr pl" id="pL"><span class="a">▲</span><span class="l">l</span></div>
+        <div class="bptr pr" id="pR"><span class="a">▲</span><span class="l">r</span></div>
+        <div class="bptr pm" id="pM"><span class="a">▲</span><span class="l">mid</span></div>
+      </div>
+      <div class="judge" id="judge"></div>
+      <div class="banner" id="banner"></div>
+    </section>
+
+    <!-- 右 -->
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+
+      <div class="free">
+        <div class="lbl">自由操作 —— 换个目标值，看自动二分：</div>
+        <div class="row">
+          <button class="act" data-fn="lower" data-x="7">lower_bound(7)</button>
+          <button class="act" data-fn="upper" data-x="1">upper_bound(1)</button>
+          <button class="act" data-fn="lower" data-x="10">lower_bound(10)</button>
+        </div>
+        <div class="freeout" id="freeOut"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const ARR=[0,1,1,1,8,9,9];
+const CW=68; // 64 + 4 gap
+/* ---------- 渲染 ----------
+   st: {part:{x,mode:'ge'|'gt'}|null, l,r,mid(可为 undefined), ans, deadOutside:[lo,hi)有效区, judge, banner} */
+const cellsBox=document.getElementById('cells');
+const pL=document.getElementById('pL'),pR=document.getElementById('pR'),pM=document.getElementById('pM');
+const judge=document.getElementById('judge'),banner=document.getElementById('banner');
+function paint(st){
+  cellsBox.innerHTML='';
+  ARR.forEach((v,i)=>{
+    const c=document.createElement('div');c.className='cell';
+    if(st.part){
+      const ok=st.part.mode==='ge'?v>=st.part.x:v>st.part.x;
+      c.classList.add(ok?'ge':'lt');
+    }
+    if(st.range&&(i<st.range[0]||i>=st.range[1]))c.classList.add('dead');
+    if(st.mid===i)c.classList.add('mid');
+    if(st.ans===i)c.classList.add('ans');
+    c.innerHTML=v+'<span class="ci">['+i+']</span>';
+    cellsBox.appendChild(c);
+  });
+  const e=document.createElement('div');e.className='cell endmark';e.textContent='end()';
+  if(st.ans===7)e.classList.add('ans');
+  cellsBox.appendChild(e);
+  setP(pL,st.l);setP(pR,st.r);setP(pM,st.mid);
+  judge.innerHTML=st.judge||'';
+  if(st.banner){banner.textContent=st.banner;banner.className='banner show good';}
+  else banner.className='banner';
+}
+function setP(el,idx){
+  if(idx===undefined||idx===null){el.style.opacity='0';return;}
+  const off=el.classList.contains('pl')?-13:el.classList.contains('pr')?13:0; // l/r 收敛同格时错开
+  el.style.opacity='1';el.style.left=(idx*CW+CW/2-2+off)+'px';
+}
+
+/* ---------- 步骤：lower_bound(8)，半开区间 [l, r) ---------- */
+const STEPS=[
+  { t:'步骤 0 · 语义先行：找的是"边界"', c:'第一个 ≥ x', cc:'c0',
+    st:{part:{x:8,mode:'ge'},judge:'性质：元素 ≥ 8　蓝区全不满足，绿区全满足'},
+    d:'前提：<b>数组必须已升序</b>。此时"≥ 8"这个性质把数组切成两半：左半全不满足（蓝），右半全满足（绿）。<span class="lo">lower_bound(8)</span> 返回的就是<b class="g">绿区的第一个位置</b>。二分的本质不是"找值"，是<b>找这条分界线</b>。' },
+  { t:'步骤 1 · 开局 [l, r) = [0, 7)，看 mid=3', c:'第一轮', cc:'ch',
+    st:{part:{x:8,mode:'ge'},l:0,r:7,mid:3,judge:'arr[3] = 1 &lt; 8　→ mid 在蓝区，答案只能在右边　→ <b>l = mid + 1 = 4</b>'},
+    d:'维护半开区间 <code>[l, r)</code>，答案一定在里面。<code>mid = (0+7)/2 = 3</code>，<code>arr[3] = 1</code> 不满足"≥8"——说明 mid 连同它左边全是蓝区，<b>砍掉左半</b>：l = 4。一次比较，候选区间减半。' },
+  { t:'步骤 2 · [4, 7)，看 mid=5', c:'第二轮', cc:'ch',
+    st:{part:{x:8,mode:'ge'},l:4,r:7,mid:5,range:[4,7],judge:'arr[5] = 9 ≥ 8　→ mid 在绿区，它可能就是答案　→ <b>r = mid = 5</b>'},
+    d:'<code>arr[5] = 9</code> 满足性质——但它未必是绿区<b>第一个</b>，它左边可能还有更早的绿。所以<b>收 r 到 mid（保留 mid 在区间外沿）</b>：r = 5。注意和上一步的不对称：不满足时 l 越过 mid，满足时 r 停在 mid。' },
+  { t:'步骤 3 · [4, 5)，看 mid=4，收敛', c:'第三轮', cc:'ch',
+    st:{part:{x:8,mode:'ge'},l:4,r:4,mid:4,range:[4,5],judge:'arr[4] = 8 ≥ 8　→ r = 4　→ l == r，收敛！'},
+    d:'<code>arr[4] = 8</code> 满足，r 收到 4。此时 <code>l == r == 4</code>，区间空了，二分结束——<b>l 和 r 同时停在分界线上</b>。整个过程只比较了 3 次（log₂ 7 ≈ 2.8）。' },
+  { t:'步骤 4 · 答案：迭代器 → 下标', c:'it − begin()', cc:'cg',
+    st:{part:{x:8,mode:'ge'},ans:4,judge:'',banner:'lower_bound(arr.begin(), arr.end(), 8) − arr.begin() = 4'},
+    d:'返回的是<b>迭代器</b>，减去 <code>begin()</code> 就是下标：4。有意思的是 <span class="lo">lower_bound(7)</span> 也返回 4——数组里根本没有 7，返回的是"7 应该插入的位置"。<b>找不到目标值时它不报错，返回的是插入点</b>。' },
+  { t:'步骤 5 · upper_bound(8)：性质换成 > x', c:'第一个 > x', cc:'cs',
+    st:{part:{x:8,mode:'gt'},ans:5,judge:'性质换成：元素 &gt; 8　→ 8 本身也归入蓝区',banner:'upper_bound(8) = 下标 5　[lower, upper) 正好框住所有的 8'},
+    d:'<span class="lo">upper_bound(8)</span> 找<b>第一个 &gt; 8</b>，8 自己也算"不满足"，所以答案是下标 5。组合技：<code>[lower_bound(x), upper_bound(x))</code> 恰好框住<b>所有等于 x 的元素</b>，相减就是出现次数（equal_range 一次给你这对）。' },
+  { t:'步骤 6 · 边界与逆向技巧', c:'查表', cc:'c0',
+    st:{part:{x:10,mode:'ge'},ans:7,judge:'lower_bound(10)：绿区为空 → 返回 end()'},
+    d:'全部元素都 &lt; x 时返回 <b>end()</b>（解引用前必须判断！）。逆向需求换算：<b>≤ x 的最后一个</b> = <code>upper_bound(x) − 1</code>；<b>&lt; x 的最后一个</b> = <code>lower_bound(x) − 1</code>（都要先确认前面有元素）。口诀：<b>lower 带等号，upper 不带；往回退一格，语义就取反</b>。' },
+];
+
+/* ---------- 控制 ---------- */
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const dotsBox=document.getElementById('dots');const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.t;d.onclick=()=>{stop();stopTrace();go(i);};dotsBox.appendChild(d);dotEls.push(d);});
+
+let cur=0;
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur];
+  paint(s.st);
+  stTitle.textContent=s.t;stChip.textContent=s.c;stChip.className='chip '+s.cc;stDesc.innerHTML=s.d;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(STEPS.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===STEPS.length-1;
+  if(cur===STEPS.length-1)stop();
+}
+
+/* ---------- 自由操作：自动二分 ---------- */
+const freeOut=document.getElementById('freeOut');
+let traceTimer=null;
+function stopTrace(){if(traceTimer){clearInterval(traceTimer);traceTimer=null;}}
+function makeTrace(x,mode){ // mode 'lower'|'upper'
+  const ok=v=>mode==='lower'?v>=x:v>x;
+  const part={x,mode:mode==='lower'?'ge':'gt'};
+  const frames=[];let l=0,r=ARR.length;
+  frames.push({part,l,r,judge:'开局 [l, r) = [0, '+r+')'});
+  while(l<r){
+    const mid=(l+r)>>1;
+    const pass=ok(ARR[mid]);
+    frames.push({part,l,r,mid,judge:'arr['+mid+'] = '+ARR[mid]+(pass?'　满足 → r = '+mid:'　不满足 → l = '+(mid+1))});
+    if(pass)r=mid;else l=mid+1;
+  }
+  frames.push({part,ans:l,judge:'收敛于下标 '+l+(l===ARR.length?'（= end()，没有满足的元素）':'')});
+  return {frames,ans:l};
+}
+document.querySelectorAll('.act').forEach(btn=>{
+  btn.onclick=()=>{
+    stop();stopTrace();
+    const x=+btn.dataset.x,fn=btn.dataset.fn;
+    const {frames,ans}=makeTrace(x,fn);
+    let k=0;
+    paint(frames[0]);
+    freeOut.innerHTML=fn+'_bound('+x+') 二分中…';
+    traceTimer=setInterval(()=>{
+      k++;
+      if(k<frames.length){paint(frames[k]);}
+      else{
+        stopTrace();
+        freeOut.innerHTML='<b>'+fn+'_bound('+x+') − begin() = '+ans+'</b>'+(ans===ARR.length?'　（返回 end()：所有元素都不满足）':'　（arr['+ans+'] = '+ARR[ans]+'）');
+      }
+    },1100);
+  };
+});
+
+let timer=null,ms=3200;
+function play(){if(cur===STEPS.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>{stopTrace();timer?stop():play();};
+btnPrev.onclick=()=>{stop();stopTrace();go(cur-1);};
+btnNext.onclick=()=>{stop();stopTrace();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();stopTrace();go(cur+1);}else if(e.key==='ArrowLeft'){stop();stopTrace();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const m=location.hash.match(/step=(\d+)/);go(m?+m[1]:0);
+</script>
+</body>
+</html>

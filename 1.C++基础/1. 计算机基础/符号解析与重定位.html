@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>符号解析与重定位 · 链接器如何把 U 连到 D</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --def:#0F6E56;--defbg:#E1F5EE;       /* 定义 D·绿 */
+  --und:#B3402F;--undbg:#F6E0DB;       /* 未定义 U·红 */
+  --txt:#185FA5;--txtbg:#E6F1FB;       /* .text·蓝 */
+  --dat:#854F0B;--datbg:#FAEEDA;       /* .data·棕 */
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:450ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.diagram{position:relative;margin-top:24px;}
+.files{display:grid;grid-template-columns:1fr 1fr 1fr;gap:26px;position:relative;z-index:2;}
+@media(max-width:900px){.files{grid-template-columns:1fr;}}
+.file{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 16px;transition:all var(--dur) var(--ease);}
+.file.dim{opacity:.5;}
+.file .fname{font-family:var(--mono);font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.file .fname .kind{font-size:10px;font-weight:500;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 6px;}
+.file .src{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:6px;white-space:pre-wrap;line-height:1.5;}
+.symtab{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;}
+.symtab .cap{font-size:10.5px;color:var(--faint);margin-bottom:5px;}
+.sym{
+  display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12.5px;
+  padding:4px 7px;border-radius:6px;margin-bottom:3px;border:1px solid transparent;
+  transition:all var(--dur) var(--ease);
+}
+.sym .mk{font-weight:700;width:14px;text-align:center;}
+.sym.d{background:var(--defbg);} .sym.d .mk{color:var(--def);}
+.sym.t{background:var(--txtbg);} .sym.t .mk{color:var(--txt);}
+.sym.u{background:var(--undbg);} .sym.u .mk{color:var(--und);}
+.sym.glow{box-shadow:0 0 0 2px currentColor;}
+.sym.u.glow{color:var(--und);}
+.sym.d.glow,.sym.t.glow{color:var(--def);}
+.sym.resolved{background:var(--defbg);}
+.sym.resolved .mk{color:var(--def);}
+.sym .note{margin-left:auto;font-size:10px;color:var(--faint);font-family:inherit;}
+
+/* 连线层 */
+.wires{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible;}
+
+/* 输出可执行 */
+.exe{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;}
+@media(max-width:900px){.exe{grid-template-columns:1fr;}}
+.card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 18px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cu{color:var(--und);border-color:var(--und);background:var(--undbg);}
+.chip.cd{color:var(--def);border-color:var(--def);background:var(--defbg);}
+.chip.ct{color:var(--txt);border-color:var(--txt);background:var(--txtbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.reloc{background:#2E2C27;border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#D8D5CC;}
+.reloc .cap{font-size:11px;color:#8F8B80;margin-bottom:6px;}
+.reloc .old{color:#D98A7B;}
+.reloc .new{color:#9BBF8A;opacity:.35;transition:opacity var(--dur) var(--ease);}
+.reloc.done .new{opacity:1;}
+.reloc.done .old{opacity:.4;text-decoration:line-through;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+.speed{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+.speed button{font:inherit;font-size:12px;color:var(--muted);background:transparent;border:none;padding:6px 12px;cursor:pointer;}
+.speed button+button{border-left:1px solid var(--line);}
+.speed button.on{background:var(--ink);color:var(--paper);}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>符号解析与重定位 · 链接器如何把 <span style="font-family:var(--mono);color:#B3402F">U</span> 连到 <span style="font-family:var(--mono);color:#0F6E56">D</span></h1>
+    <p>多个 <code>.o</code> 各自留着「未定义」符号，链接器负责把它们对上定义、再修正地址　·　<kbd>←</kbd> <kbd>→</kbd> 切换，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="diagram">
+    <svg class="wires" id="wires"></svg>
+    <div class="files">
+      <!-- file1.o -->
+      <div class="file" id="f1">
+        <div class="fname">file1.o <span class="kind">目标文件</span></div>
+        <div class="src">// file1.c
+int gdata = 999;</div>
+        <div class="symtab">
+          <div class="cap">nm file1.o</div>
+          <div class="sym d" id="s-f1-gdata"><span class="mk">D</span><span>gdata</span><span class="note">.data 已定义</span></div>
+        </div>
+      </div>
+      <!-- file2.o -->
+      <div class="file" id="f2">
+        <div class="fname">file2.o <span class="kind">目标文件</span></div>
+        <div class="src">// file2.c
+extern int gdata;
+int a = gdata;
+int main(){ printf(...); }</div>
+        <div class="symtab">
+          <div class="cap">nm file2.o</div>
+          <div class="sym t" id="s-f2-main"><span class="mk">T</span><span>main</span><span class="note">.text 已定义</span></div>
+          <div class="sym d" id="s-f2-a"><span class="mk">D</span><span>a</span><span class="note">.data 已定义</span></div>
+          <div class="sym u" id="s-f2-gdata"><span class="mk">U</span><span>gdata</span><span class="note">未定义 → 待解析</span></div>
+          <div class="sym u" id="s-f2-printf"><span class="mk">U</span><span>printf</span><span class="note">未定义 → 待解析</span></div>
+        </div>
+      </div>
+      <!-- libc -->
+      <div class="file" id="f3">
+        <div class="fname">libc.so <span class="kind">动态库</span></div>
+        <div class="src">// C 标准库
+… 大量函数定义 …</div>
+        <div class="symtab">
+          <div class="cap">nm -D libc.so</div>
+          <div class="sym t" id="s-libc-printf"><span class="mk">T</span><span>printf</span><span class="note">.text 已定义</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exe">
+    <section class="card">
+      <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+      <div class="desc-body" id="stDesc"></div>
+    </section>
+    <section class="card">
+      <div class="reloc" id="reloc">
+        <div class="cap">// file2.o 里引用 gdata 的指令（重定位前后）</div>
+        <div class="old">mov  eax, [0x00000000]   ; gdata 地址未知（占位 0）</div>
+        <div class="new">mov  eax, [0x00601020]   ; ✓ 修正为 gdata 的最终地址</div>
+        <div class="cap" style="margin-top:10px">// call printf 同理</div>
+        <div class="old">call 0x00000000          ; printf 地址未知</div>
+        <div class="new">call 0x004010a0          ; ✓ 指向 libc 的 printf</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+    <div class="speed" id="speed">
+      <button data-ms="3000">慢</button>
+      <button data-ms="2000" class="on">中</button>
+      <button data-ms="1100">快</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* wires: [fromId, toId, color] 需要画的连线；glow: 高亮的符号行 */
+const STEPS = [
+  { title:'步骤 0 · 各自编译完成', chip:'编译期产物', chipC:'c0',
+    wires:[], glow:[], dim:[], reloc:false,
+    desc:'三个文件独立编译：<code>file1.o</code> 定义了 <b style="color:var(--def)">gdata（D）</b>；<code>file2.o</code> 里 <code>main</code>、<code>a</code> 已定义，但 <b style="color:var(--und)">gdata</b> 和 <b style="color:var(--und)">printf</b> 只是<b>引用</b>了别处的符号，本文件没有定义，标为 <b style="color:var(--und)">U（未定义）</b>。' },
+  { title:'步骤 1 · 符号解析①：gdata', chip:'符号解析', chipC:'cu',
+    wires:[['s-f2-gdata','s-f1-gdata','var(--def)']], glow:['s-f2-gdata','s-f1-gdata'], dim:['f3'], reloc:false,
+    desc:'链接器扫描所有 <code>.o</code> 的符号表，为每个 <b style="color:var(--und)">U</b> 找一个匹配的<b>定义</b>。<code>file2.o</code> 的 <b>U gdata</b> 在 <code>file1.o</code> 里找到了 <b style="color:var(--def)">D gdata</b>——<b>解析成功</b>，两者对上。' },
+  { title:'步骤 2 · 符号解析②：printf', chip:'符号解析', chipC:'cu',
+    wires:[['s-f2-gdata','s-f1-gdata','var(--def)'],['s-f2-printf','s-libc-printf','var(--txt)']], glow:['s-f2-printf','s-libc-printf'], dim:[], reloc:false,
+    desc:'<b>U printf</b> 在两个 <code>.o</code> 里都找不到定义——它来自<b>标准库</b>。链接器到 <code>libc</code> 的符号表里找到 <b style="color:var(--txt)">T printf</b>,完成解析。若哪个 U 谁都对不上 → 报错 <code>undefined reference</code>。' },
+  { title:'步骤 3 · 合并段', chip:'合并 .text/.data', chipC:'ct',
+    wires:[['s-f2-gdata','s-f1-gdata','var(--def)'],['s-f2-printf','s-libc-printf','var(--txt)']], glow:[], dim:[], reloc:false, resolveU:true,
+    desc:'解析完毕后，链接器把各 <code>.o</code> 的同名段拼到一起：所有 <code>.text</code>（代码）合并成一个大代码段，所有 <code>.data</code>（数据）合并成一个大数据段。这一步之后，每个符号在最终文件里都有了<b>确定的位置</b>。' },
+  { title:'步骤 4 · 重定位', chip:'修正地址', chipC:'cd',
+    wires:[], glow:[], dim:[], reloc:true, resolveU:true,
+    desc:'段合并后，符号的最终地址才确定。链接器回头把指令里那些<b>占位地址（0x00000000）</b>逐个<b>改成真实地址</b>——这就是<b>重定位</b>。右侧：引用 <code>gdata</code>、<code>printf</code> 的指令地址被填实。' },
+  { title:'步骤 5 · 可执行文件生成', chip:'链接完成', chipC:'cd',
+    wires:[], glow:[], dim:[], reloc:true, resolveU:true,
+    desc:'所有 <b style="color:var(--und)">U</b> 都已消失，所有地址都已修正 → 输出一个可以直接运行的可执行文件。<b>一句话</b>:<b>符号解析</b>回答「这个名字定义在哪」，<b>重定位</b>回答「那到底是哪个地址」。' },
+];
+
+/* ---------- 渲染 ---------- */
+const wires=document.getElementById('wires');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const readout=document.getElementById('readout'),reloc=document.getElementById('reloc');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const dotsBox=document.getElementById('dots');const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>go(i);dotsBox.appendChild(d);dotEls.push(d);});
+
+let cur=0;
+function drawWires(list){
+  const box=wires.getBoundingClientRect();
+  wires.innerHTML='';
+  list.forEach(([from,to,color])=>{
+    const a=document.getElementById(from).getBoundingClientRect();
+    const b=document.getElementById(to).getBoundingClientRect();
+    const x1=a.right-box.left, y1=a.top+a.height/2-box.top;
+    const x2=b.left-box.left,  y2=b.top+b.height/2-box.top;
+    const mx=(x1+x2)/2;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke',color);
+    path.setAttribute('stroke-width','2');
+    path.setAttribute('stroke-dasharray','5 4');
+    path.style.opacity='0.75';
+    // 起点圆
+    const c1=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c1.setAttribute('cx',x1);c1.setAttribute('cy',y1);c1.setAttribute('r','3.5');c1.setAttribute('fill',color);
+    const c2=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c2.setAttribute('cx',x2);c2.setAttribute('cy',y2);c2.setAttribute('r','3.5');c2.setAttribute('fill',color);
+    wires.appendChild(path);wires.appendChild(c1);wires.appendChild(c2);
+  });
+}
+
+const allSyms=['s-f1-gdata','s-f2-main','s-f2-a','s-f2-gdata','s-f2-printf','s-libc-printf'];
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur];
+  // 文件淡出
+  ['f1','f2','f3'].forEach(id=>document.getElementById(id).classList.toggle('dim',s.dim.includes(id)));
+  // 符号高亮
+  allSyms.forEach(id=>document.getElementById(id).classList.toggle('glow',s.glow.includes(id)));
+  // U → resolved
+  ['s-f2-gdata','s-f2-printf'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(s.resolveU){el.classList.remove('u');el.classList.add('resolved');el.querySelector('.mk').textContent='✓';el.querySelector('.note').textContent='已解析';}
+    else{el.classList.add('u');el.classList.remove('resolved');el.querySelector('.mk').textContent='U';el.querySelector('.note').textContent='未定义 → 待解析';}
+  });
+  reloc.classList.toggle('done',s.reloc);
+  drawWires(s.wires);
+  stTitle.textContent=s.title;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(STEPS.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===STEPS.length-1;
+  if(cur===STEPS.length-1)stop();
+}
+window.addEventListener('resize',()=>drawWires(STEPS[cur].wires));
+
+let timer=null,ms=2000;
+function play(){if(cur===STEPS.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.getElementById('speed').onclick=e=>{const b=e.target.closest('button[data-ms]');if(!b)return;ms=+b.dataset.ms;document.querySelectorAll('.speed button').forEach(x=>x.classList.toggle('on',x===b));if(timer){stop();play();}};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const m=location.hash.match(/step=(\d+)/);
+requestAnimationFrame(()=>go(m?+m[1]:0));
+</script>
+</body>
+</html>

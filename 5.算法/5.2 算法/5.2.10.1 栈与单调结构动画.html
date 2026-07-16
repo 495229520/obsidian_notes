@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>栈与单调结构动画 · 普通栈 / 辅助栈 / 单调栈 / 单调队列</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:472px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ===== 通用小标题 / 备注 ===== */
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:14px 0 7px;}
+.op-note{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:auto;padding-top:12px;}
+.op-note b{color:var(--ink);}
+.op-note .bl{color:var(--blue);} .op-note .gr{color:var(--green);} .op-note .dg{color:var(--danger);} .op-note .br{color:var(--brown);}
+
+/* ===== 竖直栈（普通栈 / 最小栈） ===== */
+.stackrow{display:flex;gap:34px;justify-content:center;align-items:flex-end;margin-top:6px;}
+.stackwrap{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.stcap{font-family:var(--mono);font-size:10.5px;color:var(--faint);}
+.vstack{display:flex;flex-direction:column-reverse;gap:6px;width:96px;}
+.slot{height:44px;border:1.5px dashed var(--line);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:20px;font-weight:700;color:var(--faint);background:var(--paper);transition:all var(--dur) var(--ease);}
+.slot.fill{border-style:solid;border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.slot.fill.top{box-shadow:0 0 0 3px rgba(24,95,165,.18);}
+.slot.min{border-style:solid;border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.slot.min.top{box-shadow:0 0 0 3px rgba(154,91,14,.2);}
+.slot.hit{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.slot.dead{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+.stbase{width:112px;height:8px;border-radius:0 0 6px 6px;background:var(--grid);}
+
+/* ===== 括号字符串 ===== */
+.seq{position:relative;display:flex;gap:6px;justify-content:center;margin:8px 0 6px;padding-top:22px;}
+.pbrk{width:44px;height:50px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:24px;font-weight:700;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);}
+.pbrk.future{opacity:.45;}
+.pbrk.open{color:var(--blue);border-color:var(--blue);}
+.pbrk.cur{color:var(--blue);background:var(--bluebg);border-color:var(--blue);transform:translateY(-3px);box-shadow:0 5px 12px rgba(24,95,165,.18);}
+.pbrk.paired{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.seqptr{position:absolute;top:0;left:0;font-size:14px;color:var(--ink);opacity:0;transition:left var(--dur) var(--ease),opacity .2s;transform:translateX(-50%);}
+
+/* getMin 读数 */
+.getmin{text-align:center;font-family:var(--mono);font-size:14px;color:var(--muted);margin-top:14px;}
+.getmin b{color:var(--brown);font-size:22px;}
+
+/* ===== 柱状图（单调栈） ===== */
+.barsbox{position:relative;padding-top:22px;}
+.bars{position:relative;display:flex;gap:8px;justify-content:center;align-items:flex-end;height:158px;}
+.bar{width:54px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;}
+.bar .col{width:100%;border:1.5px solid var(--line);border-bottom:none;border-radius:7px 7px 0 0;background:var(--paper);color:var(--muted);font-family:var(--mono);font-size:13px;font-weight:700;display:flex;align-items:flex-start;justify-content:center;padding-top:4px;transition:all var(--dur) var(--ease);}
+.bar .ix{font-size:10px;color:var(--faint);font-family:var(--mono);margin-top:3px;}
+.bar.wait .col{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.bar.cur .col{border-color:var(--blue);background:var(--bluebg);color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.16);}
+.bar.done .col{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.bar.future .col{opacity:.5;}
+.barptr{position:absolute;top:-2px;left:0;font-size:14px;color:var(--ink);opacity:0;transition:left var(--dur) var(--ease),opacity .2s;transform:translateX(-50%);}
+
+/* ===== 数组（单调队列） ===== */
+.arrbox{position:relative;padding-top:22px;margin-top:4px;}
+.arr{position:relative;display:flex;gap:8px;justify-content:center;}
+.mcell{width:54px;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);font-family:var(--mono);transition:all var(--dur) var(--ease);}
+.mcell .mv{font-size:18px;font-weight:700;color:var(--muted);}
+.mcell .mi{font-size:9px;color:var(--faint);margin-top:2px;}
+.mcell.win{background:var(--bluebg);border-color:var(--blue);}
+.mcell.win .mv{color:var(--blue);}
+.mcell.cur{transform:translateY(-3px);box-shadow:0 5px 12px rgba(24,95,165,.16);}
+.mcell.maxc{background:var(--greenbg);border-color:var(--green);}
+.mcell.maxc .mv{color:var(--green);}
+.arrptr{position:absolute;top:-2px;left:0;font-size:14px;color:var(--ink);opacity:0;transition:left var(--dur) var(--ease),opacity .2s;transform:translateX(-50%);}
+
+/* ===== 横向结构（单调栈存下标 / deque） ===== */
+.hstack{display:flex;align-items:center;justify-content:center;min-height:56px;padding:8px 10px;border:1px solid var(--grid);border-radius:11px;background:var(--paper);}
+.hstack.empty-hint::after{content:"（空）";font-family:var(--mono);font-size:12px;color:var(--faint);}
+.hcell{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:46px;height:42px;padding:0 9px;margin-right:7px;border:1.5px solid var(--blue);border-radius:8px;background:var(--bluebg);color:var(--blue);font-family:var(--mono);overflow:hidden;transition:all var(--dur) var(--ease);}
+.hcell .hv{font-size:16px;font-weight:700;}
+.hcell .hi{font-size:9px;color:var(--faint);}
+.hcell.top{box-shadow:0 0 0 3px rgba(24,95,165,.18);}
+.hcell.front{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.16);}
+.hcell.hide{opacity:0;min-width:0;width:0;padding:0;margin-right:0;border-width:0;}
+
+/* ===== 答案 / 输出行 ===== */
+.ansrow{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;}
+.anslbl{font-family:var(--mono);font-size:11px;color:var(--faint);width:52px;text-align:right;}
+.ans{display:flex;gap:8px;}
+.acell{width:54px;height:32px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);color:var(--faint);font-family:var(--mono);font-size:15px;font-weight:700;transition:all var(--dur) var(--ease);}
+.acell.set{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+@keyframes flash{0%{transform:scale(.68);}62%{transform:scale(1.13);}100%{transform:scale(1);}}
+.flash{animation:flash .5s var(--ease);}
+
+/* ===== 右侧说明 ===== */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{line-height:1.4;}
+.desc-head .st{font-size:17px;font-weight:600;display:inline-block;vertical-align:middle;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;white-space:nowrap;display:inline-block;vertical-align:middle;margin-left:10px;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>栈与单调结构动画 · 四种结构一次看清</h1>
+    <p>普通栈（括号匹配）/ 辅助栈（最小栈）/ 单调栈（每日温度）/ 单调队列（滑窗最值）　·　上方切结构，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+function reflash(el){el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
+
+/* ========== 场景 1：普通栈 · 括号匹配 {[()]} ========== */
+const stackScene=(()=>{
+  const chars=['{','[','(',')',']','}'];
+  const CAP=4;
+  const code='<span class="kw">bool</span> isValid(<span class="kw">string</span> s){\n'+
+    '    stack&lt;<span class="kw">char</span>&gt; st;\n'+
+    '    <span class="kw">for</span> (<span class="kw">char</span> c : s){\n'+
+    '        <span class="kw">if</span> (c==\'(\'||c==\'[\'||c==\'{\') st.push(c);\n'+
+    '        <span class="kw">else</span> {\n'+
+    '            <span class="kw">if</span> (st.empty()) <span class="kw">return</span> <span class="kw">false</span>;\n'+
+    '            <span class="kw">char</span> l=st.top(); st.pop();  <span class="cmt">// 只配最近的</span>\n'+
+    '            <span class="kw">if</span> (!match(l,c)) <span class="kw">return</span> <span class="kw">false</span>;\n'+
+    '        }\n'+
+    '    }\n'+
+    '    <span class="kw">return</span> st.empty();  <span class="cmt">// 必须清空</span>\n}';
+  const steps=[
+    {i:-1,stack:[],matched:[],chip:'后进先出 LIFO',chipC:'c0',title:'步骤 0 · 待匹配串 {[()]}',
+     note:'左括号入栈，右括号必须配<b>栈顶</b>那个最近的左括号',
+     desc:'括号匹配是普通栈最经典的用法。核心：遇左括号就 <b>push</b>；遇右括号，只能和<b>栈顶</b>（最近的未匹配左括号）配对，配上就 <b>pop</b>。全部处理完栈必须<b>为空</b>。'},
+    {i:0,stack:['{'],matched:[],chip:'push {',chipC:'cb',title:'步骤 1 · 左括号 { 入栈',
+     note:'栈：{',
+     desc:'第 0 个字符 <span class="bl">{</span> 是左括号，直接入栈。它在等一个匹配的 <code>}</code>。'},
+    {i:1,stack:['{','['],matched:[],chip:'push [',chipC:'cb',title:'步骤 2 · 左括号 [ 入栈',
+     note:'栈：{ [',
+     desc:'<span class="bl">[</span> 入栈。栈顶永远是"最近还没被匹配"的左括号，现在是 <code>[</code>。'},
+    {i:2,stack:['{','[','('],matched:[],chip:'push (',chipC:'cb',title:'步骤 3 · 左括号 ( 入栈',
+     note:'栈：{ [ (',
+     desc:'<span class="bl">(</span> 入栈。三个左括号按出现顺序叠放，栈顶是最新的 <code>(</code>。'},
+    {i:3,stack:['{','['],matched:[2,3],chip:') 配 (',chipC:'cg',title:'步骤 4 · 右括号 ) 配对并弹栈',
+     note:'( ) 配对成功 → pop',
+     desc:'遇到右括号 <span class="gr">)</span>：看栈顶是不是 <code>(</code> —— 正好是，<b>配对成功</b>，弹出栈顶。为什么只看栈顶？因为它是离当前右括号<b>最近</b>的未匹配左括号。'},
+    {i:4,stack:['{'],matched:[1,2,3,4],chip:'] 配 [',chipC:'cg',title:'步骤 5 · 右括号 ] 配对并弹栈',
+     note:'[ ] 配对成功 → pop',
+     desc:'<span class="gr">]</span> 和新栈顶 <code>[</code> 配对成功，弹出。注意配对是"由内向外"逐层完成的。'},
+    {i:5,stack:[],matched:[0,1,2,3,4,5],chip:'} 配 {',chipC:'cg',title:'步骤 6 · 右括号 } 配对并弹栈',
+     note:'{ } 配对成功 → 栈空',
+     desc:'<span class="gr">}</span> 和最后的 <code>{</code> 配对，弹出。栈已<b>清空</b>，说明每个左括号都找到了自己的右括号。'},
+    {i:-1,stack:[],matched:[0,1,2,3,4,5],chip:'栈空即合法',chipC:'cg',done:true,title:'步骤 7 · 遍历结束，栈为空 → 合法',
+     note:'反例 <span class="dg">([)]</span>：数量对但栈顶配错 → 非法',
+     desc:'遍历结束且栈为空 → 字符串合法。<b>只数左右括号数量是不够的</b>：<span class="dg">([)]</span> 数量相同，但 <code>)</code> 来时栈顶是 <code>[</code> 配不上，栈能立刻发现这种嵌套错误。'},
+  ];
+  function mount(){
+    let cs='';chars.forEach((c,i)=>cs+='<div class="pbrk" id="s1c-'+i+'">'+c+'</div>');
+    let sl='';for(let d=0;d<CAP;d++)sl+='<div class="slot" id="s1slot-'+d+'"></div>';
+    viz.innerHTML='<div class="vcap"><b>普通栈</b>：括号匹配，左括号入栈、右括号配栈顶</div>'+
+      '<div class="seq" id="s1seq"><span class="seqptr" id="s1ptr">▼</span>'+cs+'</div>'+
+      '<div class="stackrow">'+
+        '<div class="stackwrap"><div class="stcap">栈顶 ↑</div><div class="vstack" id="s1stack">'+sl+'</div><div class="stbase"></div><div class="stcap">栈底</div></div>'+
+      '</div>'+
+      '<div class="op-note" id="s1note"></div>';
+  }
+  function paint(s){
+    const ptr=document.getElementById('s1ptr');
+    if(s.i>=0){const c=document.getElementById('s1c-'+s.i);ptr.style.opacity=1;ptr.style.left=(c.offsetLeft+c.offsetWidth/2)+'px';}
+    else ptr.style.opacity=0;
+    chars.forEach((ch,idx)=>{
+      const el=document.getElementById('s1c-'+idx);
+      let cls='pbrk';
+      if(s.matched.includes(idx))cls+=' paired';
+      else if(idx===s.i)cls+=' cur';
+      else if(s.i>=0&&idx<s.i)cls+=' open';
+      else cls+=' future';
+      el.className=cls;
+    });
+    for(let d=0;d<CAP;d++){
+      const el=document.getElementById('s1slot-'+d);
+      if(d<s.stack.length){
+        const wasEmpty=!el.classList.contains('fill');
+        el.className='slot fill'+(d===s.stack.length-1?' top':'');
+        el.textContent=s.stack[d];
+        if(wasEmpty)reflash(el);
+      }else{el.className='slot';el.textContent='';}
+    }
+    document.getElementById('s1note').innerHTML=s.note||'';
+  }
+  return {id:'stack',label:'普通栈',sub:'括号匹配',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：辅助栈 · 最小栈 MinStack ========== */
+const minScene=(()=>{
+  const CAP=4;
+  const code='<span class="kw">void</span> push(<span class="kw">int</span> x){\n'+
+    '    data.push(x);\n'+
+    '    <span class="kw">if</span> (mins.empty() || x &lt;= mins.top())\n'+
+    '        mins.push(x);      <span class="cmt">// 等号！重复最小也记</span>\n}\n'+
+    '<span class="kw">void</span> pop(){\n'+
+    '    <span class="kw">if</span> (data.top()==mins.top())\n'+
+    '        mins.pop();\n'+
+    '    data.pop();\n}\n'+
+    '<span class="kw">int</span> getMin(){ <span class="kw">return</span> mins.top(); }';
+  const steps=[
+    {data:[],mins:[],get:null,chip:'双栈同步',chipC:'c0',title:'步骤 0 · 数据栈 + 最小值栈',
+     note:'mins 栈顶 = "此刻及以下所有元素的最小值"',
+     desc:'最小栈要在 push / pop / top 之外，用 <b>O(1)</b> 拿到当前最小值。做法：额外维护一个 <b class="br">mins 辅助栈</b>，它的栈顶始终是"data 栈里当前的最小值"。'},
+    {data:[3],mins:[3],get:null,chip:'push 3',chipC:'cb',title:'步骤 1 · push(3)',
+     note:'mins 空 → 3 入 mins',
+     desc:'push(3)：data 入 3。mins 为空，<b>3 直接入 mins</b>。当前最小值 = 3。'},
+    {data:[3,5],mins:[3],get:null,chip:'5 > 3 不入',chipC:'cb',title:'步骤 2 · push(5)',
+     note:'5 &gt; 栈顶 3 → mins <b>不动</b>',
+     desc:'push(5)：data 入 5。但 <b>5 &gt; mins 栈顶 3</b>，5 当不了最小值，<b class="dg">mins 不入</b>。最小值仍是 3。这一步是关键：只有"更小或相等"才进 mins。'},
+    {data:[3,5,2],mins:[3,2],get:null,chip:'2<=3 入',chipC:'cb',title:'步骤 3 · push(2)',
+     note:'2 ≤ 栈顶 3 → 2 入 mins',
+     desc:'push(2)：<b>2 ≤ mins 栈顶 3</b>，2 入 mins。最小值刷新为 <b class="br">2</b>。'},
+    {data:[3,5,2,2],mins:[3,2,2],get:null,chip:'2<=2 也入',chipC:'ch',title:'步骤 4 · push(2) 重复最小',
+     note:'2 ≤ 栈顶 2 → <b>重复最小也要入</b>',
+     desc:'又来一个 2。<b>2 ≤ mins 栈顶 2（含等号）</b>，所以<b class="br">重复的最小值也要压入 mins</b>。这就是比较写 <code>&lt;=</code> 而不是 <code>&lt;</code> 的原因 —— 下一步就能看到它的作用。'},
+    {data:[3,5,2,2],mins:[3,2,2],get:2,chip:'getMin = 2',chipC:'cg',title:'步骤 5 · getMin() 读栈顶',
+     note:'getMin() = mins.top() = <b>2</b>',
+     desc:'getMin() 直接返回 <b>mins 栈顶 = 2</b>，O(1)。不需要遍历 data 栈。'},
+    {data:[3,5,2],mins:[3,2],get:2,chip:'顶相等双弹',chipC:'cd',title:'步骤 6 · pop() 弹出一个 2',
+     note:'data 顶 2 == mins 顶 2 → 两栈都弹',
+     desc:'pop()：data 顶是 2，<b>等于 mins 顶 2</b>，说明这个 2 也是当前最小 → <b>两个栈同时弹</b>。因为上一步存了两个 2，弹掉一个后 mins 顶<b class="gr">仍是 2</b>，最小值没算错。'},
+    {data:[3,5],mins:[3],get:3,chip:'顶相等双弹',chipC:'cd',title:'步骤 7 · pop() 再弹一个 2',
+     note:'data 顶 2 == mins 顶 2 → 两栈都弹，最小值回到 3',
+     desc:'再 pop()：data 顶 2 == mins 顶 2，两栈同弹。此时 mins 顶变回 <b class="br">3</b>，最小值正确地回到了 3。若当初用 <code>&lt;</code> 漏记了第二个 2，这里就会错删、算错最小值。'},
+    {data:[3,5],mins:[3],get:3,chip:'getMin = 3',chipC:'cg',done:true,title:'步骤 8 · getMin() = 3',
+     note:'口诀：push 看 ≤ 才入 mins，pop 顶相等才弹 mins',
+     desc:'最终 getMin() = <b>3</b>。要点：<b>push 时 x ≤ mins.top() 才入（含等号）</b>、<b>pop 时 data 顶 == mins 顶 才同弹</b>。每次操作都是 O(1)，辅助栈空间 O(n)。'},
+  ];
+  function mount(){
+    let d='',m='';
+    for(let i=0;i<CAP;i++)d+='<div class="slot" id="s2d-'+i+'"></div>';
+    for(let i=0;i<CAP;i++)m+='<div class="slot" id="s2m-'+i+'"></div>';
+    viz.innerHTML='<div class="vcap"><b>辅助栈（最小栈）</b>：data 存数据，mins 存"当前及以下的最小值"</div>'+
+      '<div class="stackrow" style="margin-top:14px">'+
+        '<div class="stackwrap"><div class="stcap">data · 栈顶 ↑</div><div class="vstack" id="s2data">'+d+'</div><div class="stbase"></div><div class="stcap">主栈</div></div>'+
+        '<div class="stackwrap"><div class="stcap">mins · 栈顶 ↑</div><div class="vstack" id="s2min">'+m+'</div><div class="stbase"></div><div class="stcap">辅助栈</div></div>'+
+      '</div>'+
+      '<div class="getmin" id="s2get">getMin() = <b>—</b></div>'+
+      '<div class="op-note" id="s2note"></div>';
+  }
+  function fillStack(pfx,arr,kind){
+    for(let i=0;i<CAP;i++){
+      const el=document.getElementById(pfx+i);
+      if(i<arr.length){
+        const wasEmpty=!el.classList.contains('fill')&&!el.classList.contains('min');
+        el.className='slot '+(kind==='min'?'min':'fill')+(i===arr.length-1?' top':'');
+        el.textContent=arr[i];
+        if(wasEmpty)reflash(el);
+      }else{el.className='slot';el.textContent='';}
+    }
+  }
+  function paint(s){
+    fillStack('s2d-',s.data,'data');
+    fillStack('s2m-',s.mins,'min');
+    document.getElementById('s2get').innerHTML='getMin() = <b>'+(s.get===null?'—':s.get)+'</b>';
+    document.getElementById('s2note').innerHTML=s.note||'';
+  }
+  return {id:'min',label:'辅助栈',sub:'最小栈 O(1) 取最值',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：单调栈 · 每日温度 ========== */
+const monoStackScene=(()=>{
+  const T=[73,74,75,71,69,72,76,73];
+  const N=T.length;
+  const H=v=>(v-64)*11;               // 温度 → 柱高
+  const code='vector&lt;<span class="kw">int</span>&gt; dailyTemperatures(vector&lt;<span class="kw">int</span>&gt;&amp; t){\n'+
+    '    vector&lt;<span class="kw">int</span>&gt; ans(t.size(),0);\n'+
+    '    vector&lt;<span class="kw">int</span>&gt; st;               <span class="cmt">// 存下标</span>\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> i=0;i&lt;t.size();++i){\n'+
+    '        <span class="kw">while</span> (!st.empty() &amp;&amp; t[i]&gt;t[st.back()]){\n'+
+    '            <span class="kw">int</span> d=st.back(); st.pop_back();\n'+
+    '            ans[d]=i-d;            <span class="cmt">// 结算天数</span>\n'+
+    '        }\n'+
+    '        st.push_back(i);\n'+
+    '    }\n'+
+    '    <span class="kw">return</span> ans;\n}';
+  const steps=[
+    {i:-1,stack:[],ans:{},res:[],chip:'存等待下标',chipC:'c0',title:'步骤 0 · 每日温度 [73,74,75,71,69,72,76,73]',
+     note:'栈里放"还在等更高温度"的下标，温度自底向顶<b>递减</b>',
+     desc:'问每天要等几天才有更高温度。单调栈存<b>下标</b>：栈内温度保持<b>递减</b>。遇到更高温度时，它就是栈顶那些"低温天"等到的答案。'},
+    {i:0,stack:[0],ans:{},res:[],chip:'push 0',chipC:'cb',title:'步骤 1 · i=0（73）入栈',
+     note:'栈：[0]',
+     desc:'第 0 天 73 入栈，开始等更高温度。'},
+    {i:1,stack:[1],ans:{0:1},res:[0],chip:'74>73 结算',chipC:'cg',title:'步骤 2 · i=1（74）弹出 0',
+     note:'74 &gt; 73 → ans[0]=1−0=1',
+     desc:'74 比栈顶的 73 高 → <span class="gr">第 0 天等到了</span>：ans[0]=1−0=<b>1</b>，弹出 0；随后 74 入栈。'},
+    {i:2,stack:[2],ans:{0:1,1:1},res:[1],chip:'75>74 结算',chipC:'cg',title:'步骤 3 · i=2（75）弹出 1',
+     note:'75 &gt; 74 → ans[1]=2−1=1',
+     desc:'75 又比栈顶 74 高 → ans[1]=<b>1</b>，弹出 1；75 入栈。连续升温时，每个新高都会立刻结算前一天。'},
+    {i:3,stack:[2,3],ans:{0:1,1:1},res:[],chip:'71<75 入栈',chipC:'cb',title:'步骤 4 · i=3（71）入栈',
+     note:'栈：[2,3]　温度 75,71 递减',
+     desc:'71 比栈顶 75 低，谁也结算不了，71 <b>直接入栈</b>。栈内温度 75、71 保持递减。'},
+    {i:4,stack:[2,3,4],ans:{0:1,1:1},res:[],chip:'69<71 入栈',chipC:'cb',title:'步骤 5 · i=4（69）入栈',
+     note:'栈：[2,3,4]　温度 75,71,69 递减',
+     desc:'69 更低，继续入栈。此刻栈里囤了三个"在等更高温度"的下标，温度严格递减。'},
+    {i:5,stack:[2,5],ans:{0:1,1:1,4:1,3:2},res:[4,3],chip:'72 连弹两个',chipC:'cg',title:'步骤 6 · i=5（72）连续弹出 4、3',
+     note:'72&gt;69→ans[4]=1；72&gt;71→ans[3]=2；72&lt;75 停',
+     desc:'72 比 69 高 → ans[4]=5−4=<b>1</b>；再比 71 高 → ans[3]=5−3=<b>2</b>；碰到 75 更高，停止。72 入栈。<b>一个新元素可以一次结算好几天</b>，这正是单调栈把枚举压成 O(n) 的原因。'},
+    {i:6,stack:[6],ans:{0:1,1:1,2:4,3:2,4:1,5:1},res:[5,2],chip:'76 弹到栈空',chipC:'cg',title:'步骤 7 · i=6（76）弹出 5、2',
+     note:'76&gt;72→ans[5]=1；76&gt;75→ans[2]=4；栈空',
+     desc:'76 是新高：比 72 高 → ans[5]=<b>1</b>；比 75 高 → ans[2]=6−2=<b>4</b>；栈被清空，76 入栈。'},
+    {i:7,stack:[6,7],ans:{0:1,1:1,2:4,3:2,4:1,5:1},res:[],chip:'73<76 入栈',chipC:'cb',title:'步骤 8 · i=7（73）入栈',
+     note:'栈：[6,7]',
+     desc:'最后一天 73 比 76 低，入栈等待（但后面没有元素了）。'},
+    {i:-1,stack:[],ans:{0:1,1:1,2:4,3:2,4:1,5:1,6:0,7:0},res:[6,7],chip:'O(n) 均摊',chipC:'cg',done:true,title:'步骤 9 · 结束：栈中剩余记 0',
+     note:'answer = [1,1,4,2,1,1,0,0]',
+     desc:'遍历结束，栈里剩下的 6、7 <b>永远等不到更高温度</b> → ans=0。每个下标最多入栈、出栈各一次，总复杂度 <b>O(n)</b>。'},
+  ];
+  function mount(){
+    let bars='';
+    for(let i=0;i<N;i++){
+      bars+='<div class="bar" id="s3bar-'+i+'"><div class="col" id="s3col-'+i+'" style="height:'+H(T[i])+'px">'+T[i]+'</div><div class="ix">'+i+'</div></div>';
+    }
+    let hc='';
+    for(let i=0;i<N;i++)hc+='<div class="hcell hide" id="s3st-'+i+'"><span class="hv">'+T[i]+'</span><span class="hi">i='+i+'</span></div>';
+    let ac='';
+    for(let i=0;i<N;i++)ac+='<div class="acell" id="s3ans-'+i+'"></div>';
+    viz.innerHTML='<div class="vcap"><b>单调栈</b>：每日温度，栈存"还在等更高温度"的下标</div>'+
+      '<div class="barsbox"><span class="barptr" id="s3ptr">▼</span><div class="bars" id="s3bars">'+bars+'</div></div>'+
+      '<div class="collbl">单调栈（存下标，栈底→栈顶 温度递减）</div>'+
+      '<div class="hstack" id="s3stack">'+hc+'</div>'+
+      '<div class="ansrow"><span class="anslbl">answer</span><div class="ans">'+ac+'</div></div>'+
+      '<div class="op-note" id="s3note"></div>';
+  }
+  function paint(s){
+    const ptr=document.getElementById('s3ptr');
+    if(s.i>=0){const b=document.getElementById('s3bar-'+s.i);ptr.style.opacity=1;ptr.style.left=(b.offsetLeft+b.offsetWidth/2)+'px';}
+    else ptr.style.opacity=0;
+    for(let i=0;i<N;i++){
+      const bar=document.getElementById('s3bar-'+i);
+      let cls='bar';
+      if(i===s.i&&s.i>=0)cls+=' cur';
+      else if(s.stack.includes(i))cls+=' wait';
+      else if(s.ans[i]!==undefined)cls+=' done';
+      else if(s.i>=0&&i>s.i)cls+=' future';
+      bar.className=cls;
+    }
+    for(let i=0;i<N;i++){
+      const el=document.getElementById('s3st-'+i);
+      const pos=s.stack.indexOf(i);
+      if(pos>=0){const wasHidden=el.classList.contains('hide');el.className='hcell'+(pos===s.stack.length-1?' top':'');if(wasHidden)reflash(el);}
+      else el.className='hcell hide';
+    }
+    for(let i=0;i<N;i++){
+      const el=document.getElementById('s3ans-'+i);
+      if(s.ans[i]!==undefined){el.className='acell set';el.textContent=s.ans[i];if(s.res.includes(i))reflash(el);}
+      else{el.className='acell';el.textContent='';}
+    }
+    document.getElementById('s3note').innerHTML=s.note||'';
+  }
+  return {id:'mono',label:'单调栈',sub:'每日温度',steps,mount,paint,code};
+})();
+
+/* ========== 场景 4：单调队列 · 滑动窗口最大值 k=3 ========== */
+const monoQueueScene=(()=>{
+  const A=[1,3,-1,-3,5,3,6,7];
+  const N=A.length,K=3;
+  const code='vector&lt;<span class="kw">int</span>&gt; maxSlidingWindow(vector&lt;<span class="kw">int</span>&gt;&amp; a,<span class="kw">int</span> k){\n'+
+    '    deque&lt;<span class="kw">int</span>&gt; dq;               <span class="cmt">// 存下标</span>\n'+
+    '    vector&lt;<span class="kw">int</span>&gt; ans;\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> r=0;r&lt;a.size();++r){\n'+
+    '        <span class="kw">if</span> (!dq.empty()&amp;&amp;dq.front()&lt;=r-k) dq.pop_front();\n'+
+    '        <span class="kw">while</span> (!dq.empty()&amp;&amp;a[dq.back()]&lt;=a[r]) dq.pop_back();\n'+
+    '        dq.push_back(r);\n'+
+    '        <span class="kw">if</span> (r&gt;=k-1) ans.push_back(a[dq.front()]);\n'+
+    '    }\n'+
+    '    <span class="kw">return</span> ans;\n}';
+  const steps=[
+    {r:-1,dq:[],left:null,ans:[],chip:'deque 存下标',chipC:'c0',title:'步骤 0 · nums=[1,3,-1,-3,5,3,6,7]，k=3',
+     note:'deque 队头→队尾 值<b>递减</b>，队头永远是窗口最大值',
+     desc:'固定窗口 k=3 的最大值。单调队列用 <b>deque 存下标</b>，保证队内值<b>递减</b>。两件事：队头下标滑出窗口就<b>弹队头</b>；新元素比队尾大就<b>弹队尾</b>（那些小值再没机会当最大）。'},
+    {r:0,dq:[0],left:-2,ans:[],chip:'push 0',chipC:'cb',title:'步骤 1 · r=0（1）入队',
+     note:'窗口未满（需 3 个）',
+     desc:'下标 0（值 1）入队。窗口还不满，暂不输出。'},
+    {r:1,dq:[1],left:-1,ans:[],chip:'3>=1 弹尾',chipC:'cb',title:'步骤 2 · r=1（3）弹尾后入队',
+     note:'a[队尾 0]=1 ≤ 3 → 弹尾；1 入队',
+     desc:'3 比队尾的 1 大，<span class="dg">1 再也不可能当窗口最大值</span>（它更旧、更小）→ 弹队尾；下标 1 入队。窗口仍未满。'},
+    {r:2,dq:[1,2],left:0,ans:[3],chip:'首个窗口',chipC:'cg',title:'步骤 3 · r=2（-1）入队，首个窗口',
+     note:'-1&lt;3 直接入队；队头 1 → 输出 a[1]=3',
+     desc:'-1 比队尾 3 小，直接入队候补。窗口 <b>[0,2]</b> 首次满员，<b class="gr">队头下标 1（值 3）就是最大值</b> → 输出 <b>3</b>。'},
+    {r:3,dq:[1,2,3],left:1,ans:[3,3],chip:'队头未过期',chipC:'cg',title:'步骤 4 · r=3（-3）入队',
+     note:'队头 1 ≥ 左界 1，未过期；-3 入队',
+     desc:'-3 入队。检查队头下标 1 是否还在窗口 <b>[1,3]</b> 内 —— 在，保留。输出队头 a[1]=<b>3</b>。'},
+    {r:4,dq:[4],left:2,ans:[3,3,5],chip:'弹头 + 弹尾',chipC:'cg',title:'步骤 5 · r=4（5）大清洗',
+     note:'队头 1 &lt; 左界 2 → 弹队头；5 连弹 -3、-1；5 入队',
+     desc:'两种弹栈同时发生：① 队头 1 <b>滑出窗口</b>（1&lt;2）→ 弹队头；② 5 比队尾 -3、-1 都大 → <b>连弹两个队尾</b>；5 入队。窗口 [2,4] 最大值 = <b>5</b>。'},
+    {r:5,dq:[4,5],left:3,ans:[3,3,5,5],chip:'3 < 5 入队',chipC:'cg',title:'步骤 6 · r=5（3）入队',
+     note:'3 &lt; 队尾 5 → 直接入队；队头 4 仍是最大',
+     desc:'3 比队尾 5 小，入队当候补（万一 5 先滑走，3 可能顶上）。队头下标 4（值 5）仍是最大 → 输出 <b>5</b>。'},
+    {r:6,dq:[6],left:4,ans:[3,3,5,5,6],chip:'6 弹空队尾',chipC:'cg',title:'步骤 7 · r=6（6）清空队尾',
+     note:'6 ≥ 队尾 3、5 → 全弹；6 入队',
+     desc:'6 比队尾 3、5 都大 → 全部弹掉；6 入队。窗口 [4,6] 最大值 = <b>6</b>。之前囤的候补此刻一次清空。'},
+    {r:7,dq:[7],left:5,ans:[3,3,5,5,6,7],chip:'7 弹尾',chipC:'cg',title:'步骤 8 · r=7（7）弹尾入队',
+     note:'7 ≥ 队尾 6 → 弹尾；7 入队',
+     desc:'7 比队尾 6 大 → 弹尾；7 入队。窗口 [5,7] 最大值 = <b>7</b>。'},
+    {r:-1,dq:[],left:null,ans:[3,3,5,5,6,7],chip:'O(n) 均摊',chipC:'cg',done:true,title:'步骤 9 · 结束',
+     note:'输出 = [3,3,5,5,6,7]',
+     desc:'滑窗最大值序列 = <b>[3,3,5,5,6,7]</b>。每个下标最多入队、出队一次，总复杂度 <b>O(n)</b>。窗口边界管范围、单调队列管范围内的最值，两者常配合出现。'},
+  ];
+  function mount(){
+    let cells='';
+    for(let i=0;i<N;i++)cells+='<div class="mcell" id="s4c-'+i+'"><span class="mv">'+A[i]+'</span><span class="mi">'+i+'</span></div>';
+    let dq='';
+    for(let i=0;i<N;i++)dq+='<div class="hcell hide" id="s4dq-'+i+'"><span class="hv">'+A[i]+'</span><span class="hi">i='+i+'</span></div>';
+    let out='';
+    for(let i=0;i<N-K+1;i++)out+='<div class="acell" id="s4ans-'+i+'"></div>';
+    viz.innerHTML='<div class="vcap"><b>单调队列</b>：滑动窗口最大值，deque 存下标、队头即最大值</div>'+
+      '<div class="arrbox"><span class="arrptr" id="s4ptr">▼</span><div class="arr" id="s4arr">'+cells+'</div></div>'+
+      '<div class="collbl">单调队列（deque，队头 → 队尾 值递减 · 队头=窗口最大值）</div>'+
+      '<div class="hstack" id="s4dqbox">'+dq+'</div>'+
+      '<div class="ansrow"><span class="anslbl">输出</span><div class="ans">'+out+'</div></div>'+
+      '<div class="op-note" id="s4note"></div>';
+  }
+  let prevLen=0;
+  function paint(s){
+    const ptr=document.getElementById('s4ptr');
+    if(s.r>=0){const c=document.getElementById('s4c-'+s.r);ptr.style.opacity=1;ptr.style.left=(c.offsetLeft+c.offsetWidth/2)+'px';}
+    else ptr.style.opacity=0;
+    const lo=(s.left===null)?99:Math.max(0,s.left);
+    const hi=(s.r>=0)?s.r:-1;
+    const full=(s.left!==null&&s.left>=0);
+    const maxIdx=full?s.dq[0]:-1;
+    for(let i=0;i<N;i++){
+      const el=document.getElementById('s4c-'+i);
+      let cls='mcell';
+      if(i>=lo&&i<=hi)cls+=' win';
+      if(i===maxIdx)cls+=' maxc';
+      if(i===s.r&&s.r>=0)cls+=' cur';
+      el.className=cls;
+    }
+    for(let i=0;i<N;i++){
+      const el=document.getElementById('s4dq-'+i);
+      const pos=s.dq.indexOf(i);
+      if(pos>=0){const wasHidden=el.classList.contains('hide');el.className='hcell'+(pos===0?' front':'');if(wasHidden)reflash(el);}
+      else el.className='hcell hide';
+    }
+    const outN=N-K+1;
+    for(let i=0;i<outN;i++){
+      const el=document.getElementById('s4ans-'+i);
+      if(i<s.ans.length){el.className='acell set';el.textContent=s.ans[i];if(s.ans.length>prevLen&&i===s.ans.length-1)reflash(el);}
+      else{el.className='acell';el.textContent='';}
+    }
+    prevLen=s.ans.length;
+    document.getElementById('s4note').innerHTML=s.note||'';
+  }
+  return {id:'queue',label:'单调队列',sub:'滑窗最大值 k=3',steps,mount,paint,code};
+})();
+
+/* ========== 引擎（与 5.2.2.1 基准一致） ========== */
+const SCENES=[stackScene,minScene,monoStackScene,monoQueueScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="10"></script>
+</body>
+</html>

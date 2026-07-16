@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>priority_queue 大根堆 · 上浮、下沉与数组下标</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;      /* 普通节点 */
+  --green:#0F6E56;--greenbg:#E1F5EE;    /* 新元素/交换 */
+  --brown:#854F0B;--brownbg:#FAEEDA;    /* 比较中 */
+  --danger:#B3402F;--dangerbg:#F6E0DB;  /* 出队 */
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.layout{display:grid;grid-template-columns:520px 1fr;gap:26px;margin-top:24px;align-items:start;}
+@media(max-width:1020px){.layout{grid-template-columns:1fr;}}
+
+/* ---------- 左 ---------- */
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:18px 20px;}
+.viz .cap{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;}
+.tree{position:relative;height:250px;}
+.tree svg{position:absolute;inset:0;width:100%;height:100%;}
+.tree svg line{stroke:var(--line);stroke-width:1.5;}
+.tn{position:absolute;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:16px;font-weight:700;border:2px solid var(--blue);background:var(--bluebg);color:var(--blue);transition:all var(--dur) var(--ease);}
+.tn .ti{position:absolute;bottom:-16px;font-size:9px;color:var(--faint);font-weight:400;}
+.tn.hide{opacity:0;transform:scale(.4);}
+.tn.cmp{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.tn.swap{border-color:var(--green);background:var(--greenbg);color:var(--green);animation:pulse .8s var(--ease);}
+.tn.out{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+@keyframes pulse{0%{transform:scale(1.18);}100%{transform:scale(1);}}
+/* 数组视图 */
+.arrcap{font-size:12px;color:var(--muted);margin:14px 0 6px;}
+.arr{display:flex;gap:3px;}
+.ac{flex:1;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);}
+.ac .ai{font-size:9px;font-weight:400;color:var(--faint);}
+.ac.f{background:var(--bluebg);color:var(--blue);border-color:var(--blue);}
+.ac.cmp{background:var(--brownbg);color:var(--brown);border-color:var(--brown);}
+.ac.swap{background:var(--greenbg);color:var(--green);border-color:var(--green);}
+.ac.out{background:var(--dangerbg);color:var(--danger);border-color:var(--danger);}
+.formula{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;}
+.outbox{margin-top:12px;font-size:12px;font-weight:600;color:var(--danger);background:var(--dangerbg);border:1px dashed var(--danger);border-radius:6px;padding:4px 10px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.outbox.show{opacity:1;}
+
+/* ---------- 右 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:190px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cs{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .g{color:var(--green);font-weight:600;}
+.desc-body .h{color:var(--brown);font-weight:600;}
+.desc-body .d{color:var(--danger);font-weight:600;}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>priority_queue 大根堆 · 上浮、下沉与数组下标</h1>
+    <p>底层就是一个 vector —— 树形关系全靠下标公式换算　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="layout">
+    <!-- 左 -->
+    <section class="viz">
+      <div class="cap"><span>逻辑视角：完全二叉树</span></div>
+      <div class="tree" id="tree">
+        <svg id="edges"></svg>
+      </div>
+      <div class="arrcap">物理视角：同一份数据躺在 vector 里</div>
+      <div class="arr" id="arr"></div>
+      <div class="formula">
+        <span>左孩子 = 2i+1</span><span>右孩子 = 2i+2</span><span>父节点 = (i−1)/2</span>
+      </div>
+      <div class="outbox" id="outbox"></div>
+    </section>
+
+    <!-- 右 -->
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+/* ---------- 树/数组渲染 ---------- */
+const POS=[[50,15],[27,50],[73,50],[15,85],[39,85],[61,85],[87,85]]; // 7 个槽位 (%)
+const tree=document.getElementById('tree'),edges=document.getElementById('edges'),arrBox=document.getElementById('arr');
+const outbox=document.getElementById('outbox');
+const tnEls=[],acEls=[];
+for(let i=0;i<7;i++){
+  const n=document.createElement('div');n.className='tn hide';
+  n.innerHTML='<span class="tv"></span><span class="ti">i='+i+'</span>';
+  n.style.left=POS[i][0]+'%';n.style.top=POS[i][1]+'%';
+  tree.appendChild(n);tnEls.push(n);
+  const a=document.createElement('div');a.className='ac';
+  a.innerHTML='<span class="av"></span><span class="ai">['+i+']</span>';
+  arrBox.appendChild(a);acEls.push(a);
+}
+function drawEdges(count){
+  edges.innerHTML='';
+  const W=tree.clientWidth,H=tree.clientHeight;
+  for(let i=1;i<count;i++){
+    const p=(i-1)>>1;
+    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',POS[p][0]/100*W);ln.setAttribute('y1',POS[p][1]/100*H);
+    ln.setAttribute('x2',POS[i][0]/100*W);ln.setAttribute('y2',POS[i][1]/100*H);
+    edges.appendChild(ln);
+  }
+}
+/* st: {heap:[...], cmp:[i..], swap:[i..], outVal, outTxt} */
+function paint(st){
+  drawEdges(st.heap.length);
+  for(let i=0;i<7;i++){
+    const has=i<st.heap.length;
+    tnEls[i].className='tn'+(has?'':' hide')
+      +(st.cmp&&st.cmp.includes(i)?' cmp':'')
+      +(st.swap&&st.swap.includes(i)?' swap':'');
+    tnEls[i].querySelector('.tv').textContent=has?st.heap[i]:'';
+    acEls[i].className='ac'+(has?' f':'')
+      +(st.cmp&&st.cmp.includes(i)?' cmp':'')
+      +(st.swap&&st.swap.includes(i)?' swap':'');
+    acEls[i].querySelector('.av').textContent=has?st.heap[i]:'·';
+  }
+  if(st.outTxt){outbox.textContent=st.outTxt;outbox.classList.add('show');}
+  else outbox.classList.remove('show');
+}
+
+/* ---------- 步骤 ---------- */
+const STEPS=[
+  { t:'步骤 0 · 堆 = 躺在数组里的树', c:'结构', cc:'c0',
+    st:{heap:[70,50,60]},
+    d:'<code>priority_queue&lt;int&gt;</code> 底层依赖 <b>vector</b>，把数据组织成<b>大根堆</b>：每个父节点 ≥ 两个孩子，堆顶（下标 0）永远是最大值。树只是"看法"——父子关系全靠下标换算：<code>左 2i+1、右 2i+2、父 (i−1)/2</code>。' },
+  { t:'步骤 1 · push(80)：先追加到末尾', c:'尾部入队', cc:'cs',
+    st:{heap:[70,50,60,80],swap:[3]},
+    d:'新元素永远先 <code>push_back</code> 到数组末尾——对应树上<b>最后一个空位</b>（i=3，是 50 的左孩子）。此刻 80 &gt; 父节点 50，大根堆性质被破坏了，需要修复。' },
+  { t:'步骤 2 · 上浮第一跳：80 ⇄ 50', c:'sift up', cc:'ch',
+    st:{heap:[70,80,60,50],cmp:[3],swap:[1]},
+    d:'和父节点比：<code>80 &gt; 50</code>，交换。80 从 i=3 浮到 i=1（父下标 <code>(3−1)/2 = 1</code>）。注意数组视图：只是 <b>swap 了两个元素</b>，没有任何指针操作。' },
+  { t:'步骤 3 · 上浮第二跳：80 ⇄ 70，登顶', c:'sift up', cc:'ch',
+    st:{heap:[80,70,60,50],cmp:[1],swap:[0]},
+    d:'再和新父节点比：<code>80 &gt; 70</code>，再交换，80 登顶。上浮路径最长就是树高，所以 <b>push 是 O(log n)</b>。现在 <code>top()</code> 返回 80——最大值随取随有。' },
+  { t:'步骤 4 · pop()：堆顶出队，末尾补位', c:'尾补根', cc:'cd',
+    st:{heap:[50,70,60],swap:[0],outTxt:'80 已出队（swap 到末尾后 pop_back）'},
+    d:'<code>pop()</code> 不是把数组第一格抽走（那样后面全要搬）——而是<b>把末尾元素 50 搬到堆顶，再 pop_back</b>。50 这个"小个子"临时坐在王座上，堆性质又破坏了，这次要<b>往下修</b>。' },
+  { t:'步骤 5 · 下沉：50 ⇄ 较大的孩子 70', c:'sift down', cc:'ch',
+    st:{heap:[70,50,60],cmp:[2],swap:[0,1]},
+    d:'和<b>两个孩子中较大的那个</b>比（70 vs 60 → 选 70）：<code>50 &lt; 70</code>，交换。50 沉到 i=1 后已无孩子，下沉结束。<b>pop 同样是 O(log n)</b>。为什么必须挑较大的孩子？——换上来的新父亲必须 ≥ 另一个孩子，否则堆还是坏的。' },
+  { t:'步骤 6 · 小根堆与复杂度总结', c:'greater<int>', cc:'cg',
+    st:{heap:[70,50,60]},
+    d:'<code>priority_queue&lt;int, vector&lt;int&gt;, greater&lt;int&gt;&gt;</code> 就是<b>小根堆</b>（比较器反过来，最小值在顶）。总结：push/pop 都是 <b>O(log n)</b>、top O(1)；持续"插入 + 取最值"的场景（任务调度、Dijkstra、Top-K）用它，比每次重新排序的 O(n log n) 快一个量级。' },
+];
+
+/* ---------- 控制 ---------- */
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const dotsBox=document.getElementById('dots');const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.t;d.onclick=()=>{stop();go(i);};dotsBox.appendChild(d);dotEls.push(d);});
+
+let cur=0;
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur];
+  paint(s.st);
+  stTitle.textContent=s.t;stChip.textContent=s.c;stChip.className='chip '+s.cc;stDesc.innerHTML=s.d;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(STEPS.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===STEPS.length-1;
+  if(cur===STEPS.length-1)stop();
+}
+
+let timer=null,ms=3000;
+function play(){if(cur===STEPS.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>paint(STEPS[cur].st));
+const m=location.hash.match(/step=(\d+)/);go(m?+m[1]:0);
+</script>
+</body>
+</html>

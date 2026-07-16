@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>子序列动态规划动画 · LIS / LCS / 编辑距离 / LPS</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--bluebar:#B7D6EE;--green:#0F6E56;--greenbg:#E1F5EE;--greenbar:#A7D8C7;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--brownbar:#E8C98E;--danger:#B3402F;--dangerbg:#F6E0DB;--dangerbar:#E7B2A8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.68;padding:34px 40px 52px;text-wrap:pretty}
+button{font:inherit}code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:2px 6px;border-radius:4px}
+.wrap{max-width:1380px;margin:0 auto}header h1{font-size:27px;font-weight:600;letter-spacing:0}header p{font-size:14.5px;color:var(--muted);margin-top:7px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:26px}.tab{font-size:14px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:3px;align-items:flex-start;justify-content:center;min-height:68px}.tab:hover{border-color:var(--muted);transform:translateY(-1px)}.tab:focus-visible,.ctrl:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.tab .t{font-weight:600;color:var(--ink)}.tab .s{font-size:11px;color:var(--faint);font-family:var(--mono)}.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 4px 14px rgba(62,61,57,.18)}.tab.on .t,.tab.on .s{color:var(--paper)}.tab.on .s{opacity:.78}
+.layout{display:grid;grid-template-columns:minmax(0,800px) minmax(400px,1fr);gap:32px;margin-top:30px;align-items:start}.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:28px;min-height:630px;display:flex;flex-direction:column;box-shadow:0 1px 4px rgba(60,55,40,.05);overflow:hidden}.vcap{font-size:14px;color:var(--muted);margin-bottom:14px}.vcap b{color:var(--ink)}.right{display:flex;flex-direction:column;gap:20px}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:25px 27px;min-height:292px;box-shadow:0 1px 4px rgba(60,55,40,.05)}.desc-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.desc-head .st{font-size:21px;font-weight:600}.act{margin-top:18px;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:12px 15px;border-radius:7px}.desc-body{margin-top:14px;font-size:16px;color:var(--muted)}.desc-body b{color:var(--ink)}.desc-body .bl{color:var(--blue);font-weight:600}.desc-body .gr{color:var(--green);font-weight:600}.desc-body .br{color:var(--brown);font-weight:600}.desc-body .dg{color:var(--danger);font-weight:600}.chip{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray)}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg)}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg)}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg)}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg)}
+.codebox{background:#2E2C27;border-radius:8px;padding:21px 23px;font-family:var(--mono);font-size:13px;line-height:1.72;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 3px 10px rgba(46,44,39,.19);min-height:260px}.codebox .cmt{color:#8F8B80}.codebox .kw{color:#E3A44C}.codebox .fn{color:#8EC5EA}.codebox .num{color:#A6D6A8}.stage-note{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:auto;padding-top:14px;min-height:36px}.stage-note .ok{color:var(--green);font-weight:700}.stage-note .bad{color:var(--danger);font-weight:700}
+
+/* Model */
+.model-flow{display:grid;grid-template-columns:1fr 40px 1fr;gap:12px;align-items:stretch;margin-top:8px}.model-card{border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:18px;min-height:140px;opacity:.48;transition:all var(--dur) var(--ease)}.model-card.on{opacity:1;border-color:var(--blue);background:var(--bluebg);transform:translateY(-3px)}.model-card.done{opacity:1;border-color:var(--green);background:var(--greenbg)}.model-card.bad{opacity:1;border-color:var(--danger);background:var(--dangerbg)}.model-card h3{font-size:16px}.model-card p{font-size:13px;color:var(--muted);margin-top:8px}.model-card .mono{font-family:var(--mono);font-size:12px;color:var(--faint);margin-top:12px}.flow-arrow{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:22px;color:var(--line);transition:color var(--dur) var(--ease)}.flow-arrow.on{color:var(--blue)}.seq-demo{display:flex;gap:8px;justify-content:center;margin-top:22px;flex-wrap:wrap}.seq-ch{width:48px;height:48px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:18px;color:var(--faint);transition:all var(--dur) var(--ease)}.seq-ch.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-2px)}.seq-ch.pick{border-color:var(--green);background:var(--greenbg);color:var(--green)}.seq-ch.skip{opacity:.28;text-decoration:line-through}.rule-board{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:20px}.rule-row{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:12px 14px;font-family:var(--mono);font-size:12px;color:var(--muted);opacity:.4;transition:all var(--dur) var(--ease)}.rule-row.on{opacity:1;border-color:var(--brown);background:var(--brownbg);color:var(--brown)}.rule-row.done{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--green)}
+
+/* Array strip + 1D DP */
+.item-strip{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:4px 0 18px}.item-card{min-width:72px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);transition:all var(--dur) var(--ease)}.item-card b{display:block;font-size:16px;color:var(--ink)}.item-card.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-2px)}.item-card.done{border-color:var(--green);background:var(--greenbg);color:var(--green)}.item-card.src{border-color:var(--brown);background:var(--brownbg);color:var(--brown)}.item-card.ans{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.18)}
+.dp-wrap{position:relative;padding-top:28px}.dp-pointer{position:absolute;top:0;left:0;opacity:0;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);transition:left var(--dur) var(--ease),opacity .18s}.dp-grid{display:grid;gap:7px}.dp-grid.n7{grid-template-columns:repeat(7,minmax(0,1fr))}.dp-cell{height:88px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur) var(--ease)}.dp-cell .idx{position:absolute;left:6px;top:4px;font-family:var(--mono);font-size:9px;color:var(--faint);z-index:2}.dp-cell .val{font-family:var(--mono);font-size:20px;font-weight:800;z-index:2}.dp-cell .bar{position:absolute;left:7px;right:7px;bottom:5px;height:0;border-radius:4px;background:var(--bluebar);transition:height var(--dur) var(--ease),background var(--dur) var(--ease)}.dp-cell.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-3px)}.dp-cell.active .bar{background:var(--bluebar)}.dp-cell.source{border-color:var(--brown);background:var(--brownbg);color:var(--brown)}.dp-cell.source .bar{background:var(--brownbar)}.dp-cell.changed{border-color:var(--green);background:var(--greenbg);color:var(--green)}.dp-cell.changed .bar{background:var(--greenbar)}.dp-cell.ans{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.18)}.dp-cell.ans .bar{background:var(--greenbar)}
+.formula-strip{margin-top:16px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:11px 13px;font-family:var(--mono);font-size:12px;color:var(--muted);min-height:44px;transition:all var(--dur) var(--ease)}.formula-strip.good{border-color:var(--green);background:var(--greenbg);color:var(--green)}.formula-strip.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}.formula-strip.hot{border-color:var(--brown);background:var(--brownbg);color:var(--brown)}
+.best-pill{display:inline-flex;align-items:center;gap:8px;margin-top:12px;font-family:var(--mono);font-size:13px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease)}.best-pill.on{border-color:var(--green);background:var(--greenbg);color:var(--green);font-weight:700}
+
+/* tails / binary LIS */
+.tails-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;min-height:64px}.tail-cell{min-width:64px;height:56px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);transition:all var(--dur) var(--ease)}.tail-cell small{font-size:9px;color:var(--faint)}.tail-cell b{font-size:18px}.tail-cell.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-2px)}.tail-cell.changed{border-color:var(--green);background:var(--greenbg);color:var(--green)}.tail-cell.empty{opacity:.35;border-style:dashed}
+
+/* 2D grid */
+.dpgrid{display:grid;gap:5px;margin:10px auto 4px;width:fit-content}.ghead{font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;align-items:center;justify-content:center;min-height:28px;padding:0 3px}.ghead.rowh{justify-content:flex-end;white-space:nowrap;font-size:11px}.gcell{width:46px;height:40px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:15px;color:var(--faint);transition:all var(--dur) var(--ease)}.gcell.base{background:var(--gray);color:var(--muted)}.gcell.done{background:var(--greenbg);border-color:var(--green);color:var(--green)}.gcell.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.14)}.gcell.src{background:var(--brownbg);border-color:var(--brown);color:var(--brown)}.gcell.ans{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.18)}.gcell.hide{opacity:0;visibility:hidden}.gcell.pending{opacity:.45}
+
+.controls{margin-top:26px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(60,55,40,.05)}.ctrl{width:48px;height:44px;flex:0 0 48px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s}.ctrl:hover:not(:disabled){background:var(--gray);border-color:var(--muted)}.ctrl:active:not(:disabled){transform:scale(.94)}.ctrl:disabled{opacity:.35;cursor:default}.ctrl.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}.dots{display:flex;gap:8px;margin:0 auto;flex-wrap:wrap;justify-content:center}.dot{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease)}.dot:hover{border-color:var(--muted);transform:scale(1.2)}.dot.done{background:var(--line);border-color:var(--line)}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3)}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:58px;text-align:center}
+@media(max-width:1180px){.layout{grid-template-columns:1fr}.right{display:grid;grid-template-columns:1fr 1fr}.codebox{min-height:280px}}
+@media(max-width:720px){body{font-size:15px;padding:20px 14px 32px}header h1{font-size:22px}header p{font-size:13px}.tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:20px}.tab{font-size:12.5px;padding:9px 10px;min-height:60px}.tab .s{font-size:9.5px}.right{display:flex}.viz{padding:16px;min-height:560px}.vcap{font-size:12px}.desc-card{padding:18px 20px;min-height:230px}.desc-head .st{font-size:17px}.act{font-size:12px;margin-top:14px;padding:9px 12px}.desc-body{font-size:14px;margin-top:10px}.codebox{font-size:10.5px;padding:14px 16px;min-height:0}.model-flow{grid-template-columns:1fr;gap:8px}.flow-arrow{height:18px;transform:rotate(90deg)}.item-card{min-width:56px}.dp-grid.n7{gap:4px}.dp-cell{height:72px}.dp-cell .val{font-size:15px}.gcell{width:36px;height:34px;font-size:12px}.controls{padding:12px 10px}.ctrl{width:44px;flex-basis:44px}.dots{order:5;width:100%;margin-top:3px}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>子序列动态规划 · 保序跳过，不是连续截取</h1>
+    <p>从子序列 vs 子串出发，逐步看清 LIS、二分 tails、LCS、编辑距离与最长回文子序列的状态定义与答案位置。</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <main class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </main>
+  <div class="controls">
+    <button class="ctrl" id="btnPrev" aria-label="上一步" title="上一步">‹</button>
+    <button class="ctrl primary" id="btnPlay" aria-label="播放动画" title="播放或暂停">▶</button>
+    <button class="ctrl" id="btnNext" aria-label="下一步" title="下一步">›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div><span class="readout" id="readout"></span>
+  </div>
+</div>
+<script>
+const viz=document.getElementById('viz');
+const byId=id=>document.getElementById(id);
+const maxValue=values=>Math.max(1,...values.filter(v=>Number.isFinite(v)&&v>0));
+
+function paint1d(prefix,values,state={}){
+  const peak=maxValue(values);
+  values.forEach((value,i)=>{
+    const cell=byId(`${prefix}-${i}`);
+    cell.querySelector('.val').textContent=value;
+    cell.querySelector('.bar').style.height=Math.max(6,value/peak*48)+'px';
+    cell.className='dp-cell'
+      +(state.active===i?' active':'')
+      +(state.source===i?' source':'')
+      +(state.changed?.includes(i)?' changed':'')
+      +(state.ans===i?' ans':'');
+  });
+  const pointer=byId(prefix+'-pointer');
+  if(pointer){
+    if(Number.isInteger(state.active)){
+      const target=byId(`${prefix}-${state.active}`),grid=byId(prefix+'-grid');
+      pointer.style.opacity=1;
+      pointer.style.left=(grid.offsetLeft+target.offsetLeft+target.offsetWidth/2)+'px';
+    }else pointer.style.opacity=0;
+  }
+}
+function setFormula(id,text,kind=''){const el=byId(id);el.textContent=text;el.className='formula-strip'+(kind?' '+kind:'')}
+function setGridCell(prefix,r,c,cls,text){
+  const cell=byId(`${prefix}-${r}-${c}`);
+  if(!cell)return;
+  cell.textContent=text;
+  cell.className='gcell'+(cls?' '+cls:'');
+}
+
+/* ========== 1. 模型：子序列 vs 子串 ========== */
+const modelScene=(()=>{
+  const letters=['a','b','c','d','e'];
+  const steps=[
+    {side:0,picks:[],rules:-1,chip:'先分清定义',chipC:'c0',title:'子序列可以跳过，子串必须连续',desc:'序列 <code>a b c d e</code> 上，<b>子串</b>要求下标连续；<b>子序列</b>只要相对顺序不变，中间可以丢字符。'},
+    {side:0,picks:[1,2,3],rules:-1,chip:'子串',chipC:'ch',title:'子串示例：连续片段 bcd',desc:'选中 <code>b c d</code>，下标 1–3 相邻。这是滑动窗口、最长回文子串一类题的对象。'},
+    {side:1,picks:[0,2,4],rules:-1,chip:'子序列',chipC:'cb',title:'子序列示例：跳过 b、d 得到 a c e',desc:'选中 <code>a c e</code>，顺序仍是从左到右，但中间被跳过。LIS / LCS 都是这种“保序跳过”。'},
+    {side:1,picks:[0,2,4],rules:0,chip:'识别信号',chipC:'cb',title:'单数组递增 → 以位置结尾的一维 DP',desc:'看到“最长递增 / 递减 / 整除链”，优先想 <code>dp[i]=以 i 结尾的最优</code>，答案常取全局 max。'},
+    {side:1,picks:[0,2,4],rules:1,chip:'双序列',chipC:'cg',title:'两个串保持相对顺序 → 前缀二维 DP',desc:'LCS、编辑距离都用 <code>dp[i][j]</code> 表示两个前缀；下标比较时用 <code>a[i-1]</code>、<code>b[j-1]</code>。'},
+    {side:1,picks:[0,2,4],rules:2,chip:'区间回文',chipC:'cg',title:'一个串内部找最长回文子序列 → 区间状态',desc:'LPS 用 <code>dp[i][j]=s[i..j]</code> 的最优；依赖 <code>i+1</code>，所以 <code>i</code> 常倒序（或按长度递增）。'}
+  ];
+  const code=`<span class="cmt">// 子序列 DP 识别表</span>
+子串 / 子数组 : 必须连续
+子序列         : 可跳过，保相对顺序
+
+单数组递增链   → dp[i] 以 i 结尾
+两个串前缀     → dp[i][j]
+插入删除替换   → 编辑距离
+一个串回文     → 区间 dp[i][j]
+
+<span class="cmt">// 别和 5.2.19 子串回文搞混</span>
+最长回文子串 ≠ 最长回文子序列`;
+  function mount(){
+    viz.innerHTML=`<div class="vcap"><b>模型识别</b>：先判连续还是保序，再选状态</div>
+      <div class="model-flow">
+        <div class="model-card" id="model-0"><h3>子串 / 子数组</h3><p>下标必须连续</p><div class="mono">substring / subarray</div></div>
+        <div class="flow-arrow" id="arrow-0">vs</div>
+        <div class="model-card" id="model-1"><h3>子序列</h3><p>可跳过，顺序不变</p><div class="mono">subsequence</div></div>
+      </div>
+      <div class="seq-demo">${letters.map((ch,i)=>`<div class="seq-ch" id="seq-${i}">${ch}</div>`).join('')}</div>
+      <div class="rule-board">${['LIS：dp[i] 以 i 结尾','LCS/编辑：前缀 dp[i][j]','LPS：区间 dp[i][j]'].map((t,i)=>`<div class="rule-row" id="rule-${i}">${t}</div>`).join('')}</div>
+      <div class="stage-note" id="model-note"></div>`;
+  }
+  function paint(s){
+    [0,1].forEach(i=>byId('model-'+i).className='model-card'+(i===s.side?' on':'')+(s.side===1&&i===0?' bad':''));
+    byId('arrow-0').className='flow-arrow'+(s.side>=0?' on':'');
+    letters.forEach((_,i)=>{
+      const el=byId('seq-'+i);
+      const picked=s.picks.includes(i);
+      el.className='seq-ch'+(picked?' pick':'')+(s.picks.length&&!picked?' skip':'')+(s.side===0&&picked?' on':'');
+    });
+    [0,1,2].forEach(i=>byId('rule-'+i).className='rule-row'+(i===s.rules?' on':'')+(s.rules>i?' done':''));
+    byId('model-note').innerHTML=s.rules<0
+      ?(s.side===0?'<span class="bad">连续片段：不能跳过中间字符</span>':'<span class="ok">保序跳过：相对顺序仍从左到右</span>')
+      :'状态定义决定答案位置：全局 max / 右下角 / 右上角';
+  }
+  return{id:'model',label:'模型识别',sub:'子序列 vs 子串',steps,mount,paint,code};
+})();
+
+/* ========== 2. LIS O(n²) ========== */
+const lisScene=(()=>{
+  const nums=[10,9,2,5,3,7,101];
+  // full final: [1,1,1,2,2,3,4]
+  const steps=[
+    {dp:[1,1,1,1,1,1,1],i:-1,j:null,source:null,changed:[],best:1,ans:null,formula:'dp[i] 全部初始化为 1：单元素自成子序列',chip:'nums 长度 7',chipC:'c0',title:'状态：dp[i] = 以 nums[i] 结尾的最长递增长度',desc:'数组 <code>[10,9,2,5,3,7,101]</code>。每个位置至少长度为 1。'},
+    {dp:[1,1,1,1,1,1,1],i:1,j:0,source:0,changed:[],best:1,ans:null,formula:'i=1, j=0：9 ≯ 10，不更新',chip:'i=1 · j=0',chipC:'cb',title:'处理 9 时，前面只有 10 且更大，无法接上',desc:'转移条件是 <code>j &lt; i</code> 且 <code>nums[j] &lt; nums[i]</code>。9 接不上 10。'},
+    {dp:[1,1,1,2,1,1,1],i:3,j:2,source:2,changed:[3],best:2,ans:null,formula:'i=3：5 接在 2 后 → dp[3]=dp[2]+1=2',chip:'i=3 · 接 2',chipC:'cb',title:'5 找到更小的前驱 2，长度升到 2',desc:'在所有满足条件的 j 里取 max；这里 j=2 给出 1+1=2。'},
+    {dp:[1,1,1,2,2,1,1],i:4,j:2,source:2,changed:[4],best:2,ans:null,formula:'i=4：3 接在 2 后 → dp[4]=2',chip:'i=4 · 3',chipC:'cb',title:'3 同样只能接在 2 后',desc:'3 比 5、9、10 都小，唯一合法前驱是 2。'},
+    {dp:[1,1,1,2,2,3,1],i:5,j:3,source:3,changed:[5],best:3,ans:null,formula:'i=5：7 接在 5 后 → dp[5]=dp[3]+1=3',chip:'i=5 · 7',chipC:'cg',title:'7 可接在 2-5 或 2-3 之后，长度 3',desc:'前驱 j=3（5）或 j=4（3）都给出 3；取 max 后 best 也更新到 3。'},
+    {dp:[1,1,1,2,2,3,4],i:6,j:5,source:5,changed:[6],best:4,ans:6,formula:'i=6：101 接在 7 后 → dp[6]=4',chip:'答案 4',chipC:'cg',title:'最终 LIS 长度 4，例如 2,5,7,101',desc:'<b>答案不是 dp[n-1] 碰巧对上</b>：定义是“以 i 结尾”，必须维护全局 <code>best</code>。若最长递增在中间结束，取末位会错。'}
+  ];
+  const code=`vector&lt;int&gt; dp(n, <span class="num">1</span>);
+<span class="kw">int</span> best = <span class="num">1</span>;
+<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; n; ++i) {
+  <span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">0</span>; j &lt; i; ++j)
+    <span class="kw">if</span> (nums[j] &lt; nums[i])
+      dp[i] = max(dp[i], dp[j] + <span class="num">1</span>);
+  best = max(best, dp[i]);
+}
+<span class="kw">return</span> best;  <span class="cmt">// 不是 dp[n-1]</span>`;
+  function mount(){
+    viz.innerHTML=`<div class="vcap"><b>LIS O(n²)</b>：以位置结尾，答案取全局最大值</div>
+      <div class="item-strip">${nums.map((n,i)=>`<div class="item-card" id="lis-item-${i}"><b>${n}</b>i=${i}</div>`).join('')}</div>
+      <div class="dp-wrap"><span class="dp-pointer" id="lis-pointer">i</span>
+        <div class="dp-grid n7" id="lis-grid">${nums.map((_,i)=>`<div class="dp-cell" id="lis-${i}"><span class="idx">${i}</span><span class="val"></span><span class="bar"></span></div>`).join('')}</div>
+      </div>
+      <div class="formula-strip" id="lis-formula"></div>
+      <div style="text-align:center"><span class="best-pill" id="lis-best">best = 1</span></div>
+      <div class="stage-note" id="lis-note"></div>`;
+  }
+  function paint(s){
+    nums.forEach((_,i)=>{
+      byId('lis-item-'+i).className='item-card'
+        +(i===s.i?' on':'')
+        +(i===s.source?' src':'')
+        +(s.ans===i?' ans':'')
+        +(s.i>i&&i!==s.source?' done':'');
+    });
+    paint1d('lis',s.dp,{active:s.i>=0?s.i:null,source:s.source,changed:s.changed,ans:s.ans});
+    setFormula('lis-formula',s.formula,s.ans!=null?'good':s.changed.length?'hot':'');
+    const pill=byId('lis-best');
+    pill.textContent='best = '+s.best;
+    pill.className='best-pill'+(s.best>=4?' on':'');
+    byId('lis-note').innerHTML=s.ans!=null
+      ?'<span class="ok">答案 = max(dp[i]) = 4，不要默认 dp[n-1]</span>'
+      :'j 扫描前驱；只有 nums[j] &lt; nums[i] 才能转移';
+  }
+  return{id:'lis',label:'LIS O(n²)',sub:'以 i 结尾 · 全局 max',steps,mount,paint,code};
+})();
+
+/* ========== 3. LIS 二分 tails ========== */
+const lisBinScene=(()=>{
+  const nums=[10,9,2,5,3,7,101];
+  const steps=[
+    {tails:[],x:null,pos:null,action:'init',chip:'tails 空',chipC:'c0',title:'tails[len] = 长度为 len+1 的递增子序列的最小结尾',desc:'不是真实 LIS 路径，而是每个长度的最优（最小）结尾候选。'},
+    {tails:[10],x:10,pos:0,action:'push',chip:'x=10',chipC:'cb',title:'10 比所有结尾都大（或 tails 空）→ 追加',desc:'lower_bound 落到 end，长度 +1。'},
+    {tails:[9],x:9,pos:0,action:'replace',chip:'x=9',chipC:'ch',title:'9 替换 10：同长度更小的结尾更好',desc:'长度为 1 的候选从 10 换成 9，后续更容易接上。'},
+    {tails:[2],x:2,pos:0,action:'replace',chip:'x=2',chipC:'ch',title:'2 继续替换，长度仍为 1',desc:'更小的结尾不会缩短已有最长长度，但改善未来扩展性。'},
+    {tails:[2,5],x:5,pos:1,action:'push',chip:'x=5',chipC:'cb',title:'5 &gt; 2 → 追加，形成长度 2',desc:'[2,5] 表示“长度 1 最小结尾 2，长度 2 最小结尾 5”。'},
+    {tails:[2,3],x:3,pos:1,action:'replace',chip:'x=3',chipC:'ch',title:'3 替换 5：长度 2 的结尾变小',desc:'真实序列可能是 2-3 而非 2-5；tails 只保留更优结尾。'},
+    {tails:[2,3,7],x:7,pos:2,action:'push',chip:'x=7',chipC:'cb',title:'7 追加 → 长度 3',desc:'lower_bound 找不到 ≥7 的位置，push 到末尾。'},
+    {tails:[2,3,7,101],x:101,pos:3,action:'push',chip:'答案 4',chipC:'cg',title:'101 追加 → tails.size() = 4',desc:'最终长度即 tails 长度。注意 <b>tails 本身不一定等于某条真实 LIS</b>，只保证长度正确。'}
+  ];
+  const code=`vector&lt;int&gt; tails;
+<span class="kw">for</span> (<span class="kw">int</span> x : nums) {
+  <span class="kw">auto</span> it = lower_bound(tails.begin(), tails.end(), x);
+  <span class="kw">if</span> (it == tails.end()) tails.push_back(x);
+  <span class="kw">else</span> *it = x;
+}
+<span class="kw">return</span> tails.size();  <span class="cmt">// O(n log n)</span>`;
+  function mount(){
+    viz.innerHTML=`<div class="vcap"><b>LIS 二分优化</b>：lower_bound 维护最小结尾候选</div>
+      <div class="item-strip">${nums.map((n,i)=>`<div class="item-card" id="lb-item-${i}"><b>${n}</b>scan</div>`).join('')}</div>
+      <div class="compare-label" style="font-family:var(--mono);font-size:11px;color:var(--faint);margin:8px 0 6px;text-align:center">tails（按长度 1..k 的最小结尾）</div>
+      <div class="tails-row" id="tails-row"></div>
+      <div class="formula-strip" id="lb-formula"></div>
+      <div class="stage-note" id="lb-note"></div>`;
+  }
+  function paint(s){
+    const consumed=s.x==null?0:nums.indexOf(s.x)+1;
+    nums.forEach((_,i)=>{
+      byId('lb-item-'+i).className='item-card'
+        +(s.x!=null&&i===consumed-1?' on':'')
+        +(i<consumed-1?' done':'');
+    });
+    const row=byId('tails-row');
+    const maxSlots=4;
+    let html='';
+    for(let i=0;i<maxSlots;i++){
+      if(i<s.tails.length){
+        const on=s.pos===i;
+        html+=`<div class="tail-cell ${on?(s.action==='push'||s.action==='replace'?'changed':'on'):''}"><small>len ${i+1}</small><b>${s.tails[i]}</b></div>`;
+      }else{
+        html+=`<div class="tail-cell empty"><small>len ${i+1}</small><b>—</b></div>`;
+      }
+    }
+    row.innerHTML=html;
+    const msg=s.x==null
+      ?'tails 为空，等待第一个数'
+      :s.action==='push'
+        ?`lower_bound(${s.x}) → end，push_back → 长度 ${s.tails.length}`
+        :`lower_bound(${s.x}) → 位置 ${s.pos}，替换 tails[${s.pos}]`;
+    setFormula('lb-formula',msg,s.tails.length===4?'good':s.action==='replace'?'hot':'');
+    byId('lb-note').innerHTML=s.tails.length===4
+      ?'<span class="ok">长度 4；tails 是候选结尾，不是路径本身</span>'
+      :'比末尾大则扩展长度，否则替换第一个 ≥ x 的结尾';
+  }
+  return{id:'lisbin',label:'LIS 二分',sub:'tails + lower_bound',steps,mount,paint,code};
+})();
+
+/* ========== 4. LCS ========== */
+const lcsScene=(()=>{
+  const A=['','a','c','e'],B=['','a','b','c','d','e'];
+  // dp 4x6 (m=3,n=5) with padding
+  // Final table:
+  //   ε a b c d e
+  // ε 0 0 0 0 0 0
+  // a 0 1 1 1 1 1
+  // c 0 1 1 2 2 2
+  // e 0 1 1 2 2 3
+  const T=[
+    [0,0,0,0,0,0],
+    [0,1,1,1,1,1],
+    [0,1,1,2,2,2],
+    [0,1,1,2,2,3]
+  ];
+  const steps=[
+    {fillR:0,fillC:5,cur:null,src:[],ans:null,chip:'边界 0',chipC:'c0',title:'dp[i][j] = a 前 i 个与 b 前 j 个的 LCS 长度',desc:'多开一行一列：空串与任意前缀的 LCS 为 0，避免下标越界判断。'},
+    {fillR:1,fillC:1,cur:[1,1],src:[[0,0]],ans:null,chip:'a vs a',chipC:'cb',title:'字符相等：对角 + 1',desc:'比较的是 <code>a[i-1]</code> 与 <code>b[j-1]</code>。\'a\'==\'a\' → <code>dp[1][1]=dp[0][0]+1=1</code>。'},
+    {fillR:1,fillC:5,cur:[1,3],src:[[1,2],[0,3]],ans:null,chip:'第一行 a',chipC:'cb',title:'不等时取上方或左方的 max',desc:'\'a\' 与 \'c\' 不等 → max(dp[0][3], dp[1][2])。第一行只能把单个 a 匹配到 b 中的 a。'},
+    {fillR:2,fillC:3,cur:[2,3],src:[[1,2]],ans:null,chip:'c vs c',chipC:'cb',title:'\'c\' 匹配成功，长度升到 2',desc:'a[1]=\'c\'、b[2]=\'c\' → 对角 dp[1][2]+1=2，公共子序列 ac。'},
+    {fillR:3,fillC:5,cur:[3,5],src:[[2,4]],ans:[3,5],chip:'答案 3',chipC:'cg',title:'\'e\' 匹配，右下角 dp[3][5]=3',desc:'完整串 "ace" 与 "abcde" 的 LCS 为 ace，长度 3。答案在 <b>右下角</b>。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">1</span>; i &lt;= m; ++i)
+  <span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">1</span>; j &lt;= n; ++j)
+    <span class="kw">if</span> (a[i-<span class="num">1</span>] == b[j-<span class="num">1</span>])
+      dp[i][j] = dp[i-<span class="num">1</span>][j-<span class="num">1</span>] + <span class="num">1</span>;
+    <span class="kw">else</span>
+      dp[i][j] = max(dp[i-<span class="num">1</span>][j], dp[i][j-<span class="num">1</span>]);
+<span class="kw">return</span> dp[m][n];`;
+  function mount(){
+    const colLabels=['ε','a','b','c','d','e'];
+    const rowLabels=['ε','a','c','e'];
+    let html='';
+    for(let r=0;r<5;r++){
+      for(let c=0;c<7;c++){
+        if(r===0&&c===0)html+='<div class="ghead">i\\\\j</div>';
+        else if(r===0)html+=`<div class="ghead">${colLabels[c-1]}</div>`;
+        else if(c===0)html+=`<div class="ghead rowh">${rowLabels[r-1]}</div>`;
+        else html+=`<div class="gcell" id="lcs-${r-1}-${c-1}">·</div>`;
+      }
+    }
+    viz.innerHTML=`<div class="vcap"><b>LCS</b>：a="ace" × b="abcde"，答案在右下角</div>
+      <div class="dpgrid" style="grid-template-columns:repeat(7,auto)">${html}</div>
+      <div class="formula-strip" id="lcs-formula"></div>
+      <div class="stage-note" id="lcs-note"></div>`;
+  }
+  function paint(s){
+    for(let r=0;r<4;r++)for(let c=0;c<6;c++){
+      const val=T[r][c];
+      if(r===0||c===0){setGridCell('lcs',r,c,'base',val);continue;}
+      const reached=s.ans||r<s.fillR||(r===s.fillR&&c<=s.fillC);
+      if(!reached){setGridCell('lcs',r,c,'pending','·');continue;}
+      setGridCell('lcs',r,c,'done',val);
+    }
+    (s.src||[]).forEach(([r,c])=>setGridCell('lcs',r,c,'src',T[r][c]));
+    if(s.cur){const[r,c]=s.cur;setGridCell('lcs',r,c,'cur',T[r][c]);}
+    if(s.ans){const[r,c]=s.ans;setGridCell('lcs',r,c,'ans',T[r][c]);}
+    setFormula('lcs-formula',s.ans?'dp[3][5] = 3 ← LCS 长度':'比较 a[i-1] 与 b[j-1]，不是 a[i] / b[j]',s.ans?'good':'');
+    byId('lcs-note').innerHTML=s.ans
+      ?'<span class="ok">ace 与 abcde 的公共子序列长度为 3</span>'
+      :'多开一行一列处理空前缀';
+  }
+  return{id:'lcs',label:'LCS',sub:'双前缀 · 右下角',steps,mount,paint,code};
+})();
+
+/* ========== 5. 编辑距离 ========== */
+const editScene=(()=>{
+  // word1=cat, word2=cut
+  // dp 4x4
+  //   ε c u t
+  // ε 0 1 2 3
+  // c 1 0 1 2
+  // a 2 1 1 2
+  // t 3 2 2 1
+  const T=[
+    [0,1,2,3],
+    [1,0,1,2],
+    [2,1,1,2],
+    [3,2,2,1]
+  ];
+  const steps=[
+    {fill:'base',cur:null,src:[],ans:null,chip:'边界',chipC:'c0',title:'dp[i][j] = a 前 i 个变成 b 前 j 个的最少操作',desc:'边界：空串变成长 j 需 j 次插入；长 i 变成空需 i 次删除。'},
+    {fill:'r1',cur:[1,1],src:[[0,0]],ans:null,chip:'c → c',chipC:'cb',title:'字符相同：直接继承对角，不花操作',desc:'\'c\'==\'c\' → dp[1][1]=dp[0][0]=0。'},
+    {fill:'r1',cur:[1,2],src:[[0,2],[1,1],[0,1]],ans:null,chip:'c → cu',chipC:'cb',title:'不等时取 删 / 插 / 替 三者最小 +1',desc:'来源：上=删除、左=插入、对角=替换。dp[1][2]=1（插入 u）。'},
+    {fill:'r2',cur:[2,2],src:[[1,1],[2,1],[1,2]],ans:null,chip:'ca → cu',chipC:'ch',title:'\'a\'≠\'u\'：替换或删插，最少仍是 1',desc:'对角 0+1=1（替换 a→u），或其它路径；取 min=1。'},
+    {fill:'done',cur:[3,3],src:[[2,2]],ans:[3,3],chip:'答案 1',chipC:'cg',title:'cat → cut 最少 1 次：替换 a 为 u',desc:'末字符 \'t\'==\'t\'，继承 dp[2][2]=1。右下角即最少编辑距离。'}
+  ];
+  const code=`dp[i][<span class="num">0</span>] = i;  dp[<span class="num">0</span>][j] = j;
+<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">1</span>; i &lt;= m; ++i)
+  <span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">1</span>; j &lt;= n; ++j)
+    <span class="kw">if</span> (a[i-<span class="num">1</span>] == b[j-<span class="num">1</span>])
+      dp[i][j] = dp[i-<span class="num">1</span>][j-<span class="num">1</span>];
+    <span class="kw">else</span>
+      dp[i][j] = <span class="num">1</span> + min({
+        dp[i-<span class="num">1</span>][j],     <span class="cmt">// 删</span>
+        dp[i][j-<span class="num">1</span>],     <span class="cmt">// 插</span>
+        dp[i-<span class="num">1</span>][j-<span class="num">1</span>]  <span class="cmt">// 替</span>
+      });`;
+  function mount(){
+    const colLabels=['ε','c','u','t'],rowLabels=['ε','c','a','t'];
+    let html='';
+    for(let r=0;r<5;r++)for(let c=0;c<5;c++){
+      if(r===0&&c===0)html+='<div class="ghead">i\\\\j</div>';
+      else if(r===0)html+=`<div class="ghead">${colLabels[c-1]}</div>`;
+      else if(c===0)html+=`<div class="ghead rowh">${rowLabels[r-1]}</div>`;
+      else html+=`<div class="gcell" id="ed-${r-1}-${c-1}">·</div>`;
+    }
+    viz.innerHTML=`<div class="vcap"><b>编辑距离</b>：cat → cut，删 / 插 / 替</div>
+      <div class="dpgrid" style="grid-template-columns:repeat(5,auto)">${html}</div>
+      <div class="formula-strip" id="ed-formula"></div>
+      <div class="stage-note" id="ed-note"></div>`;
+  }
+  function paint(s){
+    for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+      const val=T[r][c];
+      let show=false;
+      if(s.fill==='base')show=r===0||c===0;
+      else if(s.fill==='r1')show=r===0||c===0||r===1;
+      else if(s.fill==='r2')show=r<=2;
+      else show=true;
+      if(!show){setGridCell('ed',r,c,'pending','·');continue;}
+      let cls=(r===0||c===0)?'base':'done';
+      setGridCell('ed',r,c,cls,val);
+    }
+    (s.src||[]).forEach(([r,c])=>setGridCell('ed',r,c,'src',T[r][c]));
+    if(s.cur){const[r,c]=s.cur;setGridCell('ed',r,c,'cur',T[r][c]);}
+    if(s.ans){const[r,c]=s.ans;setGridCell('ed',r,c,'ans',T[r][c]);}
+    setFormula('ed-formula',
+      s.ans?'dp[3][3]=1：替换 a→u 一次即可'
+      :s.cur&&s.cur[0]===1&&s.cur[1]===1?'相同字符：dp = 对角，不加 1'
+      :s.cur?'1 + min(删=上, 插=左, 替=对角)'
+      :'边界：dp[i][0]=i，dp[0][j]=j',
+      s.ans?'good':'');
+    byId('ed-note').innerHTML=s.ans
+      ?'<span class="ok">最少操作数 1</span>'
+      :'三个来源分别对应删除、插入、替换';
+  }
+  return{id:'edit',label:'编辑距离',sub:'删 / 插 / 替',steps,mount,paint,code};
+})();
+
+/* ========== 6. LPS ========== */
+const lpsScene=(()=>{
+  // s = bbbab, same as note / 5.2.19
+  const T=[
+    [1,2,3,3,4],
+    [0,1,2,2,3],
+    [0,0,1,1,3],
+    [0,0,0,1,1],
+    [0,0,0,0,1]
+  ];
+  // Order of i descending: i=4 base, i=3, i=2, i=1, i=0
+  const steps=[
+    {iFrom:4,done:false,cur:null,src:[],ans:null,chip:'i 倒序',chipC:'c0',title:'dp[i][j] = s[i..j] 最长回文子序列长度',desc:'与 5.2.19 区间 DP 同一题，但这里强调：笔记写法是 <b>i 从 n-1 倒到 0</b>，因为依赖 dp[i+1][·]。'},
+    {iFrom:4,done:false,cur:[4,4],src:[],ans:null,chip:'base 对角',chipC:'cb',title:'单字符：dp[i][i]=1',desc:'先写对角线。每个字符本身是长度 1 的回文子序列。'},
+    {iFrom:3,done:false,cur:[3,4],src:[[4,4],[3,3]],ans:null,chip:'i=3',chipC:'cb',title:'i 倒序推进：先算更大的 i',desc:'s[3]=\'a\'、s[4]=\'b\' 不等 → max(dp[4][4], dp[3][3])=1。依赖的 i+1 行已就绪。'},
+    {iFrom:2,done:false,cur:[2,4],src:[[3,3]],ans:null,chip:'i=2 · 两端 b',chipC:'cb',title:'两端相等：内层 +2',desc:'s[2]=s[4]=\'b\' → dp[3][3]+2=3。这是子序列，中间的 a 可跳过也可纳入更优路径。'},
+    {iFrom:1,done:false,cur:[1,4],src:[[2,3]],ans:null,chip:'i=1',chipC:'ch',title:'继续倒序填完 i=1 行',desc:'s[1]=s[4]=\'b\' → dp[2][3]+2。内层区间必须先被算过。'},
+    {iFrom:0,done:true,cur:[0,4],src:[[1,3]],ans:[0,4],chip:'答案 4',chipC:'cg',title:'右上角 dp[0][4]=4',desc:'整串 "bbbab" 最长回文子序列长度 4（如 bbbb）。<b>可跳过中间 a</b>——这与最长回文子串不同。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> i = n - <span class="num">1</span>; i &gt;= <span class="num">0</span>; --i) {
+  dp[i][i] = <span class="num">1</span>;
+  <span class="kw">for</span> (<span class="kw">int</span> j = i + <span class="num">1</span>; j &lt; n; ++j) {
+    <span class="kw">if</span> (s[i] == s[j])
+      dp[i][j] = dp[i+<span class="num">1</span>][j-<span class="num">1</span>] + <span class="num">2</span>;
+    <span class="kw">else</span>
+      dp[i][j] = max(dp[i+<span class="num">1</span>][j], dp[i][j-<span class="num">1</span>]);
+  }
+}
+<span class="kw">return</span> dp[<span class="num">0</span>][n-<span class="num">1</span>];`;
+  function mount(){
+    const S=['b','b','b','a','b'];
+    let html='';
+    for(let r=0;r<6;r++)for(let c=0;c<6;c++){
+      if(r===0&&c===0)html+='<div class="ghead">i\\\\j</div>';
+      else if(r===0)html+=`<div class="ghead">${S[c-1]}</div>`;
+      else if(c===0)html+=`<div class="ghead rowh">i=${r-1}</div>`;
+      else html+=`<div class="gcell" id="lps-${r-1}-${c-1}">·</div>`;
+    }
+    viz.innerHTML=`<div class="vcap"><b>最长回文子序列</b>：s="bbbab"，i 倒序，答案在右上角</div>
+      <div class="dpgrid" style="grid-template-columns:repeat(6,auto)">${html}</div>
+      <div class="formula-strip" id="lps-formula"></div>
+      <div class="stage-note" id="lps-note"></div>`;
+  }
+  function paint(s){
+    for(let r=0;r<5;r++)for(let c=0;c<5;c++){
+      if(r>c){setGridCell('lps',r,c,'hide','');continue;}
+      const ready=s.done||r>=s.iFrom;
+      // when iFrom=k, rows r>=k are filled (since i goes n-1..k)
+      if(!ready){setGridCell('lps',r,c,'pending','·');continue;}
+      const val=T[r][c];
+      let cls=r===c?'base':'done';
+      setGridCell('lps',r,c,cls,val);
+    }
+    (s.src||[]).forEach(([r,c])=>{if(r<=c)setGridCell('lps',r,c,'src',T[r][c]);});
+    if(s.cur){const[r,c]=s.cur;setGridCell('lps',r,c,'cur',T[r][c]);}
+    if(s.ans){const[r,c]=s.ans;setGridCell('lps',r,c,'ans',T[r][c]);}
+    setFormula('lps-formula',
+      s.ans?'dp[0][4]=4：子序列可跳过 a，不同于子串'
+      :s.cur&&s.cur[0]===s.cur[1]?'对角 base = 1'
+      :s.cur?'依赖 dp[i+1][*]，故 i 必须倒序'
+      :'i 从 n-1 递减到 0',
+      s.ans?'good':s.cur?'hot':'');
+    byId('lps-note').innerHTML=s.ans
+      ?'<span class="ok">答案在右上角；与 5.2.19 区间填表等价</span>'
+      :'i 倒序 ≡ 按区间长度从小到大';
+  }
+  return{id:'lps',label:'回文子序列',sub:'i 倒序 · 右上角',steps,mount,paint,code};
+})();
+
+const SCENES=[modelScene,lisScene,lisBinScene,lcsScene,editScene,lpsScene];
+const tabsBox=byId('tabs'),dotsBox=byId('dots'),stTitle=byId('stTitle'),stChip=byId('stChip'),stAct=byId('stAct'),stDesc=byId('stDesc'),codeBox=byId('codeBox'),readout=byId('readout'),btnPrev=byId('btnPrev'),btnNext=byId('btnNext'),btnPlay=byId('btnPlay');
+SCENES.forEach((scene,index)=>{const button=document.createElement('button');button.className='tab';button.innerHTML=`<span class="t">${scene.label}</span><span class="s">${scene.sub}</span>`;button.onclick=()=>{stop();switchScene(index)};tabsBox.appendChild(button)});
+let sceneIndex=0,current=0,dotEls=[],timer=null;const intervalMs=3000;
+function switchScene(index){sceneIndex=index;current=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));SCENES[sceneIndex].mount();codeBox.innerHTML=SCENES[sceneIndex].code;dotsBox.innerHTML='';dotEls=[];SCENES[sceneIndex].steps.forEach((step,i)=>{const dot=document.createElement('button');dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',`第 ${i+1} 步：${step.title}`);dot.onclick=()=>{stop();go(i)};dotsBox.appendChild(dot);dotEls.push(dot)});go(0)}
+function go(index){const scene=SCENES[sceneIndex],steps=scene.steps;current=Math.max(0,Math.min(steps.length-1,index));const step=steps[current];scene.paint(step);stTitle.textContent=scene.label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===current);dot.classList.toggle('done',i<current)});readout.textContent=(current+1)+' / '+steps.length;btnPrev.disabled=current===0;btnNext.disabled=current===steps.length-1;if(current===steps.length-1)stop();history.replaceState(null,'','#scene='+scene.id+'&step='+current)}
+function play(){if(current===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='Ⅱ';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{current<SCENES[sceneIndex].steps.length-1?go(current+1):stop()},intervalMs)}
+function stop(){if(timer){clearInterval(timer);timer=null}btnPlay.textContent='▶';btnPlay.setAttribute('aria-label','播放动画')}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(current-1)};btnNext.onclick=()=>{stop();go(current+1)};
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(current+1)}else if(event.key==='ArrowLeft'){stop();go(current-1)}else if(event.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){event.preventDefault();timer?stop():play()}});
+window.addEventListener('resize',()=>SCENES[sceneIndex].paint(SCENES[sceneIndex].steps[current]));
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+<script src="./算法动画题单.js" data-topic="21"></script>
+</body>
+</html>

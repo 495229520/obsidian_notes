@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拓扑排序与DAG动画 · 三色判环 / 后序逆序 / 建边方向 / DAG DP / 拓扑剥叶</title>
+<style>
+:root{
+  /* Same teaching-tool system as the algorithm animation collection. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:232px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}
+
+/* 图区域 */
+.grapharea{position:relative;height:238px;margin:0 8px;}
+.gedge{position:absolute;height:2px;background:currentColor;color:var(--line);transform-origin:left center;transition:color var(--dur) var(--ease),height var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gedge.dir::after{content:'';position:absolute;right:-8px;top:50%;margin-top:-5px;border-left:8px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent;}
+.gedge.hot{color:var(--brown);height:3px;}
+.gedge.done{color:var(--green);height:3px;}
+.gedge.bad{color:var(--danger);height:3px;}
+.gedge.dim{opacity:.22;}
+.gedge.off{opacity:0;}
+.gw{position:absolute;z-index:2;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--grid);border-radius:6px;padding:0 5px;transform:translate(-50%,-50%);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gw.hot{color:var(--brown);border-color:var(--brown);}
+.gw.dim{opacity:.3;}
+.gnode{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2px solid var(--line);background:var(--paper);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);z-index:1;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gnode .nv{font-size:16px;font-weight:800;line-height:1;}
+.gnode .nsub{position:absolute;bottom:-19px;font-size:10px;color:var(--faint);font-weight:700;font-family:var(--mono);}
+.gnode.inq{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.gnode.done{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.gnode.rootn{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.gnode.badn{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+.gnode.offn{opacity:.22;}
+.gnode.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.14);box-shadow:0 0 0 4px rgba(24,95,165,.16);z-index:2;}
+
+/* 数组 / 队列单元格 */
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:12px 0 6px;}
+.cellrow{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap;}
+.cell{position:relative;width:46px;height:38px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease);}
+.cell.wide{width:66px;}
+.cell .cw{position:absolute;bottom:-15px;font-size:9px;color:var(--faint);font-weight:400;}
+.cell.on{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.cell.ok{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.cell.hot{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.cell.bad{color:var(--danger);background:var(--dangerbg);border-color:var(--danger);}
+.cell.dim{opacity:.35;}
+
+.op-note{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:auto;padding-top:12px;min-height:34px;}
+.op-note b{color:var(--ink);}.op-note .bl{color:var(--blue);}.op-note .gr{color:var(--green);}.op-note .dg{color:var(--danger);}.op-note .br{color:var(--brown);}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.viz{min-height:478px;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:232px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;min-height:448px;}.tab{flex:1 1 128px;}.grapharea{height:212px;margin:0;}.gnode{width:40px;height:40px;margin:-20px 0 0 -20px;}.gnode .nv{font-size:14px;}.cell{width:40px;}.cell.wide{width:58px;}.controls{padding:12px;gap:8px;}.dots{order:4;width:100%;}.codebox{font-size:11px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>拓扑排序与 DAG 动画 · 判环、拓扑序与 DAG 上的 DP</h1>
+    <p>DFS 三色判环 / 后序逆序 / 课程表建边方向 / DAG DP 最长路 / 拓扑剥叶　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ============ 通用图绘制（build once + mutate） ============ */
+function graphMarkup(prefix,G,caption){
+  let html='';
+  G.edges.forEach((e,i)=>{
+    html+='<span class="gedge'+(e.dir?' dir':'')+'" id="'+prefix+'e'+i+'"></span>';
+    if(e.w!==undefined)html+='<span class="gw" id="'+prefix+'w'+i+'">'+e.w+'</span>';
+  });
+  G.nodes.forEach(n=>{
+    html+='<div class="gnode" id="'+prefix+'n'+n.id+'" style="left:'+n.x+'%;top:'+n.y+'%"><span class="nv">'+n.id+'</span><span class="nsub" id="'+prefix+'s'+n.id+'"></span></div>';
+  });
+  return '<div class="vcap">'+caption+'</div><div class="grapharea" id="'+prefix+'area">'+html+'</div>';
+}
+function layoutGraph(prefix,G){
+  const area=document.getElementById(prefix+'area');if(!area)return;
+  const w=area.clientWidth,h=area.clientHeight,R=25;
+  G.edges.forEach((e,i)=>{
+    const na=G.nodes.find(n=>n.id===e.a),nb=G.nodes.find(n=>n.id===e.b);
+    const x1=na.x/100*w,y1=na.y/100*h,x2=nb.x/100*w,y2=nb.y/100*h;
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    const so=e.dir?R:0,eo=e.dir?R+8:0;
+    const line=document.getElementById(prefix+'e'+i);
+    line.style.left=(x1+ux*so)+'px';line.style.top=(y1+uy*so)+'px';
+    line.style.width=Math.max(0,len-so-eo)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';
+    const wl=document.getElementById(prefix+'w'+i);
+    if(wl){wl.style.left=(x1+dx*0.5)+'px';wl.style.top=(y1+dy*0.5)+'px';}
+  });
+}
+function paintGraph(prefix,G,s){
+  const cls=s.cls||{},sub=s.sub||{},emap=s.emap||{};
+  G.nodes.forEach(n=>{
+    const el=document.getElementById(prefix+'n'+n.id);
+    let c='gnode';if(cls[n.id])c+=' '+cls[n.id];if(s.active===n.id)c+=' active';
+    el.className=c;
+    document.getElementById(prefix+'s'+n.id).textContent=(sub[n.id]!==undefined?sub[n.id]:'');
+  });
+  G.edges.forEach((e,i)=>{
+    document.getElementById(prefix+'e'+i).className='gedge'+(e.dir?' dir':'')+(emap[i]?' '+emap[i]:'');
+    const wl=document.getElementById(prefix+'w'+i);
+    if(wl)wl.className='gw'+(emap[i]==='hot'?' hot':'')+(emap[i]==='dim'||emap[i]==='off'?' dim':'');
+  });
+}
+function cellsMarkup(prefix,n,labels,wide){
+  let s='';for(let i=0;i<n;i++)s+='<div class="cell'+(wide?' wide':'')+'" id="'+prefix+i+'"><span class="cv" id="'+prefix+'v'+i+'">·</span>'+(labels?'<span class="cw">'+labels[i]+'</span>':'')+'</div>';
+  return '<div class="cellrow">'+s+'</div>';
+}
+function paintCells(prefix,n,vals,marks,wide){
+  for(let i=0;i<n;i++){
+    const has=i<vals.length&&vals[i]!==null&&vals[i]!==undefined;
+    document.getElementById(prefix+i).className='cell'+(wide?' wide':'')+(has&&marks&&marks[i]?' '+marks[i]:'');
+    document.getElementById(prefix+'v'+i).textContent=has?String(vals[i]):'·';
+  }
+}
+/* 颜色数组着色：0 白 / 1 灰(棕) / 2 黑(绿) */
+function colorMarks(cols){return cols.reduce((m,v,i)=>{if(v===1)m[i]='hot';else if(v===2)m[i]='ok';return m;},{});}
+
+/* ========== 场景 1：DFS 三色标记判环 ========== */
+const colorScene=(()=>{
+  const G={nodes:[{id:0,x:20,y:28},{id:1,x:56,y:14},{id:2,x:40,y:72},{id:3,x:86,y:44}],
+    edges:[{a:0,b:1,dir:1},{a:1,b:2,dir:1},{a:2,b:0,dir:1},{a:1,b:3,dir:1}]};
+  const code='<span class="kw">bool</span> <span class="fn">dfs</span>(<span class="kw">int</span> u, <span class="kw">auto</span>&amp; g, vector&lt;<span class="kw">int</span>&gt;&amp; color){\n'+
+    '    color[u] = 1;                <span class="cmt">// 灰：在递归栈上</span>\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> v : g[u]) {\n'+
+    '        <span class="kw">if</span> (color[v] == 1) <span class="kw">return</span> <span class="kw">false</span>; <span class="cmt">// 撞灰 = 环!</span>\n'+
+    '        <span class="kw">if</span> (color[v] == 0 &amp;&amp; !<span class="fn">dfs</span>(v, g, color))\n'+
+    '            <span class="kw">return</span> <span class="kw">false</span>;\n'+
+    '    }\n'+
+    '    color[u] = 2;                <span class="cmt">// 黑：已完成，后续安全</span>\n'+
+    '    <span class="kw">return</span> <span class="kw">true</span>;\n}';
+  const steps=[
+    {col:[0,0,0,0],stk:[],cls:{},sub:{0:'0',1:'0',2:'0',3:'0'},emap:{},active:null,chip:'白 / 灰 / 黑',chipC:'c0',title:'有向图判环，bool visited 不够用',
+     note:'0 未访问 · 1 在递归栈上 · 2 已完成',
+     desc:'这张图里 0→1→2→0 是<b>环</b>。有向图判环的关键区分：一个"访问过"的节点，是<b class="br">还在递归栈上（灰）</b>，还是<b class="gr">已经完成（黑）</b>？普通 bool visited 混淆两者——撞到黑节点是安全的（多条路汇聚），撞到灰节点才是环。'},
+    {col:[1,0,0,0],stk:[0],cls:{0:'inq'},sub:{0:'1',1:'0',2:'0',3:'0'},emap:{},active:0,chip:'dfs(0) 染灰',chipC:'cb',title:'进入 0：color[0]=1（灰）',
+     note:'递归栈 = [0]',
+     desc:'进入节点就<b>染灰</b>：color[0]=1，表示 0 的 DFS 还没结束、正躺在递归栈上。'},
+    {col:[1,1,0,0],stk:[0,1],cls:{0:'inq',1:'inq'},sub:{0:'1',1:'1',2:'0',3:'0'},emap:{0:'hot'},active:1,chip:'深入 0→1',chipC:'cb',title:'1 也染灰，递归栈 [0,1]',
+     note:'沿 0→1 深入',
+     desc:'邻居 1 是白色，递归进入并染灰。栈上的灰色节点链 <b>0→1</b> 就是"当前正在走的路径"。'},
+    {col:[1,1,1,0],stk:[0,1,2],cls:{0:'inq',1:'inq',2:'inq'},sub:{0:'1',1:'1',2:'1',3:'0'},emap:{0:'hot',1:'hot'},active:2,chip:'深入 1→2',chipC:'cb',title:'2 染灰，路径 0→1→2 全灰',
+     note:'递归栈 = [0,1,2]',
+     desc:'继续深入到 2（1 的邻居按顺序先访问 2）。现在灰色路径是 <b>0→1→2</b>——它们互为祖先后代关系。'},
+    {col:[1,1,1,0],stk:[0,1,2],cls:{0:'badn',1:'inq',2:'inq'},sub:{0:'1',1:'1',2:'1',3:'0'},emap:{0:'hot',1:'hot',2:'bad'},active:null,chip:'撞灰 = 环!',chipC:'cd',title:'2→0：0 是灰色 → 回边，存在环',
+     note:'color[0]==1 → return false',
+     desc:'检查 2 的邻居 0：<b class="dg">color[0]==1，是灰色</b>——0 还在递归栈上，是 2 的祖先！这条 <b>2→0 是回边</b>，说明存在环 0→1→2→0，立即返回 false。如果 0 已经是<b class="gr">黑色</b>，说明它那棵子树早就安全收工，指向它<b>不构成环</b>。'},
+    {col:[1,1,1,0],stk:[],cls:{0:'badn',1:'badn',2:'badn'},sub:{0:'1',1:'1',2:'1',3:'0'},emap:{0:'bad',1:'bad',2:'bad'},active:null,chip:'O(V+E)',chipC:'cg',title:'有环 → 不存在拓扑序',
+     note:'Kahn 视角：环上节点入度永不为 0',
+     desc:'有环 → 这张图<b>不是 DAG</b>，不存在拓扑序（3 无辜躺枪，但整图判否）。两种判环对照：<b>DFS 三色</b>靠"撞灰"，<b>Kahn</b> 靠"处理数 &lt; n"（见 5.2.24 动画）。三色标记更适合递归代码和理解回边本质。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('tc',G,'<b>DFS 三色判环</b>：灰 = 递归栈上（棕），黑 = 已完成（绿），撞灰即有环')+
+      '<div class="collbl">color 数组（节点下方同步显示）</div>'+cellsMarkup('tcc',4,['0','1','2','3'])+
+      '<div class="collbl">递归栈</div>'+cellsMarkup('tcs',4)+
+      '<div class="op-note" id="tcnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('tc',G));
+  }
+  function paint(s){
+    paintGraph('tc',G,s);
+    paintCells('tcc',4,s.col,colorMarks(s.col));
+    paintCells('tcs',4,s.stk,s.stk.reduce((m,_,i)=>{m[i]=(i===s.stk.length-1)?'on':'hot';return m;},{}));
+    document.getElementById('tcnote').innerHTML=s.note;
+  }
+  return{id:'color',label:'三色判环',sub:'撞灰 = 回边 = 环',steps,mount,paint,layout:()=>layoutGraph('tc',G),code};
+})();
+
+/* ========== 场景 2：DFS 后序逆序拓扑序 ========== */
+const dfstopoScene=(()=>{
+  const G={nodes:[{id:0,x:14,y:25},{id:1,x:42,y:14},{id:2,x:38,y:74},{id:3,x:68,y:42},{id:4,x:90,y:70}],
+    edges:[{a:0,b:1,dir:1},{a:0,b:2,dir:1},{a:1,b:3,dir:1},{a:2,b:3,dir:1},{a:3,b:4,dir:1}]};
+  const code='<span class="cmt">// 后序时机入列（所有出边处理完才轮到自己）</span>\n'+
+    'color[u] = 2;\n'+
+    'order.<span class="fn">push_back</span>(u);\n'+
+    '<span class="cmt">// 全部 DFS 结束后：</span>\n'+
+    'reverse(order.begin(), order.end());\n'+
+    '<span class="cmt">// u 的所有后继都比 u 先完成、先入列；</span>\n'+
+    '<span class="cmt">// 逆序后 u 排在所有后继前面 → 拓扑序</span>';
+  const steps=[
+    {col:[0,0,0,0,0],stk:[],ord:[],cls:{},sub:{},emap:{},active:null,chip:'后序 + reverse',chipC:'c0',title:'DFS 版拓扑排序：完成顺序的逆序',
+     note:'菱形 DAG：0→{1,2}→3→4',
+     desc:'Kahn 用入度"逐步解锁"；DFS 版思路不同：节点在<b>后序时机</b>（所有出边都处理完）加入 order，最后<b>整体反转</b>。直觉：一个任务的所有后继都比它先"收工"，反过来它就该排最前。'},
+    {col:[1,1,0,1,1],stk:[0,1,3,4],ord:[],cls:{0:'inq',1:'inq',3:'inq',4:'inq'},sub:{},emap:{0:'hot',2:'hot',4:'hot'},active:4,chip:'一路深入',chipC:'cb',title:'0→1→3→4 全部染灰',
+     note:'递归栈 = [0,1,3,4]',
+     desc:'从 0 出发一路深入：0→1→3→4，四个节点依次染灰入栈。4 没有出边，即将成为<b>第一个完成</b>的节点。'},
+    {col:[1,1,0,1,2],stk:[0,1,3],ord:[4],cls:{0:'inq',1:'inq',3:'inq',4:'done'},sub:{4:'✓1st'},emap:{0:'hot',2:'hot'},active:3,chip:'4 完成 → 入列',chipC:'cg',title:'4 染黑，order = [4]',
+     note:'最深的节点最先完成',
+     desc:'4 出边处理完 → 染黑，<code>order.push_back(4)</code>。注意：<b>后继最深的节点最先入列</b>——这正是需要最后 reverse 的原因。'},
+    {col:[2,2,0,2,2],stk:[0],ord:[4,3,1],cls:{0:'inq',1:'done',3:'done',4:'done'},sub:{},emap:{0:'done',2:'done',4:'done'},active:0,chip:'回溯连收两个',chipC:'cg',title:'3、1 依次完成，order = [4,3,1]',
+     note:'递归栈只剩 [0]',
+     desc:'回溯：3 的出边处理完 → 黑，入列；1 也完成 → 入列。order=[4,3,1]。0 还有第二个孩子 2 没访问，暂不收工。'},
+    {col:[2,2,1,2,2],stk:[0,2],ord:[4,3,1],cls:{0:'inq',1:'done',2:'inq',3:'done',4:'done'},sub:{3:'黑·安全'},emap:{0:'done',1:'hot',2:'done',3:'hot',4:'done'},active:2,chip:'撞黑 = 安全',chipC:'ch',title:'2→3 遇到黑色节点：跳过，不是环',
+     note:'黑色节点可以被多条路径指向',
+     desc:'0 进入第二个孩子 2。检查 2→3：<b class="gr">3 是黑色</b>——它那棵子树已经安全完成，<b>直接跳过</b>。这就是三色的价值：菱形汇聚（1、2 都指向 3）撞到黑不误报环；上一场景撞到灰才是环。'},
+    {col:[2,2,2,2,2],stk:[],ord:[4,3,1,2,0],cls:{0:'done',1:'done',2:'done',3:'done',4:'done'},sub:{},emap:{0:'done',1:'done',2:'done',3:'done',4:'done'},active:null,chip:'完成序 [4,3,1,2,0]',chipC:'cg',title:'2、0 依次收工，DFS 结束',
+     note:'order = 完成顺序（后序）',
+     desc:'2 完成入列，最后 0 完成入列。<b>完成序 = [4,3,1,2,0]</b>——每个节点都晚于它的所有后继。'},
+    {col:[2,2,2,2,2],stk:[],ord:[0,2,1,3,4],cls:{0:'done',1:'done',2:'done',3:'done',4:'done'},sub:{0:'①',1:'③',2:'②',3:'④',4:'⑤'},emap:{0:'done',1:'done',2:'done',3:'done',4:'done'},active:null,chip:'reverse → 拓扑序',chipC:'cg',title:'反转得 [0,2,1,3,4]，每条边都从前指向后',
+     note:'与 Kahn 的 [0,1,2,3,4] 不同——拓扑序不唯一',
+     desc:'reverse 后得拓扑序 <b>[0,2,1,3,4]</b>：验证 5 条边全部"前 → 后"✓。注意它和 Kahn 给出的 [0,1,2,3,4] <b>不一样但都合法</b>——拓扑序不唯一。选择：要"逐步解锁"过程用 Kahn，递归代码里顺手判环用 DFS 三色。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('dt',G,'<b>DFS 后序逆序</b>：完成（染黑）顺序反过来就是拓扑序')+
+      '<div class="collbl">递归栈</div>'+cellsMarkup('dts',5)+
+      '<div class="collbl">order（后序入列 → 最后 reverse）</div>'+cellsMarkup('dto',5)+
+      '<div class="op-note" id="dtnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('dt',G));
+  }
+  function paint(s){
+    paintGraph('dt',G,s);
+    paintCells('dts',5,s.stk,s.stk.reduce((m,_,i)=>{m[i]=(i===s.stk.length-1)?'on':'hot';return m;},{}));
+    paintCells('dto',5,s.ord,s.ord.reduce((m,_,i)=>{m[i]='ok';return m;},{}));
+    document.getElementById('dtnote').innerHTML=s.note;
+  }
+  return{id:'dfstopo',label:'后序逆序',sub:'DFS 版拓扑排序',steps,mount,paint,layout:()=>layoutGraph('dt',G),code};
+})();
+
+/* ========== 场景 3：课程表建边方向 ========== */
+const courseScene=(()=>{
+  const G={nodes:[{id:0,x:15,y:45},{id:1,x:48,y:14},{id:2,x:48,y:78},{id:3,x:82,y:45}],
+    edges:[
+      {a:0,b:1,dir:1},{a:0,b:2,dir:1},{a:1,b:3,dir:1},{a:2,b:3,dir:1},   // 正确：b→a
+      {a:1,b:0,dir:1},{a:2,b:0,dir:1},{a:3,b:1,dir:1},{a:3,b:2,dir:1}    // 反例：a→b
+    ]};
+  const code='<span class="cmt">// prerequisites[i] = [a, b]：学 a 之前必须先学 b</span>\n'+
+    '<span class="kw">for</span> (<span class="kw">auto</span>&amp; p : prerequisites) {\n'+
+    '    <span class="kw">int</span> a = p[0], b = p[1];\n'+
+    '    g[b].<span class="fn">push_back</span>(a);   <span class="cmt">// 前置 b → 被解锁 a</span>\n'+
+    '    ++indeg[a];          <span class="cmt">// a 多了一个前置条件</span>\n'+
+    '}\n'+
+    '<span class="cmt">// 口诀：先修课指向后修课</span>';
+  const OFF={0:'off',1:'off',2:'off',3:'off',4:'off',5:'off',6:'off',7:'off'};
+  const steps=[
+    {pairs:['[1,0]','[2,0]','[3,1]','[3,2]'],pm:{},emap:OFF,cls:{},sub:{},active:null,chip:'LC 207 / 210',chipC:'c0',title:'先想清楚：谁指向谁？',
+     note:'[a, b] 语义：学 a 之前必须先学 b',
+     desc:'输入 <code>prerequisites = [[1,0],[2,0],[3,1],[3,2]]</code>。每个 <b>[a,b]</b> 的语义是"<b>学 a 之前必须先学 b</b>"。图题真正易错的不是模板，是<b>建模方向</b>——动手建图前先在纸上写一条边验证语义。'},
+    {pairs:['[1,0]','[2,0]','[3,1]','[3,2]'],pm:{0:'bad',1:'bad',2:'bad',3:'bad'},emap:{0:'off',1:'off',2:'off',3:'off',4:'bad',5:'bad',6:'bad',7:'bad'},cls:{3:'badn'},sub:{0:'入度2',1:'入度1',2:'入度1',3:'入度0'},active:null,chip:'❌ 建反了',chipC:'cd',title:'若建 a→b：入度 0 的竟然是 3！',
+     note:'Kahn 会先"学" 3，再学它的先修课——荒谬',
+     desc:'<b class="dg">反例</b>：把边建成 a→b（1→0、3→1……）。此时入度为 0 的是 <b>3</b>——Kahn 会让你<b>先学最高级的课 3，再去学它的先修课</b>，顺序完全颠倒。更隐蔽的是：这样跑完不报错、返回一个"合法拓扑序"，只是语义全反——<b>方向错误不会崩溃，只会默默给错答案</b>。'},
+    {pairs:['[1,0]','[2,0]','[3,1]','[3,2]'],pm:{0:'ok',1:'ok',2:'ok',3:'ok'},emap:{0:'done',1:'done',2:'done',3:'done',4:'off',5:'off',6:'off',7:'off'},cls:{0:'rootn'},sub:{0:'入度0',1:'入度1',2:'入度1',3:'入度2'},active:null,chip:'✅ b → a',chipC:'cg',title:'正确：前置 b 指向被解锁的 a',
+     note:'g[b].push_back(a)　·　++indeg[a]',
+     desc:'<b class="gr">正确建边</b>：<code>g[b].push_back(a)</code>——[1,0] 建 <b>0→1</b>，[3,1] 建 <b>1→3</b>……"完成 b 才解锁 a"。现在入度 0 的是基础课 <b>0</b>，符合直觉。<code>indeg[a]</code> 的含义是"a 还欠几门先修课"。'},
+    {pairs:['[1,0]','[2,0]','[3,1]','[3,2]'],pm:{0:'ok',1:'ok',2:'ok',3:'ok'},emap:{0:'done',1:'done',2:'done',3:'done',4:'off',5:'off',6:'off',7:'off'},cls:{0:'done',1:'inq',2:'inq'},sub:{0:'✓',1:'解锁',2:'解锁',3:'入度2→0'},active:0,chip:'Kahn 跑一遍',chipC:'cb',title:'学完 0 → 解锁 1、2 → 学完后解锁 3',
+     note:'order = [0, 1, 2, 3]（或 [0,2,1,3]）',
+     desc:'Kahn 流程（完整单步过程见 5.2.24 动画）：0 入队 → 学完 0，1、2 入度归零一起解锁 → 学完它们，3 解锁。1 和 2 谁先都行——<b>拓扑序不唯一</b>；若题目要求"编号小的优先"，把 <code>queue</code> 换成<b>小顶堆</b>即可。'},
+    {pairs:['[1,0]','[2,0]','[3,1]','[3,2]'],pm:{0:'ok',1:'ok',2:'ok',3:'ok'},emap:{0:'done',1:'done',2:'done',3:'done',4:'off',5:'off',6:'off',7:'off'},cls:{0:'done',1:'done',2:'done',3:'done'},sub:{},active:null,chip:'变体一览',chipC:'cg',title:'依赖解析全家桶：同一个模型',
+     note:'207 能否完成 · 210 输出顺序 · 名称先用 map 压缩编号',
+     desc:'依赖解析变体速查：<b>只问能否完成</b>（207）→ 看处理数是否等于 n；<b>要一种执行顺序</b>（210）→ 返回 order；<b>多任务可执行取编号最小</b> → queue 换小顶堆；<b>求最早完成时间</b> → 在拓扑序上做 DP（下一场景）；<b>输入是字符串名称</b> → 先用 map 压缩成 0..n-1。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('cs',G,'<b>课程表建边</b>：0 是基础课；红 = 建反的边，绿 = 正确方向')+
+      '<div class="collbl">prerequisites 输入对</div>'+cellsMarkup('csp',4,null,true)+
+      '<div class="op-note" id="csnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('cs',G));
+  }
+  function paint(s){
+    paintGraph('cs',G,s);
+    paintCells('csp',4,s.pairs,Object.assign(s.pairs.reduce((m,_,i)=>{m[i]='dim';return m;},{}),s.pm),true);
+    document.getElementById('csnote').innerHTML=s.note;
+  }
+  return{id:'course',label:'建边方向',sub:'[a,b] → 边 b→a',steps,mount,paint,layout:()=>layoutGraph('cs',G),code};
+})();
+
+/* ========== 场景 4：DAG DP 最长路 ========== */
+const dagdpScene=(()=>{
+  const G={nodes:[{id:0,x:12,y:42},{id:1,x:40,y:14},{id:2,x:40,y:76},{id:3,x:68,y:42},{id:4,x:90,y:42}],
+    edges:[{a:0,b:1,dir:1,w:3},{a:0,b:2,dir:1,w:2},{a:1,b:3,dir:1,w:4},{a:2,b:3,dir:1,w:6},{a:2,b:4,dir:1,w:5},{a:3,b:4,dir:1,w:1}]};
+  const code='<span class="cmt">// 拓扑序上做 DP：处理 u 时其前置全部已定</span>\n'+
+    '<span class="kw">while</span> (!q.empty()) {\n'+
+    '    <span class="kw">int</span> u = q.<span class="fn">front</span>(); q.<span class="fn">pop</span>();\n'+
+    '    <span class="kw">for</span> (<span class="kw">auto</span> [v, w] : g[u]) {\n'+
+    '        dp[v] = max(dp[v], dp[u] + w); <span class="cmt">// 转移</span>\n'+
+    '        <span class="kw">if</span> (--indeg[v] == 0) q.<span class="fn">push</span>(v);\n'+
+    '    }\n'+
+    '}  <span class="cmt">// dp[v] = 到 v 的最长路</span>';
+  const steps=[
+    {dp:[0,0,0,0,0],q:[0],cls:{0:'inq'},sub:{0:'0'},emap:{},active:null,chip:'为什么 DAG 能 DP',chipC:'c0',title:'拓扑序 = 天然的 DP 计算顺序',
+     note:'dp[v] = max(dp[v], dp[u] + w)　·　起点 dp=0',
+     desc:'DP 需要"算 v 时它依赖的状态都已算完"——<b>拓扑序恰好保证这一点</b>：处理 u 时，所有能到达 u 的前置都出队完毕。求 DAG 最长路：起点（入度 0）dp=0，沿拓扑序转移 <code>dp[v]=max(dp[v], dp[u]+w)</code>。'},
+    {dp:[0,3,2,0,0],q:[1,2],cls:{0:'done',1:'inq',2:'inq'},sub:{0:'0',1:'3',2:'2'},emap:{0:'hot',1:'hot'},active:0,chip:'处理 0',chipC:'cb',title:'dp[1]=0+3=3，dp[2]=0+2=2',
+     note:'1、2 入度归零 → 入队',
+     desc:'弹出 <b>0</b>：沿两条出边转移，dp[1]=3、dp[2]=2。两个后继的入度都归零，入队。节点下方数字 = 当前 dp 值。'},
+    {dp:[0,3,2,7,0],q:[2],cls:{0:'done',1:'done',2:'inq',3:'inq'},sub:{0:'0',1:'3',2:'2',3:'7'},emap:{0:'done',1:'done',2:'hot'},active:1,chip:'处理 1 · 3 先别急',chipC:'ch',title:'dp[3]=3+4=7，但 3 不能入队！',
+     note:'indeg[3] 2→1，还欠 2 这个前置',
+     desc:'弹出 <b>1</b>：dp[3]=max(0, 3+4)=<b>7</b>。但 <code>indeg[3]</code> 只从 2 减到 <b>1</b>——3 还有前置 2 没处理，<b>此刻的 dp[3] 不是最终值，绝不能提前出队定型</b>。这就是入度在 DP 里的意义：挡住没算完的状态。'},
+    {dp:[0,3,2,8,7],q:[3],cls:{0:'done',1:'done',2:'done',3:'inq',4:'inq'},sub:{0:'0',1:'3',2:'2',3:'8',4:'7'},emap:{0:'done',1:'done',2:'done',3:'hot',4:'hot'},active:2,chip:'处理 2 · 更长者胜',chipC:'cb',title:'dp[3]=max(7, 2+6)=8 被刷新！dp[4]=7',
+     note:'indeg[3] 归零 → 3 终于入队',
+     desc:'弹出 <b>2</b>：转移 2→3：max(7, 2+6)=<b>8</b>——经 2 的路更长，<b>覆盖刚才的 7</b>（若 3 上一步提前出队，就锁死在错误的 7）。再转移 2→4：dp[4]=7。indeg[3] 归零，3 安全入队。'},
+    {dp:[0,3,2,8,9],q:[4],cls:{0:'done',1:'done',2:'done',3:'done',4:'inq'},sub:{0:'0',1:'3',2:'2',3:'8',4:'9'},emap:{0:'done',1:'done',3:'done',5:'hot',2:'done',4:'done'},active:3,chip:'处理 3',chipC:'cb',title:'dp[4]=max(7, 8+1)=9：绕远路反而更长',
+     note:'最长路 0→2→3→4 = 2+6+1 = 9',
+     desc:'弹出 <b>3</b>（dp 已定型为 8）：转移 3→4：max(7, 8+1)=<b>9</b>。直达边 2→4（权 5）输给了绕行 0→2→3→4。'},
+    {dp:[0,3,2,8,9],q:[],cls:{0:'done',1:'done',2:'done',3:'done',4:'done'},sub:{0:'0',1:'3',2:'2',3:'8',4:'9'},emap:{1:'done',3:'done',5:'done',0:'dim',2:'dim',4:'dim'},active:null,chip:'dp=[0,3,2,8,9]',chipC:'cg',title:'最长路 9；同一骨架能解一整类题',
+     note:'绿边 = 最长路径树　·　前提：必须先是 DAG',
+     desc:'完成：<b>dp=[0,3,2,8,9]</b>，最长路 9（绿边）。同一骨架改一改就是：<b>最早完成时间</b>（关键路径）、<b>路径计数</b>（max 换 +=）、<b>LC 329 矩阵最长递增路径</b>（网格递增关系天然无环）。<b class="dg">前提</b>：图必须无环——先确认拓扑排序能覆盖全部节点，有环时 DP 无定义。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('dd',G,'<b>DAG DP 最长路</b>：节点下方 = dp 值，入度挡住"没算完"的状态')+
+      '<div class="collbl">dp 数组（到各点的最长距离）</div>'+cellsMarkup('ddd',5,['0','1','2','3','4'])+
+      '<div class="collbl">队列（入度已归零、dp 已定型）</div>'+cellsMarkup('ddq',5)+
+      '<div class="op-note" id="ddnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('dd',G));
+  }
+  function paint(s){
+    paintGraph('dd',G,s);
+    paintCells('ddd',5,s.dp,s.dp.reduce((m,v,i)=>{if(s.cls[i]==='done')m[i]='ok';else if(s.cls[i]==='inq')m[i]='on';return m;},{}));
+    paintCells('ddq',5,s.q,s.q.reduce((m,_,i)=>{m[i]='hot';return m;},{}));
+    document.getElementById('ddnote').innerHTML=s.note;
+  }
+  return{id:'dagdp',label:'DAG DP',sub:'拓扑序上最长路',steps,mount,paint,layout:()=>layoutGraph('dd',G),code};
+})();
+
+/* ========== 场景 5：拓扑剥叶（LC 310 最小高度树） ========== */
+const peelScene=(()=>{
+  const G={nodes:[{id:0,x:12,y:18},{id:1,x:12,y:75},{id:2,x:38,y:10},{id:3,x:38,y:46},{id:4,x:64,y:46},{id:5,x:88,y:46}],
+    edges:[{a:0,b:3},{a:1,b:3},{a:2,b:3},{a:3,b:4},{a:4,b:5}]};
+  const code='<span class="cmt">// 无向树：度 == 1 的就是叶子</span>\n'+
+    '<span class="kw">while</span> (remaining &gt; 2) {\n'+
+    '    <span class="cmt">// 当前所有叶子同层剥掉（像多源 BFS）</span>\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> leaf : leaves) {\n'+
+    '        --remaining;\n'+
+    '        <span class="kw">for</span> (<span class="kw">int</span> nb : g[leaf])\n'+
+    '            <span class="kw">if</span> (--degree[nb] == 1)\n'+
+    '                nextLeaves.<span class="fn">push_back</span>(nb);\n'+
+    '    }\n'+
+    '}  <span class="cmt">// 剩下的 1~2 个点就是答案</span>';
+  const steps=[
+    {deg:[1,1,1,4,2,1],off:[],cls:{},sub:{0:'度1',1:'度1',2:'度1',3:'度4',4:'度2',5:'度1'},emap:{},active:null,chip:'LC 310',chipC:'c0',title:'最小高度树：答案一定在树的中心',
+     note:'思路反转：不枚举根，从外圈往里剥',
+     desc:'<b>最小高度树</b>：选哪个点当根，树最矮？枚举每个根 O(n²) 太慢。<b>反转思路</b>：最矮的根一定在"树的中心"——离所有叶子最远距离最小的点。找中心的办法：<b>从外圈叶子一层层剥</b>，最后剩下的 1~2 个点就是答案。'},
+    {deg:[1,1,1,4,2,1],off:[],cls:{0:'inq',1:'inq',2:'inq',5:'inq'},sub:{0:'叶',1:'叶',2:'叶',3:'度4',4:'度2',5:'叶'},emap:{},active:null,chip:'找第一层叶子',chipC:'ch',title:'度为 1 的节点：0、1、2、5',
+     note:'无向图的"度 1" ≈ 有向图的"入度 0"',
+     desc:'无向树上<b>度==1 就是叶子</b>。当前叶子：{0,1,2,5}（棕色）。这和 Kahn 异曲同工：Kahn 剥"入度 0"，这里剥"度 1"——都是<b>用度数驱动的分层剥离</b>，同层必须一起剥（多源 BFS 的味道）。'},
+    {deg:[0,0,0,1,1,0],off:[0,1,2,5],cls:{},sub:{3:'度1',4:'度1'},emap:{0:'dim',1:'dim',2:'dim',4:'dim'},active:null,chip:'剥掉第 1 层',chipC:'cb',title:'0、1、2、5 同时移除，3、4 的度降为 1',
+     note:'remaining 6→2',
+     desc:'第一层叶子<b>同时</b>剥掉（变淡）：3 的度从 4 降到 <b>1</b>，4 的度从 2 降到 <b>1</b>——它们成为新的"外圈"。若一个个剥而不是按层剥，层次含义就错了（和多源 BFS 必须一起入队同理）。'},
+    {deg:[0,0,0,1,1,0],off:[0,1,2,5],cls:{3:'rootn',4:'rootn'},sub:{3:'根',4:'根'},emap:{0:'dim',1:'dim',2:'dim',4:'dim',3:'done'},active:null,chip:'剩 2 个 → 停',chipC:'cg',title:'remaining = 2 ≤ 2：答案 {3, 4}',
+     note:'以 3 或 4 为根，树高都是 2（最小）',
+     desc:'剩余 <b>{3,4} ≤ 2 个</b>，停止。它们就是最小高度树的根：以 3 或 4 为根树高都是 2，以叶子 0 为根则高达 3。<b>答案最多两个</b>——树的中心要么 1 个点、要么一条边的两端。注意循环条件是 <code>remaining &gt; 2</code>，不是队列空。'},
+    {deg:[0,0,0,1,1,0],off:[0,1,2,5],cls:{3:'rootn',4:'rootn'},sub:{},emap:{0:'dim',1:'dim',2:'dim',4:'dim',3:'done'},active:null,chip:'拓扑思想全家福',chipC:'cg',title:'剥叶 = 拓扑排序思想在无向图上的化身',
+     note:'Kahn 剥入度 0 · 剥叶剥度 1 · 都是分层驱动',
+     desc:'本章三板斧收官：<b>Kahn</b>（入度 0 解锁，5.2.24）、<b>DFS 三色</b>（撞灰判环 + 后序逆序）、<b>剥叶</b>（度 1 分层收缩）。它们共享同一个内核：<b>用"度数归零/归一"驱动处理顺序</b>。识别信号：依赖、先后、解锁、层层收缩。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('pl',G,'<b>拓扑剥叶</b>：无向树从叶子层层剥，最后剩下的就是中心')+
+      '<div class="collbl">degree 数组</div>'+cellsMarkup('pld',6,['0','1','2','3','4','5'])+
+      '<div class="op-note" id="plnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('pl',G));
+  }
+  function paint(s){
+    const cls=Object.assign({},s.cls);
+    s.off.forEach(id=>{cls[id]='offn';});
+    paintGraph('pl',G,{cls,sub:s.sub,emap:s.emap,active:s.active});
+    paintCells('pld',6,s.deg,s.deg.reduce((m,v,i)=>{if(s.off.includes(i))m[i]='dim';else if(v===1)m[i]='hot';return m;},{}));
+    document.getElementById('plnote').innerHTML=s.note;
+  }
+  return{id:'peel',label:'拓扑剥叶',sub:'LC 310 剥到中心',steps,mount,paint,layout:()=>layoutGraph('pl',G),code};
+})();
+
+/* ============ 引擎（与动画合集同款） ============ */
+const SCENES=[colorScene,dfstopoScene,courseScene,dagdpScene,peelScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2900;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((tab,idx)=>tab.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>SCENES[si].layout());
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(+hashStep[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="27"></script>
+</body>
+</html>

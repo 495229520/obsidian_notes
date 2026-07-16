@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>背包问题动画 · 0-1 / 完全 / 可行性 / 最值 / 计数</title>
+<style>
+:root{
+  /* Warm-paper teaching system: 8px rhythm, restrained semantic color, one shadow depth. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--bluebar:#B7D6EE;--green:#0F6E56;--greenbg:#E1F5EE;--greenbar:#A7D8C7;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--brownbar:#E8C98E;--danger:#B3402F;--dangerbg:#F6E0DB;--dangerbar:#E7B2A8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.68;padding:34px 40px 52px;text-wrap:pretty}
+button{font:inherit}code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:2px 6px;border-radius:4px}
+.wrap{max-width:1380px;margin:0 auto}header h1{font-size:27px;font-weight:600;letter-spacing:0}header p{font-size:14.5px;color:var(--muted);margin-top:7px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:26px}.tab{font-size:14px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:3px;align-items:flex-start;justify-content:center;min-height:68px}.tab:hover{border-color:var(--muted);transform:translateY(-1px)}.tab:focus-visible,.ctrl:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.tab .t{font-weight:600;color:var(--ink)}.tab .s{font-size:11px;color:var(--faint);font-family:var(--mono)}.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 4px 14px rgba(62,61,57,.18)}.tab.on .t,.tab.on .s{color:var(--paper)}.tab.on .s{opacity:.78}
+.layout{display:grid;grid-template-columns:minmax(0,800px) minmax(400px,1fr);gap:32px;margin-top:30px;align-items:start}.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:28px;min-height:630px;display:flex;flex-direction:column;box-shadow:0 1px 4px rgba(60,55,40,.05);overflow:hidden}.vcap{font-size:14px;color:var(--muted);margin-bottom:14px}.vcap b{color:var(--ink)}.right{display:flex;flex-direction:column;gap:20px}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:25px 27px;min-height:292px;box-shadow:0 1px 4px rgba(60,55,40,.05)}.desc-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.desc-head .st{font-size:21px;font-weight:600}.act{margin-top:18px;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:12px 15px;border-radius:7px}.desc-body{margin-top:14px;font-size:16px;color:var(--muted)}.desc-body b{color:var(--ink)}.desc-body .bl{color:var(--blue);font-weight:600}.desc-body .gr{color:var(--green);font-weight:600}.desc-body .br{color:var(--brown);font-weight:600}.desc-body .dg{color:var(--danger);font-weight:600}.chip{font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray)}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg)}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg)}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg)}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg)}
+.codebox{background:#2E2C27;border-radius:8px;padding:21px 23px;font-family:var(--mono);font-size:13px;line-height:1.72;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 3px 10px rgba(46,44,39,.19);min-height:260px}.codebox .cmt{color:#8F8B80}.codebox .kw{color:#E3A44C}.codebox .fn{color:#8EC5EA}.codebox .num{color:#A6D6A8}.stage-note{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:auto;padding-top:14px;min-height:36px}.stage-note .ok{color:var(--green);font-weight:700}.stage-note .bad{color:var(--danger);font-weight:700}
+
+/* Model map. */
+.model-flow{display:grid;grid-template-columns:1fr 46px 1fr 46px 1fr;gap:10px;align-items:stretch;margin-top:8px}.model-card{border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:16px;min-height:126px;opacity:.48;transition:all var(--dur) var(--ease)}.model-card.on{opacity:1;border-color:var(--blue);background:var(--bluebg);transform:translateY(-3px)}.model-card.done{opacity:1;border-color:var(--green);background:var(--greenbg)}.model-card h3{font-size:15px}.model-card p{font-size:12px;color:var(--muted);margin-top:7px}.model-card .mono{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:10px}.flow-arrow{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:22px;color:var(--line);transition:color var(--dur) var(--ease)}.flow-arrow.on{color:var(--blue)}.rule-board{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:24px}.rule-row{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:12px 14px;font-family:var(--mono);font-size:12px;color:var(--muted);opacity:.4;transition:all var(--dur) var(--ease)}.rule-row.on{opacity:1;border-color:var(--brown);background:var(--brownbg);color:var(--brown)}.rule-row.done{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--green)}
+
+/* Shared DP row. */
+.item-strip{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:4px 0 20px}.item-card{min-width:112px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);transition:all var(--dur) var(--ease)}.item-card b{display:block;font-size:14px;color:var(--ink)}.item-card.on{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-2px)}.item-card.done{border-color:var(--green);background:var(--greenbg);color:var(--green)}
+.dp-wrap{position:relative;padding-top:34px}.dp-pointer{position:absolute;top:0;left:0;opacity:0;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);transition:left var(--dur) var(--ease),opacity .18s}.dp-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.dp-grid.wide{grid-template-columns:repeat(6,minmax(0,1fr))}.dp-cell{height:92px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}.dp-cell .idx{position:absolute;left:6px;top:4px;font-family:var(--mono);font-size:9px;color:var(--faint);z-index:2}.dp-cell .val{font-family:var(--mono);font-size:18px;font-weight:800;z-index:2}.dp-cell .bar{position:absolute;left:7px;right:7px;bottom:5px;height:0;border-radius:4px;background:var(--bluebar);transition:height var(--dur) var(--ease),background var(--dur) var(--ease)}.dp-cell.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-3px)}.dp-cell.active .bar{background:var(--bluebar)}.dp-cell.source{border-color:var(--brown);background:var(--brownbg);color:var(--brown)}.dp-cell.source .bar{background:var(--brownbar)}.dp-cell.changed{border-color:var(--green);background:var(--greenbg);color:var(--green)}.dp-cell.changed .bar{background:var(--greenbar)}.dp-cell.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}.dp-cell.bad .bar{background:var(--dangerbar)}.dp-cell.unreachable{color:var(--faint)}.dp-cell.true{border-color:var(--green);background:var(--greenbg);color:var(--green)}.dp-cell.true .bar{background:var(--greenbar)}
+.formula-strip{margin-top:16px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:11px 13px;font-family:var(--mono);font-size:12px;color:var(--muted);min-height:44px;transition:all var(--dur) var(--ease)}.formula-strip.good{border-color:var(--green);background:var(--greenbg);color:var(--green)}.formula-strip.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}
+.compare-label{font-family:var(--mono);font-size:11px;color:var(--faint);margin:18px 0 7px}.risk-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.risk-cell{height:42px;border:1px solid var(--line);border-radius:6px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--faint);opacity:.35;transition:all var(--dur) var(--ease)}.risk-cell.show{opacity:1;border-color:var(--danger);background:var(--dangerbg);color:var(--danger)}
+
+/* Counting comparison. */
+.count-panel{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}.count-side{border:1px solid var(--grid);border-radius:8px;background:var(--paper);padding:15px}.count-side.on{box-shadow:inset 0 0 0 2px var(--blue)}.count-side h3{font-size:15px}.count-side p{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:3px}.count-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:16px}.count-cell{height:65px;border:1.5px solid var(--line);border-radius:6px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);transition:all var(--dur) var(--ease)}.count-cell small{font-size:9px;color:var(--faint)}.count-cell b{font-size:16px}.count-cell.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:translateY(-2px)}.count-cell.changed{border-color:var(--green);background:var(--greenbg);color:var(--green)}.sequence-list{margin-top:15px;display:grid;gap:6px}.sequence-row{border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-family:var(--mono);font-size:10.5px;color:var(--faint);opacity:.34;transition:all var(--dur) var(--ease)}.sequence-row.show{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--green)}
+
+.controls{margin-top:26px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(60,55,40,.05)}.ctrl{width:48px;height:44px;flex:0 0 48px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s}.ctrl:hover:not(:disabled){background:var(--gray);border-color:var(--muted)}.ctrl:active:not(:disabled){transform:scale(.94)}.ctrl:disabled{opacity:.35;cursor:default}.ctrl.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}.dots{display:flex;gap:8px;margin:0 auto;flex-wrap:wrap;justify-content:center}.dot{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease)}.dot:hover{border-color:var(--muted);transform:scale(1.2)}.dot.done{background:var(--line);border-color:var(--line)}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3)}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:58px;text-align:center}
+@media(max-width:1180px){.layout{grid-template-columns:1fr}.right{display:grid;grid-template-columns:1fr 1fr}.codebox{min-height:280px}}
+@media(max-width:720px){body{font-size:15px;padding:20px 14px 32px}header h1{font-size:22px}header p{font-size:13px}.tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:20px}.tab{font-size:12.5px;padding:9px 10px;min-height:60px}.tab .s{font-size:9.5px}.right{display:flex}.viz{padding:16px;min-height:600px}.vcap{font-size:12px}.desc-card{padding:18px 20px;min-height:230px}.desc-head .st{font-size:17px}.act{font-size:12px;margin-top:14px;padding:9px 12px}.desc-body{font-size:14px;margin-top:10px}.codebox{font-size:10.5px;padding:14px 16px;min-height:0}.model-flow{grid-template-columns:1fr;gap:8px}.flow-arrow{height:18px;transform:rotate(90deg)}.model-card{min-height:0}.rule-board{grid-template-columns:1fr}.item-card{min-width:94px}.dp-grid{gap:4px}.dp-cell{height:78px}.dp-cell .val{font-size:14px}.dp-grid.wide{grid-template-columns:repeat(4,minmax(0,1fr))}.risk-grid{gap:4px}.count-panel{grid-template-columns:1fr}.controls{padding:12px 10px}.ctrl{width:44px;flex-basis:44px}.dots{order:5;width:100%;margin-top:3px}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>背包问题 · 循环顺序就是状态语义</h1>
+    <p>从“物品能用几次”到“问可行、最值还是计数”，逐步观察容量方向、来源状态与循环层级如何改变答案。</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <main class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </main>
+  <div class="controls">
+    <button class="ctrl" id="btnPrev" aria-label="上一步" title="上一步">‹</button>
+    <button class="ctrl primary" id="btnPlay" aria-label="播放动画" title="播放或暂停">▶</button>
+    <button class="ctrl" id="btnNext" aria-label="下一步" title="下一步">›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div><span class="readout" id="readout"></span>
+  </div>
+</div>
+<script>
+const viz=document.getElementById('viz');
+const byId=id=>document.getElementById(id);
+const maxValue=values=>Math.max(1,...values.filter(v=>Number.isFinite(v)));
+
+function buildDpGrid(prefix,count,wide=false){return `<div class="dp-wrap"><span class="dp-pointer" id="${prefix}-pointer">j</span><div class="dp-grid${wide?' wide':''}" id="${prefix}-grid">${Array.from({length:count},(_,i)=>`<div class="dp-cell" id="${prefix}-${i}"><span class="idx">${i}</span><span class="val"></span><span class="bar"></span></div>`).join('')}</div></div>`}
+function paintDp(prefix,values,state={}){const peak=maxValue(values.map(v=>v===true?1:v===false?0:v));values.forEach((value,i)=>{const cell=byId(`${prefix}-${i}`),display=value===Infinity?'∞':value===true?'T':value===false?'F':value;cell.querySelector('.val').textContent=display;cell.querySelector('.bar').style.height=(value===Infinity||value===false?0:Math.max(5,(Number(value)||1)/peak*52))+'px';cell.className='dp-cell'+(state.active===i?' active':'')+(state.source===i?' source':'')+(state.changed?.includes(i)?' changed':'')+(state.bad?.includes(i)?' bad':'')+(value===Infinity?' unreachable':'')+(value===true?' true':'')});const pointer=byId(prefix+'-pointer');if(Number.isInteger(state.active)){const target=byId(`${prefix}-${state.active}`),grid=byId(prefix+'-grid');pointer.style.opacity=1;pointer.style.left=(grid.offsetLeft+target.offsetLeft+target.offsetWidth/2)+'px'}else pointer.style.opacity=0}
+function setFormula(id,text,kind=''){const el=byId(id);el.textContent=text;el.className='formula-strip'+(kind?' '+kind:'')}
+
+const modelScene=(()=>{
+  const steps=[
+    {stage:0,rule:-1,chip:'先判使用次数',chipC:'c0',title:'第一问：每个物品最多选一次，还是可以重复选',desc:'这是背包模型的第一处分叉。最多一次对应 0-1 背包；无限次对应完全背包。'},
+    {stage:1,rule:-1,chip:'再判问题目标',chipC:'cb',title:'第二问：状态存可行性、最优值还是方案数量',desc:'同一个容量下，dp 可以是 bool、最大或最小值，也可以是计数；初始化和转移操作随语义改变。'},
+    {stage:2,rule:0,chip:'0-1：容量倒序',chipC:'ch',title:'物品只能用一次时，容量必须从大到小',desc:'倒序保证来源 dp[j-weight] 仍属于处理当前物品之前的旧状态。'},
+    {stage:2,rule:1,chip:'完全：容量正序',chipC:'cb',title:'物品可以重复时，容量从小到大',desc:'正序允许来源状态已经包含当前物品，因此可以再选一次。'},
+    {stage:2,rule:2,chip:'组合：物品在外',chipC:'cg',title:'计数不关心顺序时，外层固定物品',desc:'先物品后容量会把相同元素集合归到同一轮，1+2 与 2+1 只算一类组合。'},
+    {stage:2,rule:3,chip:'排列：容量在外',chipC:'cg',title:'计数关心顺序时，外层固定目标容量',desc:'每个容量都重新尝试所有物品，最后一步不同就形成不同序列，因此顺序会被计数。'}
+  ];
+  const code=`<span class="cmt">// 背包题四问</span>
+<span class="num">1.</span> 物品能用一次，还是无限次？
+<span class="num">2.</span> dp 存可行、最值，还是计数？
+<span class="num">3.</span> 容量正序，还是倒序？
+<span class="num">4.</span> 计数时，物品和容量谁在外层？
+
+0-1       : item → j descending
+complete  : item → j ascending
+combination: item → target
+permutation: target → item`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>模型识别</b>：先确定状态语义，再写循环</div><div class="model-flow"><div class="model-card" id="model-0"><h3>物品使用次数</h3><p>最多一次 / 可以重复</p><div class="mono">0-1 / complete</div></div><div class="flow-arrow" id="arrow-0">→</div><div class="model-card" id="model-1"><h3>答案类型</h3><p>可行 / 最值 / 计数</p><div class="mono">bool / min-max / count</div></div><div class="flow-arrow" id="arrow-1">→</div><div class="model-card" id="model-2"><h3>循环语义</h3><p>容量方向与内外层</p><div class="mono">direction / nesting</div></div></div><div class="rule-board">${['0-1：容量倒序','完全：容量正序','组合：先物品后容量','排列：先容量后物品'].map((t,i)=>`<div class="rule-row" id="rule-${i}">${t}</div>`).join('')}</div><div class="stage-note" id="model-note"></div>`}
+  function paint(s){[0,1,2].forEach(i=>byId('model-'+i).className='model-card'+(i===s.stage?' on':'')+(i<s.stage?' done':''));[0,1].forEach(i=>byId('arrow-'+i).className='flow-arrow'+(i<s.stage?' on':''));[0,1,2,3].forEach(i=>byId('rule-'+i).className='rule-row'+(i===s.rule?' on':'')+(s.rule>i?' done':''));byId('model-note').textContent=s.rule<0?'不要从转移式开始背，先回答模型问题':'循环顺序不是写法偏好，而是题目语义'}
+  return{id:'model',label:'模型识别',sub:'次数 → 目标 → 循环',steps,mount,paint,code};
+})();
+
+const zeroOneScene=(()=>{
+  const items=[{w:2,v:3},{w:3,v:4},{w:4,v:5}];
+  const steps=[
+    {dp:[0,0,0,0,0,0,0],item:-1,active:null,source:null,changed:[],risk:false,formula:'dp 全部初始化为 0',chip:'capacity = 6',chipC:'c0',title:'一维 dp[j] 表示容量 j 下的最大价值',desc:'物品 A、B、C 的重量分别为 2、3、4，价值为 3、4、5；每件最多使用一次。'},
+    {dp:[0,0,0,0,0,0,3],item:0,active:6,source:4,changed:[6],risk:false,formula:'dp[6] = max(0, dp[4] + 3) = 3',chip:'A · j = 6',chipC:'cb',title:'处理物品 A，从最大容量 6 开始向左',desc:'来源 dp[4] 尚未在本轮被 A 更新，所以把 A 加上去只会使用一次。'},
+    {dp:[0,0,3,3,3,3,3],item:0,active:2,source:0,changed:[2,3,4,5,6],risk:false,formula:'A 完成：j 从 6 递减到 2',chip:'倒序完成',chipC:'cg',title:'容量 2 到 6 都能放入一件 A，价值变为 3',desc:'虽然多个容量被更新，但每个状态都从上一轮的旧状态读取，没有发生同轮连锁。'},
+    {dp:[0,0,3,4,4,7,7],item:1,active:6,source:3,changed:[3,4,5,6],risk:false,formula:'dp[6] = max(3, dp[3] + 4) = 7',chip:'B · j = 6',chipC:'cb',title:'处理 B 时，容量 6 组合 A 与 B 得到价值 7',desc:'来源 dp[3]=3 来自上一件物品 A，加入 B 后得到重量 5、价值 7。'},
+    {dp:[0,0,3,4,5,7,8],item:2,active:6,source:2,changed:[4,6],risk:false,formula:'dp[6] = max(7, dp[2] + 5) = 8',chip:'C · j = 6',chipC:'cg',title:'处理 C 后，容量 6 的最优解变成 A + C',desc:'来源 dp[2]=3 加上 C 的价值 5，得到最终最大价值 8。'},
+    {dp:[0,0,3,4,5,7,8],item:0,active:4,source:2,changed:[],risk:true,formula:'错误正序：dp[4] 读取本轮刚更新的 dp[2]，A 被用两次',chip:'错误方向',chipC:'cd',title:'反例：若 A 正序更新，会在同一轮重复使用 A',desc:'正序先得到 dp[2]=3，随后 dp[4]=dp[2]+3=6，dp[6] 又变成 9；这已经偷偷变成完全背包。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; weight.size(); ++i) {
+    <span class="cmt">// 0-1：容量必须倒序</span>
+    <span class="kw">for</span> (<span class="kw">int</span> j = capacity;
+         j &gt;= weight[i]; --j) {
+        dp[j] = std::max(
+            dp[j],
+            dp[j - weight[i]] + value[i]
+        );
+    }
+}`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>0-1 背包</b>：容量倒序，隔离当前物品的新旧状态</div><div class="item-strip">${items.map((it,i)=>`<div class="item-card" id="zo-item-${i}"><b>${String.fromCharCode(65+i)}</b>w=${it.w} · v=${it.v}</div>`).join('')}</div>${buildDpGrid('zo',7)}<div class="formula-strip" id="zo-formula"></div><div class="compare-label">错误正序会得到</div><div class="risk-grid">${[0,0,3,3,6,6,9].map((v,i)=>`<div class="risk-cell" id="risk-${i}">${v}</div>`).join('')}</div><div class="stage-note" id="zo-note"></div>`}
+  function paint(s){items.forEach((_,i)=>byId('zo-item-'+i).className='item-card'+(i===s.item?' on':'')+(i<s.item?' done':''));paintDp('zo',s.dp,{active:s.active,source:s.source,changed:s.changed});setFormula('zo-formula',s.formula,s.risk?'bad':s.changed.length?'good':'');[0,1,2,3,4,5,6].forEach(i=>byId('risk-'+i).classList.toggle('show',s.risk));byId('zo-note').innerHTML=s.risk?'<span class="bad">同一件 A 被重复使用：0-1 语义被破坏</span>':'倒序时，来源格永远还没被当前物品更新'}
+  return{id:'zeroone',label:'0-1 背包',sub:'每件一次 · 容量倒序',steps,mount,paint,code};
+})();
+
+const completeScene=(()=>{
+  const items=[{w:2,v:3},{w:3,v:4}];
+  const steps=[
+    {dp:[0,0,0,0,0,0,0],item:-1,active:null,source:null,changed:[],formula:'dp 全部初始化为 0',chip:'允许重复',chipC:'c0',title:'完全背包与 0-1 的转移式相同，区别在容量正序',desc:'本例物品 A 的重量为 2、价值为 3，物品 B 的重量为 3、价值为 4，都可以无限使用。'},
+    {dp:[0,0,3,0,0,0,0],item:0,active:2,source:0,changed:[2],formula:'dp[2] = dp[0] + 3 = 3',chip:'A · j = 2',chipC:'cb',title:'从最小可放容量 2 开始，先放入一件 A',desc:'正序的第一个来源仍是初始化状态 dp[0]。'},
+    {dp:[0,0,3,3,6,0,0],item:0,active:4,source:2,changed:[4],formula:'dp[4] = dp[2] + 3 = 6',chip:'A · j = 4',chipC:'cb',title:'容量 4 读取本轮刚更新的 dp[2]，再放一件 A',desc:'来源已经包含 A，继续加 A 正好表达“同一物品可以重复使用”。'},
+    {dp:[0,0,3,3,6,6,9],item:0,active:6,source:4,changed:[6],formula:'dp[6] = dp[4] + 3 = 9',chip:'A · j = 6',chipC:'cg',title:'容量 6 再次沿当前行传播，得到三件 A',desc:'正序形成 0 → 2 → 4 → 6 的连锁更新，完全背包需要的正是这种传播。'},
+    {dp:[0,0,3,4,6,6,9],item:1,active:3,source:0,changed:[3],formula:'dp[3] = max(3, dp[0] + 4) = 4',chip:'B · j = 3',chipC:'cb',title:'换到物品 B，从容量 3 开始继续正序',desc:'每切换一个物品，都从它自身的重量出发向右扫描。'},
+    {dp:[0,0,3,4,6,7,9],item:1,active:5,source:2,changed:[5],formula:'dp[5] = max(6, dp[2] + 4) = 7',chip:'A + B',chipC:'cb',title:'容量 5 组合一件 A 与一件 B，价值更新为 7',desc:'来源 dp[2] 保存一件 A，再加入当前物品 B。'},
+    {dp:[0,0,3,4,6,7,9],item:1,active:6,source:3,changed:[],formula:'dp[6] 保持 9：三件 A 优于两件 B 的价值 8',chip:'最终最优',chipC:'cg',title:'容量 6 比较旧值 9 与 dp[3]+4，保留 9',desc:'完全背包允许重复，但仍通过 max 在所有可重复组合中选最优。'}
+  ];
+  const code=`<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; weight.size(); ++i) {
+    <span class="cmt">// 完全：容量必须正序</span>
+    <span class="kw">for</span> (<span class="kw">int</span> j = weight[i];
+         j &lt;= capacity; ++j) {
+        dp[j] = std::max(
+            dp[j],
+            dp[j - weight[i]] + value[i]
+        );
+    }
+}`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>完全背包</b>：容量正序，让当前物品沿 dp 行继续传播</div><div class="item-strip">${items.map((it,i)=>`<div class="item-card" id="co-item-${i}"><b>${String.fromCharCode(65+i)}</b>w=${it.w} · v=${it.v}</div>`).join('')}</div>${buildDpGrid('co',7)}<div class="formula-strip" id="co-formula"></div><div class="stage-note" id="co-note"></div>`}
+  function paint(s){items.forEach((_,i)=>byId('co-item-'+i).className='item-card'+(i===s.item?' on':'')+(i<s.item?' done':''));paintDp('co',s.dp,{active:s.active,source:s.source,changed:s.changed});setFormula('co-formula',s.formula,s.changed.length?'good':'');byId('co-note').innerHTML=s.active===6&&s.item===0?'<span class="ok">同一物品 A 已沿正序链使用三次</span>':'正序来源可以包含当前物品'}
+  return{id:'complete',label:'完全背包',sub:'可重复 · 容量正序',steps,mount,paint,code};
+})();
+
+const feasibilityScene=(()=>{
+  const nums=[1,5,5,11];
+  const steps=[
+    {dp:[true,false,false,false,false,false,false,false,false,false,false,false],item:-1,active:0,source:null,changed:[0],formula:'dp[0] = true：空集合可以凑出 0',chip:'target = 11',chipC:'c0',title:'可行性背包把 dp[j] 定义为能否恰好凑出 j',desc:'数组是 [1,5,5,11]，总和 22，目标为一半 11；每个数字最多使用一次。'},
+    {dp:[true,true,false,false,false,false,false,false,false,false,false,false],item:0,active:1,source:0,changed:[1],formula:'dp[1] = dp[1] || dp[0] = true',chip:'num = 1',chipC:'cb',title:'处理 1 后，容量 1 变为可达',desc:'bool 转移使用逻辑或：原本可达，或者来源可达并选择当前数字。'},
+    {dp:[true,true,false,false,false,true,true,false,false,false,false,false],item:1,active:6,source:1,changed:[5,6],formula:'dp[6] = dp[6] || dp[1] = true',chip:'第一个 5',chipC:'cb',title:'第一个 5 让 5 与 6 可达',desc:'容量仍然倒序，所以 6 来自上一轮的 1，不会在同轮反复使用这个 5。'},
+    {dp:[true,true,false,false,false,true,true,false,false,false,true,true],item:2,active:11,source:6,changed:[10,11],formula:'dp[11] = dp[11] || dp[6] = true',chip:'第二个 5',chipC:'cg',title:'第二个 5 读取旧的 dp[6]，得到 1 + 5 + 5 = 11',desc:'两个值相同的 5 是两个不同物品，各自只能用一次，因此组合合法。'},
+    {dp:[true,true,false,false,false,true,true,false,false,false,true,true],item:3,active:11,source:0,changed:[],formula:'最后的 11 也能单独凑出目标，dp[11] 保持 true',chip:'答案 true',chipC:'cg',title:'处理数字 11 后目标仍可达，最终可以等分',desc:'可行性问题只关心 true 或 false，不需要保存具体方案；一维状态已经足够。'}
+  ];
+  const code=`dp[<span class="num">0</span>] = <span class="kw">true</span>;
+
+<span class="kw">for</span> (<span class="kw">int</span> num : nums) {
+    <span class="cmt">// 每个 num 最多用一次，仍然倒序</span>
+    <span class="kw">for</span> (<span class="kw">int</span> j = target; j &gt;= num; --j) {
+        dp[j] = dp[j] || dp[j - num];
+    }
+}
+
+<span class="kw">return</span> dp[target];`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>分割等和子集</b>：0-1 背包的 bool 状态</div><div class="item-strip">${nums.map((n,i)=>`<div class="item-card" id="fe-item-${i}"><b>${n}</b>item ${i}</div>`).join('')}</div>${buildDpGrid('fe',12,true)}<div class="formula-strip" id="fe-formula"></div><div class="stage-note" id="fe-note"></div>`}
+  function paint(s){nums.forEach((_,i)=>byId('fe-item-'+i).className='item-card'+(i===s.item?' on':'')+(i<s.item?' done':''));paintDp('fe',s.dp,{active:s.active,source:s.source,changed:s.changed});setFormula('fe-formula',s.formula,s.changed.length?'good':'');byId('fe-note').innerHTML=s.dp[11]?'<span class="ok">target 11 可达：数组可以分成等和两组</span>':'T 表示当前目标可由已处理数字凑出'}
+  return{id:'feasible',label:'可行性背包',sub:'bool dp · 分割等和',steps,mount,paint,code};
+})();
+
+const coinScene=(()=>{
+  const coins=[1,3,4];
+  const steps=[
+    {dp:[0,Infinity,Infinity,Infinity,Infinity,Infinity,Infinity],item:-1,active:0,source:null,changed:[0],formula:'dp[0] = 0，其余初始化为 inf = amount + 1 = 7',chip:'amount = 6',chipC:'c0',title:'零钱兑换把 dp[j] 定义为凑出金额 j 的最少硬币数',desc:'硬币可以无限使用，因此是完全背包；不可达状态用 7 作为安全哨兵。'},
+    {dp:[0,1,2,3,4,5,6],item:0,active:6,source:5,changed:[1,2,3,4,5,6],formula:'只用硬币 1：dp[j] = j',chip:'coin = 1',chipC:'cb',title:'正序处理硬币 1，它沿金额轴连续传播',desc:'每个金额都能由前一个金额再加一枚 1 得到。'},
+    {dp:[0,1,2,1,2,3,2],item:1,active:3,source:0,changed:[3,4,5,6],formula:'dp[3] = min(3, dp[0] + 1) = 1',chip:'coin = 3',chipC:'cb',title:'硬币 3 把金额 3 的最少数量降为 1',desc:'最值背包把 max 换成 min，来源状态加的是硬币数量 1。'},
+    {dp:[0,1,2,1,2,3,2],item:1,active:6,source:3,changed:[6],formula:'dp[6] = min(6, dp[3] + 1) = 2',chip:'3 + 3',chipC:'cg',title:'正序读取本轮 dp[3]=1，再用一枚 3 得到两枚硬币',desc:'这再次体现完全背包的同轮复用：硬币 3 可以使用两次。'},
+    {dp:[0,1,2,1,1,2,2],item:2,active:4,source:0,changed:[4,5],formula:'dp[4] = min(2, dp[0] + 1) = 1',chip:'coin = 4',chipC:'cb',title:'硬币 4 更新金额 4 与 5，但金额 6 的答案不变',desc:'金额 6 若使用 4，需要再凑 2，共三枚；不如已有的 3+3 两枚。'},
+    {dp:[0,1,2,1,1,2,2],item:2,active:6,source:2,changed:[],formula:'dp[6] = min(2, dp[2] + 1 = 3) = 2',chip:'答案 2',chipC:'cg',title:'最终 dp[6] 等于 2，最优方案是两枚 3',desc:'若最终仍为 inf，才返回 -1；这里目标可达并得到最少数量。'}
+  ];
+  const code=`<span class="kw">int</span> inf = amount + <span class="num">1</span>;
+std::vector&lt;<span class="kw">int</span>&gt; dp(amount + <span class="num">1</span>, inf);
+dp[<span class="num">0</span>] = <span class="num">0</span>;
+
+<span class="kw">for</span> (<span class="kw">int</span> coin : coins) {
+    <span class="kw">for</span> (<span class="kw">int</span> j = coin; j &lt;= amount; ++j) {
+        dp[j] = std::min(dp[j], dp[j - coin] + <span class="num">1</span>);
+    }
+}
+
+<span class="kw">return</span> dp[amount] == inf ? -<span class="num">1</span> : dp[amount];`;
+  function mount(){viz.innerHTML=`<div class="vcap"><b>零钱兑换</b>：完全背包的最小值状态</div><div class="item-strip">${coins.map((n,i)=>`<div class="item-card" id="coin-item-${i}"><b>${n}</b>coin</div>`).join('')}</div>${buildDpGrid('coin',7)}<div class="formula-strip" id="coin-formula"></div><div class="stage-note" id="coin-note"></div>`}
+  function paint(s){coins.forEach((_,i)=>byId('coin-item-'+i).className='item-card'+(i===s.item?' on':'')+(i<s.item?' done':''));paintDp('coin',s.dp,{active:s.active,source:s.source,changed:s.changed});setFormula('coin-formula',s.formula,s.changed.length?'good':'');byId('coin-note').innerHTML=s.dp[6]===2?'<span class="ok">金额 6 的最少硬币数为 2</span>':'∞ 表示当前硬币集合还无法凑出该金额'}
+  return{id:'coin',label:'零钱兑换',sub:'完全背包 · 最小值',steps,mount,paint,code};
+})();
+
+const countScene=(()=>{
+  const steps=[
+    {combo:[1,0,0,0,0],perm:[1,0,0,0,0],side:null,active:null,comboSeq:0,permSeq:0,chip:'target = 4',chipC:'c0',title:'计数背包把 dp[0] 初始化为 1，表示一个空方案',desc:'使用数字 1 与 2 凑出 4。是否把不同顺序视为不同答案，决定外层循环。'},
+    {combo:[1,1,1,1,1],perm:[1,0,0,0,0],side:'combo',active:4,comboSeq:1,permSeq:0,chip:'组合 · 先物品 1',chipC:'cb',title:'组合数先固定数字 1，再正序更新所有容量',desc:'只使用 1 时，每个目标都只有一种组合。'},
+    {combo:[1,1,2,2,3],perm:[1,0,0,0,0],side:'combo',active:4,comboSeq:3,permSeq:0,chip:'组合 · 再物品 2',chipC:'cg',title:'加入数字 2 后，凑出 4 的组合数变为 3',desc:'三种组合是 1+1+1+1、1+1+2、2+2；2+1+1 不会另算。'},
+    {combo:[1,1,2,2,3],perm:[1,1,0,0,0],side:'perm',active:1,comboSeq:3,permSeq:1,chip:'排列 · j = 1',chipC:'cb',title:'排列数先固定目标 1，再枚举所有可作为末尾的数字',desc:'凑出 1 只有序列 [1]。'},
+    {combo:[1,1,2,2,3],perm:[1,1,2,0,0],side:'perm',active:2,comboSeq:3,permSeq:2,chip:'排列 · j = 2',chipC:'cb',title:'目标 2 有 [1,1] 与 [2] 两个序列',desc:'同一容量里遍历所有数字，相当于枚举“最后一步选了谁”。'},
+    {combo:[1,1,2,2,3],perm:[1,1,2,3,0],side:'perm',active:3,comboSeq:3,permSeq:3,chip:'排列 · j = 3',chipC:'cb',title:'目标 3 的序列数为 3',desc:'分别是 1+1+1、1+2、2+1；后两者顺序不同，所以都被保留。'},
+    {combo:[1,1,2,2,3],perm:[1,1,2,3,5],side:'perm',active:4,comboSeq:3,permSeq:5,chip:'3 vs 5',chipC:'cg',title:'目标 4 得到 5 个排列，而组合数只有 3',desc:'新增的顺序来自 1+2+1 与 2+1+1；循环嵌套方式直接编码了“顺序是否重要”。'}
+  ];
+  const code=`<span class="cmt">// 组合数：先物品，后容量</span>
+<span class="kw">for</span> (<span class="kw">int</span> x : nums)
+    <span class="kw">for</span> (<span class="kw">int</span> j = x; j &lt;= target; ++j)
+        dp[j] += dp[j - x];
+
+<span class="cmt">// 排列数：先容量，后物品</span>
+<span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">1</span>; j &lt;= target; ++j)
+    <span class="kw">for</span> (<span class="kw">int</span> x : nums)
+        <span class="kw">if</span> (j &gt;= x)
+            dp[j] += dp[j - x];`;
+  function sideHtml(prefix,title,sub){return `<div class="count-side" id="${prefix}-side"><h3>${title}</h3><p>${sub}</p><div class="count-grid">${[0,1,2,3,4].map(i=>`<div class="count-cell" id="${prefix}-${i}"><small>dp[${i}]</small><b>0</b></div>`).join('')}</div><div class="sequence-list">${[0,1,2,3,4].map(i=>`<div class="sequence-row" id="${prefix}-seq-${i}"></div>`).join('')}</div></div>`}
+  function mount(){viz.innerHTML=`<div class="vcap"><b>计数背包</b>：外层循环决定组合还是排列</div><div class="count-panel">${sideHtml('combo','组合数','item → target')}${sideHtml('perm','排列数','target → item')}</div><div class="stage-note" id="count-note"></div>`;['1+1+1+1','1+1+2','2+2','',''].forEach((t,i)=>byId('combo-seq-'+i).textContent=t);['1+1+1+1','1+1+2','1+2+1','2+1+1','2+2'].forEach((t,i)=>byId('perm-seq-'+i).textContent=t)}
+  function paintRow(prefix,values,active){values.forEach((v,i)=>{const cell=byId(`${prefix}-${i}`);cell.querySelector('b').textContent=v;cell.className='count-cell'+(i===active?' active':'')+(i<active?' changed':'')})}
+  function paint(s){paintRow('combo',s.combo,s.side==='combo'?s.active:null);paintRow('perm',s.perm,s.side==='perm'?s.active:null);byId('combo-side').classList.toggle('on',s.side==='combo');byId('perm-side').classList.toggle('on',s.side==='perm');[0,1,2,3,4].forEach(i=>{byId('combo-seq-'+i).classList.toggle('show',i<s.comboSeq);byId('perm-seq-'+i).classList.toggle('show',i<s.permSeq)});byId('count-note').innerHTML=s.perm[4]===5?'<span class="ok">同一组数字的顺序不同，排列数因此更大</span>':'组合固定物品类别；排列固定当前目标'}
+  return{id:'count',label:'组合 / 排列计数',sub:'循环内外层决定语义',steps,mount,paint,code};
+})();
+
+const SCENES=[modelScene,zeroOneScene,completeScene,feasibilityScene,coinScene,countScene];
+const tabsBox=byId('tabs'),dotsBox=byId('dots'),stTitle=byId('stTitle'),stChip=byId('stChip'),stAct=byId('stAct'),stDesc=byId('stDesc'),codeBox=byId('codeBox'),readout=byId('readout'),btnPrev=byId('btnPrev'),btnNext=byId('btnNext'),btnPlay=byId('btnPlay');
+SCENES.forEach((scene,index)=>{const button=document.createElement('button');button.className='tab';button.innerHTML=`<span class="t">${scene.label}</span><span class="s">${scene.sub}</span>`;button.onclick=()=>{stop();switchScene(index)};tabsBox.appendChild(button)});
+let sceneIndex=0,current=0,dotEls=[],timer=null;const intervalMs=3000;
+function switchScene(index){sceneIndex=index;current=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));SCENES[sceneIndex].mount();codeBox.innerHTML=SCENES[sceneIndex].code;dotsBox.innerHTML='';dotEls=[];SCENES[sceneIndex].steps.forEach((step,i)=>{const dot=document.createElement('button');dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',`第 ${i+1} 步：${step.title}`);dot.onclick=()=>{stop();go(i)};dotsBox.appendChild(dot);dotEls.push(dot)});go(0)}
+function go(index){const scene=SCENES[sceneIndex],steps=scene.steps;current=Math.max(0,Math.min(steps.length-1,index));const step=steps[current];scene.paint(step);stTitle.textContent=scene.label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===current);dot.classList.toggle('done',i<current)});readout.textContent=(current+1)+' / '+steps.length;btnPrev.disabled=current===0;btnNext.disabled=current===steps.length-1;if(current===steps.length-1)stop();history.replaceState(null,'','#scene='+scene.id+'&step='+current)}
+function play(){if(current===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='Ⅱ';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{current<SCENES[sceneIndex].steps.length-1?go(current+1):stop()},intervalMs)}
+function stop(){if(timer){clearInterval(timer);timer=null}btnPlay.textContent='▶';btnPlay.setAttribute('aria-label','播放动画')}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(current-1)};btnNext.onclick=()=>{stop();go(current+1)};
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(current+1)}else if(event.key==='ArrowLeft'){stop();go(current-1)}else if(event.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){event.preventDefault();timer?stop():play()}});
+window.addEventListener('resize',()=>SCENES[sceneIndex].paint(SCENES[sceneIndex].steps[current]));
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+<script src="./算法动画题单.js" data-topic="20"></script>
+</body>
+</html>

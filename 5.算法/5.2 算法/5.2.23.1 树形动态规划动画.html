@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>树形动态规划动画 · 后序汇总 / 打家劫舍III / 最大路径和 / 摄像头 / 多叉树</title>
+<style>
+:root{
+  /* Same teaching-tool system as the algorithm animation collection. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:512px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:232px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}
+
+/* 树 */
+.treearea{position:relative;height:236px;margin:0 10px;}
+.treeedge{position:absolute;height:2px;background:var(--line);transform-origin:left center;transition:background var(--dur) var(--ease),height var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.treeedge.hot{background:var(--brown);height:3px;}.treeedge.done{background:var(--green);height:3px;}
+.tnode{position:absolute;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;border:2px solid var(--line);background:var(--paper);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.tnode .nv{font-size:17px;font-weight:800;line-height:1;}
+.tnode .nidx{position:absolute;bottom:-16px;color:var(--faint);font-size:10px;font-weight:600;letter-spacing:.3px;}
+.tnode.done{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.tnode.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.14);box-shadow:0 0 0 4px rgba(24,95,165,.16);z-index:2;}
+.tnode.st0{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+.tnode.st1{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.tnode.st2{border-color:var(--blue);background:var(--bluebg);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.20);}
+.tnode.st2::after{content:'◉';position:absolute;top:-11px;right:-9px;font-size:13px;color:var(--blue);background:var(--panel);border-radius:50%;line-height:1;}
+
+/* DP 状态表 */
+.dptable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;margin-top:16px;}
+.dptable th,.dptable td{border:1px solid var(--grid);padding:5px 6px;text-align:center;color:var(--muted);transition:background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.dptable th{background:var(--gray);color:var(--ink);font-weight:600;font-size:11px;}
+.dptable td.nn{font-weight:800;color:var(--ink);}
+.dptable tr.future td{opacity:.3;}
+.dptable tr.done td{background:var(--greenbg);}
+.dptable tr.done td.nn{color:var(--green);}
+.dptable tr.active td{background:var(--bluebg);color:var(--ink);font-weight:700;}
+.dptable tr.active td.nn{color:var(--blue);}
+.op-note{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:auto;padding-top:14px;min-height:34px;}
+.op-note b{color:var(--ink);}.op-note .bl{color:var(--blue);}.op-note .gr{color:var(--green);}.op-note .dg{color:var(--danger);}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.viz{min-height:470px;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:232px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;min-height:440px;}.tab{flex:1 1 128px;}.treearea{height:210px;margin:0;}.tnode{width:44px;height:44px;margin:-22px 0 0 -22px;}.tnode .nv{font-size:15px;}.dptable{font-size:11.5px;}.controls{padding:12px;gap:8px;}.dots{order:4;width:100%;}.codebox{font-size:11px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>树形动态规划动画 · 后序遍历托起五种状态设计</h1>
+    <p>后序汇总 / 打家劫舍 III / 最大路径和 / 二叉树摄像头 / 多叉树合并　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ============ 通用树绘制（build once + mutate，供各场景复用） ============ */
+function treeMarkup(prefix,T,caption,show){
+  let edges='',nodes='';
+  T.edges.forEach((_,i)=>edges+='<span class="treeedge" id="'+prefix+'e'+i+'"></span>');
+  T.names.forEach(n=>{
+    const main=(show==='name')?n:String(T.val[n]);
+    const sub =(show==='name')?'':n;
+    nodes+='<div class="tnode" id="'+prefix+'n'+n+'" style="left:'+T.pos[n][0]+'%;top:'+T.pos[n][1]+'%"><span class="nv">'+main+'</span><span class="nidx">'+sub+'</span></div>';
+  });
+  return '<div class="vcap">'+caption+'</div><div class="treearea" id="'+prefix+'tree">'+edges+nodes+'</div>';
+}
+function layoutTree(prefix,T){
+  const tree=document.getElementById(prefix+'tree');if(!tree)return;
+  const w=tree.clientWidth,h=tree.clientHeight;
+  T.edges.forEach((e,i)=>{
+    const a=e[0],b=e[1];
+    const x1=T.pos[a][0]/100*w,y1=T.pos[a][1]/100*h,x2=T.pos[b][0]/100*w,y2=T.pos[b][1]/100*h;
+    const dx=x2-x1,dy=y2-y1,line=document.getElementById(prefix+'e'+i);
+    line.style.left=x1+'px';line.style.top=y1+'px';line.style.width=Math.hypot(dx,dy)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';
+  });
+}
+function paintTree(prefix,T,s){
+  const done=s.done||[],hot=s.hot||[],cls=s.cls||{};
+  T.names.forEach(n=>{
+    const el=document.getElementById(prefix+'n'+n);
+    let c='tnode';
+    if(cls[n])c+=' '+cls[n];
+    else if(done.includes(n))c+=' done';
+    if(s.active===n)c+=' active';
+    el.className=c;
+  });
+  T.edges.forEach((e,i)=>{
+    const line=document.getElementById(prefix+'e'+i);
+    let c='treeedge';
+    if(hot.includes(i))c+=' hot';
+    else if(done.includes(e[0])&&done.includes(e[1]))c+=' done';
+    line.className=c;
+  });
+}
+/* 通用 DP 状态表 */
+function tableMarkup(prefix,data){
+  let head='<tr><th>节点</th>'+data.cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';
+  let body='';
+  data.order.forEach(n=>{body+='<tr id="'+prefix+'r'+n+'"><td class="nn">'+n+'</td>'+data.cols.map((_,ci)=>'<td id="'+prefix+'c'+n+'-'+ci+'">·</td>').join('')+'</tr>';});
+  return '<table class="dptable"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+}
+function paintTable(prefix,data,s){
+  const filled=(s.done||[]).concat(s.active?[s.active]:[]);
+  data.order.forEach(n=>{
+    const row=document.getElementById(prefix+'r'+n),on=filled.includes(n);
+    row.className=(s.active===n?'active':(on?'done':'future'));
+    data.cols.forEach((_,ci)=>{document.getElementById(prefix+'c'+n+'-'+ci).textContent=on?data.rows[n][ci]:'·';});
+  });
+}
+
+/* ============ 两棵复用的树 ============ */
+/* T1：满二叉树 A~G，供 后序汇总 / 打家劫舍 / 摄像头 三个场景复用（同一棵树，三种状态设计） */
+const T1={
+  names:['A','B','C','D','E','F','G'],
+  pos:{A:[50,12],B:[28,44],C:[72,44],D:[15,80],E:[41,80],F:[59,80],G:[85,80]},
+  edges:[['A','B'],['A','C'],['B','D'],['B','E'],['C','F'],['C','G']], // 0:AB 1:AC 2:BD 3:BE 4:CF 5:CG
+  val:{A:3,B:2,C:3,D:3,E:1,F:2,G:4}
+};
+
+/* ========== 场景 1：后序汇总（子树和）—— 树形 DP 的骨架 ========== */
+const sumScene=(()=>{
+  const data={cols:['子树和 sum'],order:['D','E','B','F','G','C','A'],
+    rows:{D:['3'],E:['1'],B:['6'],F:['2'],G:['4'],C:['9'],A:['18']}};
+  const code='<span class="kw">int</span> <span class="fn">dfs</span>(TreeNode* node){\n'+
+    '    <span class="kw">if</span> (!node) <span class="kw">return</span> 0;      <span class="cmt">// 空节点：base state</span>\n'+
+    '    <span class="kw">int</span> L = <span class="fn">dfs</span>(node-&gt;left);\n'+
+    '    <span class="kw">int</span> R = <span class="fn">dfs</span>(node-&gt;right);\n'+
+    '    <span class="kw">return</span> node-&gt;val + L + R; <span class="cmt">// 先子树，再自己</span>\n}';
+  const steps=[
+    {active:null,done:[],hot:[],chip:'后序骨架',chipC:'c0',title:'先递归子树，再合成父节点',
+     note:'访问顺序：<b>D E B F G C A</b>（叶子最先，根最后）',
+     desc:'树没有环，天生适合<b>从子节点向父节点汇总</b>。先用最简单的“子树和”看清骨架：<b>dfs(node)</b> 必须先拿到左右子树的返回值，才能算出自己——这决定了树形 DP 几乎都走<b>后序遍历</b>。空节点返回 0，是不会影响父节点的 base state。'},
+    {active:'D',done:[],hot:[2],chip:'叶子 = base',chipC:'cb',title:'递归下探到最左叶子 D',
+     note:'D 无孩子 → <span class="bl">sum(D) = 3</span>',
+     desc:'递归一路向下，直到叶子 <b>D</b>。它的左右孩子都是空节点（返回 0），于是 <b>sum(D) = val + 0 + 0 = 3</b>。叶子是递归触底、开始<b>回传</b>的地方。'},
+    {active:'E',done:['D'],hot:[3],chip:'兄弟叶子',chipC:'cb',title:'回到 B 再进入右孩子 E',
+     note:'<span class="bl">sum(E) = 1</span>',
+     desc:'D 回传后转向 B 的右孩子 <b>E</b>，同样是叶子：<b>sum(E) = 1</b>。B 的两个孩子都算完了，才轮到 B 自己。'},
+    {active:'B',done:['D','E'],hot:[2,3],chip:'子树答案合成',chipC:'ch',title:'B 用两个孩子的结果合成自己',
+     note:'<span class="gr">sum(B) = 2 + 3 + 1 = 6</span>',
+     desc:'B 拿到 <b>sum(D)=3、sum(E)=1</b>，加上自己的 val=2，得 <b>sum(B) = 6</b>。注意 B 完全不关心自己在整棵树的哪个位置——它只处理“以 B 为根的子树”。这种<b>局部自洽</b>正是树形 DP 好写的原因。'},
+    {active:'F',done:['D','E','B'],hot:[4],chip:'另一棵子树',chipC:'cb',title:'左子树完成，转向右子树的 F、G',
+     note:'<span class="bl">sum(F) = 2</span>',
+     desc:'B 子树彻底算完，递归回到根 A 再进入右子树 C。先到叶子 <b>F</b>：<b>sum(F) = 2</b>。'},
+    {active:'G',done:['D','E','B','F'],hot:[5],chip:'兄弟叶子',chipC:'cb',title:'C 的另一个叶子 G',
+     note:'<span class="bl">sum(G) = 4</span>',
+     desc:'C 的右孩子 <b>G</b>：<b>sum(G) = 4</b>。C 的孩子都就绪。'},
+    {active:'C',done:['D','E','B','F','G'],hot:[4,5],chip:'子树答案合成',chipC:'ch',title:'C 合成右子树的和',
+     note:'<span class="gr">sum(C) = 3 + 2 + 4 = 9</span>',
+     desc:'<b>sum(C) = val3 + sum(F)2 + sum(G)4 = 9</b>。至此根 A 的左右子树答案都齐了。'},
+    {active:'A',done:['D','E','B','F','G','C'],hot:[0,1],chip:'根节点收尾',chipC:'cg',title:'最后才算根 A',
+     note:'<span class="gr">sum(A) = 3 + 6 + 9 = 18</span>',
+     desc:'根 <b>A</b> 是<b>最后</b>被计算的：<b>sum(A) = val3 + sum(B)6 + sum(C)9 = 18</b>。整个过程每个节点只算一次，时间 <b>O(n)</b>，空间是递归栈 <b>O(h)</b>。'},
+    {active:null,done:['D','E','B','F','G','C','A'],hot:[],chip:'骨架成立',chipC:'cg',title:'把“子树和”换成任意状态，就是各种树形 DP',
+     note:'根的返回值 = 整棵树的答案',
+     desc:'这套“<b>后序回传 + 用子树结果合成自己</b>”的骨架保持不变，只要把返回的“子树和”换成别的状态——选/不选、向上贡献、覆盖状态——就得到后面四个场景。<b>关键永远是：想清每个节点该向父节点返回什么。</b>'},
+  ];
+  function mount(){viz.innerHTML=treeMarkup('sm',T1,'<b>后序汇总</b>：dfs 先回传子树，父节点再合成（这里演示子树和）','val')+tableMarkup('sm',data)+'<div class="op-note" id="smnote"></div>';requestAnimationFrame(()=>layoutTree('sm',T1));}
+  function paint(s){paintTree('sm',T1,s);paintTable('sm',data,s);document.getElementById('smnote').innerHTML=s.note;}
+  return{id:'sum',label:'后序汇总',sub:'树形 DP 骨架',steps,mount,paint,layout:()=>layoutTree('sm',T1),code};
+})();
+
+/* ========== 场景 2：打家劫舍 III —— 选 / 不选 两状态 ========== */
+const robScene=(()=>{
+  const data={cols:['选 choose','不选 skip'],order:['D','E','B','F','G','C','A'],
+    rows:{D:['3','0'],E:['1','0'],B:['2','4'],F:['2','0'],G:['4','0'],C:['3','6'],A:['13','10']}};
+  const code='<span class="kw">struct</span> S { <span class="kw">int</span> choose, skip; };\n'+
+    'S <span class="fn">dfs</span>(TreeNode* node){\n'+
+    '    <span class="kw">if</span> (!node) <span class="kw">return</span> {0, 0};\n'+
+    '    S l = <span class="fn">dfs</span>(node-&gt;left), r = <span class="fn">dfs</span>(node-&gt;right);\n'+
+    '    <span class="kw">int</span> choose = node-&gt;val + l.skip + r.skip;\n'+
+    '    <span class="kw">int</span> skip = max(l.choose,l.skip)+max(r.choose,r.skip);\n'+
+    '    <span class="kw">return</span> {choose, skip};\n}';
+  const steps=[
+    {active:null,done:[],hot:[],chip:'两状态',chipC:'c0',title:'相邻父子不能同时选',
+     note:'答案 = <b>max(根.choose, 根.skip)</b>',
+     desc:'打家劫舍 III（LC 337）：树上选点，<b>选了父节点就不能选子节点</b>。每个节点维护两个状态——<b class="bl">choose</b>=选当前节点时子树的最大金额，<b class="gr">skip</b>=不选当前节点时的最大金额。答案在根节点取二者较大值。'},
+    {active:null,done:['D','E','F','G'],hot:[],chip:'叶子初始化',chipC:'cb',title:'四个叶子：choose=val，skip=0',
+     note:'D E F G 的 <span class="bl">choose</span>=val，<span class="gr">skip</span>=0',
+     desc:'叶子没有孩子：<b>选它</b>就得自己的钱（choose=val），<b>不选它</b>子树里没别的可拿（skip=0）。于是 D=(3,0)、E=(1,0)、F=(2,0)、G=(4,0)。接下来向上合成。'},
+    {active:'B',done:['D','E','F','G'],hot:[2,3],chip:'choose 用孩子的 skip',chipC:'ch',title:'合成 B：选 B 则孩子必须都不选',
+     note:'choose=2+0+0=<span class="bl">2</span>　skip=max(3,0)+max(1,0)=<span class="gr">4</span>',
+     desc:'<b>选 B</b>：B 和孩子相邻，D、E 只能取各自的 <b>skip</b> → choose = val2 + D.skip0 + E.skip0 = <b class="bl">2</b>。<b>不选 B</b>：孩子无约束，各取 <code>max(choose,skip)</code> → skip = max(3,0)+max(1,0) = <b class="gr">4</b>。这里“不选 B 反而更大”。'},
+    {active:'C',done:['D','E','F','G','B'],hot:[4,5],chip:'同样的合成',chipC:'ch',title:'合成 C：换一组孩子重复一次',
+     note:'choose=3+0+0=<span class="bl">3</span>　skip=max(2,0)+max(4,0)=<span class="gr">6</span>',
+     desc:'<b>选 C</b>：choose = val3 + F.skip0 + G.skip0 = <b class="bl">3</b>。<b>不选 C</b>：skip = max(2,0)+max(4,0) = <b class="gr">6</b>。转移公式对每个内部节点完全一样，只是换了孩子。'},
+    {active:'A',done:['D','E','F','G','B','C'],hot:[0,1],chip:'根节点合成',chipC:'cb',title:'合成根 A',
+     note:'choose=3+B.skip4+C.skip6=<span class="bl">13</span>　skip=max(2,4)+max(3,6)=<span class="gr">10</span>',
+     desc:'<b>选 A</b>：choose = val3 + B.skip4 + C.skip6 = <b class="bl">13</b>（等于“抢根 + 抢四个叶子”）。<b>不选 A</b>：skip = max(2,4)+max(3,6) = 4+6 = <b class="gr">10</b>。'},
+    {active:null,done:['D','E','F','G','B','C','A'],hot:[],chip:'取根的 max',chipC:'cg',title:'答案 = max(13, 10) = 13',
+     note:'最优方案：<b>A + D + E + F + G = 13</b>',
+     desc:'只在<b>根节点</b>做最后的 <code>max(choose, skip)</code>：<b>max(13, 10) = 13</b>。对应偷 <b>A、D、E、F、G</b>（隔层偷）。<b>为什么 skip 能取孩子最大值</b>：当前不选时，孩子没有相邻限制，选或不选各取较大者即可。'},
+  ];
+  function mount(){viz.innerHTML=treeMarkup('rb',T1,'<b>打家劫舍 III</b>：每个节点维护 choose / skip 两个状态','val')+tableMarkup('rb',data)+'<div class="op-note" id="rbnote"></div>';requestAnimationFrame(()=>layoutTree('rb',T1));}
+  function paint(s){paintTree('rb',T1,s);paintTable('rb',data,s);document.getElementById('rbnote').innerHTML=s.note;}
+  return{id:'rob',label:'打家劫舍 III',sub:'选 / 不选',steps,mount,paint,layout:()=>layoutTree('rb',T1),code};
+})();
+
+/* ========== 场景 3：二叉树最大路径和 —— 向上贡献 vs 全局答案 ========== */
+const pathScene=(()=>{
+  const T2={
+    names:['A','B','C','D','E'],
+    pos:{A:[50,14],B:[32,48],C:[70,48],D:[18,82],E:[46,82]},
+    edges:[['A','B'],['A','C'],['B','D'],['B','E']], // 0:AB 1:AC 2:BD 3:BE
+    val:{A:1,B:-2,C:3,D:4,E:-5}
+  };
+  const data={cols:['左 L','右 R','向上 gain','拐弯和'],order:['D','E','B','C','A'],
+    rows:{D:['0','0','4','4'],E:['0','0','-5','-5'],B:['4','0','2','2'],C:['0','0','3','3'],A:['2','3','4','6']}};
+  const code='<span class="kw">int</span> <span class="fn">gain</span>(TreeNode* node, <span class="kw">int</span>& best){\n'+
+    '    <span class="kw">if</span> (!node) <span class="kw">return</span> 0;\n'+
+    '    <span class="kw">int</span> L = max(0, <span class="fn">gain</span>(node-&gt;left,  best));\n'+
+    '    <span class="kw">int</span> R = max(0, <span class="fn">gain</span>(node-&gt;right, best));\n'+
+    '    best = max(best, node-&gt;val + L + R); <span class="cmt">// 拐弯路径</span>\n'+
+    '    <span class="kw">return</span> node-&gt;val + max(L, R);   <span class="cmt">// 只带一条上去</span>\n}';
+  const steps=[
+    {active:null,done:[],hot:[],chip:'两个概念',chipC:'c0',title:'区分“向上贡献”和“全局答案”',
+     note:'best 初始 = <span class="dg">−∞</span>',
+     desc:'最大路径和（LC 124）：路径可从任意点到任意点，每个节点最多经过一次。核心分清两件事——<b class="bl">向上 gain</b>：返回给父节点的路径只能带<b>一条边</b>；<b class="br">拐弯和</b>：路径在当前节点<b>拐弯</b>（左+自己+右），只能用来更新<b>全局 best</b>，不能上传。负贡献用 <code>max(0, ·)</code> 直接丢弃。'},
+    {active:null,done:['D','E'],hot:[],chip:'负数被截断',chipC:'ch',title:'两个叶子：一正一负',
+     note:'gain(D)=<span class="gr">4</span>　gain(E)=<span class="dg">−5</span>',
+     desc:'叶子 <b>D=4</b>：gain=4、拐弯和=4，更新 best=4。叶子 <b>E=−5</b>：gain=−5、拐弯和=−5。E 这条<b>负贡献</b>下一步会在父节点被 <code>max(0, −5)=0</code> <b>直接舍弃</b>——带上它只会拉低路径和。'},
+    {active:'B',done:['D','E'],hot:[2,3],chip:'max(0,·) 剪枝',chipC:'ch',title:'合成 B：丢掉负的那一边',
+     note:'L=max(0,4)=<span class="gr">4</span>　R=max(0,−5)=<span class="dg">0</span>',
+     desc:'在 <b>B(−2)</b> 处：左贡献 L=max(0, gain(D)4)=<b>4</b>，右贡献 R=max(0, gain(E)−5)=<b class="dg">0</b>（E 被剪掉）。<b>拐弯和</b> = val(−2)+4+0 = <b class="br">2</b> 更新 best。<b>向上 gain</b> = val(−2)+max(4,0) = <b class="bl">2</b>：只能带 D 这一条上去。'},
+    {active:'C',done:['D','E','B'],hot:[1],chip:'正叶子',chipC:'cb',title:'右子树叶子 C',
+     note:'gain(C)=<span class="gr">3</span>，拐弯和=3',
+     desc:'<b>C=3</b> 是叶子：gain=3、拐弯和=3，更新 best=max(4,2,3…)。到这里 A 的左右子树贡献都齐了。'},
+    {active:'A',done:['D','E','B','C'],hot:[0,1],chip:'根处拐弯',chipC:'cb',title:'合成根 A：左 + 自己 + 右',
+     note:'拐弯和=1+2+3=<span class="br">6</span>　gain=1+max(2,3)=<span class="bl">4</span>',
+     desc:'在根 <b>A(1)</b>：L=max(0, gain(B)2)=2，R=max(0, gain(C)3)=3。<b>拐弯和</b> = 1+2+3 = <b class="br">6</b>，这是一条 <b>D→B→A→C</b> 的路径（4−2+1+3=6），刷新 best。而向上 gain=1+max(2,3)=<b class="bl">4</b>——但 A 是根，没人要它的 gain。'},
+    {active:null,done:['D','E','B','C','A'],hot:[],chip:'答案 = best',chipC:'cg',title:'全局 best = 6',
+     note:'最大路径和 = <b class="gr">6</b>（路径 D→B→A→C）',
+     desc:'遍历所有节点的“拐弯和”取最大：<b>best = 6</b>。<b>为什么返回时只能选一边</b>：返回值要能继续向父节点延伸，若同时带上左右两条，到父节点就<b>分叉</b>了、不再是一条简单路径；而拐弯和恰恰利用了“在本节点分叉”这唯一一次机会去更新全局答案。'},
+  ];
+  function mount(){viz.innerHTML=treeMarkup('pt',T2,'<b>最大路径和</b>：向上只带一条 gain，拐弯路径更新全局 best','val')+tableMarkup('pt',data)+'<div class="op-note" id="ptnote"></div>';requestAnimationFrame(()=>layoutTree('pt',T2));}
+  function paint(s){paintTree('pt',T2,s);paintTable('pt',data,s);document.getElementById('ptnote').innerHTML=s.note;}
+  return{id:'path',label:'最大路径和',sub:'向上贡献 / 全局答案',steps,mount,paint,layout:()=>layoutTree('pt',T2),code};
+})();
+
+/* ========== 场景 4：二叉树摄像头 —— 多状态覆盖 ========== */
+const camScene=(()=>{
+  const data={cols:['状态','含义'],order:['D','E','B','F','G','C','A'],
+    rows:{D:['0','未覆盖'],E:['0','未覆盖'],B:['2','装摄像头'],F:['0','未覆盖'],G:['0','未覆盖'],C:['2','装摄像头'],A:['1','已覆盖']}};
+  const ST={D:'st0',E:'st0',B:'st2',F:'st0',G:'st0',C:'st2',A:'st1'};
+  const code='<span class="kw">int</span> cams = 0;\n'+
+    '<span class="fn">dfs</span>(node): <span class="cmt">// 0 未覆盖 1 已覆盖 2 有摄像头</span>\n'+
+    '    <span class="kw">if</span> (!node) <span class="kw">return</span> 1;   <span class="cmt">// 空节点算已覆盖</span>\n'+
+    '    l = <span class="fn">dfs</span>(l), r = <span class="fn">dfs</span>(r);\n'+
+    '    <span class="kw">if</span> (l==0 || r==0){ ++cams; <span class="kw">return</span> 2; }\n'+
+    '    <span class="kw">if</span> (l==2 || r==2) <span class="kw">return</span> 1;\n'+
+    '    <span class="kw">return</span> 0;\n'+
+    '<span class="cmt">// 收尾：if (dfs(root)==0) ++cams;</span>';
+  const cls=(names)=>{const o={};names.forEach(n=>o[n]=ST[n]);return o;};
+  const steps=[
+    {active:null,done:[],hot:[],cls:{},chip:'三种状态',chipC:'c0',title:'先讲清每个状态对父节点意味着什么',
+     note:'目标：用最少摄像头覆盖所有节点',
+     desc:'二叉树摄像头（LC 968）：摄像头能监控<b>自己 + 父 + 两个孩子</b>，求最少摄像头。这类<b>覆盖题</b>用三态：<b class="dg">0 未覆盖</b>（盼父节点来管）、<b class="gr">1 已覆盖但无摄像头</b>、<b class="bl">2 装了摄像头</b>。<b>记公式没用，要记语义。</b>空节点返回 1（当作已覆盖），免得叶子被迫装摄像头。'},
+    {active:null,done:['D','E','F','G'],hot:[],cls:cls(['D','E','F','G']),chip:'叶子未覆盖',chipC:'cd',title:'四个叶子都返回 0（未覆盖）',
+     note:'D E F G 状态 = <span class="dg">0</span>',
+     desc:'叶子的两个孩子都是空节点（返回 1=已覆盖）。既没有孩子处于 0、也没有孩子装了摄像头，于是叶子自己<b>还没被覆盖</b> → 返回 <b class="dg">0</b>。它在<b>指望父节点</b>放摄像头来罩住自己——这正是“把摄像头往上推”的贪心。'},
+    {active:'B',done:['D','E','F','G'],hot:[2,3],cls:cls(['D','E','F','G','B']),chip:'孩子未覆盖 → 装',chipC:'cb',title:'B 发现孩子是 0，只能在这里装',
+     note:'D、E=0 → 在 B 装摄像头，返回 2，<b>cams=1</b>',
+     desc:'轮到 <b>B</b>：孩子 D、E 都是 <b class="dg">0</b>，如果 B 不装，D、E 就永远没人覆盖。所以<b>必须在 B 装摄像头</b>：<code>++cams</code>，B 返回 <b class="bl">2</b>。这一台摄像头顺带覆盖了 D、E、B 自己，还有 B 的父节点 A。'},
+    {active:'C',done:['D','E','F','G','B'],hot:[4,5],cls:cls(['D','E','F','G','B','C']),chip:'同理再装一台',chipC:'cb',title:'C 的孩子也都是 0',
+     note:'F、G=0 → 在 C 装摄像头，返回 2，<b>cams=2</b>',
+     desc:'<b>C</b> 的孩子 F、G 同样是 <b class="dg">0</b>，于是 C 也装一台：返回 <b class="bl">2</b>，<code>cams=2</code>。摄像头总是被“<b>顶在叶子的父节点</b>”这一层，这是最省的放法。'},
+    {active:'A',done:['D','E','F','G','B','C'],hot:[0,1],cls:cls(['D','E','F','G','B','C','A']),chip:'孩子有摄像头 → 免费',chipC:'cg',title:'A 被孩子的摄像头覆盖',
+     note:'B、C=2 → A 已覆盖，返回 <span class="gr">1</span>（不用装）',
+     desc:'根 <b>A</b>：孩子 B、C 都是 <b class="bl">2</b>（装了摄像头），它们的监控范围<b>向上罩住了 A</b>。所以 A <b>已覆盖但自己不用装</b>，返回 <b class="gr">1</b>。若某个状态语义没分清，这里就容易多装一台。'},
+    {active:null,done:['D','E','F','G','B','C','A'],hot:[],cls:cls(['D','E','F','G','B','C','A']),chip:'答案 = 2',chipC:'cg',title:'根返回 1（非 0），无需补装',
+     note:'最少摄像头 = <b class="bl">2</b>（装在 B、C）',
+     desc:'收尾检查：根返回 <b class="gr">1</b> 而非 0，说明根也被覆盖了，不用额外补摄像头。答案 <b>2</b>。多状态题的通用做法：<b>先把每个状态“对父节点意味着什么”写清楚，再写转移</b>——语义不清时代码极易互相覆盖出错。'},
+  ];
+  function mount(){viz.innerHTML=treeMarkup('cm',T1,'<b>二叉树摄像头</b>：三态 0/1/2，摄像头尽量顶在叶子的父节点','name')+tableMarkup('cm',data)+'<div class="op-note" id="cmnote"></div>';requestAnimationFrame(()=>layoutTree('cm',T1));}
+  function paint(s){paintTree('cm',T1,s);paintTable('cm',data,s);document.getElementById('cmnote').innerHTML=s.note;}
+  return{id:'camera',label:'二叉树摄像头',sub:'多状态覆盖',steps,mount,paint,layout:()=>layoutTree('cm',T1),code};
+})();
+
+/* ========== 场景 5：多叉树合并 —— 选 / 不选推广到 n 个孩子 ========== */
+const multiScene=(()=>{
+  const T3={
+    names:['R','A','B','C','D','E','F'],
+    pos:{R:[50,12],A:[24,46],B:[50,46],C:[78,46],D:[12,80],E:[36,80],F:[78,80]},
+    edges:[['R','A'],['R','B'],['R','C'],['A','D'],['A','E'],['C','F']], // 0:RA 1:RB 2:RC 3:AD 4:AE 5:CF
+    val:{R:4,A:2,B:5,C:1,D:3,E:2,F:6}
+  };
+  const data={cols:['选 choose','不选 skip'],order:['D','E','A','B','F','C','R'],
+    rows:{D:['3','0'],E:['2','0'],A:['2','5'],B:['5','0'],F:['6','0'],C:['1','6'],R:['15','16']}};
+  const code='<span class="kw">struct</span> S { <span class="kw">int</span> choose, skip; };\n'+
+    'S <span class="fn">dfs</span>(<span class="kw">int</span> u){\n'+
+    '    S cur{ val[u], 0 };\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> v : g[u]) {\n'+
+    '        S c = <span class="fn">dfs</span>(v);\n'+
+    '        cur.choose += c.skip;              <span class="cmt">// 选 u：孩子都不选</span>\n'+
+    '        cur.skip += max(c.choose, c.skip); <span class="cmt">// 不选 u：各取最优</span>\n'+
+    '    }\n    <span class="kw">return</span> cur;\n}';
+  const steps=[
+    {active:null,done:[],hot:[],chip:'同一个模型',chipC:'c0',title:'孩子从两个变成任意多个',
+     note:'choose 累加孩子 skip；skip 累加孩子 max',
+     desc:'多叉树上，一个节点可能有<b>很多孩子</b>。写法是先初始化当前状态，再<b>依次合并每个孩子</b>：<b class="bl">选 u</b> → 每个孩子只能取 skip，累加；<b class="gr">不选 u</b> → 每个孩子取 <code>max(choose,skip)</code>，累加。这和打家劫舍 III <b>是同一个模型</b>，只是把“左右两个”换成了“for 每个孩子”。'},
+    {active:null,done:['D','E'],hot:[],chip:'叶子初始化',chipC:'cb',title:'A 的两个孩子 D、E',
+     note:'D=(3,0)　E=(2,0)',
+     desc:'先递归 A 的孩子。叶子 <b>D=(choose3, skip0)</b>、<b>E=(2, 0)</b>，规则同二叉树叶子。'},
+    {active:'A',done:['D','E'],hot:[3,4],chip:'for 合并孩子',chipC:'ch',title:'A 用循环合并 D、E',
+     note:'choose=2+0+0=<span class="bl">2</span>　skip=max(3,0)+max(2,0)=<span class="gr">5</span>',
+     desc:'从 <code>cur={val2, 0}</code> 起，循环里：<b>choose += 孩子.skip</b> → 2+0+0=<b class="bl">2</b>；<b>skip += max(孩子.choose,孩子.skip)</b> → max(3,0)+max(2,0)=<b class="gr">5</b>。两个孩子被<b>逐个累加</b>进同一对状态。'},
+    {active:null,done:['D','E','A','B','F'],hot:[],chip:'其余子树',chipC:'cb',title:'叶子 B、F 就绪',
+     note:'B=(5,0)　F=(6,0)',
+     desc:'R 的另一个孩子 <b>B</b> 是叶子 =(5,0)。C 的孩子 <b>F</b> 是叶子 =(6,0)，先算好，下一步合成 C。'},
+    {active:'C',done:['D','E','A','B','F'],hot:[5],chip:'单孩子合并',chipC:'ch',title:'C 只有一个孩子 F',
+     note:'choose=1+0=<span class="bl">1</span>　skip=max(6,0)=<span class="gr">6</span>',
+     desc:'<b>C</b> 只有一个孩子 F：choose = val1 + F.skip0 = <b class="bl">1</b>；skip = max(6,0) = <b class="gr">6</b>。循环体对 1 个还是 3 个孩子都一样。'},
+    {active:'R',done:['D','E','A','B','F','C'],hot:[0,1,2],chip:'三个孩子累加',chipC:'cb',title:'根 R 合并 A、B、C 三个孩子',
+     note:'choose=4+5+0+6=<span class="bl">15</span>　skip=max(2,5)+max(5,0)+max(1,6)=<span class="gr">16</span>',
+     desc:'根 <b>R</b> 有三个孩子，循环累加三次：<b>choose</b> = val4 + A.skip5 + B.skip0 + C.skip6 = <b class="bl">15</b>；<b>skip</b> = max(2,5)+max(5,0)+max(1,6) = 5+5+6 = <b class="gr">16</b>。这就是二叉树写法的自然推广。'},
+    {active:null,done:['D','E','A','B','F','C','R'],hot:[],chip:'答案 = 16',chipC:'cg',title:'max(15, 16) = 16',
+     note:'最优方案：<b>D + E + B + F = 16</b>（不选 R）',
+     desc:'根取 <code>max(choose, skip)</code> = <b>max(15, 16) = 16</b>。这次<b>不选根</b>更优：选中 <b>D、E、B、F</b>（3+2+5+6=16），它们两两不相邻。多叉树合并 = 树上最大权独立集，也是很多“选点不冲突”类树形 DP 的通用骨架。'},
+  ];
+  function mount(){viz.innerHTML=treeMarkup('mt',T3,'<b>多叉树合并</b>：for 每个孩子，把 choose / skip 逐个累加','val')+tableMarkup('mt',data)+'<div class="op-note" id="mtnote"></div>';requestAnimationFrame(()=>layoutTree('mt',T3));}
+  function paint(s){paintTree('mt',T3,s);paintTable('mt',data,s);document.getElementById('mtnote').innerHTML=s.note;}
+  return{id:'multi',label:'多叉树合并',sub:'选 / 不选 · n 叉',steps,mount,paint,layout:()=>layoutTree('mt',T3),code};
+})();
+
+/* ============ 引擎（与动画合集同款） ============ */
+const SCENES=[sumScene,robScene,pathScene,camScene,multiScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2900;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((tab,idx)=>tab.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>SCENES[si].layout());
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(+hashStep[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="23"></script>
+</body>
+</html>

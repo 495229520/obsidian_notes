@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>位运算动画 · 异或消除 / Brian Kernighan / 子集枚举</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* 位单元格通用 */
+.bitrow{display:flex;gap:5px;justify-content:center;}
+.bit{width:42px;height:46px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:20px;font-weight:700;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);position:relative;box-shadow:0 1px 2px rgba(60,55,40,.05);}
+.bit.one{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.bit.flip{animation:pop .5s var(--ease);}
+.bit.lowbit{color:var(--danger);background:var(--dangerbg);border-color:var(--danger);box-shadow:0 0 0 3px rgba(179,64,47,.25);}
+.bit .w{position:absolute;bottom:-16px;left:0;right:0;text-align:center;font-size:9px;color:var(--faint);font-weight:400;}
+@keyframes pop{0%{transform:scale(.7);}70%{transform:scale(1.14);}100%{transform:scale(1);}}
+
+/* XOR 场景 */
+.xor-nums{display:flex;gap:8px;justify-content:center;margin:6px 0 26px;flex-wrap:wrap;}
+.xnum{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:20px;font-weight:700;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease);}
+.xnum.cur{color:var(--blue);background:var(--bluebg);border-color:var(--blue);transform:translateY(-4px);box-shadow:0 5px 12px rgba(24,95,165,.2);}
+.xnum.done{opacity:.4;}
+.xnum.cancel{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.ansbox{text-align:center;margin-bottom:8px;}
+.ansbox .lbl{font-family:var(--mono);font-size:12px;color:var(--faint);margin-bottom:8px;}
+.ansbox .dec{font-family:var(--mono);font-size:15px;color:var(--muted);margin-top:16px;}
+.ansbox .dec b{color:var(--blue);font-size:22px;}
+
+/* Brian Kernighan 场景 */
+.bk-rows{display:flex;flex-direction:column;gap:16px;align-items:center;margin:8px 0 20px;}
+.bk-line{display:flex;align-items:center;gap:14px;}
+.bk-line .tag{font-family:var(--mono);font-size:12px;color:var(--faint);width:96px;text-align:right;}
+.bk-count{text-align:center;font-family:var(--mono);font-size:15px;color:var(--muted);margin-top:auto;}
+.bk-count b{color:var(--green);font-size:24px;}
+
+/* 子集场景 */
+.ss-bits{display:flex;gap:8px;justify-content:center;margin:6px 0 8px;}
+.ss-map{display:flex;gap:8px;justify-content:center;margin-bottom:20px;font-family:var(--mono);font-size:11px;color:var(--faint);}
+.ss-map span{width:42px;text-align:center;}
+.ss-result{text-align:center;font-family:var(--mono);font-size:20px;font-weight:700;color:var(--blue);margin-bottom:18px;min-height:28px;}
+.ss-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;margin-top:auto;}
+.ss-table th,.ss-table td{border:1px solid var(--grid);padding:4px 8px;text-align:center;color:var(--muted);}
+.ss-table th{background:var(--gray);color:var(--ink);}
+.ss-table tr.on td{background:var(--bluebg);color:var(--ink);font-weight:700;}
+.ss-table tr.future td{opacity:.35;}
+
+/* 基础操作 / lowbit 场景（复用 bk-rows 结构） */
+.bit.target{color:var(--brown);background:var(--brownbg);border-color:var(--brown);box-shadow:0 0 0 3px rgba(133,79,11,.22);}
+.op-note{text-align:center;font-family:var(--mono);font-size:13.5px;color:var(--muted);margin-top:auto;padding-top:10px;}
+.op-note b{color:var(--ink);}
+.op-note .tf{font-weight:700;}
+.op-note .tf.t{color:var(--green);}
+.op-note .tf.f{color:var(--danger);}
+
+/* 异或分组场景 */
+.xnum.g0{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.xnum.g1{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.mini-cap{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:14px 0 6px;}
+.grp-wrap{display:flex;gap:14px;justify-content:center;margin-top:18px;}
+.grp{flex:1;border:1px solid var(--grid);border-radius:10px;padding:10px 12px;text-align:center;background:var(--paper);}
+.grp.g0{border-color:var(--blue);}
+.grp.g1{border-color:var(--brown);}
+.grp .glbl{font-family:var(--mono);font-size:11px;color:var(--faint);margin-bottom:6px;}
+.grp .gval{font-family:var(--mono);font-size:15px;color:var(--muted);}
+.grp .gval b{font-size:21px;}
+.grp.g0 .gval b{color:var(--blue);}
+.grp.g1 .gval b{color:var(--brown);}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+
+/* ---------- 位运算练习与 CodeTop 频率 ---------- */
+.lc-box{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:13px 16px;}
+.lc-box .lc-h{font-size:12px;color:var(--faint);font-family:var(--mono);margin-bottom:3px;}
+.lc-box .lc-source{font-size:11px;color:var(--faint);margin-bottom:9px;}
+.lc-list{display:flex;flex-wrap:wrap;gap:8px;}
+.lc-a{font:inherit;font-size:12px;font-weight:500;color:var(--blue);background:var(--bluebg);border:1px solid var(--blue);border-radius:8px;padding:6px 10px;text-decoration:none;transition:background .15s var(--ease),transform .1s var(--ease);display:inline-flex;align-items:center;gap:8px;max-width:100%;}
+.lc-a:hover{background:var(--blue);color:var(--paper);transform:translateY(-1px);}.lc-a:active{transform:scale(.97);}
+.lc-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.lc-topic{font-size:10px;color:var(--faint);font-family:var(--mono);white-space:nowrap;}
+.lc-freq{font-family:var(--mono);font-size:10.5px;line-height:1.3;padding:2px 6px;border-radius:5px;background:var(--panel);color:var(--danger);border:1px solid var(--danger);white-space:nowrap;}
+.lc-freq.none{color:var(--faint);border-color:var(--line);border-style:dashed;background:var(--gray);}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>位运算动画 · 六个二进制核心套路</h1>
+    <p>基础位操作 / 异或消除 · 分组 / Brian Kernighan / lowbit / 子集枚举　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+      <div class="lc-box">
+        <div class="lc-h">位运算练习 · 点击跳转 leetcode.cn</div>
+        <div class="lc-source">CodeTop 高频题 Top300 快照 · HOT 标签后为 frequency · 未收录题目显示“不常考”</div>
+        <div class="lc-list" id="lcList"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+function bin(x,w){let s='';for(let i=w-1;i>=0;i--)s+=((x>>i)&1);return s;}
+
+/* ========== 场景 1：异或消除 nums=[4,1,2,1,2] ========== */
+const xorScene=(()=>{
+  const nums=[4,1,2,1,2];
+  const W=4;
+  const code='<span class="kw">int</span> singleNumber(vector&lt;int&gt;& nums){\n'+
+    '    <span class="kw">int</span> ans = 0;\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> x : nums) ans ^= x;  <span class="cmt">// 成对抵消</span>\n'+
+    '    <span class="kw">return</span> ans;\n}';
+  // ans 序列
+  const seq=[0,4,5,7,6,4];
+  const steps=[
+    {title:'步骤 0 · 初始 ans=0',chip:'异或两性质',chipC:'c0',idx:-1,ans:0,cancel:[],
+     desc:'数组 <b>[4, 1, 2, 1, 2]</b> 里只有 4 出现一次，其余成对。异或两大性质：<b>a ^ a = 0</b>(相同抵消)、<b>a ^ 0 = a</b>。把所有数异或起来，成对的自然消成 0，只剩那个单独的数。'},
+    {title:'步骤 1 · ans ^= 4',chip:'0 ^ 4',chipC:'cb',idx:0,ans:4,cancel:[],
+     desc:'ans = 0 ^ 4 = <span class="bl">4</span>（0100）。任何数异或 0 等于它自己。'},
+    {title:'步骤 2 · ans ^= 1',chip:'4 ^ 1',chipC:'cb',idx:1,ans:5,cancel:[],
+     desc:'ans = 4 ^ 1 = <span class="bl">5</span>（0101）。不同位翻成 1。'},
+    {title:'步骤 3 · ans ^= 2',chip:'5 ^ 2',chipC:'cb',idx:2,ans:7,cancel:[],
+     desc:'ans = 5 ^ 2 = <span class="bl">7</span>（0111）。'},
+    {title:'步骤 4 · ans ^= 1（第二个 1）',chip:'1 与 1 抵消',chipC:'cg',idx:3,ans:6,cancel:[1,3],
+     desc:'又遇到 <span class="gr">1</span>！它和前面那个 1 <b>成对抵消</b>:ans = 7 ^ 1 = <span class="bl">6</span>（0110）。相当于把之前混入的 1 又消掉了。'},
+    {title:'步骤 5 · ans ^= 2（第二个 2）',chip:'2 与 2 抵消',chipC:'cg',idx:4,ans:4,cancel:[2,4],
+     desc:'又遇到 <span class="gr">2</span>,和前面的 2 抵消：ans = 6 ^ 2 = <span class="bl">4</span>（0100）。两对数全部消完。'},
+    {title:'步骤 6 · 答案 = 4',chip:'成对全消',chipC:'cg',idx:-1,ans:4,cancel:[0,1,2,3,4],done:true,
+     desc:'遍历结束，ans = <b>4</b>。本质：<b>4 ^ (1^1) ^ (2^2) = 4 ^ 0 ^ 0 = 4</b>。异或满足交换律结合律，成对的元素无论顺序都会两两抵消。'},
+  ];
+  function mount(){
+    let ns='';nums.forEach((v,i)=>ns+='<div class="xnum" id="xn-'+i+'">'+v+'</div>');
+    let bs='';for(let i=0;i<W;i++)bs+='<div class="bit" id="xb-'+i+'"><span class="w">'+(1<<(W-1-i))+'</span></div>';
+    viz.innerHTML='<div class="vcap"><b>异或累积</b>：把每个数依次异或进 ans</div>'+
+      '<div class="xor-nums">'+ns+'</div>'+
+      '<div class="ansbox"><div class="lbl">ans（二进制）</div><div class="bitrow">'+bs+'</div>'+
+      '<div class="dec">ans = <b id="xdec">0</b></div></div>';
+  }
+  let prevAns=0;
+  function paint(s){
+    nums.forEach((v,i)=>{
+      const el=document.getElementById('xn-'+i);
+      el.className='xnum';
+      if(i===s.idx)el.classList.add('cur');
+      else if(s.cancel.includes(i))el.classList.add('cancel');
+      else if(s.idx>=0&&i<s.idx)el.classList.add('done');
+      else if(s.done)el.classList.add(i===0?'':'cancel');
+    });
+    for(let i=0;i<W;i++){
+      const el=document.getElementById('xb-'+i);
+      const on=(s.ans>>(W-1-i))&1;
+      const was=(prevAns>>(W-1-i))&1;
+      el.className='bit'+(on?' one':'')+(on!==was?' flip':'');
+      el.innerHTML='<span class="w">'+(1<<(W-1-i))+'</span>'+(on?1:0);
+    }
+    document.getElementById('xdec').textContent=s.ans;
+    prevAns=s.ans;
+  }
+  return {id:'xor',label:'异或消除',sub:'找只出现一次的数',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：Brian Kernighan 数 1，x=180 ========== */
+const bkScene=(()=>{
+  const W=8;
+  const code='<span class="kw">int</span> countOnes(<span class="kw">unsigned</span> x){\n'+
+    '    <span class="kw">int</span> c = 0;\n'+
+    '    <span class="kw">while</span> (x) { x &= x - 1; ++c; }  <span class="cmt">// 每次删最低位的 1</span>\n'+
+    '    <span class="kw">return</span> c;\n}';
+  // 180 = 10110100
+  const seq=[180,176,160,128,0];
+  const lowbits=[4,16,32,128,null]; // 每步将被删掉的最低位
+  const steps=[
+    {title:'步骤 0 · x = 180 = 10110100',chip:'x & (x-1)',chipC:'c0',x:180,low:4,count:0,
+     desc:'要数 x 的二进制里有几个 1。核心：<b>x &amp; (x-1)</b> 恰好能删掉 x <b>最低位的那个 1</b>（连同它右边全变 0）。删几次就有几个 1。此刻最低位的 1 在 <span class="dg">第 2 位（值 4）</span>。'},
+    {title:'步骤 1 · 删最低位 → 176',chip:'count=1',chipC:'cb',x:176,low:16,count:1,
+     desc:'x &amp;= x-1：<b>180 &amp; 179 = 176</b>(10110000)，最低位的 1（值 4）被删掉。count=1。下一个最低位 1 在 <span class="dg">值 16</span>。'},
+    {title:'步骤 2 · 删最低位 → 160',chip:'count=2',chipC:'cb',x:160,low:32,count:2,
+     desc:'<b>176 &amp; 175 = 160</b>(10100000)，删掉值 16 那位。count=2。'},
+    {title:'步骤 3 · 删最低位 → 128',chip:'count=3',chipC:'cb',x:128,low:128,count:3,
+     desc:'<b>160 &amp; 159 = 128</b>(10000000)，删掉值 32 那位。count=3，只剩最高位。'},
+    {title:'步骤 4 · 删最后一个 → 0',chip:'count=4',chipC:'cg',x:0,low:null,count:4,
+     desc:'<b>128 &amp; 127 = 0</b>,最后一个 1 也删掉了。count=4。'},
+    {title:'步骤 5 · x=0 结束',chip:'O(1 的个数)',chipC:'cg',x:0,low:null,count:4,done:true,
+     desc:'循环条件 <code>x != 0</code> 不成立，返回 <b>4</b>。复杂度 <b>O(k)</b>,k 是 1 的个数，而非总位数——比逐位检查更快。<b>顺带</b>:若 x 只有一个 1（即 2 的幂），这个循环只跑一次，<code>x &amp; (x-1) == 0</code> 正是"判断 2 的幂"的原理。'},
+  ];
+  function mount(){
+    let bx='',bl='',br='';
+    for(let i=0;i<W;i++){bx+='<div class="bit" id="bkx-'+i+'"><span class="w">'+(1<<(W-1-i))+'</span></div>';}
+    for(let i=0;i<W;i++){bl+='<div class="bit" id="bkl-'+i+'"></div>';}
+    for(let i=0;i<W;i++){br+='<div class="bit" id="bkr-'+i+'"></div>';}
+    viz.innerHTML='<div class="vcap"><b>Brian Kernighan</b>：x &amp; (x−1) 每次抹掉最低位的 1</div>'+
+      '<div class="bk-rows">'+
+        '<div class="bk-line"><span class="tag">x</span><div class="bitrow">'+bx+'</div></div>'+
+        '<div class="bk-line"><span class="tag">x − 1</span><div class="bitrow">'+bl+'</div></div>'+
+        '<div class="bk-line"><span class="tag">x &(x−1)</span><div class="bitrow">'+br+'</div></div>'+
+      '</div>'+
+      '<div class="bk-count">1 的个数 count = <b id="bkc">0</b></div>';
+  }
+  function paint(s){
+    const xm1=s.x>0?s.x-1:0, res=s.x>0?(s.x&(s.x-1)):0;
+    for(let i=0;i<W;i++){
+      const bitVal=1<<(W-1-i);
+      const setX=(s.x>>(W-1-i))&1, setL=(xm1>>(W-1-i))&1, setR=(res>>(W-1-i))&1;
+      const ex=document.getElementById('bkx-'+i);
+      ex.className='bit'+(setX?' one':'')+(s.low===bitVal?' lowbit':'');
+      ex.innerHTML='<span class="w">'+bitVal+'</span>'+(setX?1:0);
+      const el=document.getElementById('bkl-'+i);
+      el.className='bit'+(setL?' one':'');el.textContent=setL?1:0;
+      const er=document.getElementById('bkr-'+i);
+      er.className='bit'+(setR?' one':'');er.textContent=setR?1:0;
+    }
+    document.getElementById('bkc').textContent=s.count;
+  }
+  return {id:'bk',label:'Brian Kernighan',sub:'x&(x-1) 数 1',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：位掩码枚举子集 nums=[A,B,C] ========== */
+const subsetScene=(()=>{
+  const elems=['A','B','C'];
+  const code='<span class="kw">for</span> (<span class="kw">int</span> mask=0; mask &lt; (1&lt;&lt;n); ++mask)\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> i=0; i&lt;n; ++i)\n'+
+    '        <span class="kw">if</span> (mask & (1&lt;&lt;i))  <span class="cmt">// 第 i 位为 1 → 选 nums[i]</span>\n'+
+    '            path.push_back(nums[i]);';
+  const subsetOf=m=>{let r=[];for(let i=0;i<3;i++)if(m&(1<<i))r.push(elems[i]);return r.length?'{'+r.join(', ')+'}':'{}';};
+  const steps=[];
+  const chips=['空集','选 A','选 B','选 A,B','选 C','选 A,C','选 B,C','全选'];
+  for(let m=0;m<8;m++){
+    steps.push({title:'mask = '+m+' = '+bin(m,3),chip:chips[m],chipC:m===0?'c0':(m===7?'cg':'cb'),mask:m,
+      desc:'mask 的第 i 位为 <b>1</b> 就选 <b>nums[i]</b>。'+bin(m,3)+' → 位'+
+        [...bin(m,3)].map((b,i)=>b==='1'?'<span class="bl">'+(2-i)+'</span>':null).filter(Boolean).join('、')+
+        (m===0?'无一位为 1 → <b>空集 {}</b>。':' 为 1 → 子集 <b>'+subsetOf(m)+'</b>。')+
+        (m===7?' n 个元素共 <b>2ⁿ = 8</b> 个子集，枚举复杂度 <b>O(n·2ⁿ)</b>。这与回溯法枚举子集是同一件事，只是把递归树换成了二进制计数。':'')});
+  }
+  function mount(){
+    let bs='';for(let i=0;i<3;i++)bs+='<div class="bit" id="ssb-'+i+'"></div>';
+    let mp='<span>C</span><span>B</span><span>A</span>';
+    let rows='';
+    for(let m=0;m<8;m++)rows+='<tr id="ssr-'+m+'"><td>'+m+'</td><td>'+bin(m,3)+'</td><td>'+subsetOf(m)+'</td></tr>';
+    viz.innerHTML='<div class="vcap"><b>位掩码枚举子集</b>：每一位 = 一个元素选或不选</div>'+
+      '<div class="ss-bits">'+bs+'</div>'+
+      '<div class="ss-map">'+mp+'</div>'+
+      '<div class="ss-result" id="ssres"></div>'+
+      '<table class="ss-table"><thead><tr><th>mask</th><th>二进制</th><th>子集</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  function paint(s){
+    for(let i=0;i<3;i++){
+      const on=(s.mask>>(2-i))&1; // 显示顺序 C(bit2) B(bit1) A(bit0)
+      const el=document.getElementById('ssb-'+i);
+      el.className='bit'+(on?' one':'');
+      el.innerHTML=(on?1:0)+'<span class="w">'+elems[2-i]+'</span>';
+    }
+    document.getElementById('ssres').textContent=subsetOf(s.mask);
+    for(let m=0;m<8;m++){
+      const tr=document.getElementById('ssr-'+m);
+      tr.className=(m===s.mask?'on':(m>s.mask?'future':''));
+    }
+  }
+  return {id:'subset',label:'子集枚举',sub:'mask 000→111',steps,mount,paint,code};
+})();
+
+/* ========== 场景 4：基础位操作 置位/清位/翻转/测试 ========== */
+const basicScene=(()=>{
+  const W=6;
+  const code='mask |= (1&lt;&lt;i);   <span class="cmt">// 置位：第 i 位设为 1</span>\n'+
+    'mask &amp;= ~(1&lt;&lt;i);  <span class="cmt">// 清位：第 i 位设为 0</span>\n'+
+    'mask ^= (1&lt;&lt;i);   <span class="cmt">// 翻转：第 i 位取反</span>\n'+
+    '<span class="kw">bool</span> b = mask &amp; (1&lt;&lt;i);  <span class="cmt">// 测试：该位是否为 1</span>';
+  const steps=[
+    {title:'步骤 0 · mask = 010010',chip:'1<<i 掩码',chipC:'c0',mask:0b010010,i:null,operand:null,result:null,opTag:'',resTag:'',
+     note:'把整数看成一排开关，第 <b>i</b> 位从右往左、从 <b>0</b> 编号',
+     desc:'四种位操作的共同套路：先用 <code>1&lt;&lt;i</code> 造一个"<b>只有第 i 位是 1</b>"的掩码，再和 mask 做 <b>与 / 或 / 异或</b>。下面用同一个 mask 依次演示 <b>测试 → 置位 → 翻转 → 清位</b>,注意每步只动第 i 位，其余位不变。'},
+    {title:'步骤 1 · 测试第 1 位',chip:'mask & (1<<i)',chipC:'cb',mask:0b010010,i:1,operand:0b000010,result:0b000010,opTag:'1&lt;&lt;1',resTag:'结果',
+     note:'第 1 位 = <span class="tf t">1</span>（掩码位存活，结果 ≠ 0）',
+     desc:'<b>测试位</b>:mask &amp; (1&lt;&lt;1)。掩码 <code>000010</code> 只点亮第 1 位，与 mask 相与后只保留 mask 第 1 位的值。结果 <b>非 0</b> → 第 1 位是 <span class="gr">1</span>。常写成 <code>(mask &amp; (1&lt;&lt;i)) != 0</code>。测试不改变 mask。'},
+    {title:'步骤 2 · 测试第 2 位',chip:'mask & (1<<i)',chipC:'cb',mask:0b010010,i:2,operand:0b000100,result:0b000000,opTag:'1&lt;&lt;2',resTag:'结果',
+     note:'第 2 位 = <span class="tf f">0</span>（AND 全灭，结果 = 0）',
+     desc:'换到第 2 位测试。mask 的第 2 位本来是 0，掩码 <code>000100</code> 相与后结果 <b>为 0</b> → 第 2 位是 <span class="dg">0</span>。'},
+    {title:'步骤 3 · 置位第 2 位',chip:'mask |= (1<<i)',chipC:'cb',mask:0b010010,i:2,operand:0b000100,result:0b010110,opTag:'1&lt;&lt;2',resTag:'新 mask',
+     note:'第 2 位 0→1，mask = <b>010110</b>',
+     desc:'<b>置位</b>:mask |= (1&lt;&lt;2)。或运算"只开不关"——掩码为 1 的那位强制变 1，其余位保持不变。第 2 位由 0 变 <span class="bl">1</span>,mask 从 010010 变成 <b>010110</b>。'},
+    {title:'步骤 4 · 翻转第 4 位',chip:'mask ^= (1<<i)',chipC:'cb',mask:0b010110,i:4,operand:0b010000,result:0b000110,opTag:'1&lt;&lt;4',resTag:'新 mask',
+     note:'第 4 位 1→0，mask = <b>000110</b>',
+     desc:'<b>翻转</b>:mask ^= (1&lt;&lt;4)。异或"遇 1 翻转、遇 0 不变"——掩码为 1 的那位取反。第 4 位原本是 1，翻成 <span class="dg">0</span>,mask 变成 <b>000110</b>。常用于开关状态切换。'},
+    {title:'步骤 5 · 清位第 1 位',chip:'mask &= ~(1<<i)',chipC:'cb',mask:0b000110,i:1,operand:0b111101,result:0b000100,opTag:'~(1&lt;&lt;1)',resTag:'新 mask',
+     note:'第 1 位 1→0，mask = <b>000100</b>',
+     desc:'<b>清位</b>:mask &amp;= ~(1&lt;&lt;1)。先把 <code>1&lt;&lt;1 = 000010</code> 取反得 <code>111101</code>（只有第 1 位是 0），再与 mask 相与——第 1 位被强制清 0，其余位因掩码是 1 而保持不变，mask 变成 <b>000100</b>。'},
+    {title:'步骤 6 · 四种操作小结',chip:'口诀：或开 与关 异或翻',chipC:'cg',mask:0b000100,i:null,operand:null,result:null,opTag:'',resTag:'',
+     note:'置位 <b>|</b> · 清位 <b>&amp; ~</b> · 翻转 <b>^</b> · 测试 <b>&amp;</b>',
+     desc:'四种操作都围绕 <code>1&lt;&lt;i</code> 掩码：<b class="bl">置位用 |</b>(只开不关)、<b class="dg">清位用 &amp; ~</b>(只关不开)、<b>翻转用 ^</b>(遇 1 取反)、<b>测试用 &amp;</b>(取出该位)。记住"<b>或开、与关、异或翻</b>",其余位始终不受影响。'},
+  ];
+  function mount(){
+    const row=(pfx)=>{let s='';for(let d=0;d<W;d++)s+='<div class="bit" id="'+pfx+d+'"><span class="w">'+(1<<(W-1-d))+'</span></div>';return s;};
+    viz.innerHTML='<div class="vcap"><b>基础位操作</b>：用 1&lt;&lt;i 掩码 置位 / 清位 / 翻转 / 测试</div>'+
+      '<div class="bk-rows">'+
+        '<div class="bk-line"><span class="tag">mask</span><div class="bitrow">'+row('op1-')+'</div></div>'+
+        '<div class="bk-line"><span class="tag" id="opTag2">—</span><div class="bitrow">'+row('op2-')+'</div></div>'+
+        '<div class="bk-line"><span class="tag" id="opTag3">结果</span><div class="bitrow">'+row('op3-')+'</div></div>'+
+      '</div>'+
+      '<div class="op-note" id="opNote"></div>';
+  }
+  function setRow(pfx,val,tBit,show){
+    for(let d=0;d<W;d++){
+      const bitPos=W-1-d,on=(val>>bitPos)&1;
+      const el=document.getElementById(pfx+d);
+      let cls='bit';
+      if(show){if(on)cls+=' one';if(tBit!==null&&tBit===bitPos)cls+=' target';}
+      el.className=cls;
+      el.innerHTML='<span class="w">'+(1<<bitPos)+'</span>'+(show?(on?1:0):'');
+    }
+  }
+  function paint(s){
+    const has=s.operand!==null;
+    setRow('op1-',s.mask,s.i,true);
+    setRow('op2-',has?s.operand:0,s.i,has);
+    setRow('op3-',has?s.result:0,s.i,has);
+    document.getElementById('opTag2').innerHTML=s.opTag||'—';
+    document.getElementById('opTag3').innerHTML=has?s.resTag:'结果';
+    document.getElementById('opNote').innerHTML=s.note||'';
+  }
+  return {id:'basic',label:'基础操作',sub:'置位/清位/翻转/测试',steps,mount,paint,code};
+})();
+
+/* ========== 场景 5：lowbit  x & -x ========== */
+const lowbitScene=(()=>{
+  const W=8,x=44,notx=(~x)&0xFF,negx=(-x)&0xFF,andv=x&negx,lowPos=2;
+  const rows=[x,notx,negx,andv];
+  const tags=['x','~x','−x = ~x+1','x & −x'];
+  const code='<span class="kw">int</span> lowbit(<span class="kw">int</span> x){\n'+
+    '    <span class="kw">return</span> x &amp; -x;      <span class="cmt">// 取最低位的 1</span>\n}\n\n'+
+    '<span class="cmt">// 树状数组靠它跳转：</span>\n'+
+    'i += lowbit(i);  <span class="cmt">// 更新上跳</span>\n'+
+    'i -= lowbit(i);  <span class="cmt">// 查询下跳</span>';
+  const steps=[
+    {reveal:1,title:'步骤 0 · x = 00101100 (44)',chip:'lowbit = x & -x',chipC:'c0',
+     note:'目标：只取出 x <b>最低位的那个 1</b>（第 <span class="dg">2</span> 位，值 4）',
+     desc:'<b>lowbit(x) = x &amp; -x</b> 能把 x 最低位的 1 单独取出来，是树状数组的核心；它与 <code>x &amp; (x-1)</code>(删最低位的 1)正好互补。下面用<b>补码</b>解释它为何成立。x 的最低位 1 在第 <span class="dg">2</span> 位。'},
+    {reveal:2,title:'步骤 1 · 取反 ~x',chip:'~x',chipC:'cb',
+     note:'~x 每位翻转：最低位 1 右边的 0 全变成 1',
+     desc:'先看 <b>~x</b>:每一位取反。关键观察——x 里"最低位 1 <b>右边</b>"原本全是 0，取反后<b>全变成 1</b>;最低位 1 那一位由 1 变 <b>0</b>。'},
+    {reveal:3,title:'步骤 2 · 补码 -x = ~x + 1',chip:'-x = ~x + 1',chipC:'ch',
+     note:'~x 再 +1：低位一路进位，正好把第 2 位重新变回 1',
+     desc:'补码 <b>-x = ~x + 1</b>。~x 末尾那串 1 加 1 会<b>连续进位</b>,一路推到"最低位 1"原来的位置才停下：于是第 <span class="dg">2</span> 位又变回 <b>1</b>,它右边全部归 0。结果是——<b>-x 与 x 在"最低位 1 及其右侧"完全相同，左侧则全部相反</b>。'},
+    {reveal:4,title:'步骤 3 · x & -x = 00000100',chip:'只留最低位 1',chipC:'cg',
+     note:'lowbit = 00000100 = <b>4</b>',
+     desc:'x 与 -x 相与：左侧各位一个是原值、一个是它的反，<b>相与必为 0</b>;右侧两者都是 0；唯独<b>最低位 1</b> 两边都是 1 → 存活。所以 <b>x &amp; -x</b> 恰好只剩最低位的 1 = <b>4</b>。'},
+    {reveal:4,title:'步骤 4 · 用途小结',chip:'树状数组 lowbit',chipC:'cg',
+     note:'一对互补技巧：<b>x &amp; (x-1)</b> 删最低位 1 · <b>x &amp; -x</b> 取最低位 1',
+     desc:'<b>lowbit(i) = i &amp; -i</b> 是树状数组(Fenwick Tree)的地基：下标 i 管辖长度为 lowbit(i) 的区间，更新/查询靠 <code>i += lowbit(i)</code> 与 <code>i -= lowbit(i)</code> 跳转。'},
+  ];
+  function mount(){
+    let html='';
+    for(let r=0;r<4;r++){
+      let bs='';for(let d=0;d<W;d++)bs+='<div class="bit" id="lb'+r+'-'+d+'"><span class="w">'+(1<<(W-1-d))+'</span></div>';
+      html+='<div class="bk-line"><span class="tag">'+tags[r]+'</span><div class="bitrow">'+bs+'</div></div>';
+    }
+    viz.innerHTML='<div class="vcap"><b>lowbit = x &amp; -x</b>：补码取出最低位的 1</div>'+
+      '<div class="bk-rows" style="gap:12px">'+html+'</div>'+
+      '<div class="op-note" id="lbNote"></div>';
+  }
+  function paint(s){
+    for(let r=0;r<4;r++){
+      const show=r<s.reveal,val=rows[r];
+      for(let d=0;d<W;d++){
+        const bitPos=W-1-d,on=(val>>bitPos)&1;
+        const el=document.getElementById('lb'+r+'-'+d);
+        let cls='bit';
+        if(show){if(on)cls+=' one';if(on&&bitPos===lowPos&&r!==1)cls+=' lowbit';}
+        el.className=cls;
+        el.innerHTML='<span class="w">'+(1<<bitPos)+'</span>'+(show?(on?1:0):'');
+      }
+    }
+    document.getElementById('lbNote').innerHTML=s.note||'';
+  }
+  return {id:'lowbit',label:'lowbit',sub:'x & -x 取最低位',steps,mount,paint,code};
+})();
+
+/* ========== 场景 6：异或分组 260 两个只出现一次的数 ========== */
+const groupScene=(()=>{
+  const nums=[1,2,1,3,2,5],W=4;
+  const xorAll=nums.reduce((a,b)=>a^b,0);   // 6
+  const low=xorAll&(-xorAll);               // 2
+  const lowPos=1;
+  const grp=nums.map(v=>(v&low)?1:0);
+  const code='<span class="kw">int</span> x = 0;\n'+
+    '<span class="kw">for</span> (<span class="kw">int</span> v : nums) x ^= v;   <span class="cmt">// x = a ^ b</span>\n'+
+    '<span class="kw">int</span> d = x &amp; -x;              <span class="cmt">// 最低不同位</span>\n'+
+    '<span class="kw">int</span> a = 0;\n'+
+    '<span class="kw">for</span> (<span class="kw">int</span> v : nums)\n'+
+    '    <span class="kw">if</span> (v &amp; d) a ^= v;       <span class="cmt">// 只异或组 1</span>\n'+
+    '<span class="kw">int</span> b = x ^ a;              <span class="cmt">// 另一个数</span>';
+  const steps=[
+    {title:'步骤 0 · nums = [1,2,1,3,2,5]',chip:'两个数只出现一次',chipC:'c0',colored:false,showXor:false,showLow:false,
+     desc:'数组里 <b>3</b> 和 <b>5</b> 各出现一次，其余每个出现两次，要一次找出这两个数。136 题只有一个单独数，直接全异或即可；这里有<b>两个</b>,全异或只会得到 <b>3 ^ 5</b>,两数混在一起，需要设法分开。'},
+    {title:'步骤 1 · 全部异或 xorAll',chip:'xorAll = 3 ^ 5 = 6',chipC:'cb',colored:false,showXor:true,showLow:false,
+     desc:'先把所有数异或。出现两次的 <b>1、2</b> 成对抵消，只剩两个单独数的异或：<b>xorAll = 3 ^ 5 = 6</b>(0110)。问题变成：怎样从 3 ^ 5 里把 3、5 拆开。'},
+    {title:'步骤 2 · 取 lowbit 找区分位',chip:'6 & -6 = 2',chipC:'ch',colored:false,showXor:true,showLow:true,
+     desc:'xorAll 某一位是 <b>1</b>,说明 3 和 5 在这一位上<b>一定不同</b>(异或为 1 即两数该位相异)。取最低位的 1:<b>lowbit(6) = 6 &amp; -6 = 2</b>(第 <span class="dg">1</span> 位)，用它当"分组开关"。'},
+    {title:'步骤 3 · 按第 1 位分两组',chip:'num & d 分流',chipC:'cb',colored:true,showXor:true,showLow:true,
+     desc:'遍历数组，按<b>第 1 位是 0 还是 1</b>(<code>num &amp; d</code>)分成两组。3 和 5 这一位不同，<b>被分到不同组</b>;出现两次的数彼此相等，必然落在<b>同一组</b>。<span class="bl">组 0：1,1,5</span> · <b style="color:var(--brown)">组 1：2,3,2</b>。'},
+    {title:'步骤 4 · 组内各自异或',chip:'组内 = 136 题',chipC:'cb',colored:true,showXor:true,showLow:true,g0:'1^1^5 = <b>5</b>',g1:'2^3^2 = <b>3</b>',
+     desc:'每组内部退化成 136 题：成对的数(1,1 与 2,2)再次抵消，各自只剩一个单独数。<b>组 0 → 5</b>,<b>组 1 → 3</b>。'},
+    {title:'步骤 5 · 答案 {5, 3}',chip:'O(n) 一次遍历',chipC:'cg',colored:true,showXor:true,showLow:true,g0:'= <b>5</b>',g1:'= <b>3</b>',
+     desc:'两个只出现一次的数是 <b>{5, 3}</b>。整条链路：<b>全异或 → 取 lowbit 定区分位 → 分组 → 组内再异或</b>,时间 <b>O(n)</b>、额外空间 <b>O(1)</b>。这正是 260 题标准解法，把<b>异或消除</b>和 <b>lowbit</b> 两个套路串在了一起。'},
+  ];
+  function mount(){
+    let ns='';nums.forEach((v,i)=>ns+='<div class="xnum" id="gn-'+i+'">'+v+'</div>');
+    let xb='';for(let d=0;d<W;d++)xb+='<div class="bit" id="gx-'+d+'"><span class="w">'+(1<<(W-1-d))+'</span></div>';
+    let lb='';for(let d=0;d<W;d++)lb+='<div class="bit" id="gl-'+d+'"><span class="w">'+(1<<(W-1-d))+'</span></div>';
+    viz.innerHTML='<div class="vcap"><b>异或分组</b>：找出两个只出现一次的数（260 题）</div>'+
+      '<div class="xor-nums">'+ns+'</div>'+
+      '<div class="mini-cap">全部异或 → xorAll</div>'+
+      '<div class="bitrow">'+xb+'</div>'+
+      '<div class="mini-cap" style="margin-top:12px">lowbit(xorAll) = xorAll &amp; -xorAll</div>'+
+      '<div class="bitrow">'+lb+'</div>'+
+      '<div class="grp-wrap">'+
+        '<div class="grp g0"><div class="glbl">组 0 · 第 1 位 = 0</div><div class="gval" id="gg0">—</div></div>'+
+        '<div class="grp g1"><div class="glbl">组 1 · 第 1 位 = 1</div><div class="gval" id="gg1">—</div></div>'+
+      '</div>';
+  }
+  function paint(s){
+    nums.forEach((v,i)=>{
+      const el=document.getElementById('gn-'+i);
+      el.className='xnum'+(s.colored?(grp[i]?' g1':' g0'):'');
+    });
+    for(let d=0;d<W;d++){
+      const bitPos=W-1-d;
+      const gx=document.getElementById('gx-'+d);
+      if(s.showXor){const on=(xorAll>>bitPos)&1;gx.className='bit'+(on?' one':'');gx.innerHTML='<span class="w">'+(1<<bitPos)+'</span>'+(on?1:0);}
+      else{gx.className='bit';gx.innerHTML='<span class="w">'+(1<<bitPos)+'</span>';}
+      const gl=document.getElementById('gl-'+d);
+      if(s.showLow){const on=(low>>bitPos)&1;gl.className='bit'+(on?' one':'')+((on&&bitPos===lowPos)?' lowbit':'');gl.innerHTML='<span class="w">'+(1<<bitPos)+'</span>'+(on?1:0);}
+      else{gl.className='bit';gl.innerHTML='<span class="w">'+(1<<bitPos)+'</span>';}
+    }
+    document.getElementById('gg0').innerHTML=s.g0||'—';
+    document.getElementById('gg1').innerHTML=s.g1||'—';
+  }
+  return {id:'group',label:'异或分组',sub:'260 两个单独数',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[basicScene,xorScene,bkScene,lowbitScene,groupScene,subsetScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const lcList=document.getElementById('lcList');
+
+// 频率来自仓库内 CodeTop 高频题 Top300.json；其余题目是位运算补充练习。
+const CODETOP_FREQ={
+  'https://leetcode.cn/problems/single-number':{value:53,rank:115},
+  'https://leetcode.cn/problems/single-number-iii':{value:20,rank:227},
+  'https://leetcode.cn/problems/number-of-1-bits':{value:20,rank:228},
+  'https://leetcode.cn/problems/missing-number':{value:16,rank:269}
+};
+const BIT_PROBLEMS=[
+  {id:'136',title:'只出现一次的数字',topic:'异或消除',url:'https://leetcode.cn/problems/single-number/'},
+  {id:'260',title:'只出现一次的数字 III',topic:'异或分组',url:'https://leetcode.cn/problems/single-number-iii/'},
+  {id:'191',title:'位 1 的个数',topic:'Brian Kernighan',url:'https://leetcode.cn/problems/number-of-1-bits/'},
+  {id:'338',title:'比特位计数',topic:'位运算 DP',url:'https://leetcode.cn/problems/counting-bits/'},
+  {id:'268',title:'丢失数字',topic:'异或 / 求和',url:'https://leetcode.cn/problems/missing-number/'},
+  {id:'231',title:'2 的幂',topic:'n & (n−1)',url:'https://leetcode.cn/problems/power-of-two/'},
+  {id:'190',title:'颠倒二进制位',topic:'逐位翻转',url:'https://leetcode.cn/problems/reverse-bits/'},
+  {id:'371',title:'两整数之和',topic:'无加法器',url:'https://leetcode.cn/problems/sum-of-two-integers/'},
+  {id:'405',title:'数字转换为十六进制数',topic:'低 4 位',url:'https://leetcode.cn/problems/convert-a-number-to-hexadecimal/'},
+  {id:'476',title:'数字的补数',topic:'掩码取反',url:'https://leetcode.cn/problems/number-complement/'},
+  {id:'693',title:'交替位二进制数',topic:'相邻位判断',url:'https://leetcode.cn/problems/binary-number-with-alternating-bits/'},
+  {id:'421',title:'数组中两个数的最大异或值',topic:'Trie / 位贪心',url:'https://leetcode.cn/problems/maximum-xor-of-two-numbers-in-an-array/'}
+];
+const normaliseUrl=url=>url.replace(/\/$/,'');
+function renderBitProblems(){
+  lcList.innerHTML=BIT_PROBLEMS.map(item=>{
+    const record=CODETOP_FREQ[normaliseUrl(item.url)];
+    const label=record?'HOT · '+record.value:'不常考';
+    const title=record?item.id+'. '+item.title+' · CodeTop 排名 '+record.rank+' · 频率 '+record.value:item.id+'. '+item.title+' · 未进入 CodeTop Top300';
+    return '<a class="lc-a" href="'+item.url+'" target="_blank" rel="noopener noreferrer" title="'+title+'">'+
+      '<span class="lc-name">'+item.id+'. '+item.title+'</span><span class="lc-topic">'+item.topic+'</span><span class="lc-freq'+(record?'':' none')+'">'+label+'</span></a>';
+  }).join('');
+}
+renderBitProblems();
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

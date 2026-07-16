@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>浮点数精度损失 · float 只有约 7 位有效数字</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;      /* a · 大数 */
+  --brown:#854F0B;--brownbg:#FAEEDA;    /* b · 小数 */
+  --green:#0F6E56;--greenbg:#E1F5EE;    /* 精度窗口 */
+  --purple:#6B5E8A;--purplebg:#ECE7F2;  /* 指数位 */
+  --danger:#B3402F;--dangerbg:#F6E0DB;  /* 被丢弃 */
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.layout{display:grid;grid-template-columns:560px 1fr;gap:26px;margin-top:24px;align-items:start;}
+@media(max-width:1020px){.layout{grid-template-columns:1fr;}}
+
+/* ---------- 左：可视化面板 ---------- */
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:16px;}
+.viz .cap{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;}
+.block{transition:opacity var(--dur) var(--ease);}
+.block.dim{opacity:.28;}
+.block.hide{display:none;}
+
+/* 位构造条 */
+.bitstrip{display:flex;gap:1px;}
+.bit{flex:1;height:30px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;border-radius:2px;transition:all var(--dur) var(--ease);}
+.bit.s{background:var(--gray);color:var(--muted);}
+.bit.e{background:var(--purplebg);color:var(--purple);}
+.bit.m{background:var(--bluebg);color:var(--blue);}
+.bitlegend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin-top:6px;flex-wrap:wrap;}
+.bitlegend i{width:10px;height:10px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:4px;}
+
+/* 十进制对位轨道 */
+.rail{display:flex;flex-direction:column;gap:6px;}
+.rrow{display:grid;grid-template-columns:52px repeat(8,1fr) 12px repeat(6,1fr);gap:2px;align-items:center;transition:opacity var(--dur) var(--ease);}
+.rrow.hide{opacity:0;pointer-events:none;}
+.rrow .rl{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;padding-right:6px;}
+.cell{height:32px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;border-radius:5px;background:var(--gray);color:var(--ink);transition:all var(--dur) var(--ease);}
+.cell.empty{background:transparent;}
+.cell.dot{background:transparent;font-weight:700;}
+.cell.a{background:var(--bluebg);color:var(--blue);}
+.cell.b{background:var(--brownbg);color:var(--brown);font-weight:700;}
+.cell.win{box-shadow:inset 0 0 0 2px var(--green);}
+.cell.dead{background:var(--dangerbg);color:var(--danger);opacity:.55;transform:translateY(7px);}
+.cell.flash{animation:flash .9s var(--ease);}
+@keyframes flash{0%{background:var(--greenbg);box-shadow:0 0 0 3px var(--green);}100%{}}
+.rrow.hd .cell{height:18px;font-size:9px;background:transparent;color:var(--faint);}
+.winlabel{font-size:11px;color:var(--green);font-weight:600;text-align:left;padding-left:52px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.winlabel.show{opacity:1;}
+
+/* ---------- 右 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:170px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cs{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .ca{color:var(--blue);font-weight:600;}
+.desc-body .cb{color:var(--brown);font-weight:600;}
+
+.codecard{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 18px;font-family:var(--mono);font-size:13px;line-height:1.9;color:var(--ink);}
+.codecard .cm{color:var(--faint);}
+.codecard .ka{color:var(--blue);font-weight:700;}
+.codecard .kb{color:var(--brown);font-weight:700;}
+
+/* 自由操作区 */
+.free{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 18px;}
+.free .lbl{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.free .row{display:flex;gap:10px;flex-wrap:wrap;}
+.act{font:inherit;font-family:var(--mono);font-size:13px;font-weight:500;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid;transition:all .15s var(--ease);color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.act:hover{background:#f5e4c8;}
+.act:active{transform:scale(.96);}
+.freeout{margin-top:10px;font-size:13px;color:var(--muted);min-height:44px;}
+.freeout b{color:var(--ink);}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>浮点数精度损失 · float 只有约 7 位有效数字</h1>
+    <p><code>65923600.f + 0.000001f</code> 为什么等于原值 —— 大数吃小数的全过程　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="layout">
+    <!-- 左：可视化 -->
+    <section class="viz">
+      <div class="block" id="blkBits">
+        <div class="cap"><span>float 的 32 位构造（a = 65923600.f 的真实位型）</span></div>
+        <div class="bitstrip" id="bitstrip"></div>
+        <div class="bitlegend">
+          <span><i style="background:var(--gray)"></i>S 符号 ×1</span>
+          <span><i style="background:var(--purplebg)"></i>E 指数 ×8</span>
+          <span><i style="background:var(--bluebg)"></i>M 尾数 ×23（+隐含 1 = 24 位 ≈ 7 位十进制）</span>
+        </div>
+      </div>
+
+      <div class="block" id="blkRail">
+        <div class="cap"><span>十进制对位视角</span><span style="font-family:var(--mono)">10⁷ ←→ 10⁻⁶</span></div>
+        <div class="rail">
+          <div class="rrow hd"><span class="rl"></span><span class="cell">10⁷</span><span class="cell">10⁶</span><span class="cell">10⁵</span><span class="cell">10⁴</span><span class="cell">10³</span><span class="cell">10²</span><span class="cell">10¹</span><span class="cell">10⁰</span><span class="cell dot"></span><span class="cell">⁻¹</span><span class="cell">⁻²</span><span class="cell">⁻³</span><span class="cell">⁻⁴</span><span class="cell">⁻⁵</span><span class="cell">⁻⁶</span></div>
+          <div class="rrow" id="rowA"><span class="rl">a</span></div>
+          <div class="rrow" id="rowB"><span class="rl">b</span></div>
+          <div class="rrow" id="rowI"><span class="rl">理想和</span></div>
+          <div class="rrow" id="rowF"><span class="rl">float 存下</span></div>
+        </div>
+        <div class="winlabel" id="winLabel">▔▔▔ float 精度窗口 ≈ 7 位 ▔▔▔（窗口外一律丢弃）</div>
+      </div>
+    </section>
+
+    <!-- 右 -->
+    <section class="right">
+      <div class="codecard">
+        <span class="cm">// 出自笔记 2.1 §4.2</span><br>
+        float <span class="ka">a</span>{ 65923600. }, <span class="kb">b</span>{ 0.000001 };<br>
+        float c{ <span class="ka">a</span> + <span class="kb">b</span> };&nbsp;&nbsp;<span class="cm">// c = ?</span>
+      </div>
+
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+
+      <div class="free">
+        <div class="lbl">自由操作 —— 换个 b 试试，多大才能"挤进窗口"？</div>
+        <div class="row">
+          <button class="act" data-b="0.000001">b = 0.000001</button>
+          <button class="act" data-b="1">b = 1</button>
+          <button class="act" data-b="2">b = 2</button>
+          <button class="act" data-b="4">b = 4</button>
+        </div>
+        <div class="freeout" id="freeOut">在 65923600 这个量级上，float 能分辨的最小差距（ulp）其实是 <b>4</b>——点按钮亲手验证。</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+/* ---------- 位构造条：65923600.f 的真实 IEEE 754 位型 ---------- */
+const SIGN='0', EXP='10011000', MANT='11110110111101010000100'; // 152=127+25
+const bitstrip=document.getElementById('bitstrip');
+[...SIGN].forEach(v=>{const d=document.createElement('div');d.className='bit s';d.textContent=v;bitstrip.appendChild(d);});
+[...EXP ].forEach(v=>{const d=document.createElement('div');d.className='bit e';d.textContent=v;bitstrip.appendChild(d);});
+[...MANT].forEach(v=>{const d=document.createElement('div');d.className='bit m';d.textContent=v;bitstrip.appendChild(d);});
+
+/* ---------- 十进制轨道 ---------- */
+/* 15 列：8 整数位 + 小数点 + 6 小数位。win = 精度窗口盖住的前 8 列 */
+const DIG_A=['6','5','9','2','3','6','0','0','.','0','0','0','0','0','0'];
+const DIG_B=['','','','','','','','0','.','0','0','0','0','0','1'];
+const DIG_I=['6','5','9','2','3','6','0','0','.','0','0','0','0','0','1'];
+const DIG_F=['6','5','9','2','3','6','0','0','.','·','·','·','·','·','·'];
+function buildRow(rowId,digs,cls){
+  const row=document.getElementById(rowId);
+  digs.forEach((v,i)=>{
+    const c=document.createElement('span');
+    c.className='cell'+(v===''?' empty':v==='.'?' dot':'');
+    if(v!==''&&v!=='.'&&cls)c.classList.add(cls);
+    c.dataset.col=i;c.textContent=v;
+    row.appendChild(c);
+  });
+}
+buildRow('rowA',DIG_A,'a');
+buildRow('rowB',DIG_B,'b');
+buildRow('rowI',DIG_I,'a');
+buildRow('rowF',DIG_F,'a');
+/* b 行里那个关键的 1 */
+document.querySelectorAll('#rowB .cell').forEach(c=>{if(c.textContent==='1')c.classList.add('b');});
+document.querySelectorAll('#rowI .cell').forEach(c=>{if(c.dataset.col==='14')c.classList.replace('a','b');});
+
+const rowB=document.getElementById('rowB'),rowI=document.getElementById('rowI'),rowF=document.getElementById('rowF');
+const blkBits=document.getElementById('blkBits'),blkRail=document.getElementById('blkRail');
+const winLabel=document.getElementById('winLabel');
+
+function setWin(on){ /* 窗口 = 前 8 个数字列（col 0-7） */
+  ['rowA','rowI','rowF'].forEach(id=>{
+    document.querySelectorAll('#'+id+' .cell').forEach(c=>{
+      const col=+c.dataset.col;
+      if(!isNaN(col)&&col<8)c.classList.toggle('win',on);
+    });
+  });
+  winLabel.classList.toggle('show',on);
+}
+function setDrop(on){ /* 理想和窗口外的数字被丢弃 */
+  document.querySelectorAll('#rowI .cell').forEach(c=>{
+    const col=+c.dataset.col;
+    if(!isNaN(col)&&col>8)c.classList.toggle('dead',on);
+  });
+}
+function setFloatDigits(digs){
+  document.querySelectorAll('#rowF .cell').forEach((c,idx)=>{
+    if(c.textContent!==digs[idx]){c.textContent=digs[idx];c.classList.add('flash');setTimeout(()=>c.classList.remove('flash'),950);}
+  });
+}
+
+/* ---------- 步骤 ---------- */
+const STEPS=[
+  { title:'步骤 0 · 一道诡异的加法', chip:'问题', chipC:'c0',
+    desc:'<span class="ca">a = 65923600</span>，<span class="cb">b = 0.000001</span>，然后 <code>float c = a + b</code> —— 直觉上 c 应该比 a 大一丁点，但打印出来 <b>c == a 完全成立</b>。加法"失效"了？',
+    fx:{bits:'dim',showI:false,showF:false,win:false,drop:false} },
+  { title:'步骤 1 · float 的 32 位构造', chip:'1 + 8 + 23', chipC:'cs',
+    desc:'float = <b>1 位符号 + 8 位指数 + 23 位尾数</b>。尾数加上隐含的 1 共 24 位，2²⁴ ≈ 1677 万，折成十进制<b>有效数字只有约 7 位</b>。它记得住"数量级"（指数很能装），但"细节"只有尾数这么宽。',
+    fx:{bits:'on',railDim:true,showI:false,showF:false,win:false,drop:false} },
+  { title:'步骤 2 · 加法先对位', chip:'理想的和', chipC:'c0',
+    desc:'加法要先把小数点对齐。理想的和是 <code>65923600.000001</code> —— 从最高位 6 到 <span class="cb">b</span> 贡献的那个 1，<b>横跨 14 位有效数字</b>。而 float 只有 7 位的"存储宽度"。',
+    fx:{bits:'dim',showI:true,showF:false,win:false,drop:false} },
+  { title:'步骤 3 · 精度窗口盖下来', chip:'舍入丢位', chipC:'cd',
+    desc:'尾数只罩得住<b>最前面的约 7 位</b>（绿色窗口）。<span class="cb">b</span> 那个 1 远在窗口外 —— 按二进制说，它要<b>右移 45 位</b>才能和 a 对阶，而尾数一共才 23 位，<b>移着移着就全掉光了</b>。窗口外的数字被直接舍弃。',
+    fx:{bits:'dim',showI:true,showF:false,win:true,drop:true} },
+  { title:'步骤 4 · c 就是 a', chip:'c == a → true', chipC:'cd',
+    desc:'舍弃之后 <span class="cb">b</span> 的贡献是 0，<code>c</code> 存进内存的位型和 <span class="ca">a</span> <b>一 bit 不差</b>。这不是 bug，是构造决定的：<b>大数吃小数</b>。两个数量级悬殊的浮点数相加，小的可能完全消失。',
+    fx:{bits:'dim',showI:true,showF:true,win:true,drop:true} },
+  { title:'步骤 5 · 工程上怎么防', chip:'三条习惯', chipC:'cg',
+    desc:'① 精度敏感就换 <code>double</code>（约 16 位有效数字，本题足够）；② 避免悬殊相加：求和从小数开始累加；③ 浮点判等<b>永远不用 ==</b>，用 <code>std::abs(x-y) &lt; eps</code>。',
+    fx:{bits:'dim',showI:true,showF:true,win:true,drop:true} },
+];
+
+/* ---------- 渲染 ---------- */
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const dotsBox=document.getElementById('dots');const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(i);};dotsBox.appendChild(d);dotEls.push(d);});
+
+let cur=0;
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur],fx=s.fx;
+  blkBits.className='block'+(fx.bits==='on'?'':fx.bits==='dim'?' dim':' hide');
+  blkRail.className='block'+(fx.railDim?' dim':'');
+  rowI.classList.toggle('hide',!fx.showI);
+  rowF.classList.toggle('hide',!fx.showF);
+  setWin(fx.win);setDrop(fx.drop);
+  if(fx.showF)setFloatDigits(DIG_F);
+  stTitle.textContent=s.title;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(STEPS.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===STEPS.length-1;
+  if(cur===STEPS.length-1)stop();
+}
+
+/* ---------- 自由操作：换 b ---------- */
+const A=65923600;
+const freeOut=document.getElementById('freeOut');
+const MSG={
+  '0.000001':'<b>c = 65,923,600</b>，没变。和 a 差 8 个数量级，对阶时早被移出尾数丢光了。',
+  '1':'<b>c = 65,923,600</b>，居然还是没变！窗口最后一位的"刻度"（ulp）是 <b>4</b>，+1 不到半格，四舍五入弹回原值。',
+  '2':'<b>c = 65,923,600</b>，仍然没变 —— 正好卡在半格上，IEEE 754 按"四舍六入五取偶"舍向偶数侧，还是原值。',
+  '4':'<b>c = 65,923,604</b>，终于变了！刚好跨满一个刻度。float 在 6 千万量级上能分辨的最小差距就是 4。',
+};
+document.querySelectorAll('.act').forEach(btn=>{
+  btn.onclick=()=>{
+    stop();
+    const bv=parseFloat(btn.dataset.b);
+    const c=Math.fround(A+bv);           // 真实的 float 单次舍入
+    const digs=String(c).padStart(8,'0').split('');
+    setFloatDigits([...digs,'.','·','·','·','·','·','·']);
+    rowF.classList.remove('hide');setWin(true);
+    freeOut.innerHTML=MSG[btn.dataset.b]+'（真实计算：Math.fround(a+b) = '+c+'）';
+  };
+});
+
+/* ---------- 播放 ---------- */
+let timer=null,ms=2400;
+function play(){if(cur===STEPS.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const m=location.hash.match(/step=(\d+)/);go(m?+m[1]:0);
+</script>
+</body>
+</html>

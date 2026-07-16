@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图与图算法动画 · 网格DFS / 多源BFS / Kruskal MST / 最短路 vs MST</title>
+<style>
+:root{
+  /* Same teaching-tool system as the algorithm animation collection. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:232px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}
+
+/* 图区域 */
+.grapharea{position:relative;height:238px;margin:0 8px;}
+.gedge{position:absolute;height:2px;background:currentColor;color:var(--line);transform-origin:left center;transition:color var(--dur) var(--ease),height var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gedge.hot{color:var(--brown);height:3px;}
+.gedge.done{color:var(--green);height:3px;}
+.gedge.bad{color:var(--danger);height:3px;}
+.gedge.dim{opacity:.22;}
+.gw{position:absolute;z-index:2;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--grid);border-radius:6px;padding:0 5px;transform:translate(-50%,-50%);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gw.hot{color:var(--brown);border-color:var(--brown);}
+.gw.dim{opacity:.3;}
+.gnode{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2px solid var(--line);background:var(--paper);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);z-index:1;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gnode .nv{font-size:16px;font-weight:800;line-height:1;}
+.gnode .nsub{position:absolute;bottom:-19px;font-size:10px;color:var(--faint);font-weight:700;font-family:var(--mono);}
+.gnode.inq{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.gnode.done{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.gnode.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.14);box-shadow:0 0 0 4px rgba(24,95,165,.16);z-index:2;}
+
+/* 数组 / 队列单元格 */
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:12px 0 6px;}
+.cellrow{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap;}
+.cell{position:relative;width:46px;height:38px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease);}
+.cell.wide{width:66px;}
+.cell .cw{position:absolute;bottom:-15px;font-size:9px;color:var(--faint);font-weight:400;}
+.cell.on{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.cell.ok{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.cell.hot{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.cell.bad{color:var(--danger);background:var(--dangerbg);border-color:var(--danger);text-decoration:line-through;}
+.cell.dim{opacity:.35;}
+
+/* 网格 */
+.ggrid{display:grid;gap:5px;justify-content:center;margin-top:10px;}
+.gc{width:50px;height:46px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:700;color:var(--muted);position:relative;transition:all var(--dur) var(--ease);}
+.gc .gi{position:absolute;bottom:1px;right:4px;font-size:8px;color:var(--faint);font-weight:400;}
+.gc.water{background:var(--gray);color:var(--faint);border-color:var(--grid);}
+.gc.land{background:var(--brownbg);color:var(--brown);border-color:var(--brown);}
+.gc.flood{background:var(--greenbg);color:var(--green);border-color:var(--green);}
+.gc.rot{background:var(--dangerbg);color:var(--danger);border-color:var(--danger);}
+.gc.cur{transform:scale(1.12);box-shadow:0 0 0 4px rgba(24,95,165,.16);border-color:var(--blue);z-index:2;}
+
+.op-note{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:auto;padding-top:12px;min-height:34px;}
+.op-note b{color:var(--ink);}.op-note .bl{color:var(--blue);}.op-note .gr{color:var(--green);}.op-note .dg{color:var(--danger);}.op-note .br{color:var(--brown);}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.viz{min-height:478px;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:232px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;min-height:448px;}.tab{flex:1 1 128px;}.grapharea{height:212px;margin:0;}.gnode{width:40px;height:40px;margin:-20px 0 0 -20px;}.gnode .nv{font-size:14px;}.cell{width:40px;}.cell.wide{width:58px;}.gc{width:40px;height:38px;font-size:13px;}.controls{padding:12px;gap:8px;}.dots{order:4;width:100%;}.codebox{font-size:11px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>图与图算法动画 · 从网格建模到最小生成树</h1>
+    <p>网格 DFS 岛屿 / 多源 BFS 腐烂橘子 / Kruskal MST / 最短路 vs MST　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ============ 通用图绘制（build once + mutate） ============ */
+function graphMarkup(prefix,G,caption){
+  let html='';
+  G.edges.forEach((e,i)=>{
+    html+='<span class="gedge" id="'+prefix+'e'+i+'"></span>';
+    if(e.w!==undefined)html+='<span class="gw" id="'+prefix+'w'+i+'">'+e.w+'</span>';
+  });
+  G.nodes.forEach(n=>{
+    html+='<div class="gnode" id="'+prefix+'n'+n.id+'" style="left:'+n.x+'%;top:'+n.y+'%"><span class="nv">'+n.id+'</span><span class="nsub" id="'+prefix+'s'+n.id+'"></span></div>';
+  });
+  return '<div class="vcap">'+caption+'</div><div class="grapharea" id="'+prefix+'area">'+html+'</div>';
+}
+function layoutGraph(prefix,G){
+  const area=document.getElementById(prefix+'area');if(!area)return;
+  const w=area.clientWidth,h=area.clientHeight;
+  G.edges.forEach((e,i)=>{
+    const na=G.nodes.find(n=>n.id===e.a),nb=G.nodes.find(n=>n.id===e.b);
+    const x1=na.x/100*w,y1=na.y/100*h,x2=nb.x/100*w,y2=nb.y/100*h;
+    const dx=x2-x1,dy=y2-y1;
+    const line=document.getElementById(prefix+'e'+i);
+    line.style.left=x1+'px';line.style.top=y1+'px';
+    line.style.width=Math.hypot(dx,dy)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';
+    const wl=document.getElementById(prefix+'w'+i);
+    if(wl){wl.style.left=(x1+dx*0.5)+'px';wl.style.top=(y1+dy*0.5)+'px';}
+  });
+}
+function paintGraph(prefix,G,s){
+  const cls=s.cls||{},sub=s.sub||{},emap=s.emap||{};
+  G.nodes.forEach(n=>{
+    const el=document.getElementById(prefix+'n'+n.id);
+    let c='gnode';if(cls[n.id])c+=' '+cls[n.id];if(s.active===n.id)c+=' active';
+    el.className=c;
+    document.getElementById(prefix+'s'+n.id).textContent=(sub[n.id]!==undefined?sub[n.id]:'');
+  });
+  G.edges.forEach((e,i)=>{
+    document.getElementById(prefix+'e'+i).className='gedge'+(emap[i]?' '+emap[i]:'');
+    const wl=document.getElementById(prefix+'w'+i);
+    if(wl)wl.className='gw'+(emap[i]==='hot'?' hot':'')+(emap[i]==='dim'?' dim':'');
+  });
+}
+function cellsMarkup(prefix,n,labels,wide){
+  let s='';for(let i=0;i<n;i++)s+='<div class="cell'+(wide?' wide':'')+'" id="'+prefix+i+'"><span class="cv" id="'+prefix+'v'+i+'">·</span>'+(labels?'<span class="cw">'+labels[i]+'</span>':'')+'</div>';
+  return '<div class="cellrow">'+s+'</div>';
+}
+function paintCells(prefix,n,vals,marks,wide){
+  for(let i=0;i<n;i++){
+    const has=i<vals.length&&vals[i]!==null&&vals[i]!==undefined;
+    document.getElementById(prefix+i).className='cell'+(wide?' wide':'')+(has&&marks&&marks[i]?' '+marks[i]:'');
+    document.getElementById(prefix+'v'+i).textContent=has?String(vals[i]):'·';
+  }
+}
+
+/* ========== 场景 1：网格 DFS 岛屿数量（LC 200） ========== */
+const islandScene=(()=>{
+  // 4×5：1=陆地
+  const M=[[1,1,0,0,0],[1,1,0,0,1],[0,0,0,1,1],[1,0,0,0,0]];
+  const key=(r,c)=>r*5+c;
+  const code='<span class="kw">int</span> <span class="fn">numIslands</span>(<span class="kw">auto</span>&amp; grid){\n'+
+    '    <span class="kw">int</span> count = 0;\n'+
+    '    <span class="kw">for</span> (每个格子 (r,c))\n'+
+    '        <span class="kw">if</span> (grid[r][c] == \'1\') { ++count; <span class="fn">dfs</span>(r,c); }\n'+
+    '    <span class="kw">return</span> count;\n}\n'+
+    '<span class="kw">void</span> <span class="fn">dfs</span>(r, c){          <span class="cmt">// 淹没整块岛</span>\n'+
+    '    <span class="kw">if</span> (越界 || grid[r][c] != \'1\') <span class="kw">return</span>;\n'+
+    '    grid[r][c] = \'0\';    <span class="cmt">// 原地标记 visited</span>\n'+
+    '    <span class="fn">dfs</span>(上); <span class="fn">dfs</span>(下); <span class="fn">dfs</span>(左); <span class="fn">dfs</span>(右);\n}';
+  const A=[key(0,0),key(0,1),key(1,0),key(1,1)],B=[key(1,4),key(2,3),key(2,4)],C=[key(3,0)];
+  const steps=[
+    {flood:[],cur:null,cnt:0,chip:'隐式图',chipC:'c0',title:'网格就是图：陆地格 = 顶点，相邻 = 边',
+     note:'外层双循环扫描，找未访问的 \'1\'',
+     desc:'岛屿数量的本质：<b>网格隐式图的连通块计数</b>。每个陆地格是顶点，上下左右相邻的陆地间有边——不需要真的建邻接表，<b>四方向偏移就是边</b>。策略：扫描找到 \'1\' 就 count+1，然后用 DFS 把整块岛<b>淹没</b>，保证不重复计数。'},
+    {flood:[],cur:key(0,0),cnt:1,chip:'发现岛 ① 起点',chipC:'cb',title:'(0,0) 是 \'1\' → count=1，启动 DFS',
+     note:'count = 1，开始淹没这一块',
+     desc:'扫到 <b>(0,0)</b> 是陆地：这一定是一座<b>新岛</b>（旧岛早被淹没了），count=1。接着启动 DFS，任务不是“数格子”，而是<b>把与它连通的所有陆地全部变成 \'0\'</b>。'},
+    {flood:[key(0,0),key(0,1),key(1,0)],cur:key(1,1),cnt:1,chip:'递归淹没中',chipC:'ch',title:'DFS 向四个方向扩散：(0,1)、(1,0) 已淹没',
+     note:'grid[r][c] = \'0\' 就是 visited 标记',
+     desc:'DFS 递归扩散：<code>grid[r][c]=\'0\'</code> <b>原地充当 visited</b>——不用额外数组。边界判断必须<b>先判越界再读内容</b>（网格题第一大 bug）。绿色 = 已淹没。'},
+    {flood:A,cur:null,cnt:1,chip:'岛 ① 全灭',chipC:'cg',title:'(1,1) 也淹没，递归回退，岛 ① 处理完',
+     note:'这块岛再也不会被重复计数',
+     desc:'4 个格子全部变 \'0\'，递归逐层回退。之后扫描器再经过这些格子时读到 \'0\'，直接跳过——<b>一座岛只在“第一次被发现”时计数一次</b>。'},
+    {flood:A.concat(B),cur:key(1,4),cnt:2,chip:'发现岛 ②',chipC:'cb',title:'扫过水域，(1,4) 又是 \'1\' → count=2',
+     note:'DFS 淹没 (1,4) → (2,4) → (2,3)',
+     desc:'扫描继续（水格和已淹没格都跳过），到 <b>(1,4)</b> 又遇到 \'1\'：count=2，DFS 淹没这块三格岛——注意 (2,3) 和 (1,4) 不相邻，是<b>通过 (2,4) 间接连通</b>的，DFS 自动沿边爬过去。'},
+    {flood:A.concat(B).concat(C),cur:key(3,0),cnt:3,chip:'发现岛 ③',chipC:'cb',title:'(3,0) 单格岛 → count=3，扫描结束',
+     note:'孤立单格也是一座岛',
+     desc:'最后 <b>(3,0)</b> 是孤立的单格岛：count=3，DFS 一层就返回。全网格扫完，答案 <b>3</b>。'},
+    {flood:A.concat(B).concat(C),cur:null,cnt:3,chip:'O(rows×cols)',chipC:'cg',title:'每格最多进出 DFS 一次',
+     note:'省份数量 LC 547 = 同一模型换输入',
+     desc:'复杂度 <b>O(rows×cols)</b>：每格最多被淹没一次。递归深度最坏 O(rows×cols)（全图一块陆地），超大网格改显式栈。<b>识别关键词</b>：岛屿 / 连通块 / 染色 / 一整片搜掉——DFS、BFS、并查集三选一都行（并查集版见 5.2.25 动画）。'},
+  ];
+  function mount(){
+    let cells='';
+    for(let r=0;r<4;r++)for(let c=0;c<5;c++)cells+='<div class="gc" id="il'+key(r,c)+'"><span id="ilv'+key(r,c)+'">'+M[r][c]+'</span><span class="gi">'+r+','+c+'</span></div>';
+    viz.innerHTML='<div class="vcap"><b>岛屿数量</b>：扫描找 \'1\' → count+1 → DFS 淹没整块（绿 = 已淹没为 \'0\'）</div>'+
+      '<div class="ggrid" style="grid-template-columns:repeat(5,50px)">'+cells+'</div>'+
+      '<div class="op-note" id="ilnote"></div>';
+  }
+  function paint(s){
+    for(let r=0;r<4;r++)for(let c=0;c<5;c++){
+      const id=key(r,c),el=document.getElementById('il'+id);
+      let cl='gc';
+      if(s.flood.includes(id))cl+=' flood';
+      else if(M[r][c]===1)cl+=' land';
+      else cl+=' water';
+      if(s.cur===id)cl+=' cur';
+      el.className=cl;
+      document.getElementById('ilv'+id).textContent=s.flood.includes(id)?'0':String(M[r][c]);
+    }
+    document.getElementById('ilnote').innerHTML='岛屿数 count = <b>'+s.cnt+'</b>';
+  }
+  return{id:'island',label:'网格 DFS',sub:'LC 200 岛屿数量',steps,mount,paint,layout:()=>{},code};
+})();
+
+/* ========== 场景 2：多源 BFS 腐烂的橘子（LC 994） ========== */
+const rottenScene=(()=>{
+  // 3×4：2=腐烂 1=新鲜 0=空
+  const M=[[2,1,1,0],[1,1,0,1],[0,1,1,2]];
+  const key=(r,c)=>r*4+c;
+  const code='<span class="cmt">// 1. 所有腐烂橘子同时入队（多源）</span>\n'+
+    '<span class="kw">if</span> (grid[r][c] == 2) que.<span class="fn">push</span>({r, c});\n'+
+    '<span class="kw">else if</span> (grid[r][c] == 1) ++fresh;\n'+
+    '<span class="cmt">// 2. 按层 = 按分钟扩散</span>\n'+
+    '<span class="kw">while</span> (!que.empty()) {\n'+
+    '    <span class="kw">int</span> size = que.size();  <span class="cmt">// 固定当前层!</span>\n'+
+    '    <span class="kw">for</span> (i &lt; size) { 弹出并感染四邻; --fresh; }\n'+
+    '    <span class="kw">if</span> (spread) ++minutes;\n'+
+    '}\n'+
+    '<span class="kw">return</span> fresh == 0 ? minutes : -1;';
+  const R0=[key(0,0),key(2,3)];
+  const R1=[key(0,1),key(1,0),key(1,3),key(2,2)];
+  const R2=[key(0,2),key(1,1),key(2,1)];
+  const steps=[
+    {rot:R0,q:['0,0','2,3'],fresh:7,min:0,chip:'多源同时入队',chipC:'c0',title:'两个腐烂源同时作为第 0 分钟的起点',
+     note:'fresh = 7　·　minutes = 0',
+     desc:'两个烂橘子<b>同时</b>开始扩散——这就是<b>多源 BFS</b>：初始化时把所有源一起入队，等价于在它们上方虚拟一个<b>超级源点</b>。同时统计 <code>fresh=7</code>，最后用它判断是否有橘子永远烂不到。'},
+    {rot:R0.concat(R1),q:['0,1','1,0','1,3','2,2'],fresh:3,min:1,chip:'第 1 分钟',chipC:'cb',title:'size=2 固定本层：两源各自感染邻居，共 4 个',
+     note:'fresh 7→3　·　minutes = 1',
+     desc:'先取 <code>size=2</code> <b>固定当前层</b>，只处理这两个源：(0,0) 感染 (0,1)、(1,0)；(2,3) 感染 (1,3)、(2,2)。新感染的 4 个属于<b>下一分钟</b>，绝不能和本层混算——这就是 size 固定的意义（与二叉树层序完全同款）。'},
+    {rot:R0.concat(R1).concat(R2),q:['0,2','1,1','2,1'],fresh:0,min:2,chip:'第 2 分钟',chipC:'cb',title:'size=4：再感染 (0,2)、(1,1)、(2,1)，fresh=0',
+     note:'fresh 3→0　·　minutes = 2',
+     desc:'第二层 size=4：(0,1) 感染 (0,2) 和 (1,1)；(2,2) 感染 (2,1)；(1,0) 和 (1,3) 的邻居要么已腐烂要么是空格。<b>fresh 归零</b>。注意 (1,1) 被 (0,1) 和 (1,0) 同时够到——先感染者改 <code>grid=2</code>，后来者跳过，<b>不会重复入队</b>。'},
+    {rot:R0.concat(R1).concat(R2),q:[],fresh:0,min:2,chip:'fresh==0 → 返回 2',chipC:'cg',title:'队列耗尽，所有橘子已腐烂，答案 2 分钟',
+     note:'若有被空格隔离的鲜橘子 → 返回 -1',
+     desc:'队列清空，<code>fresh==0</code> → 返回 <b>2</b>。如果存在被空格团团围住的新鲜橘子，它永远不会入队，fresh 停在正数——返回 <b class="dg">-1</b>。代码里的 <code>spread</code> 标志防止“最后一轮没有新感染却多计一分钟”。'},
+    {rot:R0.concat(R1).concat(R2),q:[],fresh:0,min:2,chip:'单源 → 多源',chipC:'cg',title:'多源 BFS 与单源只差初始化',
+     note:'O(rows×cols)　·　识别词：扩散 / 感染 / 最少轮次',
+     desc:'把单源 BFS 改成多源，<b>只改初始化那几行</b>——主循环一字不动。识别关键词：<b>扩散、感染、传播、最少几轮/几分钟</b>。同款题：542 01矩阵（从所有 0 出发）、286 墙与门。'},
+  ];
+  function mount(){
+    let cells='';
+    for(let r=0;r<3;r++)for(let c=0;c<4;c++)cells+='<div class="gc" id="ro'+key(r,c)+'"><span id="rov'+key(r,c)+'">'+M[r][c]+'</span><span class="gi">'+r+','+c+'</span></div>';
+    viz.innerHTML='<div class="vcap"><b>腐烂的橘子</b>：红 = 腐烂(2)，棕 = 新鲜(1)，灰 = 空(0)，一层 = 一分钟</div>'+
+      '<div class="ggrid" style="grid-template-columns:repeat(4,50px)">'+cells+'</div>'+
+      '<div class="collbl">队列（本分钟待扩散的腐烂橘子坐标）</div>'+cellsMarkup('roq',4,null,true)+
+      '<div class="op-note" id="ronote"></div>';
+  }
+  function paint(s){
+    for(let r=0;r<3;r++)for(let c=0;c<4;c++){
+      const id=key(r,c),el=document.getElementById('ro'+id);
+      let cl='gc';
+      if(s.rot.includes(id))cl+=' rot';
+      else if(M[r][c]===1)cl+=' land';
+      else if(M[r][c]===2)cl+=' rot';
+      else cl+=' water';
+      el.className=cl;
+      document.getElementById('rov'+id).textContent=s.rot.includes(id)?'2':String(M[r][c]);
+    }
+    paintCells('roq',4,s.q,s.q.reduce((m,_,i)=>{m[i]='bad';return m;},{}),true);
+    document.getElementById('ronote').innerHTML='fresh = <b>'+s.fresh+'</b>　·　minutes = <b>'+s.min+'</b>';
+  }
+  return{id:'rotten',label:'多源 BFS',sub:'LC 994 按分钟分层',steps,mount,paint,layout:()=>{},code};
+})();
+
+/* ========== 场景 3：Kruskal 最小生成树（LC 1584） ========== */
+const kruskalScene=(()=>{
+  const G={nodes:[{id:0,x:14,y:24},{id:1,x:44,y:12},{id:2,x:38,y:64},{id:3,x:72,y:78},{id:4,x:88,y:28}],
+    edges:[{a:0,b:1,w:1},{a:2,b:3,w:2},{a:1,b:2,w:3},{a:0,b:2,w:4},{a:3,b:4,w:5},{a:1,b:4,w:7}]};
+  const code='sort(edges.begin(), edges.end());  <span class="cmt">// 按边权升序</span>\n'+
+    'UnionFind uf(n);\n'+
+    '<span class="kw">int</span> answer = 0, used = 0;\n'+
+    '<span class="kw">for</span> (<span class="kw">auto</span> [cost, u, v] : edges) {\n'+
+    '    <span class="kw">if</span> (uf.<span class="fn">unite</span>(u, v)) {      <span class="cmt">// 不成环才要</span>\n'+
+    '        answer += cost;\n'+
+    '        <span class="kw">if</span> (++used == n - 1) <span class="kw">break</span>; <span class="cmt">// 选满提前收工</span>\n'+
+    '    }\n'+
+    '}  <span class="cmt">// LC 1584：先把两两曼哈顿距离建成边集</span>';
+  const L=['0-1:1','2-3:2','1-2:3','0-2:4','3-4:5','1-4:7'];
+  const steps=[
+    {lm:{},emap:{},cls:{},total:0,used:0,chip:'MST 定义',chipC:'c0',title:'最小总代价连通所有点：n−1 条边、无环',
+     note:'贪心：按边权从小到大挑，成环就跳过',
+     desc:'<b>最小生成树</b>：用总权最小的 n−1 条边把所有点连通（多一条必成环，少一条必不连通）。<b>Kruskal</b> = 全局贪心：边按权<b>升序排序</b>，逐条尝试；会成环的边跳过——判环正是并查集 unite 的返回值（5.2.25 冗余连接同款）。'},
+    {lm:{0:'ok'},emap:{0:'done'},cls:{0:'done',1:'done'},total:1,used:1,chip:'选 0-1 (w=1)',chipC:'cb',title:'最便宜的边：0、1 不连通 → 收下',
+     note:'total=1　used=1/4',
+     desc:'第一条边 <b>0-1（权 1）</b>：unite 成功，收入生成树。贪心正确性直觉：最小的边如果不选，之后连通 0 和 1 只会用更贵的边替代。'},
+    {lm:{0:'ok',1:'ok'},emap:{0:'done',1:'done'},cls:{0:'done',1:'done',2:'done',3:'done'},total:3,used:2,chip:'选 2-3 (w=2)',chipC:'cb',title:'两棵树各自生长：{0,1} 和 {2,3}',
+     note:'total=3　used=2/4',
+     desc:'边 <b>2-3（权 2）</b>：也不成环，收下。注意 Kruskal 过程中生成树可以是<b>多棵碎片</b>（森林），不像 Prim 从一个点集连续扩张——最后自然长成一棵。'},
+    {lm:{0:'ok',1:'ok',2:'ok'},emap:{0:'done',1:'done',2:'done'},cls:{0:'done',1:'done',2:'done',3:'done'},total:6,used:3,chip:'选 1-2 (w=3)',chipC:'cb',title:'1-2 把两块碎片焊成一块',
+     note:'total=6　used=3/4　{0,1,2,3} 连通',
+     desc:'边 <b>1-2（权 3）</b>：find(1) 和 find(2) 不同根 → 合并，两块碎片焊成 {0,1,2,3}。'},
+    {lm:{0:'ok',1:'ok',2:'ok',3:'bad'},emap:{0:'done',1:'done',2:'done',3:'bad'},cls:{0:'done',1:'done',2:'done',3:'done'},total:6,used:3,chip:'跳过 0-2 (w=4)',chipC:'cd',title:'0、2 已连通 → 这条边会成环，丢弃',
+     note:'unite 返回 false → 跳过，total 不变',
+     desc:'边 <b>0-2（权 4）</b>：find(0)==find(2)——加入会形成环 0-1-2-0，<b class="dg">跳过</b>。这就是 Kruskal 的全部“智慧”：便宜但成环的边一律不要。'},
+    {lm:{0:'ok',1:'ok',2:'ok',3:'bad',4:'ok',5:'dim'},emap:{0:'done',1:'done',2:'done',3:'dim',4:'done',5:'dim'},cls:{0:'done',1:'done',2:'done',3:'done',4:'done'},total:11,used:4,chip:'选 3-4 · 提前结束',chipC:'cg',title:'used=4=n−1 → break，1-4 (w=7) 根本不看',
+     note:'MST 总权 = 1+2+3+5 = <b>11</b>',
+     desc:'边 <b>3-4（权 5）</b>：合并成功，<code>used=4=n−1</code> → <b>提前 break</b>。最贵的 1-4（权 7）连看都不用看（变淡）。总代价 <b>11</b>。'},
+    {lm:{0:'ok',1:'ok',2:'ok',3:'bad',4:'ok',5:'dim'},emap:{0:'done',1:'done',2:'done',3:'dim',4:'done',5:'dim'},cls:{0:'done',1:'done',2:'done',3:'done',4:'done'},total:11,used:4,chip:'O(E log E)',chipC:'cg',title:'排序是大头；1584 的边集是两两曼哈顿距离',
+     note:'Prim 对比：从已连通点集不断向外扩最便宜的边',
+     desc:'复杂度：<b>排序 O(E log E)</b> 主导，并查集近线性。<b>LC 1584</b>：任意两点的曼哈顿距离即边权，先 O(n²) 建边集再跑本算法。另一条路是 <b>Prim</b>——像 Dijkstra 一样从一个点集向外扩最便宜的边，稠密图更合适。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('kr',G,'<b>Kruskal</b>：边按权升序逐条尝试，绿 = 选入，红 = 成环跳过')+
+      '<div class="collbl">排序后的边集（w 升序）</div>'+cellsMarkup('krl',6,null,true)+
+      '<div class="op-note" id="krnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('kr',G));
+  }
+  function paint(s){
+    paintGraph('kr',G,s);
+    paintCells('krl',6,L,Object.assign(L.reduce((m,_,i)=>{m[i]='dim';return m;},{}),s.lm),true);
+    document.getElementById('krnote').innerHTML='total = <b>'+s.total+'</b>　·　used = <b>'+s.used+'</b> / 4';
+  }
+  return{id:'kruskal',label:'Kruskal MST',sub:'LC 1584 排序+判环',steps,mount,paint,layout:()=>layoutGraph('kr',G),code};
+})();
+
+/* ========== 场景 4：最短路 vs MST + 选型口诀 ========== */
+const vsScene=(()=>{
+  const G={nodes:[{id:0,x:22,y:22},{id:1,x:74,y:18},{id:2,x:50,y:78}],
+    edges:[{a:0,b:1,w:2},{a:0,b:2,w:2},{a:1,b:2,w:1}]};
+  const code='<span class="cmt">// 同一张图，两个不同的问题：</span>\n'+
+    '<span class="cmt">// 最短路（Dijkstra）: 从起点 0 到每个点最便宜</span>\n'+
+    '<span class="cmt">//   → 最短路树 {0-1, 0-2}，dist=[0,2,2]</span>\n'+
+    '<span class="cmt">// MST（Kruskal）:     全图连通总代价最小</span>\n'+
+    '<span class="cmt">//   → 生成树 {1-2, 0-1}，总权 3</span>\n'+
+    '\n'+
+    '<span class="cmt">// 搜一整片      → DFS / BFS</span>\n'+
+    '<span class="cmt">// 最少步数      → BFS</span>\n'+
+    '<span class="cmt">// 依赖顺序      → 拓扑排序</span>\n'+
+    '<span class="cmt">// 加边判连通/环 → 并查集</span>\n'+
+    '<span class="cmt">// 非负权最短路  → Dijkstra</span>\n'+
+    '<span class="cmt">// 最小连接代价  → Kruskal / Prim</span>';
+  const steps=[
+    {emap:{},cls:{},sub:{},chip:'一图两问',chipC:'c0',title:'最容易混淆的一对概念，用同一张图对比',
+     note:'三条边：0-1 (2)　0-2 (2)　1-2 (1)',
+     desc:'<b>最短路</b>和<b>最小生成树</b>都在带权图上“挑边建树”，但目标完全不同。下面在同一张三角形图上分别跑 Dijkstra 和 Kruskal，看结果如何<b>不一样</b>。'},
+    {emap:{0:'done',1:'done',2:'dim'},cls:{0:'active',1:'done',2:'done'},sub:{0:'0',1:'2',2:'2'},chip:'Dijkstra 从 0',chipC:'cb',title:'最短路树：0 直达 1 和 2，各花 2',
+     note:'dist = [0, 2, 2]　·　最短路树总权 = 4',
+     desc:'<b>Dijkstra 从 0 出发</b>：到 1 直达花 2（绕 0-2-1 要 3）；到 2 直达花 2（绕 0-1-2 要 3）。<b class="gr">最短路树 = {0-1, 0-2}</b>，w=1 的边反而没用上——它对“从 0 出发”没有帮助。树总权 2+2=<b>4</b>。'},
+    {emap:{0:'hot',1:'dim',2:'hot'},cls:{0:'done',1:'done',2:'done'},sub:{},chip:'Kruskal 建 MST',chipC:'ch',title:'MST：先选最便宜的 1-2，再选 0-1，总权 3',
+     note:'MST = {1-2, 0-1}　·　总权 = 1 + 2 = 3',
+     desc:'<b>Kruskal</b>：按权排序先收 <b>1-2（权 1）</b>，再收 0-1（权 2），0-2 会成环跳过。<b class="br">MST = {1-2, 0-1}</b>，总权 <b>3</b> —— 比最短路树的 4 便宜，因为它只关心“全网连通的总成本”。'},
+    {emap:{0:'done',1:'dim',2:'hot'},cls:{0:'done',1:'done',2:'done'},sub:{0:'0',1:'2',2:'2'},chip:'两棵树不相同',chipC:'cd',title:'MST 里 0→2 要绕行花 3 > 直达 2',
+     note:'SPT 总权 4 > MST 总权 3；MST 上 0→2 = 3 > 直达 2',
+     desc:'对比（绿 = 两树共有的 0-1，棕 = 仅 MST 的 1-2）：<b>MST 不保证任意两点最短</b>——0→2 在 MST 上要绕 0-1-2 花 3，比直达的 2 贵；<b>最短路树不保证总代价最小</b>——总权 4 &gt; 3。一句话：<b class="bl">最短路问“从我出发到你最便宜”</b>，<b class="br">MST 问“全网连通总成本最低”</b>。'},
+    {emap:{0:'done',1:'done',2:'done'},cls:{0:'done',1:'done',2:'done'},sub:{},chip:'图算法选型口诀',chipC:'cg',title:'六句话选对算法',
+     note:'难点从来不是模板，是建模方向和访问状态',
+     desc:'<b>搜一整片</b>用 DFS/BFS；<b>最少步数</b>用 BFS；<b>依赖顺序</b>用拓扑排序；<b>边不断加入判连通/判环</b>用并查集；<b>带权（非负）最短路</b>用 Dijkstra；<b>全图最小连接代价</b>用 MST。配套动画：五件套见 5.2.24，并查集专题见 5.2.25。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('vs',G,'<b>最短路 vs MST</b>：同一张带权图，两个问题给出两棵不同的树')+
+      '<div class="collbl">节点下方 = Dijkstra 求出的 dist（起点 0）</div>'+
+      '<div class="op-note" id="vsnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('vs',G));
+  }
+  function paint(s){
+    paintGraph('vs',G,s);
+    document.getElementById('vsnote').innerHTML=s.note;
+  }
+  return{id:'vs',label:'最短路 vs MST',sub:'一图两问 + 选型',steps,mount,paint,layout:()=>layoutGraph('vs',G),code};
+})();
+
+/* ============ 引擎（与动画合集同款） ============ */
+const SCENES=[islandScene,rottenScene,kruskalScene,vsScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2900;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((tab,idx)=>tab.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>SCENES[si].layout());
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(+hashStep[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="26"></script>
+</body>
+</html>

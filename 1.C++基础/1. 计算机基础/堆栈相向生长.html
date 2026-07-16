@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>堆栈相向生长 · 栈向下、堆向上，中间留最大空洞</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --stack:#185FA5;--stackbg:#E6F1FB;    /* 栈·蓝 */
+  --heap:#854F0B;--heapbg:#FAEEDA;       /* 堆·棕 */
+  --static:#0F6E56;--staticbg:#E1F5EE;   /* 静态区·绿 */
+  --kernel:#6B5E8A;--kernelbg:#ECE7F2;   /* 内核·紫灰 */
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.layout{display:grid;grid-template-columns:440px 1fr;gap:26px;margin-top:24px;align-items:start;}
+@media(max-width:920px){.layout{grid-template-columns:1fr;}}
+
+/* ---------- 内存条 ---------- */
+.mem-panel{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:18px 20px;}
+.mem-panel .cap{font-size:12px;color:var(--muted);margin-bottom:12px;display:flex;justify-content:space-between;}
+.membar{position:relative;height:520px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--paper);}
+.seg{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all var(--dur) var(--ease);overflow:hidden;}
+.seg .tag{font-weight:600;}
+.seg .sub{font-size:10px;color:var(--faint);margin-left:6px;}
+.seg.kernel{background:var(--kernelbg);color:var(--kernel);border-bottom:1px solid var(--kernel);}
+.seg.stack{background:var(--stackbg);color:var(--stack);border-bottom:1px solid var(--stack);}
+.seg.gap{background:repeating-linear-gradient(-45deg,transparent,transparent 7px,rgba(0,0,0,.03) 7px,rgba(0,0,0,.03) 14px);color:var(--faint);}
+.seg.heap{background:var(--heapbg);color:var(--heap);border-top:1px solid var(--heap);}
+.seg.shlib{background:var(--gray);color:var(--muted);}
+.seg.static{background:var(--staticbg);color:var(--static);border-top:1px solid var(--static);}
+.seg.reserved{background:#EDEBE3;color:var(--faint);}
+
+/* 指针标签 */
+.ptr{position:absolute;left:6px;z-index:5;display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;border-radius:5px;padding:2px 7px;transition:top var(--dur) var(--ease);}
+.ptr.esp{background:var(--stack);}
+.ptr.brk{background:var(--heap);}
+.ptr .arw{font-size:12px;}
+.addr-tick{position:absolute;right:8px;font-family:var(--mono);font-size:10px;color:var(--faint);transition:top var(--dur) var(--ease);z-index:4;}
+
+/* 碰撞警告 */
+.collide{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:600;color:var(--danger);background:var(--dangerbg);border:1px dashed var(--danger);border-radius:6px;padding:3px;opacity:0;transition:opacity var(--dur) var(--ease);z-index:6;}
+.collide.show{opacity:1;}
+
+/* ---------- 右侧 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:150px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cs{color:var(--stack);border-color:var(--stack);background:var(--stackbg);}
+.chip.ch{color:var(--heap);border-color:var(--heap);background:var(--heapbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .s{color:var(--stack);font-weight:600;}
+.desc-body .h{color:var(--heap);font-weight:600;}
+
+/* 自由操作区 */
+.free{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 18px;}
+.free .lbl{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.free .row{display:flex;gap:10px;flex-wrap:wrap;}
+.act{font:inherit;font-size:13px;font-weight:500;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid;transition:all .15s var(--ease);}
+.act:active{transform:scale(.96);}
+.act.s{color:var(--stack);border-color:var(--stack);background:var(--stackbg);}
+.act.s:hover{background:#d8e8f8;}
+.act.h{color:var(--heap);border-color:var(--heap);background:var(--heapbg);}
+.act.h:hover{background:#f5e4c8;}
+.act.reset{color:var(--muted);border-color:var(--line);background:var(--paper);margin-left:auto;}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--muted);}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block;}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>堆栈相向生长 · 栈向下、堆向上，中间留最大空洞</h1>
+    <p>栈随 <code>call/push</code> 往低地址走，堆随 <code>malloc/new</code> 往高地址走，二者相向逼近　·　<kbd>←</kbd> <kbd>→</kbd> 切换，或用右侧按钮自由生长</p>
+  </header>
+
+  <div class="layout">
+    <!-- 内存条 -->
+    <section class="mem-panel">
+      <div class="cap"><span>进程虚拟地址空间</span><span style="font-family:var(--mono)">↑ 高地址　↓ 低地址</span></div>
+      <div class="membar" id="membar">
+        <div class="seg kernel" id="segKernel"><span class="tag">内核空间</span><span class="sub">0xC000···</span></div>
+        <div class="seg stack" id="segStack"><span class="tag">栈 stack</span><span class="sub">局部变量/栈帧</span></div>
+        <div class="seg gap" id="segGap"><span class="tag">↑ 空洞 ↓</span></div>
+        <div class="seg shlib" id="segShlib"><span class="tag">共享库</span><span class="sub">.so / .dll</span></div>
+        <div class="seg heap" id="segHeap"><span class="tag">堆 heap</span><span class="sub">malloc/new</span></div>
+        <div class="seg static" id="segStatic"><span class="tag">.data/.bss/.rodata/.text</span></div>
+        <div class="seg reserved" id="segReserved"><span class="tag">保留区</span><span class="sub">0x0 空指针陷阱</span></div>
+        <div class="ptr esp" id="ptrEsp"><span class="arw">▼</span>esp</div>
+        <div class="ptr brk" id="ptrBrk"><span class="arw">▲</span>brk</div>
+        <div class="collide" id="collide">⚠ 栈与堆逼近 —— 再扩展就会相撞（栈溢出 / 堆耗尽）</div>
+      </div>
+    </section>
+
+    <!-- 右 -->
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+
+      <div class="free">
+        <div class="lbl">自由操作 —— 亲手让两者逼近：</div>
+        <div class="row">
+          <button class="act s" id="actStack">函数调用（栈 ↓ 增长）</button>
+          <button class="act h" id="actHeap">malloc / new（堆 ↑ 增长）</button>
+          <button class="act reset" id="actReset">↺ 复位</button>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--stack)"></i>栈：高→低，每次调用往下</span>
+          <span><i style="background:var(--heap)"></i>堆：低→高，每次分配往上</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+/* 布局：membar 高 520。固定区块高度，中部 stack/gap/heap 三段随 stackH/heapH 变化。
+   顺序(上→下)：kernel(固定) / stack(可变,顶部) / gap(可变) / shlib(固定) / heap(可变) / static(固定) / reserved(固定) */
+const BAR=520;
+const H={kernel:44, shlib:38, static:52, reserved:34};
+const MIN_STACK=26, MIN_HEAP=26;
+const midTop=H.kernel;                       // 中部可变区起点
+const midBot=BAR-H.static-H.reserved;        // 中部可变区终点（heap 底部贴 static）
+const shlibY=()=>0;                          // 计算时定位
+
+function layout(stackH,heapH){
+  const el=id=>document.getElementById(id);
+  // kernel 固定顶部
+  el('segKernel').style.top='0px'; el('segKernel').style.height=H.kernel+'px';
+  // reserved 固定底部
+  el('segReserved').style.top=(BAR-H.reserved)+'px'; el('segReserved').style.height=H.reserved+'px';
+  // static 固定在 reserved 上方
+  el('segStatic').style.top=(BAR-H.reserved-H.static)+'px'; el('segStatic').style.height=H.static+'px';
+  // heap 从 static 顶部往上长 heapH
+  const heapBottom=BAR-H.reserved-H.static;
+  el('segHeap').style.top=(heapBottom-heapH)+'px'; el('segHeap').style.height=heapH+'px';
+  // shlib 固定，贴在 heap 上方
+  el('segShlib').style.top=(heapBottom-heapH-H.shlib)+'px'; el('segShlib').style.height=H.shlib+'px';
+  // stack 从 kernel 底部往下长 stackH
+  el('segStack').style.top=H.kernel+'px'; el('segStack').style.height=stackH+'px';
+  // gap 填充 stack 底 到 shlib 顶
+  const gapTop=H.kernel+stackH;
+  const gapBot=heapBottom-heapH-H.shlib;
+  el('segGap').style.top=gapTop+'px'; el('segGap').style.height=Math.max(0,gapBot-gapTop)+'px';
+  // 指针
+  el('ptrEsp').style.top=(gapTop-11)+'px';
+  el('ptrBrk').style.top=(heapBottom-heapH-11)+'px';
+  // 碰撞检测
+  const gap=gapBot-gapTop;
+  el('collide').style.top=(gapTop+Math.max(0,gap)/2-12)+'px';
+  el('collide').classList.toggle('show',gap<44);
+  return gap;
+}
+
+/* 步骤：stackH / heapH 目标值 */
+const STEPS=[
+  { title:'步骤 0 · 进程刚启动', chip:'初始布局', chipC:'c0', stackH:34, heapH:30,
+    desc:'进程地址空间从上到下：<b>内核空间 → 栈 → （大片空洞）→ 共享库 → 堆 → 静态区(.data/.bss/.rodata/.text) → 保留区</b>。此刻栈和堆都很浅，中间留着<b>巨大的空洞</b>备用。' },
+  { title:'步骤 1 · 函数调用', chip:'栈 ↓ 增长', chipC:'cs', stackH:96, heapH:30,
+    desc:'每次 <code>call</code>/<code>push</code> 都把 <span class="s">esp 往低地址方向压</span>,栈帧一层层叠下来。所以<b class="s">栈从高地址向低地址生长</b>——嵌套调用越深，栈伸得越长（向下）。' },
+  { title:'步骤 2 · malloc 一块内存', chip:'堆 ↑ 增长', chipC:'ch', stackH:96, heapH:92,
+    desc:'<code>malloc(1KB)</code> / <code>new</code> 向堆申请内存，<span class="h">堆顶 brk 往高地址方向抬</span>。所以<b class="h">堆从低地址向高地址生长</b>——方向和栈正好<b>相反</b>。' },
+  { title:'步骤 3 · 更深的调用', chip:'栈 ↓ 增长', chipC:'cs', stackH:146, heapH:88,
+    desc:'继续嵌套调用，栈再向下延伸。<span class="s">栈</span>和<span class="h">堆</span>从两端<b>相向而行</b>,中间的空洞被逐渐吃掉——但它俩谁都不知道对方长到哪了。' },
+  { title:'步骤 4 · 继续 malloc', chip:'堆 ↑ 增长', chipC:'ch', stackH:170, heapH:130,
+    desc:'再多分配几次，堆继续上抬。现在能明显看到：<b>两条边界从上下两头逼近同一片空洞</b>。这正是「相向生长」四个字的含义。' },
+  { title:'步骤 5 · 为什么这样设计', chip:'设计意图', chipC:'cd', stackH:192, heapH:148,
+    desc:'把栈放顶部往下、堆放底部往上、<b>中间共享一整片空洞</b>,就能让两者<b>按需灵活伸缩</b>——谁用得多谁多占，不必预先划死边界，<b>空间利用率最高</b>。代价：极端情况下二者在中间相撞 → <b class="s">栈溢出</b>或<b class="h">堆耗尽</b>。' },
+];
+
+/* ---------- 渲染 ---------- */
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const dotsBox=document.getElementById('dots');const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>go(i);dotsBox.appendChild(d);dotEls.push(d);});
+
+let cur=0, stackH=34, heapH=30, freeMode=false;
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur];
+  freeMode=false;
+  stackH=s.stackH; heapH=s.heapH;
+  layout(stackH,heapH);
+  stTitle.textContent=s.title;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(STEPS.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===STEPS.length-1;
+  if(cur===STEPS.length-1)stop();
+}
+
+/* 自由操作 */
+function grow(which){
+  freeMode=true;
+  const gap=layout(stackH,heapH);
+  if(which==='stack'){ if(gap>40) stackH+=36; }
+  else { if(gap>40) heapH+=36; }
+  const g=layout(stackH,heapH);
+  if(g<=40){
+    stChip.textContent='相撞！';stChip.className='chip cd';
+    stTitle.textContent='空洞耗尽';
+    stDesc.innerHTML='栈和堆在中间<b>撞上了</b>——现实中这就是<b class="s">栈溢出（stack overflow）</b>或<b class="h">堆分配失败（out of memory）</b>。点「复位」重来。';
+  }
+}
+document.getElementById('actStack').onclick=()=>{stop();grow('stack');};
+document.getElementById('actHeap').onclick=()=>{stop();grow('heap');};
+document.getElementById('actReset').onclick=()=>{stop();go(0);};
+
+let timer=null,ms=2000;
+function play(){if(cur===STEPS.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const m=location.hash.match(/step=(\d+)/);go(m?+m[1]:0);
+</script>
+</body>
+</html>

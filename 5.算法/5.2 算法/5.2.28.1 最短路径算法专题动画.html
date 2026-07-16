@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>最短路径算法专题动画 · 带权BFS反例 / Bellman-Ford / Floyd / 选型决策</title>
+<style>
+:root{
+  /* Same teaching-tool system as the algorithm animation collection. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:232px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}
+
+/* 图区域 */
+.grapharea{position:relative;height:238px;margin:0 8px;}
+.grapharea.short{height:170px;}
+.gedge{position:absolute;height:2px;background:currentColor;color:var(--line);transform-origin:left center;transition:color var(--dur) var(--ease),height var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gedge.dir::after{content:'';position:absolute;right:-8px;top:50%;margin-top:-5px;border-left:8px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent;}
+.gedge.hot{color:var(--brown);height:3px;}
+.gedge.done{color:var(--green);height:3px;}
+.gedge.bad{color:var(--danger);height:3px;}
+.gedge.dim{opacity:.22;}
+.gw{position:absolute;z-index:2;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--grid);border-radius:6px;padding:0 5px;transform:translate(-50%,-50%);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gw.hot{color:var(--brown);border-color:var(--brown);}
+.gw.neg{color:var(--danger);border-color:var(--danger);}
+.gw.dim{opacity:.3;}
+.gnode{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2px solid var(--line);background:var(--paper);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);z-index:1;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gnode .nv{font-size:16px;font-weight:800;line-height:1;}
+.gnode .nsub{position:absolute;bottom:-19px;font-size:10px;color:var(--faint);font-weight:700;font-family:var(--mono);}
+.gnode.inq{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.gnode.done{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.gnode.badn{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+.gnode.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.14);box-shadow:0 0 0 4px rgba(24,95,165,.16);z-index:2;}
+
+/* 数组单元格 */
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:12px 0 6px;}
+.cellrow{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap;}
+.cell{position:relative;width:46px;height:38px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease);}
+.cell.wide{width:70px;}
+.cell .cw{position:absolute;bottom:-15px;font-size:9px;color:var(--faint);font-weight:400;}
+.cell.on{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.cell.ok{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.cell.hot{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.cell.bad{color:var(--danger);background:var(--dangerbg);border-color:var(--danger);}
+.cell.dim{opacity:.35;}
+
+/* Floyd 矩阵 */
+.mxwrap{display:grid;gap:3px;justify-content:center;margin-top:10px;font-family:var(--mono);}
+.mx{width:44px;height:30px;border:1px solid var(--grid);border-radius:5px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);transition:all var(--dur) var(--ease);}
+.mx.h{border:none;background:transparent;color:var(--faint);font-weight:400;font-size:10px;}
+.mx.inf{color:var(--faint);}
+.mx.upd{color:var(--brown);background:var(--brownbg);border-color:var(--brown);transform:scale(1.1);}
+.mx.diag{background:var(--gray);}
+
+/* 选型决策行 */
+.selrow{display:flex;align-items:center;gap:10px;font-size:13px;padding:9px 13px;border:1px solid var(--grid);border-radius:8px;background:var(--paper);margin-bottom:7px;transition:all var(--dur) var(--ease);}
+.selrow .q{flex:1;color:var(--muted);}
+.selrow .a{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);}
+.selrow .d{font-family:var(--mono);font-size:10.5px;color:var(--faint);}
+.selrow.hit{border-color:var(--blue);background:var(--bluebg);box-shadow:0 2px 8px rgba(24,95,165,.10);}
+.selrow.hit .q{color:var(--ink);}
+.selrow.hit .a{color:var(--blue);}
+.selrow.pass{opacity:.45;}
+
+.op-note{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:auto;padding-top:12px;min-height:34px;}
+.op-note b{color:var(--ink);}.op-note .bl{color:var(--blue);}.op-note .gr{color:var(--green);}.op-note .dg{color:var(--danger);}.op-note .br{color:var(--brown);}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.viz{min-height:478px;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:232px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;min-height:448px;}.tab{flex:1 1 128px;}.grapharea{height:212px;margin:0;}.gnode{width:40px;height:40px;margin:-20px 0 0 -20px;}.gnode .nv{font-size:14px;}.cell{width:40px;}.cell.wide{width:60px;}.mx{width:34px;height:26px;font-size:11px;}.controls{padding:12px;gap:8px;}.dots{order:4;width:100%;}.codebox{font-size:11px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>最短路径算法专题动画 · 选对算法比写对模板更重要</h1>
+    <p>带权 BFS 反例 / Bellman-Ford 负权 / Floyd 任意两点 / 选型决策　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ============ 通用图绘制（build once + mutate） ============ */
+function graphMarkup(prefix,G,caption,short){
+  let html='';
+  G.edges.forEach((e,i)=>{
+    html+='<span class="gedge'+(e.dir?' dir':'')+'" id="'+prefix+'e'+i+'"></span>';
+    if(e.w!==undefined)html+='<span class="gw'+(e.w<0?' neg':'')+'" id="'+prefix+'w'+i+'">'+e.w+'</span>';
+  });
+  G.nodes.forEach(n=>{
+    html+='<div class="gnode" id="'+prefix+'n'+n.id+'" style="left:'+n.x+'%;top:'+n.y+'%"><span class="nv">'+n.id+'</span><span class="nsub" id="'+prefix+'s'+n.id+'"></span></div>';
+  });
+  return '<div class="vcap">'+caption+'</div><div class="grapharea'+(short?' short':'')+'" id="'+prefix+'area">'+html+'</div>';
+}
+function layoutGraph(prefix,G){
+  const area=document.getElementById(prefix+'area');if(!area)return;
+  const w=area.clientWidth,h=area.clientHeight,R=25;
+  G.edges.forEach((e,i)=>{
+    const na=G.nodes.find(n=>n.id===e.a),nb=G.nodes.find(n=>n.id===e.b);
+    const x1=na.x/100*w,y1=na.y/100*h,x2=nb.x/100*w,y2=nb.y/100*h;
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+    const so=e.dir?R:0,eo=e.dir?R+8:0;
+    const line=document.getElementById(prefix+'e'+i);
+    line.style.left=(x1+ux*so)+'px';line.style.top=(y1+uy*so)+'px';
+    line.style.width=Math.max(0,len-so-eo)+'px';
+    line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';
+    const wl=document.getElementById(prefix+'w'+i);
+    if(wl){wl.style.left=(x1+dx*0.5)+'px';wl.style.top=(y1+dy*0.5)+'px';}
+  });
+}
+function paintGraph(prefix,G,s){
+  const cls=s.cls||{},sub=s.sub||{},emap=s.emap||{};
+  G.nodes.forEach(n=>{
+    const el=document.getElementById(prefix+'n'+n.id);
+    let c='gnode';if(cls[n.id])c+=' '+cls[n.id];if(s.active===n.id)c+=' active';
+    el.className=c;
+    document.getElementById(prefix+'s'+n.id).textContent=(sub[n.id]!==undefined?sub[n.id]:'');
+  });
+  G.edges.forEach((e,i)=>{
+    document.getElementById(prefix+'e'+i).className='gedge'+(e.dir?' dir':'')+(emap[i]?' '+emap[i]:'');
+    const wl=document.getElementById(prefix+'w'+i);
+    if(wl)wl.className='gw'+(e.w<0?' neg':'')+(emap[i]==='hot'?' hot':'')+(emap[i]==='dim'?' dim':'');
+  });
+}
+function cellsMarkup(prefix,n,labels,wide){
+  let s='';for(let i=0;i<n;i++)s+='<div class="cell'+(wide?' wide':'')+'" id="'+prefix+i+'"><span class="cv" id="'+prefix+'v'+i+'">·</span>'+(labels?'<span class="cw">'+labels[i]+'</span>':'')+'</div>';
+  return '<div class="cellrow">'+s+'</div>';
+}
+function paintCells(prefix,n,vals,marks,wide){
+  for(let i=0;i<n;i++){
+    const has=i<vals.length&&vals[i]!==null&&vals[i]!==undefined;
+    document.getElementById(prefix+i).className='cell'+(wide?' wide':'')+(has&&marks&&marks[i]?' '+marks[i]:'');
+    document.getElementById(prefix+'v'+i).textContent=has?String(vals[i]):'·';
+  }
+}
+
+/* ========== 场景 1：带权图误用 BFS 反例 ========== */
+const trapScene=(()=>{
+  const G={nodes:[{id:0,x:16,y:38},{id:1,x:78,y:26},{id:2,x:46,y:78}],
+    edges:[{a:0,b:1,dir:1,w:10},{a:0,b:2,dir:1,w:1},{a:2,b:1,dir:1,w:1}]};
+  const code='<span class="cmt">// BFS 的 dist 数的是"边数"，不是"权重和"</span>\n'+
+    'dist[v] = dist[u] + 1;   <span class="cmt">// ← 每条边都算 1</span>\n'+
+    '\n'+
+    '<span class="cmt">// 带权图要用 Dijkstra 的松弛：</span>\n'+
+    '<span class="kw">if</span> (dist[u] + w &lt; dist[v])\n'+
+    '    dist[v] = dist[u] + w; <span class="cmt">// ← 累加真实边权</span>\n'+
+    '\n'+
+    '<span class="cmt">// 边权全相等(=1)时两者才等价</span>';
+  const steps=[
+    {emap:{},cls:{},sub:{},active:null,chip:'误区 №1',chipC:'c0',title:'带权图误用 BFS：最常见的最短路翻车',
+     note:'0→1 直达权 10；绕 0→2→1 权 1+1=2',
+     desc:'这张图从 <b>0 到 1</b> 有两条路：<b>直达</b>一条边、权 10；<b>绕行</b> 0→2→1 两条边、权 2。"最短"到底指什么？<b>BFS 和 Dijkstra 给出不同答案</b>——这就是选型的意义。'},
+    {emap:{0:'bad',1:'dim',2:'dim'},cls:{1:'badn'},sub:{0:'0层',1:'1层',2:'1层'},active:0,chip:'BFS 的答案',chipC:'cd',title:'BFS：第 1 层就到 1 → 选权 10 的直达边',
+     note:'BFS dist[1] = 1 条边，实际代价 10 ❌',
+     desc:'BFS 按<b>层</b>扩展：第 1 层同时到达 1 和 2，宣布 dist[1]="1 步"——它选中<b class="dg">权 10 的直达边</b>。BFS 的 <code>dist[v]=dist[u]+1</code> 把每条边都当 1，<b>数的是边数不是代价</b>。图一带权，它答的就是另一个问题。'},
+    {emap:{0:'dim',1:'done',2:'done'},cls:{0:'done',1:'done',2:'done'},sub:{0:'0',1:'2',2:'1'},active:null,chip:'Dijkstra 的答案',chipC:'cg',title:'松弛看真实权：0→2→1 = 2 才是最短',
+     note:'dist = [0, 2, 1]　·　多走一条边反而省 8',
+     desc:'Dijkstra 的松弛 <code>dist[u]+w &lt; dist[v]</code> 累加<b>真实边权</b>：先定型 2（dist=1），再经 2→1 得 dist[1]=<b>2</b>——比直达便宜 8。<b>边数多 ≠ 代价大</b>，这正是带权图的本质。'},
+    {emap:{0:'dim',1:'done',2:'done'},cls:{0:'done',1:'done',2:'done'},sub:{},active:null,chip:'选型第一问',chipC:'cg',title:'拿到题先问：边有没有权？',
+     note:'无权(或全 1) → BFS；带权非负 → Dijkstra',
+     desc:'<b>选型第一问：边有没有权？</b>无权或权全为 1 → BFS（O(V+E)，见 5.2.24 动画）；带权非负 → Dijkstra（O((V+E)logV)，见 5.2.24 动画）。第二问：<b>权会不会是负的？</b>——负权连 Dijkstra 也扛不住，请看下一场景。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('tp',G,'<b>带权 BFS 反例</b>：同一张图，BFS 与 Dijkstra 给出不同的"最短"')+
+      '<div class="collbl">节点下方 = 各算法视角的 dist</div>'+
+      '<div class="op-note" id="tpnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('tp',G));
+  }
+  function paint(s){
+    paintGraph('tp',G,s);
+    document.getElementById('tpnote').innerHTML=s.note;
+  }
+  return{id:'trap',label:'带权 BFS 反例',sub:'边数 ≠ 代价',steps,mount,paint,layout:()=>layoutGraph('tp',G),code};
+})();
+
+/* ========== 场景 2：Bellman-Ford ========== */
+const bellmanScene=(()=>{
+  const G={nodes:[{id:0,x:12,y:34},{id:1,x:45,y:12},{id:2,x:45,y:74},{id:3,x:86,y:44}],
+    edges:[{a:0,b:1,dir:1,w:4},{a:0,b:2,dir:1,w:5},{a:1,b:2,dir:1,w:-3},{a:1,b:3,dir:1,w:6},{a:2,b:3,dir:1,w:2}]};
+  const EL=['0→1:4','0→2:5','1→2:-3','1→3:6','2→3:2'];
+  const code='<span class="kw">for</span> (<span class="kw">int</span> i = 1; i &lt;= n - 1; ++i) {   <span class="cmt">// 最多 n-1 轮</span>\n'+
+    '    <span class="kw">bool</span> updated = <span class="kw">false</span>;\n'+
+    '    <span class="kw">for</span> (<span class="kw">auto</span>&amp; e : edges) {          <span class="cmt">// 扫全部边</span>\n'+
+    '        <span class="kw">if</span> (dist[e.u] == INF) <span class="kw">continue</span>; <span class="cmt">// 防溢出!</span>\n'+
+    '        <span class="kw">if</span> (dist[e.u] + e.w &lt; dist[e.v])\n'+
+    '            { dist[e.v] = dist[e.u] + e.w; updated = <span class="kw">true</span>; }\n'+
+    '    }\n'+
+    '    <span class="kw">if</span> (!updated) <span class="kw">break</span>;              <span class="cmt">// 提前收敛</span>\n'+
+    '}\n'+
+    '<span class="cmt">// 再扫一遍仍能松弛 → 存在可达负环</span>';
+  const I='∞';
+  const steps=[
+    {dist:[0,I,I,I],lm:{},emap:{},cls:{},sub:{0:'0'},active:null,chip:'负权怎么办',chipC:'c0',title:'有负权边，Dijkstra 的贪心失效',
+     note:'边 1→2 权 -3（红色标签）',
+     desc:'图里有<b class="dg">负权边 1→2 (−3)</b>。若跑 Dijkstra：2 会先以 dist=5 出堆"定型"，但真值其实是 4−3=<b>1</b>——"堆顶已定型"的贪心前提被负权打破。<b>Bellman-Ford</b> 不贪心：<b>反复扫全部边做松弛，最多 n−1 轮</b>，用边集数组即可。'},
+    {dist:[0,4,5,I],lm:{0:'ok',1:'ok'},emap:{0:'hot',1:'hot'},cls:{1:'inq',2:'inq'},sub:{0:'0',1:'4',2:'5'},active:0,chip:'第 1 轮 · 边①②',chipC:'cb',title:'(0,1,4)：dist[1]=4；(0,2,5)：dist[2]=5',
+     note:'注意 dist[u]==INF 的边直接跳过（防 INF+w 溢出）',
+     desc:'<b>第 1 轮</b>按边表顺序扫描。前两条边把 dist[1]=4、dist[2]=5 松弛出来。细节：<code>dist[u]==INF</code> 时必须跳过——<b class="dg">INF + w 会溢出</b>，这是 BF 的经典 bug（配合 long long 更稳）。'},
+    {dist:[0,4,1,I],lm:{0:'ok',1:'ok',2:'bad'},emap:{0:'done',1:'done',2:'bad'},cls:{1:'inq',2:'inq'},sub:{0:'0',1:'4',2:'1'},active:2,chip:'负权边照常松弛',chipC:'cd',title:'(1,2,−3)：4−3=1 < 5 → dist[2] 压到 1',
+     note:'dist[2] 5→1　·　负权无需任何特殊处理',
+     desc:'扫到<b class="dg">负权边 (1,2,−3)</b>：dist[1]+(−3)=1 &lt; 5，dist[2] 被压到 <b>1</b>。BF 对负权<b>没有任何特殊逻辑</b>——松弛条件本身就兼容负数，这是它和 Dijkstra 的本质区别：不提前定型任何点，错了下一轮再修。'},
+    {dist:[0,4,1,3],lm:{0:'ok',1:'ok',2:'bad',3:'ok',4:'ok'},emap:{0:'done',2:'done',3:'hot',4:'hot'},cls:{1:'inq',2:'inq',3:'inq'},sub:{0:'0',1:'4',2:'1',3:'3'},active:3,chip:'第 1 轮扫完',chipC:'cb',title:'(1,3,6)：dist[3]=10；(2,3,2)：1+2=3 更优',
+     note:'第 1 轮结束：dist = [0, 4, 1, 3]',
+     desc:'继续：(1,3,6) 先给出 dist[3]=10，随后 (2,3,2) 用 1+2=<b>3</b> 覆盖它——同一轮内后扫的边能吃到前面的成果（边表顺序只影响收敛快慢，不影响最终答案）。第 1 轮结束：<b>dist=[0,4,1,3]</b>。'},
+    {dist:[0,4,1,3],lm:{0:'dim',1:'dim',2:'dim',3:'dim',4:'dim'},emap:{0:'done',2:'done',4:'done',1:'dim',3:'dim'},cls:{1:'done',2:'done',3:'done'},sub:{0:'0',1:'4',2:'1',3:'3'},active:null,chip:'第 2 轮无更新',chipC:'cg',title:'updated == false → 提前 break',
+     note:'为什么最多 n−1 轮：无环最短路最多 n−1 条边',
+     desc:'<b>第 2 轮</b>再扫全部边：没有任何松弛发生 → <code>updated=false</code>，提前退出。<b>为什么 n−1 轮够</b>：不含环的最短路最多走 n−1 条边，每轮至少把"再多一跳"的最短路确定下来。本图第 1 轮就收敛了。'},
+    {dist:[0,4,1,3],lm:{0:'dim',1:'dim',2:'dim',3:'dim',4:'dim'},emap:{0:'done',2:'done',4:'done',1:'dim',3:'dim'},cls:{1:'done',2:'done',3:'done'},sub:{0:'0',1:'4',2:'1',3:'3'},active:null,chip:'负环检测',chipC:'cg',title:'第 n 轮仍能松弛 = 起点可达负环',
+     note:'O(VE)　·　绿边 = 最短路树（含负权边）',
+     desc:'收尾<b>负环检测</b>：跑完 n−1 轮后再扫一遍，若仍有边能松弛，说明有<b class="dg">负环</b>参与最短路——可以无限绕圈刷低距离，"最短路"不存在。本图检测通过。复杂度 <b>O(VE)</b>，比 Dijkstra 慢，但这是负权下的正确选择；队列优化版本就是 SPFA。'},
+  ];
+  function mount(){
+    viz.innerHTML=graphMarkup('bf',G,'<b>Bellman-Ford</b>：反复扫边集松弛，负权照常处理（节点下方 = dist）')+
+      '<div class="collbl">dist 数组</div>'+cellsMarkup('bfd',4,['0','1','2','3'])+
+      '<div class="collbl">边集数组（按扫描顺序）</div>'+cellsMarkup('bfl',5,null,true)+
+      '<div class="op-note" id="bfnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('bf',G));
+  }
+  function paint(s){
+    paintGraph('bf',G,s);
+    paintCells('bfd',4,s.dist,s.dist.reduce((m,v,i)=>{if(v!=='∞')m[i]=(s.cls[i]==='done'?'ok':'on');return m;},{}));
+    paintCells('bfl',5,EL,Object.assign(EL.reduce((m,_,i)=>{m[i]='dim';return m;},{}),s.lm),true);
+    document.getElementById('bfnote').innerHTML=s.note;
+  }
+  return{id:'bellman',label:'Bellman-Ford',sub:'负权 + 负环检测',steps,mount,paint,layout:()=>layoutGraph('bf',G),code};
+})();
+
+/* ========== 场景 3：Floyd ========== */
+const floydScene=(()=>{
+  const G={nodes:[{id:0,x:14,y:26},{id:1,x:56,y:12},{id:2,x:40,y:80},{id:3,x:88,y:62}],
+    edges:[{a:0,b:1,dir:1,w:2},{a:1,b:2,dir:1,w:3},{a:0,b:2,dir:1,w:7},{a:2,b:3,dir:1,w:1},{a:1,b:3,dir:1,w:8}]};
+  const I='∞';
+  const MATS={
+    init:[[0,2,7,I],[I,0,3,8],[I,I,0,1],[I,I,I,0]],
+    k1:[[0,2,5,10],[I,0,3,8],[I,I,0,1],[I,I,I,0]],
+    k2:[[0,2,5,6],[I,0,3,4],[I,I,0,1],[I,I,I,0]],
+  };
+  const code='<span class="kw">for</span> (<span class="kw">int</span> k = 0; k &lt; n; ++k)      <span class="cmt">// 中转点在最外层!</span>\n'+
+    '  <span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; n; ++i)\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> j = 0; j &lt; n; ++j) {\n'+
+    '      <span class="kw">if</span> (d[i][k]==INF || d[k][j]==INF) <span class="kw">continue</span>;\n'+
+    '      d[i][j] = min(d[i][j], d[i][k] + d[k][j]);\n'+
+    '    }\n'+
+    '<span class="cmt">// 初始化三件套：d[i][i]=0 · 有边取 min · 无边 INF</span>';
+  const steps=[
+    {mat:'init',upd:[],emap:{},cls:{},active:null,chip:'任意两点',chipC:'c0',title:'dist[i][j] 矩阵 + 枚举中转点 k',
+     note:'初始化：对角 0，有边填权，无边 ∞',
+     desc:'Floyd 求<b>任意两点</b>最短路，适合点少的稠密图。状态 <code>dist[i][j]</code>，核心：枚举<b>中转点 k</b>，尝试用 i→k→j 更新 i→j。初始化三件套（都易漏）：<b>d[i][i]=0</b>、有边 <b>取 min</b>（防重边）、无边 <b>INF</b>。'},
+    {mat:'init',upd:[],emap:{},cls:{0:'active'},active:0,chip:'k=0 无收益',chipC:'ch',title:'k=0：没有边进入 0，经 0 中转无路可走',
+     note:'k 的含义：允许使用的中转点集合逐个扩大',
+     desc:'<b>k=0</b>：第 0 列除对角线全是 ∞（没有边指向 0），i→0→j 无从谈起，整轮无更新。理解 k 层的正确姿势：外层每推进一格，等于<b>把 k 加入"允许中转"的集合</b>——这是个 DP，k 必须在最外层（写进内层就错）。'},
+    {mat:'k1',upd:[[0,2],[0,3]],emap:{0:'hot',1:'hot',4:'hot',2:'dim'},cls:{1:'active'},active:1,chip:'k=1 两处更新',chipC:'cb',title:'0→1→2 = 5 < 7；0→1→3 = 10 < ∞',
+     note:'d[0][2] 7→5　·　d[0][3] ∞→10',
+     desc:'<b>k=1</b>：允许经过 1 中转。<b>d[0][2]</b> = min(7, 2+3) = <b>5</b>——绕 1 比直达便宜；<b>d[0][3]</b> = min(∞, 2+8) = <b>10</b>——首次连通。直达边 0→2(7) 已被淘汰（变淡）。'},
+    {mat:'k2',upd:[[0,3],[1,3]],emap:{0:'hot',1:'hot',3:'hot'},cls:{2:'active'},active:2,chip:'k=2 层层叠加',chipC:'cb',title:'0→…→2→3 = 6；1→2→3 = 4',
+     note:'d[0][3] 10→6　·　d[1][3] 8→4',
+     desc:'<b>k=2</b>：<b>d[0][3]</b> = min(10, d[0][2]+d[2][3]) = min(10, 5+1) = <b>6</b>——注意 d[0][2]=5 是<b>上一轮 k=1 的成果</b>，DP 层层叠加，最优路径 0→1→2→3 就这样拼出来；<b>d[1][3]</b> = min(8, 3+1) = <b>4</b>。'},
+    {mat:'k2',upd:[],emap:{0:'done',1:'done',3:'done',2:'dim',4:'dim'},cls:{},active:null,chip:'k=3 结束',chipC:'cg',title:'3 无出边，无更新；矩阵收敛',
+     note:'0→3 最短 = 6（路径 0→1→2→3）',
+     desc:'<b>k=3</b>：3 没有出边，i→3→j 走不通，整轮无更新，算法结束。最终矩阵每格就是两点间最短距离：<b>0→3 = 6</b>，恰好用满三条绿边。'},
+    {mat:'k2',upd:[],emap:{0:'done',1:'done',3:'done',2:'dim',4:'dim'},cls:{},active:null,chip:'O(V³)',chipC:'cg',title:'三重循环 O(V³)，n 小才用',
+     note:'空间 O(V²)　·　k 在最外层是铁律',
+     desc:'复杂度 <b>O(V³)</b> / 空间 O(V²)——点数几百以内才考虑。适用信号：<b>多次查询任意两点</b>、点少、甚至有负权（无负环即可）。对比：单源非负权还是 Dijkstra 划算；Floyd 的优势是"一次算完所有点对"。'},
+  ];
+  function mxMarkup(){
+    let s='<div class="mx h"></div>';
+    for(let j=0;j<4;j++)s+='<div class="mx h">j='+j+'</div>';
+    for(let i=0;i<4;i++){
+      s+='<div class="mx h">i='+i+'</div>';
+      for(let j=0;j<4;j++)s+='<div class="mx" id="fdm'+i+'-'+j+'">·</div>';
+    }
+    return '<div class="collbl">dist 矩阵（行 i → 列 j）</div><div class="mxwrap" style="grid-template-columns:repeat(5,44px)">'+s+'</div>';
+  }
+  function mount(){
+    viz.innerHTML=graphMarkup('fd',G,'<b>Floyd</b>：枚举中转点 k，d[i][j] = min(d[i][j], d[i][k]+d[k][j])',true)+
+      mxMarkup()+'<div class="op-note" id="fdnote"></div>';
+    requestAnimationFrame(()=>layoutGraph('fd',G));
+  }
+  function paint(s){
+    paintGraph('fd',G,s);
+    const M=MATS[s.mat];
+    for(let i=0;i<4;i++)for(let j=0;j<4;j++){
+      const el=document.getElementById('fdm'+i+'-'+j);
+      let c='mx';
+      if(i===j)c+=' diag';
+      if(M[i][j]==='∞')c+=' inf';
+      if(s.upd.some(p=>p[0]===i&&p[1]===j))c+=' upd';
+      el.className=c;
+      el.textContent=String(M[i][j]);
+    }
+    document.getElementById('fdnote').innerHTML=s.note;
+  }
+  return{id:'floyd',label:'Floyd',sub:'中转点 k 三重循环',steps,mount,paint,layout:()=>layoutGraph('fd',G),code};
+})();
+
+/* ========== 场景 4：选型决策 ========== */
+const selectScene=(()=>{
+  const ROWS=[
+    {q:'无权图，求最少边数 / 最少步数',a:'BFS',d:'queue + dist'},
+    {q:'多个起点同时扩散',a:'多源 BFS',d:'所有源一起入队'},
+    {q:'带权且边权非负，单源最短路',a:'Dijkstra',d:'邻接表 + 小顶堆'},
+    {q:'存在负权边，或要判负环',a:'Bellman-Ford',d:'边集数组'},
+    {q:'点数较少，求任意两点最短路',a:'Floyd',d:'邻接矩阵'},
+  ];
+  const code='<span class="cmt">// 拿到最短路题，先问四件事：</span>\n'+
+    '<span class="cmt">// ① 边有没有权？        无 → BFS</span>\n'+
+    '<span class="cmt">// ② 权会不会是负的？    负 → Bellman-Ford</span>\n'+
+    '<span class="cmt">// ③ 单源还是任意两点？  全对+点少 → Floyd</span>\n'+
+    '<span class="cmt">// ④ 起点一个还是多个？  多个 → 多源 BFS</span>\n'+
+    '\n'+
+    '<span class="cmt">// 无权用 BFS，非负权用 Dijkstra，</span>\n'+
+    '<span class="cmt">// 有负权看 Bellman-Ford，任意两点且点少用 Floyd</span>';
+  const steps=[
+    {hit:-1,pass:[],comp:'先判断，再写码',chip:'四个问题',chipC:'c0',title:'最短路第一步不是写代码，是选算法',
+     desc:'选型只需回答四件事：<b>① 边有没有权？② 权会不会负？③ 单源还是任意两点？④ 起点一个还是多个？</b>答案组合直接指向唯一算法。下面逐行过一遍这张决策表。'},
+    {hit:0,pass:[],comp:'O(V+E)',chip:'无权 → BFS',chipC:'cb',title:'无权图的"最短"就是最少边数',
+     desc:'<b>无权图</b>（或边权全 1）：BFS 按层扩展，第一次到达即最短，O(V+E) 最快。识别词：<b>最少步数、迷宫、单词接龙</b>。带权时千万别用（场景 1 的反例）。完整过程见 5.2.24 动画。'},
+    {hit:1,pass:[0],comp:'O(V+E)',chip:'多起点 → 多源',chipC:'cb',title:'所有源点一起入队，等价于超级源点',
+     desc:'<b>多个起点同时扩散</b>：批量入队即可，主循环不变。识别词：<b>腐烂橘子、多个出口、所有水源</b>。易错：不能一个源跑完再跑下一个，层次含义会错。完整过程见 5.2.26 动画。'},
+    {hit:2,pass:[0,1],comp:'O((V+E)logV)',chip:'非负权 → Dijkstra',chipC:'cb',title:'贪心 + 小顶堆，出堆即定型',
+     desc:'<b>带权非负、单源</b>：Dijkstra。两个铁律：必须<b>小顶堆</b>（普通队列贪心不成立）；同点多条记录用 <code>d != dist[u]</code> 跳过过期（C++ 堆不支持 decrease-key）。识别词：<b>网络延迟、最小代价路径</b>。见 5.2.24 动画。'},
+    {hit:3,pass:[0,1,2],comp:'O(VE)',chip:'负权 → BF',chipC:'cd',title:'不贪心：n−1 轮全边松弛 + 负环检测',
+     desc:'<b>有负权边</b>：Dijkstra 前提被破坏，换 Bellman-Ford——n−1 轮扫全边，天然兼容负权，还能检测负环（第 n 轮仍可松弛）。慢（O(VE)）但正确。本页场景 2 就是完整过程。'},
+    {hit:4,pass:[0,1,2,3],comp:'O(V³)',chip:'任意两点 → Floyd',chipC:'ch',title:'点少 + 多次查询点对，一次算完',
+     desc:'<b>任意两点 + 点数少</b>（几百以内）：Floyd 三重循环一次算出全部点对，k 必须在最外层。识别词：<b>多次查询 u 到 v、传递闭包</b>。本页场景 3 就是完整过程。'},
+    {hit:-1,pass:[],comp:'一句话口诀',chip:'收官',chipC:'cg',title:'无权 BFS · 非负 Dijkstra · 负权 BF · 全对 Floyd',
+     desc:'口诀：<b>无权用 BFS，非负权用 Dijkstra，有负权看 Bellman-Ford，任意两点且点少用 Floyd</b>。三个高频坑收尾：<b class="dg">带权误用 BFS</b>、<b class="dg">INF+w 溢出</b>（松弛前判 INF + long long）、<b class="dg">Floyd 漏 d[i][i]=0</b>。至此最短路家族与 5.2.24 / 5.2.26 的动画全部打通。'},
+  ];
+  function mount(){
+    let rows='';
+    ROWS.forEach((r,i)=>{rows+='<div class="selrow" id="sr'+i+'"><span class="q">'+r.q+'</span><span class="a">'+r.a+'</span><span class="d">'+r.d+'</span></div>';});
+    viz.innerHTML='<div class="vcap"><b>选型决策表</b>：题目特征 → 算法 → 关键结构</div>'+rows+
+      '<div class="op-note" id="slnote"></div>';
+  }
+  function paint(s){
+    ROWS.forEach((_,i)=>{
+      const el=document.getElementById('sr'+i);
+      el.className='selrow'+(s.hit===i?' hit':'')+(s.pass.includes(i)?' pass':'');
+    });
+    document.getElementById('slnote').innerHTML='复杂度：<b>'+s.comp+'</b>';
+  }
+  return{id:'select',label:'选型决策',sub:'四问定算法',steps,mount,paint,layout:()=>{},code};
+})();
+
+/* ============ 引擎（与动画合集同款） ============ */
+const SCENES=[trapScene,bellmanScene,floydScene,selectScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2900;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((tab,idx)=>tab.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>SCENES[si].layout());
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(+hashStep[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="28"></script>
+</body>
+</html>

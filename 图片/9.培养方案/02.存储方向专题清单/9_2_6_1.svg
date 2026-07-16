@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620">
+  <title>两大索引家族：原地更新 vs 追加合并</title>
+  <desc>B+ tree 原地更新结构与 LSM-tree 追加合并结构的对比，以及读放大、写放大、空间放大三角和 bitcask 在谱系中的位置。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1000" height="620" fill="rgb(245, 244, 237)"/>
+
+  <text x="500" y="34" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">两大索引家族：原地更新 vs 追加合并</text>
+
+  <!-- 左：B+ tree -->
+  <text x="40" y="76" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="start" dominant-baseline="central">B+ tree：原地更新（update-in-place）</text>
+
+  <rect x="190" y="110" width="140" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="260" y="132" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">根节点</text>
+
+  <rect x="90" y="214" width="140" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="160" y="236" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">内部节点</text>
+  <rect x="290" y="214" width="140" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="360" y="236" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">内部节点</text>
+
+  <rect x="90" y="318" width="140" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="160" y="340" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">叶子页（原地改）</text>
+  <rect x="290" y="318" width="140" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="360" y="340" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle" dominant-baseline="central">叶子页（会分裂）</text>
+
+  <polyline points="260,154 260,184 160,184 160,210" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="260,154 260,184 360,184 360,210" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="160" y1="258" x2="160" y2="314" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="360" y1="258" x2="360" y2="314" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="40" y="394" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">写：定位到页后原地修改 → 随机写 + 页分裂</text>
+  <text x="40" y="418" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">读：根到叶一条路径，O(log n) 稳定，支持范围扫描</text>
+
+  <!-- 右：LSM-tree -->
+  <text x="520" y="76" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="start" dominant-baseline="central">LSM-tree：追加 + 后台合并（RocksDB）</text>
+
+  <rect x="620" y="110" width="240" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="740" y="132" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">memtable（内存，有序）</text>
+
+  <rect x="560" y="214" width="160" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="640" y="236" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">L0 SSTable（新）</text>
+  <rect x="780" y="214" width="160" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="860" y="236" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">L0 SSTable（旧）</text>
+
+  <polyline points="740,154 740,184 640,184 640,210" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="740,154 740,184 860,184 860,210" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="752" y="170" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="start" dominant-baseline="central">写满 flush（顺序写）</text>
+
+  <rect x="560" y="318" width="380" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="750" y="340" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">L1：有序、不重叠的 SSTable run</text>
+
+  <line x1="640" y1="258" x2="640" y2="314" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="860" y1="258" x2="860" y2="314" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="750" y="288" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489" text-anchor="middle" dominant-baseline="central">compaction：归并、去重</text>
+
+  <text x="520" y="394" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">写：只追加 memtable + WAL → 顺序写、天然批量</text>
+  <text x="520" y="418" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">读：memtable → L0 → L1 逐层找，bloom filter 挡住不存在的 key</text>
+
+  <!-- 底部三放大三角 -->
+  <rect x="40" y="478" width="920" height="96" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="60" y="502" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">三放大三角：写放大（compaction 反复搬）· 读放大（逐层查）· 空间放大（旧版本滞留）—— 三者不可同时最小</text>
+  <text x="60" y="526" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">B+ tree 押注读：读路径最短、可范围扫描；LSM 押注写：磁盘上只做顺序写</text>
+  <text x="60" y="550" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">bitcask 是第三极：哈希索引读一跳、写顺序，代价是 key 必须全装内存 —— mini-kv-engine 即此模型</text>
+</svg>

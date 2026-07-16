@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>进制转换 · 除基取余、位权展开与四位一组</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;      /* 商 */
+  --brown:#854F0B;--brownbg:#FAEEDA;    /* 余数 */
+  --green:#0F6E56;--greenbg:#E1F5EE;    /* 结果 */
+  --purple:#6B5E8A;--purplebg:#ECE7F2;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.layout{display:grid;grid-template-columns:520px 1fr;gap:26px;margin-top:24px;align-items:start;}
+@media(max-width:1020px){.layout{grid-template-columns:1fr;}}
+
+/* ---------- 左：可视化 ---------- */
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;min-height:480px;}
+.viz .cap{font-size:12px;color:var(--muted);}
+.view{transition:opacity var(--dur) var(--ease);}
+.view.hide{display:none;}
+
+/* 三副面孔 */
+.faces{display:flex;gap:10px;flex-wrap:wrap;}
+.face{font-family:var(--mono);font-size:13px;font-weight:600;border-radius:8px;padding:6px 12px;border:1px solid;}
+.face.f10{color:var(--ink);border-color:var(--line);background:var(--gray);}
+.face.f2{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.face.f8{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.face.f16{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+
+/* 除法梯子 */
+.ladder{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:15px;}
+.lrow{display:grid;grid-template-columns:80px 40px 80px 40px 56px;align-items:center;gap:4px;opacity:0;transform:translateY(-8px);transition:all var(--dur) var(--ease);}
+.lrow.on{opacity:1;transform:none;}
+.lrow span{text-align:center;}
+.lrow .q0{background:var(--gray);border-radius:6px;padding:3px 0;}
+.lrow .op{color:var(--faint);font-size:13px;}
+.lrow .q1{background:var(--bluebg);color:var(--blue);border-radius:6px;padding:3px 0;}
+.lrow .rem{background:var(--brownbg);color:var(--brown);font-weight:700;border-radius:6px;padding:3px 0;position:relative;}
+.lrow.stop .q1{box-shadow:inset 0 0 0 2px var(--blue);}
+.readdir{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green);font-weight:600;opacity:0;transition:opacity var(--dur) var(--ease);}
+.readdir.show{opacity:1;}
+.readdir .arrow{font-size:18px;}
+
+/* 结果槽 */
+.slots{display:flex;gap:6px;align-items:center;margin-top:4px;}
+.slots .pre{font-family:var(--mono);font-size:14px;color:var(--faint);}
+.slot{width:40px;height:40px;border:1.5px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green);transition:all var(--dur) var(--ease);}
+.slot.fill{border-style:solid;border-color:var(--green);background:var(--greenbg);animation:pop .5s var(--ease);}
+@keyframes pop{0%{transform:scale(.6);}70%{transform:scale(1.12);}100%{transform:scale(1);}}
+
+/* 位权展开 */
+.expand{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:15px;}
+.erow{display:grid;grid-template-columns:56px 90px 30px 90px;align-items:center;gap:6px;opacity:0;transform:translateX(-10px);transition:all var(--dur) var(--ease);}
+.erow.on{opacity:1;transform:none;}
+.erow .ed{background:var(--brownbg);color:var(--brown);font-weight:700;border-radius:6px;padding:3px 0;text-align:center;}
+.erow .ew{color:var(--muted);text-align:center;}
+.erow .eq{color:var(--faint);text-align:center;}
+.erow .ev{background:var(--bluebg);color:var(--blue);border-radius:6px;padding:3px 0;text-align:center;}
+.etotal{display:grid;grid-template-columns:56px 90px 30px 90px;gap:6px;margin-top:4px;padding-top:8px;border-top:1px solid var(--grid);opacity:0;transition:opacity var(--dur) var(--ease);}
+.etotal.on{opacity:1;}
+.etotal .ev{background:var(--greenbg);color:var(--green);font-weight:700;border-radius:6px;padding:3px 0;text-align:center;grid-column:4;}
+.etotal .el{grid-column:1/4;text-align:right;color:var(--muted);font-size:13px;align-self:center;}
+
+/* 四位一组 */
+.grp{display:flex;flex-direction:column;gap:12px;}
+.grow{display:flex;gap:8px;justify-content:flex-start;}
+.nib{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.nibbits{display:flex;gap:2px;background:var(--bluebg);border-radius:6px;padding:4px 6px;}
+.nibbits span{font-family:var(--mono);font-size:14px;color:var(--blue);font-weight:600;}
+.nibbits .pad{color:var(--faint);font-weight:400;}
+.nibhex{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green);background:var(--greenbg);border:1px solid var(--green);border-radius:8px;width:38px;text-align:center;padding:2px 0;opacity:0;transform:translateY(-6px);transition:all var(--dur) var(--ease);}
+.nibhex.on{opacity:1;transform:none;}
+
+/* ---------- 右 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:170px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cs{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .q{color:var(--blue);font-weight:600;}
+.desc-body .r{color:var(--brown);font-weight:600;}
+.desc-body .g{color:var(--green);font-weight:600;}
+
+.free{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 18px;}
+.free .lbl{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.free .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.act{font:inherit;font-family:var(--mono);font-size:13px;font-weight:500;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid;transition:all .15s var(--ease);}
+.act:active{transform:scale(.96);}
+.act.base{color:var(--muted);border-color:var(--line);background:var(--paper);}
+.act.base.sel{color:var(--blue);border-color:var(--blue);background:var(--bluebg);font-weight:700;}
+.act.step{color:var(--brown);border-color:var(--brown);background:var(--brownbg);font-family:inherit;}
+.act.step:hover:not(:disabled){background:#f5e4c8;}
+.act.step:disabled{opacity:.4;cursor:default;}
+.act.reset{color:var(--muted);border-color:var(--line);background:var(--paper);margin-left:auto;font-family:inherit;}
+.freeout{margin-top:10px;font-size:13px;color:var(--muted);min-height:22px;}
+.freeout b{color:var(--ink);font-family:var(--mono);}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>进制转换 · 除基取余、位权展开与四位一组</h1>
+    <p>983 是怎么变成 <code>0b1111010111</code>、<code>01727</code>、<code>0x3D7</code> 的　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="layout">
+    <!-- 左：可视化 -->
+    <section class="viz">
+      <div class="view" id="vFaces">
+        <div class="cap" style="margin-bottom:8px;">同一个数的四副面孔</div>
+        <div class="faces">
+          <span class="face f10">983</span>
+          <span class="face f2">0b1111010111</span>
+          <span class="face f8">01727</span>
+          <span class="face f16">0x3D7</span>
+        </div>
+      </div>
+
+      <div class="view" id="vLadder">
+        <div class="cap" style="margin-bottom:8px;" id="ladderCap">除基取余（基数 = 8）</div>
+        <div class="ladder" id="ladder"></div>
+        <div class="readdir" id="readDir" style="margin-top:10px;"><span class="arrow">⤴</span>余数<b>从下往上</b>读 —— 最后一个余数是最高位</div>
+        <div class="slots" id="slots" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="view hide" id="vExpand">
+        <div class="cap" style="margin-bottom:8px;">位权展开验算：01727 → 十进制</div>
+        <div class="expand" id="expand"></div>
+        <div class="etotal" id="etotal"><span class="el">相加 =</span><span class="ev">983 ✓</span></div>
+      </div>
+
+      <div class="view hide" id="vGroup">
+        <div class="cap" style="margin-bottom:8px;">二 ↔ 十六快捷通道：4 位一组（不足 4 位左边补 0）</div>
+        <div class="grp">
+          <div class="grow">
+            <div class="nib"><div class="nibbits"><span class="pad">0</span><span class="pad">0</span><span>1</span><span>1</span></div><div class="nibhex" id="nib0">3</div></div>
+            <div class="nib"><div class="nibbits"><span>1</span><span>1</span><span>0</span><span>1</span></div><div class="nibhex" id="nib1">D</div></div>
+            <div class="nib"><div class="nibbits"><span>0</span><span>1</span><span>1</span><span>1</span></div><div class="nibhex" id="nib2">7</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右 -->
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+
+      <div class="free">
+        <div class="lbl">自由操作 —— 选个基数，亲手把 983 除到底：</div>
+        <div class="row">
+          <button class="act base" data-base="2">÷ 2</button>
+          <button class="act base" data-base="8">÷ 8</button>
+          <button class="act base" data-base="16">÷ 16</button>
+          <button class="act step" id="actDiv" disabled>再除一次</button>
+          <button class="act reset" id="actReset">↺ 复位</button>
+        </div>
+        <div class="freeout" id="freeOut"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const HEX='0123456789ABCDEF';
+function rowsFor(n,base){
+  const rows=[];let q=n;
+  while(q>0){rows.push({from:q,quot:Math.floor(q/base),rem:q%base});q=Math.floor(q/base);}
+  return rows;
+}
+const PREFIX={2:'0b',8:'0',16:'0x'};
+
+/* ---------- 梯子渲染 ---------- */
+const ladder=document.getElementById('ladder');
+const slotsBox=document.getElementById('slots');
+const ladderCap=document.getElementById('ladderCap');
+const readDir=document.getElementById('readDir');
+let curRows=[],curBase=8;
+
+function buildLadder(base){
+  curBase=base;curRows=rowsFor(983,base);
+  ladderCap.textContent='除基取余（基数 = '+base+'）';
+  ladder.innerHTML='';
+  curRows.forEach(r=>{
+    const div=document.createElement('div');div.className='lrow';
+    div.innerHTML='<span class="q0">'+r.from+'</span><span class="op">÷'+base+'=</span><span class="q1">'+r.quot+'</span><span class="op">……</span><span class="rem">'+HEX[r.rem]+'</span>';
+    ladder.appendChild(div);
+  });
+  slotsBox.innerHTML='<span class="pre">'+PREFIX[base]+'</span>';
+  curRows.forEach(()=>{const s=document.createElement('div');s.className='slot';slotsBox.appendChild(s);});
+  readDir.classList.remove('show');
+}
+function showRows(k,markStop){
+  const rows=ladder.querySelectorAll('.lrow');
+  rows.forEach((r,i)=>{r.classList.toggle('on',i<k);r.classList.toggle('stop',markStop&&i===curRows.length-1&&k>=curRows.length);});
+}
+function fillSlots(on){
+  const slots=slotsBox.querySelectorAll('.slot');
+  const digits=curRows.map(r=>HEX[r.rem]).reverse(); // 从下往上读
+  slots.forEach((s,i)=>{
+    if(on){setTimeout(()=>{s.textContent=digits[i];s.classList.add('fill');},i*180);}
+    else{s.textContent='';s.classList.remove('fill');}
+  });
+  readDir.classList.toggle('show',on);
+}
+
+/* ---------- 位权展开 ---------- */
+const expandBox=document.getElementById('expand');
+const EXP=[['1','× 8³','=','512'],['7','× 8²','=','448'],['2','× 8¹','=','16'],['7','× 8⁰','=','7']];
+EXP.forEach(e=>{
+  const div=document.createElement('div');div.className='erow';
+  div.innerHTML='<span class="ed">'+e[0]+'</span><span class="ew">'+e[1]+'</span><span class="eq">=</span><span class="ev">'+e[3]+'</span>';
+  expandBox.appendChild(div);
+});
+function showExpand(on){
+  expandBox.querySelectorAll('.erow').forEach((r,i)=>{
+    if(on){setTimeout(()=>r.classList.add('on'),i*260);}else r.classList.remove('on');
+  });
+  const t=document.getElementById('etotal');
+  if(on){setTimeout(()=>t.classList.add('on'),EXP.length*260+150);}else t.classList.remove('on');
+}
+function showGroup(on){
+  ['nib0','nib1','nib2'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    if(on){setTimeout(()=>el.classList.add('on'),i*320);}else el.classList.remove('on');
+  });
+}
+
+const vFaces=document.getElementById('vFaces'),vLadder=document.getElementById('vLadder'),
+      vExpand=document.getElementById('vExpand'),vGroup=document.getElementById('vGroup');
+
+/* ---------- 步骤（讲解线用基数 8：4 步除完，和笔记的 01727 对上） ---------- */
+const STEPS=[
+  { title:'步骤 0 · 同一个数，四副面孔', chip:'前缀回顾', chipC:'c0', fx:{faces:1,ladder:0,rows:0} ,
+    desc:'983 换套写法就是 <code>0b1111010111</code>、<code>01727</code>、<code>0x3D7</code> —— <b>值没变，只是记数系统变了</b>。前缀是身份证：<code>0b</code> 二进制、<code>0</code> 八进制、<code>0x</code> 十六进制。下面以八进制为例走一遍"除基取余"。' },
+  { title:'步骤 1 · 第一次除：983 ÷ 8', chip:'余数 = 最低位', chipC:'ch', fx:{ladder:1,rows:1},
+    desc:'983 ÷ 8 = <span class="q">122</span> …… <span class="r">7</span>。这个余数 7 是"塞不进下一级"的零头，正是八进制的<b>个位（最低位）</b>。商 122 带着"剩下的整八"进入下一轮。' },
+  { title:'步骤 2 · 继续除：122 ÷ 8', chip:'逐位剥离', chipC:'ch', fx:{ladder:1,rows:2},
+    desc:'122 ÷ 8 = <span class="q">15</span> …… <span class="r">2</span>。每除一次，就<b>剥出更高的一位</b>。余数序列是从低位到高位一位位"吐"出来的。' },
+  { title:'步骤 3 · 再除：15 ÷ 8', chip:'逐位剥离', chipC:'ch', fx:{ladder:1,rows:3},
+    desc:'15 ÷ 8 = <span class="q">1</span> …… <span class="r">7</span>。商已经小于基数了，下一轮就是最后一轮。' },
+  { title:'步骤 4 · 商变 0，停', chip:'终止条件', chipC:'cs', fx:{ladder:1,rows:4,stop:1},
+    desc:'1 ÷ 8 = <span class="q">0</span> …… <span class="r">1</span>。<b>商为 0 就停</b>（等价于笔记里"商小于基数后，把商放在最前面"的说法）。四个余数已经集齐：7、2、7、1。' },
+  { title:'步骤 5 · 倒着读！', chip:'最易错的一步', chipC:'cd', fx:{ladder:1,rows:4,stop:1,fill:1},
+    desc:'余数要<b class="g">从下往上</b>读：1 7 2 7 → <code>01727</code>。<b>顺着抄写就错了</b>——第一个余数是最低位，最后一个才是最高位。这是进制转换里翻车率最高的一步。' },
+  { title:'步骤 6 · 位权展开验算', chip:'反向转换', chipC:'cs', fx:{expand:1},
+    desc:'反过来（其他进制 → 十进制）用<b>位权展开</b>：每一位乘上 基数<sup>位序</sup> 再相加。1×8³ + 7×8² + 2×8¹ + 7×8⁰ = 512 + 448 + 16 + 7 = <b>983</b>，转换无误。做题时正反各算一遍，基本不会错。' },
+  { title:'步骤 7 · 二 ↔ 十六的快捷通道', chip:'4 位一组', chipC:'cg', fx:{group:1},
+    desc:'因为 16 = 2⁴，二进制<b>从右往左每 4 位一组</b>直接查表就是十六进制：<code>0011</code>→3、<code>1101</code>→D、<code>0111</code>→7 → <code>0x3D7</code>。同理 8 = 2³，3 位一组对应八进制。<b>不需要过十进制中转</b>。' },
+];
+
+/* ---------- 渲染 ---------- */
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+const dotsBox=document.getElementById('dots');const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(i);};dotsBox.appendChild(d);dotEls.push(d);});
+
+let cur=0;
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur],fx=s.fx;
+  exitFree();
+  if(curBase!==8||ladder.children.length===0)buildLadder(8);
+  vFaces.classList.toggle('hide',!fx.faces);
+  vLadder.classList.toggle('hide',!(fx.ladder||fx.faces));
+  vExpand.classList.toggle('hide',!fx.expand);
+  vGroup.classList.toggle('hide',!fx.group);
+  if(fx.ladder||fx.faces){showRows(fx.rows||0,fx.stop);fillSlots(!!fx.fill);}
+  showExpand(!!fx.expand);
+  showGroup(!!fx.group);
+  stTitle.textContent=s.title;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(STEPS.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===STEPS.length-1;
+  if(cur===STEPS.length-1)stop();
+}
+
+/* ---------- 自由操作 ---------- */
+let free=null; // {base, shown}
+const actDiv=document.getElementById('actDiv');
+const freeOut=document.getElementById('freeOut');
+const baseBtns=document.querySelectorAll('.act.base');
+function exitFree(){
+  free=null;actDiv.disabled=true;freeOut.textContent='';
+  baseBtns.forEach(b=>b.classList.remove('sel'));
+}
+baseBtns.forEach(b=>{
+  b.onclick=()=>{
+    stop();
+    const base=+b.dataset.base;
+    baseBtns.forEach(x=>x.classList.toggle('sel',x===b));
+    free={base,shown:0};
+    buildLadder(base);
+    vFaces.classList.add('hide');vExpand.classList.add('hide');vGroup.classList.add('hide');
+    vLadder.classList.remove('hide');
+    showRows(0,false);fillSlots(false);
+    actDiv.disabled=false;
+    freeOut.innerHTML='983 ÷ '+base+'，一共要除 <b>'+curRows.length+'</b> 次。点「再除一次」开始。';
+  };
+});
+actDiv.onclick=()=>{
+  if(!free)return;
+  stop();
+  if(free.shown<curRows.length){
+    free.shown++;
+    showRows(free.shown,free.shown>=curRows.length);
+    const r=curRows[free.shown-1];
+    if(free.shown<curRows.length){
+      freeOut.innerHTML=r.from+' ÷ '+free.base+' = <b>'+r.quot+'</b> …… 余 <b>'+HEX[r.rem]+'</b>　（还差 '+(curRows.length-free.shown)+' 次）';
+    }else{
+      fillSlots(true);
+      const digits=curRows.map(x=>HEX[x.rem]).reverse().join('');
+      freeOut.innerHTML='商到 0 了！倒序读出 → <b>'+PREFIX[free.base]+digits+'</b>　✓ 与 983 等值';
+      actDiv.disabled=true;
+    }
+  }
+};
+document.getElementById('actReset').onclick=()=>{stop();go(0);};
+
+/* ---------- 播放 ---------- */
+let timer=null,ms=2600;
+function play(){if(cur===STEPS.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+buildLadder(8);
+const m=location.hash.match(/step=(\d+)/);go(m?+m[1]:0);
+</script>
+</body>
+</html>

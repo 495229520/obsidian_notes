@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>排序算法动画 · 快排 / 归并 / 堆排序 / 计数排序</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.72;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.viz .vcap b{color:var(--ink);}
+.slabel{text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--faint);margin:10px 0 2px;}
+.slabel b{color:var(--ink);}
+
+/* ---- 柱状（快排）---- */
+.barrow{display:flex;gap:9px;justify-content:center;align-items:flex-end;height:212px;position:relative;margin:12px 0 50px;}
+.bar{width:46px;background:var(--paper);border:1.5px solid var(--line);border-radius:7px 7px 0 0;display:flex;justify-content:center;align-items:flex-start;padding-top:5px;font-family:var(--mono);font-weight:700;font-size:15px;color:var(--muted);position:relative;transition:height var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);box-shadow:0 1px 2px rgba(60,55,40,.05);}
+.bar .bidx{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-size:10px;color:var(--faint);}
+.bar.less{background:var(--bluebg);border-color:var(--blue);color:var(--blue);}
+.bar.greater{background:var(--brownbg);border-color:var(--brown);color:var(--brown);}
+.bar.pivot{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);box-shadow:0 0 0 4px rgba(179,64,47,.18);}
+.bar.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.16);}
+.bar.cur2{background:var(--brownbg);border-color:var(--brown);color:var(--brown);box-shadow:0 0 0 4px rgba(154,91,14,.16);}
+.bar.sorted{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.bar.pop{animation:barpop .55s var(--ease);}
+@keyframes barpop{0%{transform:translateY(0);}45%{transform:translateY(-16px) scale(1.05);}100%{transform:translateY(0);}}
+.bbadge{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .25s;line-height:1.05;pointer-events:none;z-index:3;}
+.bbadge .tri{font-size:9px;display:block;}
+.bbadge.a{color:var(--blue);}.bbadge.b{color:var(--brown);}.bbadge.d{color:var(--danger);}
+
+/* ---- 单元格（归并 / 计数）---- */
+.cellrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+.subrow{display:flex;align-items:center;gap:12px;justify-content:center;margin:9px 0;}
+.slbl{font-family:var(--mono);font-size:11.5px;color:var(--faint);width:92px;text-align:right;flex-shrink:0;}
+.cells{display:flex;gap:8px;}
+.cell{width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:16px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--muted);position:relative;transition:all var(--dur) var(--ease);}
+.cell.a{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.cell.b{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.cell.head.a{box-shadow:0 0 0 4px rgba(24,95,165,.16);}
+.cell.head.b{box-shadow:0 0 0 4px rgba(154,91,14,.16);}
+.cell.head::after{content:'▲';position:absolute;bottom:-17px;left:0;right:0;font-size:9px;color:currentColor;}
+.cell.pick{color:var(--green);border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 4px rgba(15,110,86,.16);}
+.cell.done{opacity:.32;}
+.cell.empty{border-style:dashed;color:var(--faint);background:transparent;}
+.cell.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.16);}
+.cell.scan{opacity:.4;}
+.cell.flash{animation:pop .55s var(--ease);}
+@keyframes pop{0%{transform:scale(.5);opacity:.2;}70%{transform:scale(1.13);}100%{transform:scale(1);opacity:1;}}
+.mrule{height:1px;background:var(--grid);margin:6px auto;width:78%;}
+
+/* ---- 堆（树）---- */
+.tree{position:relative;height:250px;margin:8px 0 24px;}
+.node{position:absolute;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:16px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);transform:translate(-50%,-50%);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease);z-index:2;box-shadow:0 1px 2px rgba(60,55,40,.06);}
+.node.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.16);}
+.node.child{background:var(--brownbg);border-color:var(--brown);color:var(--brown);}
+.node.swap{background:var(--greenbg);border-color:var(--green);color:var(--green);animation:pulse .55s var(--ease);}
+.node.sorted{background:var(--greenbg);border-color:var(--green);color:var(--green);opacity:.5;}
+@keyframes pulse{0%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.16);}100%{transform:translate(-50%,-50%) scale(1);}}
+.edge{position:absolute;height:1.5px;background:var(--grid);transform-origin:left center;z-index:1;}
+
+/* ---- 计数排序桶 ---- */
+.count-wrap{display:flex;gap:9px;justify-content:center;margin:10px 0 12px;flex-wrap:wrap;}
+.bucket{display:flex;flex-direction:column;align-items:center;gap:5px;}
+.bucket .bk{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:16px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease);}
+.bucket .bk.hit{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.15);}
+.bucket .bk.emit{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.bucket .bv{font-family:var(--mono);font-size:11px;color:var(--faint);}
+
+/* ---- 右侧 ---- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.desc-body{margin-top:13px;font-size:13.5px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.38;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:48px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>排序算法动画 · 四个核心套路</h1>
+    <p>快排 partition 双指针 / 归并合并 / 堆排序下沉 / 计数排序　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+function barH(v){return 28+v*18;}
+function buildBars(container,values,badges,pfx){
+  pfx=pfx||'q';
+  let h='<div class="barrow" id="brow-'+pfx+'">';
+  values.forEach((v,i)=>{h+='<div class="bar" id="'+pfx+i+'" style="height:'+barH(v)+'px"><span class="bv">'+v+'</span><span class="bidx">'+i+'</span></div>';});
+  (badges||[]).forEach(b=>{h+='<div class="bbadge '+b.cls+'" id="bb-'+pfx+'-'+b.name+'" style="opacity:0"><span class="tri">▲</span>'+b.label+'</div>';});
+  h+='</div>';
+  container.innerHTML=h;
+}
+function setBar(pfx,i,val,cls){const el=document.getElementById(pfx+i);if(!el)return;el.style.height=barH(val)+'px';el.className='bar '+(cls||'');el.querySelector('.bv').textContent=val;}
+function popBar(pfx,i){const el=document.getElementById(pfx+i);if(!el)return;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
+function moveBarBadges(pfx,list){const row=document.getElementById('brow-'+pfx);const H=row.clientHeight;const occ={};
+  list.forEach(p=>{const el=document.getElementById('bb-'+pfx+'-'+p.name);if(!el)return;
+   if(p.at==null){el.style.opacity=0;return;}
+   const bar=document.getElementById(pfx+p.at);let top=H+8;if(occ[p.at])top+=20;occ[p.at]=1;
+   el.style.left=(bar.offsetLeft+bar.offsetWidth/2)+'px';el.style.top=top+'px';el.style.opacity=1;});}
+
+/* ========== 场景 1：快速排序 · Hoare 分区 ========== */
+const quickScene={
+  id:'quick',label:'快速排序',sub:'Hoare 分区',
+  code:'<span class="kw">void</span> quickSort(vector&lt;int&gt;& a,<span class="kw">int</span> l,<span class="kw">int</span> r){\n'+
+    '    <span class="kw">if</span>(l&gt;=r) <span class="kw">return</span>;\n'+
+    '    <span class="kw">int</span> i=l-1, j=r+1, p=a[l+(r-l)/2];\n'+
+    '    <span class="kw">while</span>(i&lt;j){\n'+
+    '        <span class="kw">do</span> ++i; <span class="kw">while</span>(a[i]&lt;p);  <span class="cmt">// 停在 &gt;=p</span>\n'+
+    '        <span class="kw">do</span> --j; <span class="kw">while</span>(a[j]&gt;p);  <span class="cmt">// 停在 &lt;=p</span>\n'+
+    '        <span class="kw">if</span>(i&lt;j) swap(a[i],a[j]);\n'+
+    '    }\n'+
+    '    quickSort(a,l,j); quickSort(a,j+1,r);\n}',
+  steps:[
+    {arr:[5,3,8,4,2,7,1],pivotIdx:3,i:null,j:null,swap:[],chip:'选基准 pivot=4',chipC:'cd',
+     act:'▸ 取 pivot = a[mid] = 4，i=l−1 从左、j=r+1 从右',
+     desc:'快排核心是 <b>partition 分区</b>：选基准 <b class="dg">pivot = a[mid] = 4</b>，把比它小的甩左、大的甩右。本模板用 <b>Hoare 双指针</b>：<code>i=l-1</code> 从左、<code>j=r+1</code> 从右，向中间夹逼。'},
+    {arr:[5,3,8,4,2,7,1],pivotIdx:3,i:0,j:6,swap:[],chip:'i 停 5，j 停 1',chipC:'cb',
+     act:'▸ i 右移停在首个 ≥4（a[0]=5）；j 左移停在首个 ≤4（a[6]=1）',
+     desc:'<code>do ++i while a[i]&lt;p</code>：i 找第一个 <b>≥4</b> → 停在 <span class="bl">a[0]=5</span>。<code>do --j while a[j]&gt;p</code>：j 找第一个 <b>≤4</b> → 停在 <span class="br">a[6]=1</span>。比较用 <code>&lt;</code>/<code>&gt;</code> 而非 <code>≤</code>/<code>≥</code>，否则遇重复值会越界。'},
+    {arr:[1,3,8,4,2,7,5],pivotIdx:3,i:0,j:6,swap:[0,6],chip:'swap(5,1)',chipC:'cg',
+     act:'▸ i<j → 交换 a[0]=5 与 a[6]=1',
+     desc:'i&lt;j，交换 <b>a[0]=5</b> 与 <b>a[6]=1</b>（注意柱子高度对调）。左边「太大」的数换到右边、右边「太小」的换到左边——一次交换同时纠正两侧。'},
+    {arr:[1,3,8,4,2,7,5],pivotIdx:3,i:2,j:4,swap:[],chip:'i 停 8，j 停 2',chipC:'cb',
+     act:'▸ 继续夹逼：i 停 a[2]=8，j 停 a[4]=2',
+     desc:'继续。i 越过 3(&lt;4) 停在 <span class="bl">a[2]=8</span>；j 越过 7(&gt;4) 停在 <span class="br">a[4]=2</span>。'},
+    {arr:[1,3,2,4,8,7,5],pivotIdx:3,i:2,j:4,swap:[2,4],chip:'swap(8,2)',chipC:'cg',
+     act:'▸ i<j → 交换 a[2]=8 与 a[4]=2',
+     desc:'i&lt;j，交换 <b>a[2]=8</b> 与 <b>a[4]=2</b>。现在左段越来越「小」、右段越来越「大」。'},
+    {arr:[1,3,2,4,8,7,5],pivotIdx:3,i:3,j:3,swap:[],chip:'i==j 相遇',chipC:'ch',
+     act:'▸ i、j 相遇于 3，while(i<j) 结束，返回边界 j=3',
+     desc:'再走一步：i 前进到 a[3]=4 停、j 后退到 a[3]=4 停。此时 <b>i==j==3</b>，<code>i&lt;j</code> 不成立，分区结束，返回边界 <b>j=3</b>。'},
+    {arr:[1,3,2,4,8,7,5],pivotIdx:null,i:null,j:null,swap:[],split:3,chip:'左≤ | 右≥',chipC:'cg',
+     act:'▸ 分区完成：[1,3,2,4] ≤ pivot ≤ [8,7,5]',
+     desc:'分区完成：<span class="bl">[1,3,2,4]</span> 整体 ≤ pivot，<span class="br">[8,7,5]</span> 整体 ≥ pivot。注意<b>两侧内部还没排好</b>，接着递归 <code>quickSort(l,j)</code> 与 <code>quickSort(j+1,r)</code>。'},
+    {arr:[1,2,3,4,5,7,8],pivotIdx:null,i:null,j:null,swap:[],allSorted:true,chip:'平均 O(n log n)',chipC:'cg',
+     act:'▸ 各子区间递归分区完毕 → 数组有序',
+     desc:'所有子区间递归分区完毕，数组有序。快排<b>原地</b>、常数小、平均 <b>O(n log n)</b>；但 pivot 选得极差会退化到 <b>O(n²)</b>，且<b>不稳定</b>。工程直接用 <code>std::sort</code>（introsort，已处理退化）。'},
+  ],
+  build(){viz.innerHTML='<div class="vcap"><b>快速排序</b>：Hoare 双指针一次 partition，把小的甩左、大的甩右</div><div id="qbox"></div>';
+    buildBars(document.getElementById('qbox'),[5,3,8,4,2,7,1],[{name:'i',cls:'a',label:'i'},{name:'j',cls:'b',label:'j'},{name:'p',cls:'d',label:'pivot'}],'q');},
+  render(s){
+    s.arr.forEach((v,i)=>{
+      let cls='';
+      if(s.allSorted)cls='sorted';
+      else if(s.split!==undefined)cls=(i<=s.split?'less':'greater');
+      else{
+        if(i===s.pivotIdx)cls='pivot';
+        if(i===s.i)cls='cur';
+        else if(i===s.j)cls='cur2';
+      }
+      setBar('q',i,v,cls);
+    });
+    s.swap.forEach(i=>popBar('q',i));
+    const active=(s.split===undefined&&!s.allSorted);
+    moveBarBadges('q',[{name:'i',at:active?s.i:null},{name:'j',at:active?s.j:null},
+      {name:'p',at:active&&s.pivotIdx!=null&&s.pivotIdx!==s.i&&s.pivotIdx!==s.j?s.pivotIdx:null}]);
+  }
+};
+
+/* ========== 场景 2：归并排序 · 合并有序段 ========== */
+const mergeScene=(()=>{
+  const L=[1,4,7],R=[2,3,8];
+  return {
+    id:'merge',label:'归并排序',sub:'合并有序段',
+    code:'<span class="kw">int</span> i=l, j=mid+1; vector&lt;int&gt; t;\n'+
+      '<span class="kw">while</span>(i&lt;=mid &amp;&amp; j&lt;=r){\n'+
+      '    <span class="kw">if</span>(a[i] &lt;= a[j]) t.push_back(a[i++]); <span class="cmt">// &lt;= 保稳定</span>\n'+
+      '    <span class="kw">else</span>            t.push_back(a[j++]);\n'+
+      '}\n'+
+      '<span class="kw">while</span>(i&lt;=mid) t.push_back(a[i++]);\n'+
+      '<span class="kw">while</span>(j&lt;=r)   t.push_back(a[j++]);',
+    steps:[
+      {i:0,j:0,out:[],pick:null,chip:'两段已各自有序',chipC:'c0',
+       act:'▸ 双指针 i、j 各指一段头部，谁小取谁',
+       desc:'归并的递归负责把数组一分为二直到单元素；真正的操作是<b>合并两个有序区间</b>。这里合并 <span class="bl">左段 [1,4,7]</span> 与 <span class="br">右段 [2,3,8]</span>。'},
+      {i:1,j:0,out:[1],pick:'L',chip:'1 ≤ 2 → 取左',chipC:'cb',
+       act:'▸ a[i]=1 ≤ a[j]=2 → 取左段 1，i++',
+       desc:'比较 <span class="bl">1</span> 与 <span class="br">2</span>：1≤2，取左段 1，<code>i++</code>。谁小取谁，被取走的指针后移。'},
+      {i:1,j:1,out:[1,2],pick:'R',chip:'4 > 2 → 取右',chipC:'ch',
+       act:'▸ 4 > 2 → 取右段 2，j++',
+       desc:'比较 <span class="bl">4</span> 与 <span class="br">2</span>：4&gt;2，取右段 2，<code>j++</code>。'},
+      {i:1,j:2,out:[1,2,3],pick:'R',chip:'4 > 3 → 取右',chipC:'ch',
+       act:'▸ 4 > 3 → 取右段 3，j++',
+       desc:'比较 <span class="bl">4</span> 与 <span class="br">3</span>：取右段 3，<code>j++</code>。'},
+      {i:2,j:2,out:[1,2,3,4],pick:'L',chip:'4 ≤ 8 → 取左',chipC:'cb',
+       act:'▸ 4 ≤ 8 → 取左段 4，i++（相等取左保稳定）',
+       desc:'比较 <span class="bl">4</span> 与 <span class="br">8</span>：4≤8，取左段 4。<b>相等取左</b>（<code>a[i]&lt;=a[j]</code>）是稳定性的关键——左段本来更靠前。'},
+      {i:3,j:2,out:[1,2,3,4,7],pick:'L',chip:'7 ≤ 8 → 取左',chipC:'cb',
+       act:'▸ 7 ≤ 8 → 取左段 7，i 越过左段末尾',
+       desc:'比较 <span class="bl">7</span> 与 <span class="br">8</span>：取左段 7，<code>i++</code>。此刻 i 已越过左段末尾，左段用完。'},
+      {i:3,j:2,out:[1,2,3,4,7,8],pick:'R',chip:'左段空 → 追加右段',chipC:'cg',
+       act:'▸ 一侧耗尽 → 直接追加右段剩余 8',
+       desc:'主循环因一侧耗尽而结束。左段已空，直接把右段剩余的 <span class="br">8</span> 追加——剩余部分本就有序，无需再比较。这就是两个收尾 <code>while</code> 的作用。'},
+      {i:3,j:3,out:[1,2,3,4,7,8],pick:null,done:true,chip:'稳定 O(n log n)',chipC:'cg',
+       act:'▸ 合并完成 [1,2,3,4,7,8]，稳定 O(n log n)',
+       desc:'合并完成：<b>[1,2,3,4,7,8]</b>。归并<b>最好/平均/最坏都是 O(n log n)</b>、<b>稳定</b>，代价 <b>O(n)</b> 额外空间。也是<b>链表排序</b>与<b>外部排序</b>首选；<code>std::stable_sort</code> 基于归并。逆序对计数就在这一步统计。'},
+    ],
+    build(){
+      const cellsHTML=(pre,arr)=>{let c='';arr.forEach((v,i)=>{c+='<div class="cell" id="'+pre+i+'">'+v+'</div>';});return c;};
+      viz.innerHTML='<div class="vcap"><b>归并排序 · merge</b>：谁小取谁，合成一个更大的有序区间（LC 148 同款）</div>'+
+        '<div style="margin-top:14px">'+
+        '<div class="subrow"><span class="slbl">左 i →</span><div class="cells">'+cellsHTML('L',L)+'</div></div>'+
+        '<div class="subrow"><span class="slbl">右 j →</span><div class="cells">'+cellsHTML('R',R)+'</div></div>'+
+        '<div class="mrule"></div>'+
+        '<div class="subrow"><span class="slbl">输出 temp →</span><div class="cells" id="outc"></div></div>'+
+        '</div>';
+    },
+    render(s){
+      L.forEach((v,i)=>{let c='cell a';if(s.done||i<s.i)c+=' done';else if(i===s.i)c+=' head';document.getElementById('L'+i).className=c;});
+      R.forEach((v,i)=>{let c='cell b';if(s.done||i<s.j)c+=' done';else if(i===s.j)c+=' head';document.getElementById('R'+i).className=c;});
+      let h='';
+      for(let i=0;i<6;i++){
+        if(i<s.out.length){const fl=(i===s.out.length-1&&!s.done)?' flash':'';h+='<div class="cell pick'+fl+'">'+s.out[i]+'</div>';}
+        else h+='<div class="cell empty">·</div>';
+      }
+      document.getElementById('outc').innerHTML=h;
+    }
+  };
+})();
+
+/* ========== 场景 3：堆排序 · 建大根堆 + 下沉 ========== */
+const heapScene=(()=>{
+  const pos=[[50,28],[27,100],[73,100],[15,175],[39,175],[61,175]];
+  const edges=[[0,1],[0,2],[1,3],[1,4],[2,5]];
+  return {
+    id:'heap',label:'堆排序',sub:'建堆 + 下沉',
+    code:'<span class="kw">void</span> siftDown(vector&lt;int&gt;& a,<span class="kw">int</span> i,<span class="kw">int</span> n){\n'+
+      '    <span class="kw">while</span>(2*i+1&lt;n){\n'+
+      '        <span class="kw">int</span> c=2*i+1;              <span class="cmt">// 左孩子</span>\n'+
+      '        <span class="kw">if</span>(c+1&lt;n &amp;&amp; a[c+1]&gt;a[c]) ++c; <span class="cmt">// 取较大孩子</span>\n'+
+      '        <span class="kw">if</span>(a[i]&gt;=a[c]) <span class="kw">break</span>;\n'+
+      '        swap(a[i],a[c]); i=c;\n'+
+      '    }\n}',
+    steps:[
+      {arr:[2,8,5,4,9,1],cur:null,child:null,swap:[],chip:'数组即完全二叉树',chipC:'c0',
+       act:'▸ 下标 i 的孩子是 2i+1 / 2i+2，从最后一个非叶子 i=2 起建堆',
+       desc:'堆排序把数组看成<b>完全二叉树</b>：下标 i 的左右孩子是 <code>2i+1</code>、<code>2i+2</code>。先建<b>大根堆</b>（每个父 ≥ 孩子），堆顶即最大值。建堆从<b>最后一个非叶子</b> <code>i=n/2−1=2</code> 起，逐个向前 <b>siftDown 下沉</b>。'},
+      {arr:[2,8,5,4,9,1],cur:2,child:5,swap:[],chip:'i=2 · 已满足',chipC:'cb',
+       act:'▸ i=2（值5）：父 5 ≥ 孩子 1，不下沉',
+       desc:'从 <span class="bl">i=2（值 5）</span> 开始。它只有左孩子 <span class="br">a[5]=1</span>。父 5 ≥ 孩子 1，已满足堆性质，<b>不下沉</b>。'},
+      {arr:[2,9,5,4,8,1],cur:1,child:4,swap:[1,4],chip:'i=1 · 9>8 下沉',chipC:'cg',
+       act:'▸ i=1（值8）：较大孩子 9 > 8 → 交换',
+       desc:'轮到 <span class="bl">i=1（值 8）</span>，孩子 a[3]=4、<span class="br">a[4]=9</span>，较大者 9。父 8 &lt; 9，<b>交换 8 与 9</b>。8 沉下、9 上来当子树根。'},
+      {arr:[9,2,5,4,8,1],cur:0,child:1,swap:[0,1],chip:'i=0 · 9>5 换左',chipC:'cg',
+       act:'▸ i=0（值2）：较大孩子 9 → 交换，2 开始下沉',
+       desc:'轮到 <span class="bl">i=0（值 2）</span>，孩子 a[1]=9、a[2]=5，较大 <span class="br">9</span>。父 2 &lt; 9，<b>交换</b>，2 下沉到位置 1，继续沿路径往下比。'},
+      {arr:[9,8,5,4,2,1],cur:1,child:4,swap:[1,4],chip:'继续下沉到位置 1',chipC:'cg',
+       act:'▸ 2 落到位置1：较大孩子 8 → 再交换，大根堆建成',
+       desc:'2 落到位置 1，孩子 a[3]=4、<span class="br">a[4]=8</span>，较大 8。2 &lt; 8，<b>再交换</b>。2 沉到叶子，下沉停止。至此<b>大根堆建成</b>：堆顶 <span class="bl">a[0]=9</span> 是全局最大值。'},
+      {arr:[1,8,5,4,2,9],cur:0,child:null,swap:[0,5],sorted:[5],chip:'堆顶↔末尾',chipC:'ch',
+       act:'▸ 堆顶 9 与末尾交换，9 进入有序区',
+       desc:'排序阶段：把<b>堆顶 9 与末尾 a[5] 交换</b>，9 进入有序区（尾部）。堆缩小到前 5 个，堆顶换成 1，堆性质被破坏。'},
+      {arr:[8,4,5,1,2,9],cur:0,child:null,swap:[],sorted:[5],chip:'对新堆顶 siftDown',chipC:'cb',
+       act:'▸ 对新堆顶 1 再 siftDown，把次大值 8 顶上来',
+       desc:'对新堆顶 <b>1</b> 再做 siftDown，把次大值 8 顶上来。<b>反复「取堆顶→换末尾→缩堆→下沉」</b>，最大值不断进入尾部有序区，最终整个数组升序。'},
+      {arr:[1,2,4,5,8,9],cur:null,child:null,swap:[],sorted:[0,1,2,3,4,5],chip:'原地 O(n log n)',chipC:'cg',
+       act:'▸ 全部弹出 → 有序；原地 O(1) 空间、不稳定',
+       desc:'全部弹出后数组有序。堆排序<b>最坏也是 O(n log n)</b>、<b>原地 O(1) 额外空间</b>，但<b>不稳定</b>、缓存局部性差，实测常慢于快排。它是理解 <code>priority_queue</code> / <code>make_heap</code> / <code>pop_heap</code> 的底座。'},
+    ],
+    build(){
+      let e='';edges.forEach(()=>e+='<div class="edge"></div>');
+      let n='';pos.forEach((p,i)=>{n+='<div class="node" id="hn-'+i+'" style="left:'+p[0]+'%;top:'+p[1]+'px"></div>';});
+      viz.innerHTML='<div class="vcap"><b>堆排序</b>：建大根堆 → 堆顶最大值反复换到末尾</div><div class="tree" id="htree">'+e+n+'</div>';
+      requestAnimationFrame(()=>{
+        const tree=document.getElementById('htree');if(!tree)return;const W=tree.clientWidth;
+        document.querySelectorAll('#htree .edge').forEach((el,k)=>{
+          const [a,b]=edges[k];const x1=pos[a][0]/100*W,y1=pos[a][1],x2=pos[b][0]/100*W,y2=pos[b][1];
+          const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)*180/Math.PI;
+          el.style.left=x1+'px';el.style.top=y1+'px';el.style.width=len+'px';el.style.transform='rotate('+ang+'deg)';
+        });
+      });
+    },
+    render(s){
+      for(let i=0;i<6;i++){const el=document.getElementById('hn-'+i);if(!el)continue;
+        let cls='node';
+        if(s.sorted&&s.sorted.includes(i))cls+=' sorted';
+        else if(s.swap.includes(i))cls+=' swap';
+        else if(i===s.cur)cls+=' cur';
+        else if(i===s.child)cls+=' child';
+        el.className=cls;el.textContent=s.arr[i];}
+    }
+  };
+})();
+
+/* ========== 场景 4：计数排序 ========== */
+const countScene=(()=>{
+  const src=[4,2,2,8,3,3,1];
+  const vals=[1,2,3,4,5,6,7,8];
+  return {
+    id:'count',label:'计数排序',sub:'桶计数 + 回填',
+    code:'<span class="kw">int</span> mx=*max_element(a.begin(),a.end());\n'+
+      'vector&lt;int&gt; cnt(mx+1,0);\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> v:a) ++cnt[v];        <span class="cmt">// 统计次数</span>\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> v=0;v&lt;=mx;++v)\n'+
+      '    <span class="kw">while</span>(cnt[v]--) out.push_back(v); <span class="cmt">// 按值回填</span>',
+    steps:[
+      {phase:'intro',scan:-1,cnt:[0,0,0,0,0,0,0,0],emit:[],chip:'不是比较排序',chipC:'c0',
+       act:'▸ 利用「值可以当下标」：cnt[值]++ 统计次数',
+       desc:'计数排序<b>不比较元素</b>，而是利用「值可以当下标」。原数组 <b>[4,2,2,8,3,3,1]</b>，值域 1–8。第一步：开 <code>cnt[]</code>，扫描原数组，<b>每个值出现一次就 cnt[值]++</b>。'},
+      {phase:'scan',scan:0,cnt:[0,0,0,1,0,0,0,0],emit:[],chip:'扫描 a[0]=4',chipC:'cb',
+       act:'▸ 读到 4 → cnt[4]++',
+       desc:'读到 <span class="bl">4</span> → <code>cnt[4]++</code>。'},
+      {phase:'scan',scan:2,cnt:[0,2,0,1,0,0,0,0],emit:[],chip:'扫描到 2,2',chipC:'cb',
+       act:'▸ 读到两个 2 → cnt[2] = 2',
+       desc:'读到两个 <span class="bl">2</span> → <code>cnt[2]</code> 变成 2。相同的值堆在同一个桶里。'},
+      {phase:'scan',scan:5,cnt:[0,2,2,1,0,0,0,1],emit:[],chip:'扫描到 8,3,3',chipC:'cb',
+       act:'▸ 读 8、3、3 → cnt[8]=1、cnt[3]=2',
+       desc:'继续读 8、3、3 → <code>cnt[8]=1</code>、<code>cnt[3]=2</code>。'},
+      {phase:'scan',scan:6,cnt:[1,2,2,1,0,0,0,1],emit:[],chip:'扫描完成',chipC:'ch',
+       act:'▸ 读到 1 → cnt[1]=1，统计结束 O(n)',
+       desc:'最后读到 <span class="bl">1</span> → <code>cnt[1]=1</code>。统计结束：值 1×1、2×2、3×2、4×1、8×1。整个扫描是 <b>O(n)</b>。'},
+      {phase:'emit',scan:-1,cnt:[1,2,2,1,0,0,0,1],emit:[1,2,2,3,3],chip:'按值从小到大回填',chipC:'cb',
+       act:'▸ 从小到大遍历 cnt，值 v 出现几次就写几个 v',
+       desc:'第二步：从小到大遍历 cnt，<b>值 v 出现几次就写几个 v</b>。写出 1；两个 2；两个 3……天然升序。遍历值域是 <b>O(k)</b>。'},
+      {phase:'emit',scan:-1,cnt:[1,2,2,1,0,0,0,1],emit:[1,2,2,3,3,4,8],chip:'回填完成',chipC:'cg',
+       act:'▸ 继续写 4、8 → [1,2,2,3,3,4,8]',
+       desc:'继续写 4、8，得到 <b>[1,2,2,3,3,4,8]</b>。总复杂度 <b>O(n+k)</b>、空间 <b>O(k)</b>。'},
+      {phase:'done',scan:-1,cnt:[1,2,2,1,0,0,0,1],emit:[1,2,2,3,3,4,8],chip:'O(n+k) 线性',chipC:'cg',
+       act:'▸ 值域 k 不大时线性，快过比较排序的 O(n log n) 下界',
+       desc:'计数排序在<b>整数、值域 k 不大</b>时是线性的，快过任何比较排序的 O(n log n) 下界。但若值域远大于元素个数，cnt 数组会巨大而浪费——此时不如 <code>std::sort</code>。想保持相同 key 原序需「前缀和 + 逆序回填」的稳定版。'},
+    ],
+    build(){
+      const cellsHTML=(pre,arr)=>{let c='';arr.forEach((v,i)=>{c+='<div class="cell" id="'+pre+i+'">'+v+'</div>';});return c;};
+      let bk='';vals.forEach((v,i)=>{bk+='<div class="bucket"><div class="bk" id="bk-'+i+'">0</div><div class="bv">'+v+'</div></div>';});
+      viz.innerHTML='<div class="vcap"><b>计数排序</b>：统计每个值的出现次数，再按值回填</div>'+
+        '<div class="subrow"><span class="slbl">原数组 a</span><div class="cells">'+cellsHTML('s',src)+'</div></div>'+
+        '<div class="slabel"><b>cnt[值]</b> — 每个值出现的次数</div>'+
+        '<div class="count-wrap">'+bk+'</div>'+
+        '<div class="subrow" style="margin-top:8px"><span class="slbl">回填输出 →</span><div class="cells" id="outc"></div></div>';
+    },
+    render(s){
+      src.forEach((v,i)=>{let cls='cell';
+        if(s.phase==='scan'&&i===s.scan)cls='cell cur';
+        else if(s.phase==='scan'&&i<s.scan)cls='cell scan';
+        else if(s.phase!=='intro'&&s.phase!=='scan')cls='cell scan';
+        document.getElementById('s'+i).className=cls;});
+      vals.forEach((v,i)=>{const el=document.getElementById('bk-'+i);let cls='bk';
+        if(s.phase==='scan'&&s.scan>=0&&i===src[s.scan]-1)cls='bk hit';
+        else if((s.phase==='emit'||s.phase==='done')&&s.cnt[i]>0)cls='bk emit';
+        el.className=cls;el.textContent=s.cnt[i];});
+      let h='';
+      for(let i=0;i<7;i++){
+        if(i<s.emit.length){const fl=(i===s.emit.length-1&&s.phase!=='done')?' flash':'';h+='<div class="cell pick'+fl+'">'+s.emit[i]+'</div>';}
+        else h+='<div class="cell empty">·</div>';
+      }
+      document.getElementById('outc').innerHTML=h;
+    }
+  };
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[quickScene,mergeScene,heapScene,countScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+const SC=()=>SCENES[si];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SC().build();codeBox.innerHTML=SC().code;
+  dotsBox.innerHTML='';dotEls=[];
+  SC().steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.chip;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SC().steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SC().render(s);
+  stTitle.textContent=SC().label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;
+  stAct.innerHTML=s.act;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SC().steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SC().steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="5"></script>
+</body>
+</html>

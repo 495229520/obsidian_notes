@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>堆与优先队列动画 · 上浮下沉 / Top K / 多路归并 / 双堆 / Dijkstra</title>
+<style>
+:root{
+  /* Design system: warm paper, 4/8 rhythm, compact teaching-tool density. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:478px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:10px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:218px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}
+
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:12px 0 6px;}
+.op-note{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:auto;padding-top:12px;min-height:34px;}
+.op-note b{color:var(--ink);}.op-note .dg{color:var(--danger);font-weight:700;}
+.seqbox{position:relative;padding-top:22px;}
+.seq{display:flex;gap:7px;justify-content:center;position:relative;}
+.cell{width:52px;height:50px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.cell .v{font-size:17px;font-weight:700;}.cell .i{font-size:9px;color:var(--faint);}
+.cell.future{opacity:.43;}.cell.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);transform:translateY(-3px);box-shadow:0 5px 12px rgba(24,95,165,.15);}
+.cell.keep{background:var(--greenbg);border-color:var(--green);color:var(--green);}.cell.drop{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);}.cell.used{background:var(--gray);color:var(--faint);opacity:.58;}
+.scanptr{position:absolute;top:-2px;left:0;font-size:14px;color:var(--ink);opacity:0;transform:translateX(-50%);transition:left var(--dur) var(--ease),opacity .18s;}
+
+/* Heap: one data set, tree and array views. */
+.tree{position:relative;height:232px;margin-top:2px;}
+.tree svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
+.tree line{stroke:var(--line);stroke-width:1.5;transition:opacity var(--dur) var(--ease),stroke var(--dur) var(--ease);}
+.tree line.hide{opacity:0;}
+.hnode{position:absolute;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:16px;font-weight:700;border:2px solid var(--line);background:var(--paper);color:var(--faint);opacity:0;transform:scale(.48);transition:all var(--dur) var(--ease);}
+.hnode.show{opacity:1;transform:scale(1);border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.hnode.top{box-shadow:0 0 0 4px rgba(24,95,165,.16);}.hnode.cmp{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}.hnode.swap{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.hnode .idx{position:absolute;bottom:-16px;font-size:9px;color:var(--faint);font-weight:400;}
+.heaparr{position:relative;display:flex;gap:5px;justify-content:center;padding-top:20px;}
+.hslot{width:62px;height:44px;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);color:var(--faint);transition:all var(--dur) var(--ease);}
+.hslot .hv{font-weight:700;}.hslot .hi{font-size:9px;color:var(--faint);}.hslot.fill{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}.hslot.cmp{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}.hslot.swap{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.formulas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:11px;font-family:var(--mono);font-size:10.5px;color:var(--muted);}
+
+/* Compact heap / candidate strips. */
+.heaptray{display:flex;justify-content:center;align-items:center;gap:8px;min-height:66px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:8px 12px;}
+.heapcell{min-width:58px;height:44px;padding:0 9px;border:1.5px solid var(--blue);border-radius:7px;background:var(--bluebg);color:var(--blue);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);transition:all var(--dur) var(--ease);}
+.heapcell .hv{font-size:16px;font-weight:700;}.heapcell .hi{font-size:9px;color:var(--faint);}.heapcell.empty{opacity:.24;border-style:dashed;background:transparent;color:var(--faint);}.heapcell.top{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.14);}.heapcell.stale{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}.heapcell.candidate{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.kbadge{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center;margin:9px 0;}.kbadge b{color:var(--green);font-size:17px;}
+
+/* Multi-way merge lists. */
+.lists{display:grid;gap:12px;margin-top:10px;}.listrow{display:flex;align-items:center;gap:8px;position:relative;}.listname{width:28px;font-family:var(--mono);font-size:11px;color:var(--faint);}
+.lnode{width:50px;height:40px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;color:var(--muted);position:relative;transition:all var(--dur) var(--ease);}
+.lnode:not(:last-child)::after{content:"";position:absolute;left:49px;width:9px;height:1.5px;background:var(--line);}
+.lnode.head{border-color:var(--brown);background:var(--brownbg);color:var(--brown);transform:translateY(-2px);}.lnode.used{opacity:.35;background:var(--gray);}.lnode.pick{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.14);}
+.outrow{display:flex;gap:5px;justify-content:center;min-height:44px;}.outcell{width:44px;height:38px;border:1.5px dashed var(--line);border-radius:6px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;color:transparent;transition:all var(--dur) var(--ease);}.outcell.fill{border-style:solid;border-color:var(--green);background:var(--greenbg);color:var(--green);}
+
+/* Two heaps for the streaming median. */
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;}.heaphalf{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:12px;min-height:148px;}.heaphalf h3{font-size:12px;text-align:center;color:var(--muted);font-weight:600;}.halfslots{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:12px;min-height:48px;}.halfcell{width:50px;height:42px;border:1.5px solid var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;opacity:.25;transition:all var(--dur) var(--ease);}.halfcell.fill{opacity:1;}.leftheap .halfcell.fill{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}.rightheap .halfcell.fill{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}.halfcell.top{box-shadow:0 0 0 3px rgba(15,110,86,.18);border-color:var(--green)!important;color:var(--green)!important;background:var(--greenbg)!important;}
+.balance{height:6px;border-radius:3px;background:var(--grid);margin:13px auto 0;max-width:230px;position:relative;}.balance::after{content:"";position:absolute;left:50%;top:-4px;width:2px;height:14px;background:var(--ink);}.balldot{position:absolute;top:-4px;width:14px;height:14px;border-radius:50%;background:var(--green);transform:translateX(-50%);transition:left var(--dur) var(--ease);}
+.median{text-align:center;margin-top:11px;font-family:var(--mono);font-size:12px;color:var(--muted);}.median b{font-size:21px;color:var(--green);}
+
+/* Dijkstra graph and candidate queue. */
+.graph{position:relative;height:226px;margin:4px 18px 0;}.gedge{position:absolute;height:2px;background:var(--line);transform-origin:left center;transition:background var(--dur) var(--ease),height var(--dur) var(--ease);}.gedge.hot{background:var(--brown);height:3px;}.gedge.ok{background:var(--green);height:3px;}.weight{position:absolute;font-family:var(--mono);font-size:10px;color:var(--faint);background:var(--panel);padding:0 4px;transform:translate(-50%,-50%);}
+.gnode{position:absolute;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;border:2px solid var(--line);background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all var(--dur) var(--ease);}.gnode .name{font-family:var(--mono);font-weight:800;}.gnode .dist{font-family:var(--mono);font-size:10px;color:var(--faint);}.gnode.cur{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.08);}.gnode.done{border-color:var(--green);background:var(--greenbg);color:var(--green);}.gnode.relax{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.viz{min-height:450px;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:218px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;min-height:430px;}.tab{flex:1 1 132px}.cell{width:43px}.tree{height:210px}.heaparr{gap:3px}.hslot{width:39px}.outrow{gap:4px}.outcell{width:30px}.twocol{gap:8px}.controls{padding:12px;gap:8px}.dots{order:4;width:100%}.graph{margin-inline:0}.codebox{font-size:11px}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>堆与优先队列动画 · 动态候选集合的五种用法</h1>
+    <p>上浮 / 下沉、Top K、多路归并、数据流中位数、Dijkstra　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const POS=[[50,13],[28,45],[72,45],[16,80],[40,80],[60,80],[84,80]];
+function movePointer(ptr,target){
+  if(!target){ptr.style.opacity=0;return;}
+  ptr.style.opacity=1;ptr.style.left=(target.offsetLeft+target.offsetWidth/2)+'px';
+}
+function buildHeapMarkup(prefix,caption){
+  let lines='';for(let i=1;i<7;i++)lines+='<line id="'+prefix+'e'+i+'" class="hide"></line>';
+  let nodes='';POS.forEach((p,i)=>nodes+='<div class="hnode" id="'+prefix+'n'+i+'" style="left:'+p[0]+'%;top:'+p[1]+'%"><span class="nv"></span><span class="idx">i='+i+'</span></div>');
+  let slots='';for(let i=0;i<7;i++)slots+='<div class="hslot" id="'+prefix+'a'+i+'"><span class="hv">·</span><span class="hi">['+i+']</span></div>';
+  return '<div class="vcap">'+caption+'</div><div class="tree" id="'+prefix+'tree"><svg>'+lines+'</svg>'+nodes+'</div><div class="collbl">同一份数据的 vector 视角</div><div class="heaparr" id="'+prefix+'arr"><span class="scanptr" id="'+prefix+'ptr">▼</span>'+slots+'</div><div class="formulas"><span>left=2i+1</span><span>right=2i+2</span><span>parent=(i-1)/2</span></div><div class="op-note" id="'+prefix+'note"></div>';
+}
+function layoutHeapEdges(prefix){
+  const tree=document.getElementById(prefix+'tree');if(!tree)return;const w=tree.clientWidth,h=tree.clientHeight;
+  for(let i=1;i<7;i++){
+    const p=(i-1)>>1,line=document.getElementById(prefix+'e'+i);
+    line.setAttribute('x1',POS[p][0]/100*w);line.setAttribute('y1',POS[p][1]/100*h);
+    line.setAttribute('x2',POS[i][0]/100*w);line.setAttribute('y2',POS[i][1]/100*h);
+  }
+}
+function paintHeap(prefix,s){
+  for(let i=0;i<7;i++){
+    const has=i<s.heap.length,n=document.getElementById(prefix+'n'+i),a=document.getElementById(prefix+'a'+i);
+    let cls='hnode'+(has?' show':'');if(i===0&&has)cls+=' top';if(s.cmp&&s.cmp.includes(i))cls+=' cmp';if(s.swap&&s.swap.includes(i))cls+=' swap';
+    n.className=cls;n.querySelector('.nv').textContent=has?s.heap[i]:'';
+    let ac='hslot'+(has?' fill':'');if(s.cmp&&s.cmp.includes(i))ac+=' cmp';if(s.swap&&s.swap.includes(i))ac+=' swap';a.className=ac;a.querySelector('.hv').textContent=has?s.heap[i]:'·';
+  }
+  for(let i=1;i<7;i++)document.getElementById(prefix+'e'+i).classList.toggle('hide',i>=s.heap.length);
+  movePointer(document.getElementById(prefix+'ptr'),s.focus==null?null:document.getElementById(prefix+'a'+s.focus));
+  document.getElementById(prefix+'note').innerHTML=s.note;
+}
+function trayMarkup(prefix,count){let h='';for(let i=0;i<count;i++)h+='<div class="heapcell empty" id="'+prefix+i+'"><span class="hv">·</span><span class="hi"></span></div>';return h;}
+function paintTray(prefix,count,items,topIndex=0,stale=[]){
+  for(let i=0;i<count;i++){
+    const el=document.getElementById(prefix+i),item=items[i],has=item!==undefined;
+    el.className='heapcell'+(has?'':' empty')+(has&&i===topIndex?' top':'')+(stale.includes(i)?' stale':'');
+    el.querySelector('.hv').textContent=has?(typeof item==='object'?item.v:item):'·';
+    el.querySelector('.hi').textContent=has&&typeof item==='object'?(item.sub||''):'';
+  }
+}
+
+const heapScene=(()=>{
+  const steps=[
+    {heap:[70,50,60],focus:0,cmp:[],swap:[],chip:'大根堆',chipC:'c0',title:'堆是数组中的完全二叉树',note:'top = <b>70</b> · 只有父子有序，不是整棵树全排序',desc:'<b>大根堆</b>只保证每个父节点不小于孩子，所以根节点一定是最大值。物理上它仍是一段连续数组；树的父子关系来自下标公式。<code>top()</code> 直接读取下标 0，因此是 O(1)。'},
+    {heap:[70,50,60,80],focus:3,cmp:[1,3],swap:[],chip:'push_back(80)',chipC:'cb',title:'新元素先落在数组末尾',note:'80 > parent 50 · 堆性质暂时被破坏',desc:'<code>push(80)</code> 先把 80 追加到末尾。它对应完全二叉树的下一个空位，但 80 大于父节点 50，需要沿父链<b>上浮</b>。'},
+    {heap:[70,80,60,50],focus:1,cmp:[0,1],swap:[1,3],chip:'sift up',chipC:'ch',title:'80 与父节点 50 交换，继续向上比较',note:'80 从 i=3 浮到 i=1 · 下一位父节点是 i=0',desc:'上浮每次只与父节点比较并交换。80 从下标 3 到下标 1，距离根节点更近；树高是对数级，因此上浮最多执行 O(log n) 次。'},
+    {heap:[80,70,60,50],focus:0,cmp:[],swap:[0,1],chip:'上浮完成',chipC:'cg',title:'80 再换过 70，成为新的堆顶',note:'top = <b>80</b> · push 完成',desc:'80 大于根节点 70，再交换一次后登顶。现在所有父子关系重新满足大根堆性质，<code>push</code> 完成。'},
+    {heap:[50,70,60],focus:0,cmp:[0,1,2],swap:[0],chip:'pop + 尾补根',chipC:'cd',title:'删除堆顶：末尾 50 先补到根节点',note:'80 已出队 · 50 要与两个孩子中更大的 70 比',desc:'<code>pop()</code> 不会从数组头部直接删除。它把末尾元素搬到根，再缩短数组。新根 50 小于孩子，接下来要<b>下沉</b>。'},
+    {heap:[70,50,60],focus:1,cmp:[],swap:[0,1],chip:'sift down',chipC:'cg',title:'50 与较大的孩子 70 交换，下沉结束',note:'必须选较大孩子，否则新的父节点可能仍小于另一个孩子',desc:'下沉时先找两个孩子中较大的 70，再与 50 交换。50 到叶子后停止。<code>pop</code> 同样只走一条根到叶路径，所以是 O(log n)。'},
+    {heap:[10,30,20,50],focus:0,cmp:[],swap:[],chip:'小根堆',chipC:'cb',title:'比较方向反转，最小值来到堆顶',note:'greater&lt;int&gt; → top = <b>10</b>',desc:'把比较器换成 <code>greater&lt;int&gt;</code> 就得到<b>小根堆</b>：每个父节点不大于孩子，堆顶是最小值。自定义比较器也遵循同一原则：返回 true 的元素优先级更低。'}
+  ];
+  const code='<span class="cmt">// 大根堆（默认）</span>\npriority_queue&lt;<span class="kw">int</span>&gt; maxHeap;\n\n<span class="cmt">// 小根堆</span>\npriority_queue&lt;<span class="kw">int</span>, vector&lt;<span class="kw">int</span>&gt;, greater&lt;<span class="kw">int</span>&gt;&gt; minHeap;\n\n<span class="cmt">// top O(1)，push / pop O(log n)</span>';
+  function mount(){viz.innerHTML=buildHeapMarkup('hp','<b>堆结构</b>：树只是逻辑视角，底层仍是连续数组');requestAnimationFrame(()=>layoutHeapEdges('hp'));}
+  function paint(s){paintHeap('hp',s);}
+  return{id:'heap',label:'堆结构',sub:'上浮 / 下沉',steps,mount,paint,code};
+})();
+
+const topKScene=(()=>{
+  const input=[7,4,9,1,6,8];
+  const steps=[
+    {scan:-1,heap:[],drop:null,chip:'k = 3',chipC:'c0',title:'用小根堆维护当前最大的 3 个数',desc:'堆最多保留 3 个元素。因为答案是“最大的 3 个”，需要让其中最小的那个待在堆顶，方便新元素更大时把它淘汰。'},
+    {scan:0,heap:[7],drop:null,chip:'push 7',chipC:'cb',title:'堆未满，7 直接进入候选集合',desc:'当前只见过 7，它自然属于前 3 大。堆顶 7 是候选集合中最小的值。'},
+    {scan:1,heap:[4,7],drop:null,chip:'push 4',chipC:'cb',title:'堆仍未满，4 进入并上浮到堆顶',desc:'小根堆把更小的 4 放到堆顶。这里并不要求两个元素完整排序，只要堆顶始终是当前候选中最弱的一个。'},
+    {scan:2,heap:[4,7,9],drop:null,chip:'堆满',chipC:'cg',title:'9 进入后，候选集合达到 k 个',desc:'堆现在保存 4、7、9。堆顶 4 是这 3 个数中的最小值，也就是当前第 3 大。'},
+    {scan:3,heap:[4,7,9],drop:1,rejected:true,chip:'1 被淘汰',chipC:'cd',title:'1 进入后堆超限，最小值 1 立即弹出',desc:'可以先 push 再在大小超过 k 时 pop。1 比现有候选都弱，最终被自己的小根堆弹出，候选集合不变。'},
+    {scan:4,heap:[6,7,9],drop:4,rejected:false,chip:'4 被替换',chipC:'ch',title:'6 进入，原堆顶 4 被淘汰',desc:'6 比门槛 4 更强。插入 6 后弹出最小值 4，堆中留下 6、7、9；新的门槛变成 6。'},
+    {scan:5,heap:[7,8,9],drop:6,rejected:false,chip:'6 被替换',chipC:'ch',title:'8 进入，再淘汰当前最小值 6',desc:'候选更新为 7、8、9。数据流持续到来时，只需保存 k 个元素，无需对全部数据排序。'},
+    {scan:-1,heap:[7,8,9],drop:null,chip:'答案 = 7',chipC:'cg',title:'遍历结束，堆顶就是第 3 大元素',desc:'小根堆中保存了全局最大的 3 个数，而堆顶是这 3 个数中最小的，所以答案是 <b>7</b>。总时间 O(n log k)，额外空间 O(k)。'}
+  ];
+  const code='<span class="kw">for</span> (<span class="kw">int</span> x : nums) {\n    heap.<span class="fn">push</span>(x);\n    <span class="kw">if</span> (heap.size() &gt; k)\n        heap.<span class="fn">pop</span>();\n}\n<span class="kw">return</span> heap.<span class="fn">top</span>(); <span class="cmt">// 第 k 大</span>';
+  function mount(){let cells='';input.forEach((v,i)=>cells+='<div class="cell" id="tkc'+i+'"><span class="v">'+v+'</span><span class="i">i='+i+'</span></div>');viz.innerHTML='<div class="vcap"><b>Top K</b>：小根堆只保留当前最大的 k 个元素</div><div class="seqbox"><span class="scanptr" id="tkptr">▼</span><div class="seq">'+cells+'</div></div><div class="collbl">大小固定为 3 的小根堆 · 左侧为堆顶</div><div class="heaptray">'+trayMarkup('tkh',3)+'</div><div class="kbadge">当前门槛（堆顶）= <b id="tkans">—</b></div><div class="op-note" id="tknote"></div>';}
+  function paint(s){input.forEach((v,i)=>{const el=document.getElementById('tkc'+i);el.className='cell'+(i===s.scan?' cur':s.scan>=0&&i<s.scan?' used':s.scan<0&&s.heap.length?' keep':' future');});if(s.rejected&&s.scan>=0)document.getElementById('tkc'+s.scan).className='cell drop';movePointer(document.getElementById('tkptr'),s.scan<0?null:document.getElementById('tkc'+s.scan));paintTray('tkh',3,s.heap);document.getElementById('tkans').textContent=s.heap.length===3?s.heap[0]:'—';document.getElementById('tknote').innerHTML=s.drop==null?'堆大小 ≤ k':('<span class="dg">弹出 '+s.drop+'</span> · 只保留更强候选');}
+  return{id:'topk',label:'Top K',sub:'固定大小小根堆',steps,mount,paint,code};
+})();
+
+const mergeScene=(()=>{
+  const lists=[[1,4,7],[2,5,8],[3,6,9]];
+  const steps=[
+    {heads:[0,0,0],heap:[{v:1,sub:'L1'},{v:2,sub:'L2'},{v:3,sub:'L3'}],out:[],pick:null,chip:'每链一名候选',chipC:'c0',title:'把 3 条链表的头节点放入小根堆',desc:'每条链表内部已经有序，所以整条链表当前最小的未输出节点一定在头部。堆中只需保存每条链表的当前头节点。'},
+    {heads:[1,0,0],heap:[{v:2,sub:'L2'},{v:3,sub:'L3'},{v:4,sub:'L1'}],out:[1],pick:[0,0],chip:'pop 1 → push 4',chipC:'cg',title:'弹出全局最小的 1，再推进 L1',desc:'1 接到答案尾部后，L1 的新头节点 4 才有资格进入候选集合。堆大小始终不超过链表数量 K。'},
+    {heads:[1,1,0],heap:[{v:3,sub:'L3'},{v:4,sub:'L1'},{v:5,sub:'L2'}],out:[1,2],pick:[1,0],chip:'pop 2 → push 5',chipC:'cg',title:'弹出 2，L2 向后推进到 5',desc:'每次只做两件事：弹出最小头节点；如果它有后继，就把后继入堆。dummy 与 tail 负责把弹出的节点接到结果链表。'},
+    {heads:[1,1,1],heap:[{v:4,sub:'L1'},{v:5,sub:'L2'},{v:6,sub:'L3'}],out:[1,2,3],pick:[2,0],chip:'pop 3 → push 6',chipC:'cg',title:'弹出 3，前三个输出已经全局有序',desc:'虽然从未把 9 个节点一起排序，但小根堆保证每次弹出的都是所有链表头部中最小的，因此输出自然有序。'},
+    {heads:[2,1,1],heap:[{v:5,sub:'L2'},{v:6,sub:'L3'},{v:7,sub:'L1'}],out:[1,2,3,4],pick:[0,1],chip:'pop 4 → push 7',chipC:'ch',title:'L1 再推进，候选更新为 5、6、7',desc:'已经输出的节点不再参与比较；每条链表只有一个“前沿”节点在堆中。这个候选压缩是多路归并高效的关键。'},
+    {heads:[3,3,3],heap:[],out:[1,2,3,4,5,6,7,8,9],pick:null,chip:'合并完成',chipC:'cg',title:'所有节点各进堆、出堆一次',desc:'总节点数为 N，堆大小最多为 K。每个节点进行一次入堆与出堆，时间复杂度 O(N log K)，额外空间 O(K)。'}
+  ];
+  const code='<span class="kw">while</span> (!heap.empty()) {\n    ListNode* node = heap.<span class="fn">top</span>();\n    heap.<span class="fn">pop</span>();\n    tail-&gt;next = node;\n    tail = node;\n    <span class="kw">if</span> (node-&gt;next)\n        heap.<span class="fn">push</span>(node-&gt;next);\n}';
+  function mount(){let rows='';lists.forEach((list,r)=>{let ns='';list.forEach((v,c)=>ns+='<div class="lnode" id="ml'+r+'n'+c+'">'+v+'</div>');rows+='<div class="listrow"><span class="listname">L'+(r+1)+'</span>'+ns+'</div>';});let out='';for(let i=0;i<9;i++)out+='<div class="outcell" id="mlo'+i+'"></div>';viz.innerHTML='<div class="vcap"><b>合并 K 个有序链表</b>：堆里只放每条链表当前最小的头节点</div><div class="lists">'+rows+'</div><div class="collbl">小根堆候选 · 左侧为堆顶</div><div class="heaptray">'+trayMarkup('mlh',3)+'</div><div class="collbl">输出链表</div><div class="outrow">'+out+'</div><div class="op-note" id="mlnote"></div>';}
+  function paint(s){lists.forEach((list,r)=>list.forEach((v,c)=>{const el=document.getElementById('ml'+r+'n'+c);let cls='lnode';if(c<s.heads[r])cls+=' used';else if(c===s.heads[r])cls+=' head';if(s.pick&&s.pick[0]===r&&s.pick[1]===c)cls+=' pick';el.className=cls;}));paintTray('mlh',3,s.heap);for(let i=0;i<9;i++){const el=document.getElementById('mlo'+i);el.className='outcell'+(i<s.out.length?' fill':'');el.textContent=i<s.out.length?s.out[i]:'';}document.getElementById('mlnote').textContent=s.heap.length?'候选数 = '+s.heap.length+'（最多 K 个）':'堆空 → 合并结束';}
+  return{id:'merge',label:'多路归并',sub:'合并 K 个有序链表',steps,mount,paint,code};
+})();
+
+const medianScene=(()=>{
+  const stream=[5,2,10,4,8];
+  const steps=[
+    {scan:-1,left:[],right:[],median:null,chip:'左右两半',chipC:'c0',title:'大根堆管左半区，小根堆管右半区',desc:'左堆保存较小的一半，堆顶是左半区最大值；右堆保存较大的一半，堆顶是右半区最小值。两个堆大小差不超过 1。'},
+    {scan:0,left:[5],right:[],median:5,chip:'5 → left',chipC:'cb',title:'第一个数 5 进入左侧大根堆',desc:'约定奇数个元素时让左堆多一个。此时左堆顶 5 就是中位数。'},
+    {scan:1,left:[2],right:[5],median:3.5,chip:'移动 5 平衡',chipC:'ch',title:'2 进左堆后过重，把左堆顶 5 移到右堆',desc:'插入 2 后左堆有两个元素，需要把其中最大的 5 移到右堆。两边各一个元素，中位数是两个堆顶的平均值。'},
+    {scan:2,left:[5,2],right:[10],median:5,chip:'移动 5 回 left',chipC:'ch',title:'10 进右堆后，右侧过重，最小值 5 回到左堆',desc:'10 属于较大一半，先进入右堆。为保持左堆不少于右堆，把右堆顶 5 移回左边；总数为奇数，中位数取左堆顶。'},
+    {scan:3,left:[4,2],right:[5,10],median:4.5,chip:'移动 5 到 right',chipC:'ch',title:'4 进入左堆，再把最大值 5 移到右堆',desc:'两堆重新各有两个元素，并且左堆顶 4 不大于右堆顶 5。中位数位于这两个边界值之间。'},
+    {scan:4,left:[5,2,4],right:[8,10],median:5,chip:'平衡完成',chipC:'cg',title:'8 进入右堆，最小值 5 调回左堆',desc:'最终左边 3 个、右边 2 个，大小差为 1；所有左边元素都不大于右边元素。插入 O(log n)，查询中位数只看堆顶，是 O(1)。'}
+  ];
+  const code='priority_queue&lt;<span class="kw">int</span>&gt; left;\npriority_queue&lt;<span class="kw">int</span>, vector&lt;<span class="kw">int</span>&gt;, greater&lt;<span class="kw">int</span>&gt;&gt; right;\n\n<span class="cmt">// 保持 size 差不超过 1</span>\n<span class="kw">if</span> (left.size() &gt; right.size()+1)\n    right.<span class="fn">push</span>(left.<span class="fn">top</span>());';
+  function mount(){let cells='';stream.forEach((v,i)=>cells+='<div class="cell" id="mdc'+i+'"><span class="v">'+v+'</span><span class="i">#'+(i+1)+'</span></div>');let left='',right='';for(let i=0;i<4;i++){left+='<div class="halfcell" id="mdl'+i+'">·</div>';right+='<div class="halfcell" id="mdr'+i+'">·</div>';}viz.innerHTML='<div class="vcap"><b>数据流中位数</b>：两个堆夹住中间位置</div><div class="seqbox"><span class="scanptr" id="mdptr">▼</span><div class="seq">'+cells+'</div></div><div class="twocol"><section class="heaphalf leftheap"><h3>left · 大根堆 · 较小一半</h3><div class="halfslots">'+left+'</div></section><section class="heaphalf rightheap"><h3>right · 小根堆 · 较大一半</h3><div class="halfslots">'+right+'</div></section></div><div class="balance"><span class="balldot" id="mdball"></span></div><div class="median">median = <b id="mdans">—</b></div><div class="op-note" id="mdnote"></div>';}
+  function paintHalf(prefix,vals){for(let i=0;i<4;i++){const el=document.getElementById(prefix+i),has=i<vals.length;el.className='halfcell'+(has?' fill':'')+(has&&i===0?' top':'');el.textContent=has?vals[i]:'·';}}
+  function paint(s){stream.forEach((v,i)=>{document.getElementById('mdc'+i).className='cell'+(i===s.scan?' cur':s.scan>=0&&i<s.scan?' used':' future');});movePointer(document.getElementById('mdptr'),s.scan<0?null:document.getElementById('mdc'+s.scan));paintHalf('mdl',s.left);paintHalf('mdr',s.right);document.getElementById('mdans').textContent=s.median==null?'—':s.median;const diff=s.left.length-s.right.length;document.getElementById('mdball').style.left=(50+diff*18)+'%';document.getElementById('mdnote').innerHTML='size(left)='+s.left.length+' · size(right)='+s.right.length+' · 差值 ≤ <b>1</b>';}
+  return{id:'median',label:'双堆中位数',sub:'大根堆 + 小根堆',steps,mount,paint,code};
+})();
+
+const dijkstraScene=(()=>{
+  const nodePos={A:[14,52],B:[47,20],C:[47,82],D:[84,52]};
+  const edges=[['A','B',4],['A','C',1],['C','B',2],['B','D',1],['C','D',5]];
+  const steps=[
+    {dist:{A:0,B:'∞',C:'∞',D:'∞'},pq:[{v:'0,A',sub:'最小'}],cur:'A',done:[],relax:[],hot:[],stale:[],chip:'起点入堆',chipC:'c0',title:'dist[A] = 0，把状态 (0,A) 放入小根堆',desc:'优先队列按距离从小到大弹出候选。堆中保存的是“距离快照 + 节点”，不直接修改已在堆里的记录。'},
+    {dist:{A:0,B:4,C:1,D:'∞'},pq:[{v:'1,C',sub:'top'},{v:'4,B',sub:''}],cur:'A',done:['A'],relax:['B','C'],hot:[0,1],stale:[],chip:'松弛 A 的边',chipC:'cb',title:'从 A 得到 C=1、B=4，两条新记录入堆',desc:'弹出 A 后检查邻边。更新更短距离时，直接把新状态入堆；此时下一位候选是距离 1 的 C。'},
+    {dist:{A:0,B:3,C:1,D:6},pq:[{v:'3,B',sub:'top'},{v:'4,B',sub:'旧'},{v:'6,D',sub:''}],cur:'C',done:['A','C'],relax:['B','D'],hot:[2,4],stale:[1],chip:'出现重复记录',chipC:'ch',title:'C 把 B 改短为 3，但旧记录 (4,B) 仍留在堆中',desc:'<code>priority_queue</code> 不支持 decrease-key。常用策略是把新的 (3,B) 再入堆，旧的 (4,B) 暂时保留，之后弹出时识别为过期记录。'},
+    {dist:{A:0,B:3,C:1,D:4},pq:[{v:'4,B',sub:'旧'},{v:'4,D',sub:'top'},{v:'6,D',sub:'旧'}],cur:'B',done:['A','C','B'],relax:['D'],hot:[3],stale:[0,2],chip:'D 更新为 4',chipC:'cb',title:'弹出 (3,B)，经 B 把 D 从 6 改短为 4',desc:'有效记录满足弹出距离等于当前 dist。B 的最短距离已经确定，再松弛 B→D，得到更短的 D=4。'},
+    {dist:{A:0,B:3,C:1,D:4},pq:[{v:'4,D',sub:'top'},{v:'6,D',sub:'旧'}],cur:null,done:['A','C','B'],relax:[],hot:[],stale:[1],chip:'跳过旧记录',chipC:'cd',title:'弹出 (4,B)，发现 4 不等于 dist[B]=3，直接跳过',desc:'这就是 <code>if (d != dist[u]) continue;</code> 的作用。旧记录不会破坏正确性，只会被懒惰地丢弃。'},
+    {dist:{A:0,B:3,C:1,D:4},pq:[],cur:'D',done:['A','C','B','D'],relax:[],hot:[],stale:[],chip:'最短路确定',chipC:'cg',title:'弹出有效状态 (4,D)，所有最短距离确定',desc:'小根堆始终优先处理当前距离最小的候选。对非负权图，这个顺序保证节点第一次以有效记录弹出时，其最短距离已经确定。'}
+  ];
+  const code='<span class="kw">while</span> (!heap.empty()) {\n    <span class="kw">auto</span> [d,u] = heap.<span class="fn">top</span>();\n    heap.<span class="fn">pop</span>();\n    <span class="kw">if</span> (d != dist[u]) <span class="kw">continue</span>;\n    <span class="kw">for</span> (<span class="kw">auto</span> [v,w] : graph[u])\n        <span class="kw">if</span> (dist[v] &gt; d+w) {\n            dist[v] = d+w;\n            heap.<span class="fn">push</span>({dist[v],v});\n        }\n}';
+  function layout(){const graph=document.querySelector('.graph');if(!graph)return;const w=graph.clientWidth,h=graph.clientHeight;edges.forEach((e,i)=>{const x1=nodePos[e[0]][0]/100*w,y1=nodePos[e[0]][1]/100*h,x2=nodePos[e[1]][0]/100*w,y2=nodePos[e[1]][1]/100*h,dx=x2-x1,dy=y2-y1;const line=document.getElementById('dge'+i),weight=document.getElementById('dgw'+i);line.style.left=x1+'px';line.style.top=y1+'px';line.style.width=Math.hypot(dx,dy)+'px';line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';weight.style.left=((x1+x2)/2)+'px';weight.style.top=((y1+y2)/2)+'px';});}
+  function mount(){let es='',ws='';edges.forEach((e,i)=>{es+='<span class="gedge" id="dge'+i+'"></span>';ws+='<span class="weight" id="dgw'+i+'">'+e[2]+'</span>';});let ns='';Object.entries(nodePos).forEach(([name,p])=>ns+='<div class="gnode" id="dgn'+name+'" style="left:'+p[0]+'%;top:'+p[1]+'%"><span class="name">'+name+'</span><span class="dist">∞</span></div>');viz.innerHTML='<div class="vcap"><b>Dijkstra</b>：小根堆取当前距离最小的候选，旧记录延迟跳过</div><div class="graph">'+es+ws+ns+'</div><div class="collbl">优先队列 · 左侧为堆顶</div><div class="heaptray">'+trayMarkup('dgh',4)+'</div><div class="op-note" id="dgnote"></div>';requestAnimationFrame(layout);}
+  function paint(s){Object.keys(nodePos).forEach(name=>{const el=document.getElementById('dgn'+name);let cls='gnode';if(s.done.includes(name))cls+=' done';if(s.relax.includes(name))cls+=' relax';if(s.cur===name)cls+=' cur';el.className=cls;el.querySelector('.dist').textContent='d='+s.dist[name];});edges.forEach((e,i)=>{document.getElementById('dge'+i).className='gedge'+(s.hot.includes(i)?' hot':'')+(s.done.includes(e[0])&&s.done.includes(e[1])?' ok':'');});paintTray('dgh',4,s.pq,0,s.stale);document.getElementById('dgnote').innerHTML=s.pq.length?'heap.top = <b>'+s.pq[0].v+'</b>':'候选堆为空 · 算法结束';}
+  return{id:'dijkstra',label:'Dijkstra',sub:'重复入堆 + 过期跳过',steps,mount,paint,layout,code};
+})();
+
+const SCENES=[heapScene,topKScene,mergeScene,medianScene,dijkstraScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2800;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>{if(SCENES[si].id==='heap')layoutHeapEdges('hp');if(SCENES[si].layout)SCENES[si].layout();});
+const hm=location.hash.match(/scene=([a-z]+)/),sm=location.hash.match(/step=(\d+)/);let init=0;if(hm){const found=SCENES.findIndex(s=>s.id===hm[1]);if(found>=0)init=found;}switchScene(init);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="11"></script>
+</body>
+</html>

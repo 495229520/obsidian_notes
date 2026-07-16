@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>前缀和动画 · 一维 / 二维容斥 / 和为K子数组 / 差分</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.72;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.viz .vcap b{color:var(--ink);}
+.pslabel{text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--faint);margin:12px 0 2px;}
+.pslabel b{color:var(--ink);}
+
+/* ---- 通用单元格 ---- */
+.cwrap{position:relative;}
+.cellrow{display:flex;gap:8px;justify-content:center;position:relative;padding:22px 0 8px;flex-wrap:wrap;}
+.cell{width:50px;height:50px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:17px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--muted);position:relative;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.cell .idx{position:absolute;top:-19px;left:0;right:0;text-align:center;font-size:10px;color:var(--faint);font-weight:400;}
+.cell.pop{animation:pop .5s var(--ease);}
+@keyframes pop{0%{transform:scale(.5);opacity:.2;}70%{transform:scale(1.13);}100%{transform:scale(1);opacity:1;}}
+.cell.ph{border-style:dashed;opacity:.35;}
+.cell.pend{border-style:dashed;color:var(--faint);opacity:.5;}
+.cell.sent{border-style:dashed;color:var(--faint);}
+.cell.fill{background:var(--panel);border-color:var(--line);color:var(--ink);}
+.cell.src{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.13);}
+.cell.add{background:var(--brownbg);border-color:var(--brown);color:var(--brown);box-shadow:0 0 0 4px rgba(154,91,14,.13);}
+.cell.newv{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.16);}
+.cell.ql{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.16);}
+.cell.qr{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.16);}
+.cell.region{background:var(--brownbg);border-color:var(--brown);color:var(--brown);}
+.cell.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.16);}
+.cell.zero{color:var(--faint);opacity:.55;}
+.cell.plus{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.16);}
+.cell.minus{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);box-shadow:0 0 0 4px rgba(179,64,47,.16);}
+.cbadge{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .25s;line-height:1.05;pointer-events:none;z-index:3;}
+.cbadge .tri{font-size:9px;display:block;}
+.cbadge.a{color:var(--blue);}.cbadge.b{color:var(--brown);}
+
+.readbar{text-align:center;font-family:var(--mono);font-size:13.5px;color:var(--muted);margin:12px 0 4px;min-height:24px;}
+.readbar b{color:var(--ink);}
+.readbar .gr{color:var(--green);font-weight:700;}.readbar .bl{color:var(--blue);font-weight:700;}.readbar .br{color:var(--brown);font-weight:700;}.readbar .dg{color:var(--danger);font-weight:700;}
+.legend{display:flex;gap:14px;justify-content:center;font-size:11px;color:var(--faint);font-family:var(--mono);margin-top:auto;padding-top:12px;flex-wrap:wrap;}
+.legend .bl{color:var(--blue);}.legend .gr{color:var(--green);}.legend .br{color:var(--brown);}.legend .dg{color:var(--danger);}
+
+/* ---- 二维网格 ---- */
+.grid2{display:grid;grid-template-columns:repeat(4,52px);gap:8px;justify-content:center;margin:16px auto 10px;}
+.gcell{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:16px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease);}
+.gcell.inc{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.gcell.dec{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);}
+.gcell.inc2{background:var(--bluebg);border-color:var(--blue);color:var(--blue);}
+.gcell.cur{background:var(--brownbg);border-color:var(--brown);color:var(--brown);box-shadow:0 0 0 4px rgba(154,91,14,.15);}
+.gcell.tgt{box-shadow:0 0 0 4px rgba(15,110,86,.3);border-color:var(--green);z-index:1;}
+
+/* ---- 和为 K：哈希表面板 ---- */
+.metrics{display:flex;gap:12px;justify-content:center;margin:14px 0 6px;flex-wrap:wrap;}
+.metric{font-family:var(--mono);font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:7px 13px;background:var(--panel);}
+.metric b{font-size:16px;}
+.metric.pre b{color:var(--blue);}.metric.need b{color:var(--brown);}.metric.cnt b{color:var(--green);}
+.kvpanel{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;margin:8px 0 6px;min-height:44px;}
+.kvpanel .lbl{font-family:var(--mono);font-size:11px;color:var(--faint);}
+.kv{font-family:var(--mono);font-size:13px;font-weight:700;border:1.5px solid var(--line);border-radius:9px;padding:5px 10px;background:var(--panel);color:var(--muted);transition:all var(--dur) var(--ease);}
+.kv .c{color:var(--faint);font-size:11px;font-weight:400;}
+.kv.hit{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.15);}
+.kv.ins{border-color:var(--brown);background:var(--brownbg);color:var(--brown);animation:pop .5s var(--ease);}
+
+/* ---- 差分：柱状 ---- */
+.bars{display:flex;gap:10px;justify-content:center;align-items:flex-end;height:172px;margin:12px 0 30px;}
+.bar{width:46px;background:var(--paper);border:1.5px solid var(--line);border-radius:7px 7px 0 0;display:flex;justify-content:center;align-items:flex-start;padding-top:5px;font-family:var(--mono);font-weight:700;font-size:14px;color:var(--muted);position:relative;transition:height var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);box-shadow:0 1px 2px rgba(60,55,40,.05);}
+.bar .bidx{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-size:10px;color:var(--faint);}
+.bar.ph{border-style:dashed;opacity:.3;}
+.bar.up{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.bar.now{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.14);}
+
+/* ---- 右侧 ---- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.desc-body{margin-top:13px;font-size:13.5px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.38;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:48px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>前缀和动画 · 四个核心套路</h1>
+    <p>一维前缀和 / 二维前缀和容斥 / 和为 K 的子数组 / 差分（逆运算）　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+function buildCells(container,values,badges,pfx){
+  pfx=pfx||'c';
+  let h='<div class="cellrow" id="crow-'+pfx+'">';
+  values.forEach((v,i)=>{h+='<div class="cell" id="'+pfx+i+'"><span class="idx">'+i+'</span><span class="v">'+v+'</span></div>';});
+  (badges||[]).forEach(b=>{h+='<div class="cbadge '+b.cls+'" id="bdg-'+pfx+'-'+b.name+'" style="opacity:0"><span class="tri">▲</span>'+b.label+'</div>';});
+  h+='</div>';
+  container.innerHTML=h;
+}
+function setCell(pfx,i,cls,val){const el=document.getElementById(pfx+i);if(!el)return;el.className='cell '+cls;if(val!=null)el.querySelector('.v').textContent=val;}
+function popCell(pfx,i){const el=document.getElementById(pfx+i);if(!el)return;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
+function moveBadges(pfx,list){const occ={};list.forEach(p=>{const el=document.getElementById('bdg-'+pfx+'-'+p.name);if(!el)return;
+  if(p.at==null){el.style.opacity=0;return;}
+  const cell=document.getElementById(pfx+p.at);if(!cell)return;
+  let top=cell.offsetTop+cell.offsetHeight+8;if(occ[p.at])top+=22;occ[p.at]=1;
+  el.style.left=(cell.offsetLeft+cell.offsetWidth/2)+'px';el.style.top=top+'px';el.style.opacity=1;});}
+function barH(v){return 14+Math.max(0,v)*28;}
+
+/* ========== 场景 1：一维前缀和（构建 + 查询）========== */
+const oneDScene=(()=>{
+  const A=[null,3,1,4,1,5,9,2];          // a[1..7]，A[0] 占位
+  const S=[0,3,4,8,9,14,23,25];          // s[0..7]
+  return {
+    id:'oned',label:'一维前缀和',sub:'构建 + O(1) 查询',
+    code:'<span class="cmt">// 构建：一次扫描，s[0]=0 作哨兵</span>\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=1;i&lt;=n;++i)\n'+
+      '    s[i] = s[i-1] + a[i];\n\n'+
+      '<span class="cmt">// 查询区间 [l,r] 之和：一次减法 O(1)</span>\n'+
+      'ans = s[r] - s[l-1];',
+    steps:[
+      {intro:true,chip:'s[0]=0 哨兵',chipC:'c0',
+       act:'▸ 前缀和 s[i] = 从 a[1] 累加到 a[i]，约定 s[0]=0',
+       desc:'要反复查询「区间 [l,r] 之和」，逐次累加是 <b>O(n)/次</b>。前缀和先花 <b>O(n)</b> 把「从头到每个位置的累加和」预存下来：<code>s[i] = s[i-1] + a[i]</code>，哨兵 <b>s[0]=0</b> 让 <code>l=1</code> 时无需特判。'},
+      {bi:1,chip:'s[1] = 0 + 3',chipC:'cb',act:'▸ s[1] = s[0] + a[1] = 0 + 3 = 3',
+       desc:'从左往右扫。每个 <span class="gr">s[i]</span> 只需在<b>前一个前缀和</b> <span class="bl">s[i-1]</span> 上加当前 <span class="br">a[i]</span>——所以整趟构建是 <b>O(n)</b>。'},
+      {bi:2,chip:'s[2] = 3 + 1',chipC:'cb',act:'▸ s[2] = s[1] + a[2] = 3 + 1 = 4',
+       desc:'<span class="gr">s[2]</span> = <span class="bl">s[1]=3</span> + <span class="br">a[2]=1</span> = 4。前缀和数组像一条「累加的水位线」，越往右越高。'},
+      {bi:3,chip:'s[3] = 4 + 4',chipC:'cb',act:'▸ s[3] = s[2] + a[3] = 4 + 4 = 8',
+       desc:'<span class="gr">s[3]</span> = <span class="bl">4</span> + <span class="br">4</span> = 8。'},
+      {bi:4,chip:'s[4] = 8 + 1',chipC:'cb',act:'▸ s[4] = s[3] + a[4] = 8 + 1 = 9',
+       desc:'<span class="gr">s[4]</span> = <span class="bl">8</span> + <span class="br">1</span> = 9。'},
+      {bi:5,chip:'s[5] = 9 + 5',chipC:'cb',act:'▸ s[5] = s[4] + a[5] = 9 + 5 = 14',
+       desc:'<span class="gr">s[5]</span> = <span class="bl">9</span> + <span class="br">5</span> = 14。'},
+      {bi:6,chip:'s[6] = 14 + 9',chipC:'cb',act:'▸ s[6] = s[5] + a[6] = 14 + 9 = 23',
+       desc:'<span class="gr">s[6]</span> = <span class="bl">14</span> + <span class="br">9</span> = 23。'},
+      {bi:7,chip:'s[7] = 23 + 2',chipC:'cg',act:'▸ s[7] = s[6] + a[7] = 23 + 2 = 25，构建完成',
+       desc:'<span class="gr">s[7]</span> = <span class="bl">23</span> + <span class="br">2</span> = 25。前缀和数组构建完毕：<b>[0,3,4,8,9,14,23,25]</b>。之后任意区间和都能 O(1) 得到。'},
+      {mode:'q1',chip:'查询 [3, 6]',chipC:'ch',act:'▸ 查询 [l,r]=[3,6]：需要 s[r]=s[6] 与 s[l-1]=s[2]',
+       desc:'查询区间 <b>[3,6]</b> 的和。原理：<code>s[6]</code> 是「a[1..6] 之和」，<code>s[2]</code> 是「a[1..2] 之和」，两者相减刚好剩下 <b>a[3..6]</b>。取出 <span class="gr">s[6]=23</span> 与 <span class="bl">s[2]=4</span>。'},
+      {mode:'q2',chip:'23 − 4 = 19',chipC:'cg',act:'▸ s[6] − s[2] = 23 − 4 = 19 = a[3]+a[4]+a[5]+a[6]',
+       desc:'<b>s[6] − s[2] = 23 − 4 = <span class="gr">19</span></b>，恰好等于 <span class="br">a[3]+a[4]+a[5]+a[6] = 4+1+5+9 = 19</span>。与区间长度无关，恒为 <b>O(1)</b>。适用前提：<b>数组不变、只反复查询</b>；若频繁单点修改，改用树状数组 / 线段树。'},
+    ],
+    build(){
+      viz.innerHTML='<div class="vcap"><b>一维前缀和</b>：一次扫描构建，区间和用一次减法查询</div>'+
+        '<div class="pslabel">原数组 <b>a[i]</b>（下标 1..7，a[0] 不存在）</div><div class="cwrap" id="cwa"></div>'+
+        '<div class="pslabel">前缀和 <b>s[i] = s[i-1] + a[i]</b>（s[0]=0 哨兵）</div><div class="cwrap" id="cws"></div>'+
+        '<div class="readbar" id="psread"></div>'+
+        '<div class="legend"><span class="bl">s[i-1] 前缀</span><span class="br">a[i] 当前</span><span class="gr">s[i] 新算</span></div>';
+      buildCells(document.getElementById('cwa'),['',3,1,4,1,5,9,2],[],'a');
+      buildCells(document.getElementById('cws'),[0,'','','','','','',''],[{name:'i',cls:'a',label:'i'}],'s');
+    },
+    render(st){
+      for(let k=0;k<8;k++){
+        let cls='active',val=(k===0?'':A[k]);
+        if(k===0)cls='ph';
+        else if(st.bi!=null)cls=(k===st.bi)?'add':'active';
+        else if(st.mode==='q2'&&k>=3&&k<=6)cls='region';
+        setCell('a',k,cls,k===0?'':val);
+      }
+      for(let k=0;k<8;k++){
+        let cls,val;
+        if(st.bi!=null){
+          if(k>st.bi){cls='pend';val='';}
+          else{val=S[k];
+            if(k===st.bi)cls='newv';
+            else if(k===st.bi-1)cls='src';
+            else if(k===0)cls='sent';
+            else cls='fill';}
+        }else{
+          val=S[k];
+          if(k===6)cls='qr';else if(k===2)cls='ql';else cls='fill';
+        }
+        setCell('s',k,cls,val===''?'':val);
+      }
+      if(st.bi!=null)popCell('s',st.bi);
+      moveBadges('s',[{name:'i',at:st.bi!=null?st.bi:null}]);
+      let msg='';
+      if(st.intro)msg='准备构建：s[0]=0，其余待算';
+      else if(st.bi!=null)msg='s['+st.bi+'] = s['+(st.bi-1)+'] + a['+st.bi+'] = <b>'+S[st.bi-1]+' + '+A[st.bi]+' = '+S[st.bi]+'</b>';
+      else if(st.mode==='q1')msg='区间和 [3,6] = s[6] − s[l−1] = <span class="gr">s[6]</span> − <span class="bl">s[2]</span>';
+      else msg='s[6] − s[2] = <b>23 − 4 = <span class="gr">19</span></b> = a[3]+a[4]+a[5]+a[6]';
+      document.getElementById('psread').innerHTML=msg;
+    }
+  };
+})();
+
+/* ========== 场景 2：二维前缀和 · 容斥 ========== */
+const twoDScene=(()=>{
+  const M={1:{1:3,2:1,3:4,4:1},2:{1:5,2:9,3:2,4:6},3:{1:5,2:3,3:5,4:8},4:{1:9,2:7,3:9,4:3}};
+  return {
+    id:'twod',label:'二维前缀和',sub:'容斥四块',
+    code:'<span class="cmt">// 构建：整块 = 上 + 左 − 重叠 + 当前</span>\n'+
+      'S[i][j] = S[i-1][j] + S[i][j-1]\n'+
+      '        - S[i-1][j-1] + a[i][j];\n\n'+
+      '<span class="cmt">// 查询子矩阵 (x1,y1)~(x2,y2)</span>\n'+
+      'sum = S[x2][y2] - S[x1-1][y2]\n'+
+      '    - S[x2][y1-1] + S[x1-1][y1-1];',
+    steps:[
+      {stage:'intro',chip:'S(i,j)=左上矩形和',chipC:'c0',
+       act:'▸ S(i,j) = 从 (1,1) 到 (i,j) 的整块矩形和',
+       desc:'二维前缀和 <code>S(i,j)</code> 表示<b>从左上角 (1,1) 到 (i,j) 的矩形区域和</b>。构建与查询的核心都是<b>容斥原理</b>：一块矩形 = 「整块 − 上 − 左 + 重叠」。'},
+      {stage:'build',chip:'构建 S(3,3)',chipC:'cb',
+       act:'▸ S(3,3) = S(2,3) + S(3,2) − S(2,2) + a(3,3)',
+       desc:'以格 <span class="br">(3,3)</span> 为例：上方矩形 <span class="gr">S(2,3)</span> 与左方矩形 <span class="bl">S(3,2)</span> 都包含左上角块 <span class="dg">S(2,2)</span>（红色，被算了两次），故要<b>减回一次</b>，再加上当前格 a(3,3)。这就是构建递推。'},
+      {stage:'big',chip:'查询：整块 S(3,3)',chipC:'cg',
+       act:'▸ 目标子矩阵 [2..3][2..3]；先取整块 S(3,3)',
+       desc:'现在查询子矩阵 <b>[行2..3][列2..3]</b>（绿色描边）。第一步取<b>整块</b> <span class="gr">S(3,3)</span> = 从 (1,1) 到 (3,3) 的全部和 = <b>37</b>。它比目标大，多含了上方一条和左方一条。'},
+      {stage:'top',chip:'− 上方 S(1,3)',chipC:'cd',
+       act:'▸ 减去上方矩形 S(1,3) = 8',
+       desc:'<b>减去上方</b>矩形 <span class="dg">S(1,3)</span>（第 1 行、列 1..3）= 8。它是「目标上边界之上」的部分，不属于子矩阵。'},
+      {stage:'left',chip:'− 左方 S(3,1)',chipC:'cd',
+       act:'▸ 减去左方矩形 S(3,1) = 13',
+       desc:'<b>再减左方</b>矩形 <span class="dg">S(3,1)</span>（列 1、行 1..3）= 13。但注意：左上角格 (1,1) 同时属于「上方」和「左方」，此刻已被<b>减了两次</b>。'},
+      {stage:'corner',chip:'+ 重叠 S(1,1)',chipC:'cb',
+       act:'▸ 加回重叠角 S(1,1) = 3',
+       desc:'<b>加回</b>被重复扣除的左上角 <span class="bl">S(1,1)</span> = 3。这一步「少加回重叠」正是二维前缀和<b>最常见的错误</b>——符号是「− 上 − 左 <b>+</b> 重叠」。'},
+      {stage:'result',chip:'= 19',chipC:'cg',
+       act:'▸ 37 − 8 − 13 + 3 = 19，即子矩阵之和',
+       desc:'<b>37 − 8 − 13 + 3 = <span class="gr">19</span></b>，正好是子矩阵 <span class="gr">[2..3][2..3]</span> = 9+2+3+5 = 19。构建 O(n·m)、单次查询 O(1)。典型应用：LC 面试题 17.24 最大子矩阵（枚举行边界 + 压成一维）。'},
+    ],
+    build(){
+      viz.innerHTML='<div class="vcap"><b>二维前缀和</b>：构建与查询都是「整块 − 上 − 左 + 重叠」的容斥</div>'+
+        '<div class="grid2" id="g2"></div><div class="readbar" id="g2read"></div>'+
+        '<div class="legend"><span class="gr">整块 / 加</span><span class="dg">减去</span><span class="bl">重叠加回</span><span class="br">当前格</span></div>';
+      let h='';
+      for(let r=1;r<=4;r++)for(let c=1;c<=4;c++)h+='<div class="gcell" id="g-'+r+'-'+c+'">'+M[r][c]+'</div>';
+      document.getElementById('g2').innerHTML=h;
+    },
+    render(st){
+      const cls=(r,c)=>{
+        const g=st.stage;
+        if(g==='intro')return '';
+        if(g==='build'){
+          if(r===3&&c===3)return 'cur';
+          const up=(r<=2&&c<=3),left=(r<=3&&c<=2);
+          if(up&&left)return 'dec'; if(up)return 'inc'; if(left)return 'inc2'; return '';
+        }
+        const inTgt=(r>=2&&r<=3&&c>=2&&c<=3);
+        let base='';
+        if(g==='big')base=(r<=3&&c<=3)?'inc':'';
+        else if(g==='top'){ if(r===1&&c<=3)base='dec'; else if(r<=3&&c<=3)base='inc'; }
+        else if(g==='left'){ if((r===1&&c<=3)||(r<=3&&c===1))base='dec'; else if(r<=3&&c<=3)base='inc'; }
+        else if(g==='corner'){ if(r===1&&c===1)base='inc2'; else if((r===1&&c<=3)||(r<=3&&c===1))base='dec'; else if(r<=3&&c<=3)base='inc'; }
+        else if(g==='result')base=inTgt?'inc':'';
+        if((g==='big'||g==='top'||g==='left'||g==='corner'||g==='result')&&inTgt)base=(base?base+' ':'')+'tgt';
+        return base;
+      };
+      for(let r=1;r<=4;r++)for(let c=1;c<=4;c++)document.getElementById('g-'+r+'-'+c).className='gcell '+cls(r,c);
+      const msg={intro:'S(i,j) = 从 (1,1) 到 (i,j) 的矩形和',
+        build:'S(3,3) = <span class="gr">S(2,3)</span> + <span class="bl">S(3,2)</span> − <span class="dg">S(2,2)</span> + a(3,3)',
+        big:'整块 <span class="gr">S(3,3)</span> = <b>37</b>',
+        top:'37 − <span class="dg">S(1,3)=8</span>',
+        left:'37 − 8 − <span class="dg">S(3,1)=13</span>',
+        corner:'37 − 8 − 13 + <span class="bl">S(1,1)=3</span>',
+        result:'37 − 8 − 13 + 3 = <b class="gr">19</b>　子矩阵 [2..3][2..3] 之和'};
+      document.getElementById('g2read').innerHTML=msg[st.stage];
+    }
+  };
+})();
+
+/* ========== 场景 3：和为 K 的子数组（前缀和 + 哈希，LC 560）========== */
+const subKScene=(()=>{
+  const nums=[1,2,3,-3,3],K=3;
+  const raw=[];
+  let map={0:1},pre=0,cnt=0;
+  raw.push({i:null,pre:0,need:null,hit:0,cnt:0,map:{'0':1},ins:0});
+  nums.forEach((v,i)=>{pre+=v;const need=pre-K;const hit=map[need]||0;cnt+=hit;map[pre]=(map[pre]||0)+1;
+    raw.push({i,v,pre,need,hit,cnt,map:JSON.parse(JSON.stringify(map)),ins:pre});});
+  raw.push({done:true,i:null,pre:6,need:null,hit:0,cnt,map:JSON.parse(JSON.stringify(map)),ins:null});
+  const texts=[
+    {chip:'map={0:1} 哨兵',chipC:'c0',act:'▸ 前缀和 pre=0，map 预置 {0:1}，cnt=0',
+     desc:'求「和为 K=<b>3</b>」的连续子数组个数。含<b>负数</b>时窗口无法收缩，得用<b>前缀和 + 哈希</b>：区间 (j,i] 之和 = pre[i]−pre[j]。想让它 = K，就找<b>之前出现过多少个 pre − K</b>。map 记录「每个前缀和出现的次数」，预置 <code>{0:1}</code> 处理「从头开始」的子数组。'},
+    {chip:"i=0 v=1",chipC:'cb',act:'▸ pre=1，找 pre−K=−2 → 不在 map，cnt+=0',
+     desc:'pre = 1，need = pre−K = <b>−2</b>。map 里没有 −2 → 无贡献。然后把 <span class="br">pre=1</span> 记进 map。'},
+    {chip:"i=1 v=2",chipC:'cg',act:'▸ pre=3，找 0 → map[0]=1，cnt+=1',
+     desc:'pre = 3，need = <b>0</b>。<span class="gr">map[0]=1</span> → 有 1 个历史前缀能和当前配成 K → <b>cnt = 1</b>（对应子数组 [1,2]）。再记 pre=3。'},
+    {chip:"i=2 v=3",chipC:'cg',act:'▸ pre=6，找 3 → map[3]=1，cnt+=1',
+     desc:'pre = 6，need = <b>3</b>。<span class="gr">map[3]=1</span> → cnt = <b>2</b>（子数组 [3]）。记 pre=6。'},
+    {chip:"i=3 v=−3",chipC:'cg',act:'▸ pre=3，找 0 → map[0]=1，cnt+=1；map[3] 增到 2',
+     desc:'pre 回到 3，need = 0，<span class="gr">map[0]=1</span> → cnt = <b>3</b>（子数组 [1,2,3,−3]）。关键：<span class="br">map[3]</span> 现在<b>增到 2</b>——前缀和 3 出现了两次。'},
+    {chip:"i=4 v=3",chipC:'cg',act:'▸ pre=6，找 3 → map[3]=2，cnt+=2（一次加 2！）',
+     desc:'pre = 6，need = 3，<span class="gr">map[3]=2</span> → <b>一次性 cnt += 2</b>，cnt = <b>5</b>（子数组 [3] 与 [3,−3,3]）。这就是为什么 map 存的是<b>次数</b>而非布尔——同一前缀和可能出现多次，各自都能配对。'},
+    {chip:'答案 = 5',chipC:'cg',act:'▸ 共 5 个和为 3 的子数组，全程 O(n)',
+     desc:'最终 <b>cnt = <span class="gr">5</span></b>。每个前缀和只入一次表、查一次，<b>O(n)</b> 时间、O(n) 空间。同款套路：LC 974（和可被 K 整除→前缀和取模）、LC 525（0/1 → 映射 ±1）、LC 523。'},
+  ];
+  const steps=raw.map((r,i)=>Object.assign({},r,texts[i]));
+  return {
+    id:'subk',label:'和为 K 子数组',sub:'前缀和 + 哈希',
+    code:'<span class="kw">unordered_map</span>&lt;<span class="kw">int</span>,<span class="kw">int</span>&gt; mp{{0,1}};\n'+
+      '<span class="kw">int</span> pre=0, cnt=0;\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> x : nums){\n'+
+      '    pre += x;\n'+
+      '    cnt += mp[pre - k];   <span class="cmt">// 有几个历史前缀能配成 k</span>\n'+
+      '    mp[pre]++;            <span class="cmt">// 记录当前前缀和</span>\n'+
+      '}',
+    steps,
+    build(){
+      viz.innerHTML='<div class="vcap"><b>和为 K 的子数组</b>：区间和 = pre[i] − pre[j]，用哈希查「pre − K」出现次数（LC 560）</div>'+
+        '<div class="cwrap" id="cwn"></div>'+
+        '<div class="metrics"><span class="metric pre">前缀和 pre = <b id="mPre">0</b></span>'+
+        '<span class="metric need">need = pre − K = <b id="mNeed">–</b></span>'+
+        '<span class="metric cnt">答案 cnt = <b id="mCnt">0</b></span></div>'+
+        '<div class="pslabel">哈希表 <b>mp[前缀和] = 出现次数</b></div>'+
+        '<div class="kvpanel" id="kv"></div>'+
+        '<div class="legend"><span class="gr">命中 need（+次数）</span><span class="br">写入当前 pre</span></div>';
+      buildCells(document.getElementById('cwn'),nums,[{name:'i',cls:'a',label:'i'}],'n');
+    },
+    render(st){
+      nums.forEach((v,i)=>{let cls='active';
+        if(st.done)cls='fill';
+        else if(st.i===i)cls='cur';
+        else if(st.i!=null&&i<st.i)cls='fill';
+        setCell('n',i,cls);});
+      moveBadges('n',[{name:'i',at:st.i!=null?st.i:null}]);
+      document.getElementById('mPre').textContent=st.pre;
+      document.getElementById('mNeed').textContent=(st.need==null?'–':st.need);
+      document.getElementById('mCnt').textContent=st.cnt;
+      const keys=Object.keys(st.map).map(Number).sort((a,b)=>a-b);
+      let h='<span class="lbl">mp =</span>';
+      keys.forEach(k=>{const isHit=(st.need!=null&&k===st.need&&st.hit>0&&!st.done);
+        const isIns=(st.ins!=null&&k===st.ins&&!st.done);
+        h+='<span class="kv'+(isHit?' hit':'')+(isIns&&!isHit?' ins':'')+'">'+k+'<span class="c"> : '+st.map[k]+'</span></span>';});
+      document.getElementById('kv').innerHTML=h;
+    }
+  };
+})();
+
+/* ========== 场景 4：差分（前缀和的逆运算）========== */
+const diffScene=(()=>{
+  // 位置 1..7；d 索引 1..8；区间加两点打标记，再对 d 求前缀和还原
+  const steps=[
+    {chip:'差分 = 前缀和逆运算',chipC:'c0',
+     dv:[null,0,0,0,0,0,0,0,0],res:[null,0,0,0,0,0,0,0],hotD:[],hotR:[],ptr:null,
+     act:'▸ 目标：对数组做多次「区间加」，最后一次性还原',
+     desc:'差分是前缀和的<b>逆运算</b>。若要对数组反复做「区间 [l,r] 每个数 +v」，逐个改是 O(区间长)。差分只在<b>两个端点打标记</b>：<code>d[l] += v</code>、<code>d[r+1] −= v</code>，最后对 d 求<b>一次前缀和</b>即可还原全部改动。初始数组与 d 全为 0。'},
+    {chip:'[2,5] += 3',chipC:'cg',
+     dv:[null,0,3,0,0,0,-3,0,0],res:[null,0,0,0,0,0,0,0],hotD:[2,6],hotR:[],ptr:null,
+     act:'▸ 区间 [2,5]+3 → d[2]+=3，d[6]−=3（只动 2 格）',
+     desc:'区间 <b>[2,5] 每个 +3</b>：只需 <span class="gr">d[2] += 3</span> 与 <span class="dg">d[6] −= 3</span>。这两个标记的含义是「从位置 2 起抬高 3，到位置 6 之前恢复」。<b>O(1)</b> 完成一次区间加，还没真正改数组。'},
+    {chip:'[4,7] += 2',chipC:'cg',
+     dv:[null,0,3,0,2,0,-3,0,-2],res:[null,0,0,0,0,0,0,0],hotD:[4,8],hotR:[],ptr:null,
+     act:'▸ 区间 [4,7]+2 → d[4]+=2，d[8]−=2',
+     desc:'再来一次区间加 <b>[4,7] +2</b>：<span class="gr">d[4] += 2</span>、<span class="dg">d[8] −= 2</span>。做 k 次区间加就是 <b>O(k)</b>，全程只碰端点。'},
+    {chip:'还原：前缀和（左半）',chipC:'cb',
+     dv:[null,0,3,0,2,0,-3,0,-2],res:[null,0,3,3,5,0,0,0],hotR:[1,2,3,4],ptr:4,
+     act:'▸ 对 d 求前缀和：s=0→3→3→5，位置 1..4 抬起',
+     desc:'还原只需对差分数组 <b>求一次前缀和</b>：<code>a[i] = a[i-1] + d[i]</code>。运行和 s：位置1→0、2→3、3→3、4→5。柱子按累加水位<b>逐格抬起</b>——d[2]=+3 让水位在位置 2 阶跃上升。'},
+    {chip:'还原：前缀和（右半）',chipC:'cb',
+     dv:[null,0,3,0,2,0,-3,0,-2],res:[null,0,3,3,5,5,2,2],hotR:[5,6,7],ptr:7,
+     act:'▸ 继续前缀和：位置 5..7 → 5,2,2',
+     desc:'继续：位置5→5、6→<b>2</b>（d[6]=−3 让水位回落）、7→2。两次区间加的叠加效果，通过<b>一趟前缀和</b>全部体现出来。'},
+    {chip:'O(k + n)',chipC:'cg',
+     dv:[null,0,3,0,2,0,-3,0,-2],res:[null,0,3,3,5,5,2,2],hotR:[],ptr:null,done:true,
+     act:'▸ 结果 [0,3,3,5,5,2,2]：k 次区间加 O(k) + 还原 O(n)',
+     desc:'最终数组 <b>[0,3,3,5,5,2,2]</b>。<b>k 次区间加 O(k) + 最后一次前缀和 O(n)</b>，远优于每次都遍历区间。差分与前缀和互为逆：前缀和把「增量」累积成「值」，差分把「值」还原成「增量」。二维差分同理（四个角打标记）。'},
+  ];
+  return {
+    id:'diff',label:'差分',sub:'前缀和逆运算',
+    code:'<span class="cmt">// 区间 [l,r] 每个 +v：只打两个标记</span>\n'+
+      'd[l]   += v;\n'+
+      'd[r+1] -= v;\n\n'+
+      '<span class="cmt">// 还原：对差分数组求前缀和</span>\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> i=1;i&lt;=n;++i)\n'+
+      '    a[i] = a[i-1] + d[i];',
+    steps,
+    build(){
+      viz.innerHTML='<div class="vcap"><b>差分</b>：区间加只改两个端点，最后对差分数组求前缀和还原（前缀和的逆运算）</div>'+
+        '<div class="pslabel">差分数组 <b>d[i]</b>（区间加的端点标记，d[8] 为溢出位）</div><div class="cwrap" id="cwd"></div>'+
+        '<div class="pslabel">还原后的数组 <b>a[i] = a[i-1] + d[i]</b></div>'+
+        '<div class="bars" id="bars"></div>'+
+        '<div class="legend"><span class="gr">+v 标记</span><span class="dg">−v 标记</span><span class="bl">当前前缀和位置</span></div>';
+      buildCells(document.getElementById('cwd'),['',0,0,0,0,0,0,0,0],[],'d');
+      let h='';for(let k=0;k<=7;k++)h+='<div class="bar" id="r'+k+'" style="height:'+barH(0)+'px"><span class="bv">0</span><span class="bidx">'+k+'</span></div>';
+      document.getElementById('bars').innerHTML=h;
+    },
+    render(st){
+      for(let k=0;k<=8;k++){
+        let cls='fill',val=(k===0?'':st.dv[k]);
+        if(k===0)cls='ph';
+        else if(st.hotD&&st.hotD.includes(k))cls=(st.dv[k]>0?'plus':'minus');
+        else cls=(st.dv[k]===0?'zero':(st.dv[k]>0?'plus':'minus'));
+        setCell('d',k,cls,k===0?'':val);
+      }
+      for(let k=0;k<=7;k++){
+        const el=document.getElementById('r'+k);
+        if(k===0){el.className='bar ph';el.style.height=barH(0)+'px';el.querySelector('.bv').textContent='';continue;}
+        const v=st.res[k];
+        let cls='bar';
+        if(st.done)cls='bar up';
+        else if(st.hotR&&st.hotR.includes(k))cls='bar now';
+        else if(v>0)cls='bar up';
+        el.className=cls;el.style.height=barH(v)+'px';el.querySelector('.bv').textContent=v;
+      }
+    }
+  };
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[oneDScene,twoDScene,subKScene,diffScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+const SC=()=>SCENES[si];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SC().build();codeBox.innerHTML=SC().code;
+  dotsBox.innerHTML='';dotEls=[];
+  SC().steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.chip;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SC().steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SC().render(s);
+  stTitle.textContent=SC().label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;
+  stAct.innerHTML=s.act;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2700;
+function play(){const steps=SC().steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SC().steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="4"></script>
+</body>
+</html>

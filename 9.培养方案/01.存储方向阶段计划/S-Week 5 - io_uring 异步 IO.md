@@ -122,6 +122,8 @@ io_uring_cqe_seen(&ring, cqe);
 
 - [[S-Week 4 - mmap 与读路径对比]]
 - [[S-Week 6 - MVP 收口与报告]]
+- [[S-Week 5 - 前置知识 - io_uring 异步 IO]]
+- [[io_uring 异步 IO 专题]]
 - [[13.4 epoll模型]]
 - [[13.6 Reactor模式与EventLoop]]
 - liburing（axboe/liburing）examples

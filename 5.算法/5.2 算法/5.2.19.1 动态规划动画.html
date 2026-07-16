@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>动态规划动画 · 重叠子问题 / 线性DP / 背包 / 区间DP</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:500ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:8px 15px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.72;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ---- 一维单元格 ---- */
+.cellrow{display:flex;gap:8px;justify-content:center;position:relative;padding:22px 0 20px;flex-wrap:wrap;}
+.cell{width:50px;height:50px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:17px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--faint);position:relative;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.cell.base{background:var(--gray);color:var(--muted);border-color:var(--line);}
+.cell.done{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.cell.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.16);transform:translateY(-3px);}
+.cell.src{background:var(--brownbg);border-color:var(--brown);color:var(--brown);box-shadow:0 0 0 3px rgba(154,91,14,.13);}
+.cell.ans{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 5px rgba(15,110,86,.22);}
+.cell.active{background:var(--panel);border-color:var(--muted);color:var(--ink);}
+.cell .idx{position:absolute;top:-18px;left:0;right:0;text-align:center;font-size:10px;color:var(--faint);font-weight:400;}
+
+/* ---- 二维网格 ---- */
+.dpgrid{display:grid;gap:5px;margin:12px auto 4px;width:fit-content;}
+.ghead{font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;align-items:center;justify-content:center;min-height:30px;padding:0 4px;}
+.ghead.rowh{justify-content:flex-end;white-space:nowrap;font-size:10.5px;}
+.gcell{width:50px;height:42px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:16px;color:var(--faint);transition:all var(--dur) var(--ease);}
+.gcell.base{background:var(--gray);color:var(--muted);}
+.gcell.done{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.gcell.cur{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.16);}
+.gcell.src{background:var(--brownbg);border-color:var(--brown);color:var(--brown);}
+.gcell.ans{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 5px rgba(15,110,86,.22);}
+.gcell.hide{opacity:0;visibility:hidden;}
+
+/* ---- 递归树 ---- */
+.ftree{position:relative;height:296px;margin:6px 0;}
+.ftsvg{position:absolute;inset:0;width:100%;height:100%;z-index:1;}
+.ftedge{stroke:var(--line);stroke-width:1.5;transition:stroke .4s var(--ease);}
+.ftedge.dim{stroke:var(--grid);}
+.ftnode{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:14px;z-index:2;transition:all var(--dur) var(--ease);}
+.ftnode .fk{font-size:9px;color:var(--faint);margin-right:1px;}
+.ftnode.rep{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);box-shadow:0 0 0 4px rgba(179,64,47,.14);}
+.ftnode.keep{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.14);}
+.ftnode.dim{opacity:.26;}
+
+.rowlab{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:6px 0 0;}
+.mread{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:8px;min-height:22px;}
+.mread b{color:var(--ink);}.mread .ok{color:var(--green);font-weight:700;}.mread .no{color:var(--danger);font-weight:700;}
+.legend{display:flex;gap:13px;justify-content:center;font-size:11px;color:var(--faint);font-family:var(--mono);margin-top:auto;padding-top:12px;flex-wrap:wrap;}
+.legend .gr{color:var(--green);}.legend .bl{color:var(--blue);}.legend .dg{color:var(--danger);}.legend .br{color:var(--brown);}
+
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:214px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.desc-body{margin-top:13px;font-size:13.5px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:11.5px;line-height:1.6;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;} .codebox .fn{color:#8EC5EA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.38;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:6px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:48px;text-align:center;}
+@media(max-width:720px){body{padding:20px 14px 32px;}.viz{padding:16px;}.cell{width:42px;height:42px;font-size:15px;}.gcell{width:42px;font-size:14px;}.controls{padding:12px;gap:8px}.dots{order:4;width:100%}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>动态规划动画 · 从「重复计算」到「填表求解」</h1>
+    <p>重叠子问题 / 爬楼梯 / 打家劫舍 / 0-1 背包 / 背包一维优化 / 区间 DP　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+function buildCells(container,values){let h='<div class="cellrow" id="crow">';values.forEach((v,i)=>{h+='<div class="cell" id="c'+i+'"><span class="idx">'+i+'</span><span class="v">'+v+'</span></div>';});h+='</div>';container.innerHTML=h;}
+function setCell(i,cls,val){const el=document.getElementById('c'+i);el.className='cell '+cls;if(val!=null)el.querySelector('.v').textContent=val;}
+function setId(id,cls){const el=document.getElementById(id);if(el)el.className=cls;}
+function buildGrid(prefix,nR,nC,rowL,colL,corner){
+  let h='<div class="dpgrid" style="grid-template-columns:repeat('+(nC+1)+',max-content)"><div class="ghead corner">'+corner+'</div>';
+  for(let c=0;c<nC;c++)h+='<div class="ghead">'+colL[c]+'</div>';
+  for(let r=0;r<nR;r++){h+='<div class="ghead rowh">'+rowL[r]+'</div>';for(let c=0;c<nC;c++)h+='<div class="gcell" id="'+prefix+'-'+r+'-'+c+'">·</div>';}
+  h+='</div>';return h;
+}
+function setGrid(prefix,r,c,cls,val){const el=document.getElementById(prefix+'-'+r+'-'+c);if(!el)return;el.className='gcell '+cls;if(val!=null)el.textContent=val;}
+
+/* ========== 场景 1：重叠子问题（fib 递归树） ========== */
+const overlapScene=(()=>{
+  const NODES=[['n0',5,50,7],['n1',4,27,25],['n2',3,73,25],['n3',3,14,44],['n4',2,39,44],['n5',2,62,44],['n6',1,86,44],['n7',2,8,64],['n8',1,21,64],['n9',1,33,64],['n10',0,45,64],['n11',1,56,64],['n12',0,68,64],['n13',1,5,84],['n14',0,14,84]];
+  const EDGES=[['n0','n1'],['n0','n2'],['n1','n3'],['n1','n4'],['n2','n5'],['n2','n6'],['n3','n7'],['n3','n8'],['n4','n9'],['n4','n10'],['n5','n11'],['n5','n12'],['n7','n13'],['n7','n14']];
+  const KEEP=['n0','n1','n3','n7','n13','n14'],DUP=['n2','n4','n5','n6','n8','n9','n10','n11','n12'];
+  const pos=id=>NODES.find(x=>x[0]===id);
+  const steps=[
+    {chip:'暴力递归',chipC:'c0',act:'▸ fib(n)=fib(n-1)+fib(n-2)，每次都拆成两个子调用',read:'fib(5) 暴力展开 = <b>15</b> 次调用，越深重复越多',
+     desc:'朴素递归把 fib(5) 拆成一棵调用树。问题是：左右两个分支<b>并不独立</b>，会不断到达<b>同一个子问题</b>。没有缓存的话，每次都从头再算一遍。'},
+    {rep:['n2','n3'],chip:'fib(3) ×2',chipC:'cd',act:'▸ 同一个 fib(3) 出现在两条不同路径上',read:'<span class="no">fib(3) 被重复计算 2 次</span>',
+     desc:'fib(3) 既出现在 fib(4) 的左子树里，也作为 fib(5) 的右孩子被再算一遍。两处<span class="dg">红色</span>节点是<b>完全相同</b>的子问题。'},
+    {rep:['n4','n5','n7'],chip:'fib(2) ×3',chipC:'cd',act:'▸ fib(2) 被算了 3 次，越往下重复越夸张',read:'<span class="no">fib(2) 被重复计算 3 次</span>',
+     desc:'再看 fib(2)：整棵树里出现了 3 次。随着 n 增大，重复次数按<b>指数级</b>膨胀——这正是朴素递归慢到不可用的根因。'},
+    {keep:KEEP,chip:'只有 6 个子问题',chipC:'cb',act:'▸ 不同的子问题其实只有 fib(0)…fib(5)',read:'真正不同的子问题只有 <b>6</b> 个：fib(0) … fib(5)',
+     desc:'尽管有 15 个节点，<b>本质不同</b>的子问题只有 fib(0)、fib(1) … fib(5) 共 6 个（绿色为每种的一个代表）。「适用 DP」的第一个信号就是：<b>重叠子问题</b>。'},
+    {keep:KEEP,dim:DUP,chip:'记忆化坍缩',chipC:'cg',act:'▸ 加一张缓存表，重复子树直接查表返回',read:'记忆化：重复子树<b>直接返回</b>，指数树坍缩成线性链',
+     desc:'<b>记忆化搜索</b>（自顶向下）：第一次算出的值存进缓存，之后再遇到相同子问题直接查表。灰色的 9 个重复计算被剪掉，只剩 6 次真正的计算。'},
+    {keep:KEEP,dim:DUP,chip:'O(2ⁿ) → O(n)',chipC:'cg',act:'▸ 把每个子问题只算一次 = 用空间换时间',read:'时间从 <b>O(φⁿ)</b> 指数 降到 <b>O(n)</b> 线性',
+     desc:'DP 的本质就是<b>用空间换时间</b>：存下每个子问题的解，避免重复劳动。无论是自顶向下的记忆化，还是自底向上的递推，核心都是「每个状态只计算一次」。'},
+  ];
+  return{
+    steps,
+    id:'overlap',label:'重叠子问题',sub:'fib 递归树',
+    code:'<span class="cmt">// 暴力递归：指数级重复</span>\n<span class="kw">int</span> <span class="fn">fib</span>(<span class="kw">int</span> n){\n  <span class="kw">if</span>(n&lt;=1) <span class="kw">return</span> n;\n  <span class="kw">return</span> fib(n-1)+fib(n-2);\n}\n<span class="cmt">// 记忆化：每个子问题只算一次 → O(n)</span>\n<span class="kw">int</span> <span class="fn">fib</span>(<span class="kw">int</span> n){\n  <span class="kw">if</span>(n&lt;=1) <span class="kw">return</span> n;\n  <span class="kw">if</span>(memo[n]!=-1) <span class="kw">return</span> memo[n];\n  <span class="kw">return</span> memo[n]=fib(n-1)+fib(n-2);\n}',
+    build(){
+      let lines='';EDGES.forEach((e,i)=>{const a=pos(e[0]),b=pos(e[1]);lines+='<line class="ftedge" id="fte'+i+'" x1="'+a[2]+'" y1="'+a[3]+'" x2="'+b[2]+'" y2="'+b[3]+'" vector-effect="non-scaling-stroke"/>';});
+      let nodes='';NODES.forEach(nd=>{nodes+='<div class="ftnode" id="ft'+nd[0]+'" style="left:'+nd[2]+'%;top:'+nd[3]+'%"><span class="fk">f</span>'+nd[1]+'</div>';});
+      viz.innerHTML='<div class="vcap"><b>重叠子问题</b>：fib(5) 的递归调用树，红=重复计算，绿=真正不同的子问题</div>'+
+        '<div class="ftree" id="ftree"><svg class="ftsvg" viewBox="0 0 100 100" preserveAspectRatio="none">'+lines+'</svg>'+nodes+'</div>'+
+        '<div class="mread" id="ftread"></div>'+
+        '<div class="legend"><span class="dg">重复计算</span><span class="gr">不同子问题</span><span>灰=记忆化后被跳过</span></div>';
+    },
+    render(s){
+      NODES.forEach(nd=>{let cls='ftnode';if(s.dim&&s.dim.includes(nd[0]))cls+=' dim';if(s.rep&&s.rep.includes(nd[0]))cls+=' rep';if(s.keep&&s.keep.includes(nd[0]))cls+=' keep';document.getElementById('ft'+nd[0]).className=cls;});
+      EDGES.forEach((e,i)=>{document.getElementById('fte'+i).setAttribute('class','ftedge'+(s.dim&&s.dim.includes(e[1])?' dim':''));});
+      document.getElementById('ftread').innerHTML=s.read;
+    }
+  };
+})();
+
+/* ========== 场景 2：爬楼梯（线性 DP） ========== */
+const climbScene=(()=>{
+  const DP=[1,1,2,3,5,8,13];
+  const steps=[
+    {filled:1,chip:'base case',chipC:'c0',act:'▸ dp[i] = 到第 i 阶的走法数',read:'base：dp[0]=1（站地面）, dp[1]=1',
+     desc:'每次爬 1 或 2 阶，问到第 n 阶有多少走法。定义 <b>dp[i] = 到第 i 阶的方法数</b>。起点：dp[0]=1、dp[1]=1，这是不需要转移就能确定的 base case。'},
+    {filled:2,cur:2,src:[1,0],chip:'dp[2]',chipC:'cb',act:'▸ dp[2] = dp[1] + dp[0]',read:'dp[2]=dp[1]+dp[0]=1+1=<b>2</b>',
+     desc:'到第 2 阶，最后一步要么从第 1 阶爬 1 步、要么从第 0 阶爬 2 步，方法数相加：<span class="br">dp[1]</span>+<span class="br">dp[0]</span>。这就是<b>状态转移方程</b> dp[i]=dp[i-1]+dp[i-2]。'},
+    {filled:3,cur:3,src:[2,1],chip:'dp[3]',chipC:'cb',act:'▸ dp[3] = dp[2] + dp[1]',read:'dp[3]=dp[2]+dp[1]=2+1=<b>3</b>',
+     desc:'同一套转移：dp[3] 只依赖它<b>左边紧邻的两个</b>已算好的状态。因为依赖的是更小的下标，所以<b>正序遍历</b>就能保证用到的都是算好的值。'},
+    {filled:4,cur:4,src:[3,2],chip:'dp[4]',chipC:'cb',act:'▸ dp[4] = dp[3] + dp[2]',read:'dp[4]=dp[3]+dp[2]=3+2=<b>5</b>',desc:'继续从左往右填表，每一格都是前两格之和。这正是斐波那契数列——爬楼梯本质上就是斐波那契。'},
+    {filled:5,cur:5,src:[4,3],chip:'dp[5]',chipC:'cb',act:'▸ dp[5] = dp[4] + dp[3]',read:'dp[5]=dp[4]+dp[3]=5+3=<b>8</b>',desc:'表格一路填到目标。每个状态只被计算一次，因此时间是 <b>O(n)</b>，而不是朴素递归的指数级。'},
+    {filled:6,cur:6,ans:6,src:[5,4],chip:'dp[6] = 答案',chipC:'cg',act:'▸ dp[6] = dp[5] + dp[4] = 13',read:'dp[6]=dp[5]+dp[4]=8+5=<b>13</b> ← 答案',desc:'到第 6 阶共有 <span class="gr">13</span> 种走法，答案就在 dp[n]。这就是自底向上「递推填表」的完整过程。'},
+    {filled:6,ans:6,opt:true,chip:'空间优化 O(1)',chipC:'cg',act:'▸ 只依赖前两格 → 两个变量滚动即可',read:'dp[i] 只用到前两格 → 用 prev1、prev2 两个变量，空间 O(1)',
+     desc:'观察依赖：dp[i] 永远只看前两格（棕色）。所以整张表没必要全存，用 <b>prev1、prev2 两个变量</b>滚动更新即可，把空间从 O(n) 压到 <b>O(1)</b>。'},
+  ];
+  return{
+    steps,
+    id:'climb',label:'爬楼梯',sub:'线性 DP · 填表',
+    code:'dp[0]=1; dp[1]=1;\n<span class="kw">for</span>(<span class="kw">int</span> i=2; i&lt;=n; ++i)\n    dp[i]=dp[i-1]+dp[i-2];\n<span class="cmt">// 空间优化：两个变量滚动 O(1)</span>\n<span class="kw">int</span> a=1,b=1;\n<span class="kw">for</span>(<span class="kw">int</span> i=2;i&lt;=n;++i){\n    <span class="kw">int</span> c=a+b; a=b; b=c;\n}',
+    build(){viz.innerHTML='<div class="vcap"><b>爬楼梯</b>（LC 70）：dp[i]=到第 i 阶的走法，正序填表</div><div style="margin:10px 0" id="cw"></div><div class="mread" id="cbread"></div><div class="legend"><span class="gr">已填</span><span class="bl">正在计算</span><span class="br">依赖来源</span></div>';buildCells(document.getElementById('cw'),['·','·','·','·','·','·','·']);},
+    render(s){
+      for(let i=0;i<7;i++){if(i<=s.filled)setCell(i,i<=1?'base':'done',DP[i]);else setCell(i,'','·');}
+      if(s.src)s.src.forEach(i=>setCell(i,'src',DP[i]));
+      if(s.cur!=null)setCell(s.cur,'cur',DP[s.cur]);
+      if(s.ans!=null)setCell(s.ans,'ans',DP[s.ans]);
+      if(s.opt){setCell(4,'src',DP[4]);setCell(5,'src',DP[5]);setCell(6,'ans',DP[6]);}
+      document.getElementById('cbread').innerHTML=s.read;
+    }
+  };
+})();
+
+/* ========== 场景 3：打家劫舍（决策型线性 DP） ========== */
+const robScene=(()=>{
+  const NUMS=[2,7,9,3,1],DP=[2,7,11,11,12];
+  const steps=[
+    {filled:1,chip:'base case',chipC:'c0',act:'▸ dp[i] = 前 i 家能偷到的最大金额',read:'base：dp[0]=2，dp[1]=max(2,7)=7',
+     desc:'相邻两家不能同时偷，求最大金额。定义 <b>dp[i] = 考虑前 i 家的最大收益</b>。base：dp[0]=nums[0]=2；dp[1]=max(nums[0],nums[1])=7。'},
+    {filled:2,i:2,cur:2,src:[1,0],chip:'dp[2]',chipC:'cb',act:'▸ dp[2] = max(不偷2: dp[1], 偷2: dp[0]+nums[2])',read:'max(dp[1]=7, dp[0]+9=11) = <b>11</b>',
+     desc:'到第 2 家有两个选择：<b>不偷</b>它 → 收益 dp[1]=7；<b>偷</b>它 → 不能碰第 1 家，收益 dp[0]+nums[2]=2+9=11。取 max=<span class="gr">11</span>。这类 DP 的核心是「<b>选或不选</b>」。'},
+    {filled:3,i:3,cur:3,src:[2,1],chip:'dp[3]',chipC:'cb',act:'▸ dp[3] = max(dp[2], dp[1]+nums[3])',read:'max(dp[2]=11, dp[1]+3=10) = <b>11</b>',
+     desc:'第 3 家：不偷 → dp[2]=11；偷 → dp[1]+nums[3]=7+3=10。这次<b>不偷更优</b>，dp[3]=11。注意偷第 i 家时是从 <b>dp[i-2]</b> 转移（跳过相邻的 i-1）。'},
+    {filled:4,i:4,cur:4,src:[3,2],ans:4,chip:'dp[4] = 答案',chipC:'cg',act:'▸ dp[4] = max(dp[3], dp[2]+nums[4])',read:'max(dp[3]=11, dp[2]+1=12) = <b>12</b> ← 答案',
+     desc:'第 4 家：不偷 → 11；偷 → dp[2]+nums[4]=11+1=12。取 <span class="gr">12</span>（对应偷第 0、2、4 家：2+9+1）。答案 dp[n-1]=12。'},
+    {filled:4,ans:4,chip:'O(n) · O(1)',chipC:'cg',act:'▸ 同样只依赖前两个状态，可压成两变量',read:'dp[i]=max(dp[i-1], dp[i-2]+nums[i])，O(n) 时间',
+     desc:'与爬楼梯类似，dp[i] 只依赖 dp[i-1] 与 dp[i-2]，也能用两变量把空间压到 O(1)。「打家劫舍 II」是环形版本：拆成「不偷首」「不偷尾」两条链各跑一次取 max。'},
+  ];
+  return{
+    steps,
+    id:'rob',label:'打家劫舍',sub:'线性 DP · 选/不选',
+    code:'dp[0]=nums[0];\ndp[1]=max(nums[0],nums[1]);\n<span class="kw">for</span>(<span class="kw">int</span> i=2; i&lt;n; ++i)\n    dp[i]=max(dp[i-1],          <span class="cmt">// 不偷 i</span>\n             dp[i-2]+nums[i]);  <span class="cmt">// 偷 i</span>',
+    build(){
+      let rn='<div class="cellrow" style="padding-bottom:6px">';NUMS.forEach((v,i)=>rn+='<div class="cell active" id="rn'+i+'"><span class="idx">'+i+'</span><span class="v">'+v+'</span></div>');rn+='</div>';
+      let rd='<div class="cellrow" style="padding-top:6px">';NUMS.forEach((v,i)=>rd+='<div class="cell" id="rd'+i+'"><span class="v">·</span></div>');rd+='</div>';
+      viz.innerHTML='<div class="vcap"><b>打家劫舍</b>（LC 198）：相邻不可同偷，dp[i]=前 i 家最大金额</div><div class="rowlab">nums（每家金额）</div>'+rn+'<div class="rowlab">dp（前 i 家能偷的最大金额）</div>'+rd+'<div class="mread" id="h3read"></div><div class="legend"><span class="bl">当前家 / dp[i]</span><span class="br">两个转移来源</span><span class="gr">已填 / 答案</span></div>';
+    },
+    render(s){
+      NUMS.forEach((v,i)=>setId('rn'+i,'cell '+(i===s.i?'cur':'active')));
+      for(let i=0;i<5;i++){const el=document.getElementById('rd'+i);if(i<=s.filled){el.className='cell '+(i<=1?'base':'done');el.querySelector('.v').textContent=DP[i];}else{el.className='cell';el.querySelector('.v').textContent='·';}}
+      if(s.src)s.src.forEach(i=>{document.getElementById('rd'+i).className='cell src';});
+      if(s.cur!=null)document.getElementById('rd'+s.cur).className='cell cur';
+      if(s.ans!=null)document.getElementById('rd'+s.ans).className='cell ans';
+      document.getElementById('h3read').innerHTML=s.read;
+    }
+  };
+})();
+
+/* ========== 场景 4：0-1 背包（二维表格） ========== */
+const knap2dScene=(()=>{
+  const T=[[0,0,0,0,0,0],[0,6,6,6,6,6],[0,6,10,16,16,16],[0,6,10,16,18,22]];
+  const rowL=['i=0 ∅','i=1 (1,6)','i=2 (2,10)','i=3 (3,12)'],colL=['0','1','2','3','4','5'];
+  const steps=[
+    {rows:1,chip:'状态 & base',chipC:'c0',act:'▸ dp[i][j] = 前 i 件、容量 j 的最大价值',read:'base：dp[0][j]=0（没有物品可选）',
+     desc:'3 件物品 (重,值)=(1,6)(2,10)(3,12)，容量 W=5。定义 <b>dp[i][j] = 只看前 i 件、容量为 j 时的最大价值</b>。第 0 行全 0：没有物品可放。'},
+    {rows:2,cur:[1,1],src:[[0,1],[0,0]],chip:'第 1 件 (w=1,v=6)',chipC:'cb',act:'▸ dp[1][1]=max(不选 dp[0][1], 选 dp[0][0]+6)',read:'dp[1][1]=max(<span class="br">0</span>, <span class="br">0</span>+6)=<b>6</b>',
+     desc:'每格两个来源：<b>不选</b>第 i 件 → 正上方 <span class="br">dp[i-1][j]</span>；<b>选</b>它（需 j≥w）→ 上一行、容量减 w 处 <span class="br">dp[i-1][j-w]</span> 再加 v。取二者 max。这是 0-1 背包最核心的转移。'},
+    {rows:3,cur:[2,3],src:[[1,3],[1,1]],chip:'第 2 件 (w=2,v=10)',chipC:'cb',act:'▸ dp[2][3]=max(dp[1][3], dp[1][3-2]+10)',read:'dp[2][3]=max(<span class="br">6</span>, <span class="br">6</span>+10)=<b>16</b>',
+     desc:'算 dp[2][3]：不选第 2 件 → dp[1][3]=6；选它 → 上一行容量 3−2=1 处 dp[1][1]=6，加价值 10 得 16。<b>选更优</b>，dp[2][3]=16。两个来源都在<b>上一行</b>。'},
+    {rows:4,cur:[3,5],src:[[2,5],[2,2]],ans:[3,5],chip:'第 3 件 (w=3,v=12)',chipC:'cg',act:'▸ dp[3][5]=max(dp[2][5], dp[2][5-3]+12)',read:'dp[3][5]=max(<span class="br">16</span>, <span class="br">10</span>+12)=<b>22</b> ← 答案',
+     desc:'右下角 dp[3][5]：不选 → dp[2][5]=16；选第 3 件 → dp[2][2]=10 加 12 得 22。答案 <span class="gr">22</span>（选第 2、3 件：重 2+3=5，值 10+12）。'},
+    {rows:4,ans:[3,5],chip:'O(nW)',chipC:'cg',act:'▸ 逐行填表，答案在 dp[n][W]',read:'时间 O(n×W)，空间 O(n×W)（可优化，见下一主题）',
+     desc:'整张表 n×W 个状态、每个 O(1) 转移，时间 <b>O(nW)</b>。注意 dp[i][*] <b>只依赖上一行 dp[i-1][*]</b> —— 这个观察正是把二维压成一维的关键。'},
+  ];
+  return{
+    steps,
+    id:'knap2d',label:'0-1 背包',sub:'二维表格填充',
+    code:'<span class="kw">for</span>(<span class="kw">int</span> i=1;i&lt;=n;++i)\n  <span class="kw">for</span>(<span class="kw">int</span> j=0;j&lt;=W;++j){\n    dp[i][j]=dp[i-1][j];                 <span class="cmt">// 不选</span>\n    <span class="kw">if</span>(j&gt;=w[i])\n      dp[i][j]=max(dp[i][j],\n               dp[i-1][j-w[i]]+v[i]);    <span class="cmt">// 选</span>\n  }',
+    build(){viz.innerHTML='<div class="vcap"><b>0-1 背包</b>：dp[i][j]=前 i 件、容量 j 的最大价值；每格来自「正上方」与「上一行偏移 w 处」</div>'+buildGrid('k4',4,6,rowL,colL,'i \\\\ j')+'<div class="mread" id="k4read"></div><div class="legend"><span class="bl">正在计算</span><span class="br">两个来源（上 / 上一行偏移 w）</span><span class="gr">已填 / 答案</span></div>';},
+    render(s){
+      for(let r=0;r<4;r++)for(let c=0;c<6;c++){if(r<s.rows)setGrid('k4',r,c,r===0?'base':'done',T[r][c]);else setGrid('k4',r,c,'','·');}
+      if(s.src)s.src.forEach(([r,c])=>setGrid('k4',r,c,'src',T[r][c]));
+      if(s.cur){const[r,c]=s.cur;setGrid('k4',r,c,'cur',T[r][c]);}
+      if(s.ans){const[r,c]=s.ans;setGrid('k4',r,c,'ans',T[r][c]);}
+      document.getElementById('k4read').innerHTML=s.read;
+    }
+  };
+})();
+
+/* ========== 场景 5：背包一维优化（逆序遍历） ========== */
+const knap1dScene=(()=>{
+  const S0=[0,0,0,0,0,0],S1=[0,6,6,6,6,6],S2=[0,6,10,16,16,16],S3=[0,6,10,16,18,22];
+  const steps=[
+    {arr:S0,chip:'压成一维',chipC:'c0',act:'▸ dp[j] = 容量 j 的最大价值（滚动覆盖上一行）',read:'一维 dp[0..W]，初始全 0',
+     desc:'因为二维里 dp[i][*] 只依赖上一行，可以只用<b>一维数组 dp[j]</b>，逐件物品原地更新。难点在遍历方向：内层容量必须<b>逆序</b>。'},
+    {arr:S1,cur:1,dir:'←',chip:'第 1 件 (w=1,v=6)',chipC:'cb',act:'▸ j 从 W 到 w 逆序：dp[j]=max(dp[j], dp[j-1]+6)',read:'处理第 1 件后：dp = [0,6,6,6,6,6]',
+     desc:'处理第 1 件，内层 <b>j 从大到小</b>：dp[j]=max(dp[j], dp[j-w]+v)。逆序的意义马上揭晓。'},
+    {arr:S2,cur:5,src:[3],dir:'←',chip:'第 2 件 (w=2,v=10)',chipC:'cb',act:'▸ dp[5]=max(dp[5], dp[3]+10)，dp[3] 仍是上一件的值',read:'dp[5]=max(6, <span class="br">dp[3]=6</span>+10)=<b>16</b>',
+     desc:'算 dp[5] 用到 <span class="br">dp[3]</span>。因为 j 从大往小走，dp[3] <b>本轮还没被更新</b>，它保存的正是「上一件」的结果——等价于二维里的 dp[i-1][3]。'},
+    {arr:S2,cur:3,src:[3],dir:'←',chip:'为什么必须逆序',chipC:'cd',act:'▸ 若正序，dp[j-w] 会先被本轮更新 → 同一件被选两次',read:'<span class="no">正序</span>：dp[3] 已含第 2 件，再拿去更新 dp[5] = 重复选',
+     desc:'反过来想：若<b>正序</b>（j 从小到大），算 dp[5] 时 dp[3] 早已在本轮被第 2 件更新过，相当于第 2 件被<b>选了两次</b>——那就变成了「完全背包」。所以 0-1 背包一维<b>必须逆序</b>。'},
+    {arr:S3,cur:5,src:[2],dir:'←',ans:5,chip:'第 3 件 (w=3,v=12)',chipC:'cg',act:'▸ dp[5]=max(dp[5], dp[2]+12)=22',read:'dp[5]=max(16, <span class="br">dp[2]=10</span>+12)=<b>22</b> ← 答案',
+     desc:'处理第 3 件后 dp=[0,6,10,16,18,22]，dp[W]=<span class="gr">22</span>，与二维结果一致，但空间从 O(nW) 降到 <b>O(W)</b>。'},
+    {arr:S3,ans:5,chip:'逆序=0-1，正序=完全',chipC:'cg',act:'▸ 一句话记忆：0-1 背包逆序，完全背包正序',read:'0-1 背包一维 → 内层逆序；完全背包 → 内层正序',
+     desc:'总结这条最容易写错的细节：<b>0-1 背包</b>（每件至多一次）内层<b>逆序</b>；<b>完全背包</b>（每件无限次）内层<b>正序</b>——正序时的「重复选取」恰好是完全背包想要的。'},
+  ];
+  return{
+    steps,
+    id:'knap1d',label:'背包一维优化',sub:'逆序遍历',
+    code:'vector&lt;int&gt; dp(W+1, 0);\n<span class="kw">for</span>(<span class="kw">int</span> i=0;i&lt;n;++i)\n  <span class="kw">for</span>(<span class="kw">int</span> j=W;j&gt;=w[i];--j)   <span class="cmt">// 逆序！</span>\n    dp[j]=max(dp[j], dp[j-w[i]]+v[i]);\n<span class="cmt">// 正序会重复选同一物品 → 完全背包</span>',
+    build(){viz.innerHTML='<div class="vcap"><b>背包一维优化</b>：二维压成一维 dp[j]，内层容量<b>逆序</b>才是 0-1 背包</div><div style="margin:10px 0" id="cw"></div><div class="mread" id="k1read"></div><div class="legend"><span class="bl">正在计算 dp[j]</span><span class="br">dp[j−w]（上一件的值）</span><span class="gr">已更新 / 答案</span></div>';buildCells(document.getElementById('cw'),[0,0,0,0,0,0]);},
+    render(s){
+      for(let j=0;j<6;j++)setCell(j,s.arr[j]>0?'done':'base',s.arr[j]);
+      if(s.src)s.src.forEach(j=>setCell(j,'src',s.arr[j]));
+      if(s.cur!=null)setCell(s.cur,'cur',s.arr[s.cur]);
+      if(s.ans!=null)setCell(s.ans,'ans',s.arr[s.ans]);
+      document.getElementById('k1read').innerHTML=(s.dir?'<b>逆序 '+s.dir+'</b>　·　':'')+s.read;
+    }
+  };
+})();
+
+/* ========== 场景 6：区间 DP（最长回文子序列） ========== */
+const intervalScene=(()=>{
+  const STR=['b','b','b','a','b'],N=5;
+  const T=[[1,2,3,3,4],[0,1,2,2,3],[0,0,1,1,3],[0,0,0,1,1],[0,0,0,0,1]];
+  const rowL=['l=0 b','l=1 b','l=2 b','l=3 a','l=4 b'],colL=['b','b','b','a','b'];
+  const steps=[
+    {len:1,chip:'状态 & base',chipC:'c0',act:'▸ dp[l][r] = 子串 s[l..r] 的最长回文子序列长度',read:'base：dp[i][i]=1（单字符自成回文）',
+     desc:'求字符串 "bbbab" 的最长回文<b>子序列</b>。定义 <b>dp[l][r] = s[l..r] 内最长回文子序列长度</b>。base：对角线 dp[i][i]=1。区间 DP 的答案在<b>右上角</b> dp[0][n-1]。'},
+    {len:2,cur:[0,1],chip:'长度 2',chipC:'cb',act:'▸ s[l]==s[r] → dp[l][r]=dp[l+1][r-1]+2',read:'dp[0][1]: s[0]=s[1]=b → 内层(空)+2 = <b>2</b>',
+     desc:'按<b>区间长度从小到大</b>填表。长度 2 的 dp[0][1]：两端 s[0]=s[1]=\'b\' 相等，用<b>内层区间</b> dp[1][0]（空=0）加 2 得 2。区间 DP 依赖的是<b>更短</b>的区间。'},
+    {len:3,cur:[0,2],src:[[1,1]],chip:'长度 3',chipC:'cb',act:'▸ dp[0][2]=dp[1][1]+2',read:'dp[0][2]: s[0]=s[2]=b → <span class="br">dp[1][1]</span>+2 = 1+2 = <b>3</b>',
+     desc:'长度 3 的 dp[0][2]="bbb"：两端相等，取内层 <span class="br">dp[1][1]</span>=1 加 2 得 3。可以看到当前格依赖的是它<b>左下方</b>（更短区间）的格子，所以必须先算短的。'},
+    {len:4,cur:[0,3],src:[[1,3],[0,2]],chip:'长度 4 · 两端不等',chipC:'ch',act:'▸ s[l]≠s[r] → dp[l][r]=max(dp[l+1][r], dp[l][r-1])',read:'dp[0][3]: s[0]=b≠a=s[3] → max(<span class="br">dp[1][3]=2</span>, <span class="br">dp[0][2]=3</span>) = <b>3</b>',
+     desc:'dp[0][3]="bbba"：两端 \'b\'≠\'a\'，<b>不等</b>时丢掉一端取较大：max(去掉左端 dp[1][3]=2, 去掉右端 dp[0][2]=3)=3。两个来源分别在<b>正下方</b>和<b>正左方</b>。'},
+    {len:5,cur:[0,4],src:[[1,3]],ans:[0,4],chip:'长度 5 = 答案',chipC:'cg',act:'▸ dp[0][4]=dp[1][3]+2',read:'dp[0][4]: s[0]=s[4]=b → <span class="br">dp[1][3]=2</span>+2 = <b>4</b> ← 答案',
+     desc:'最后整段 dp[0][4]="bbbab"：两端 \'b\'=\'b\'，取内层 <span class="br">dp[1][3]</span>=2 加 2 得 <span class="gr">4</span>（回文 "bbbb" 或 "bbab"…长度 4）。答案就在右上角。'},
+    {len:5,ans:[0,4],chip:'O(n²)',chipC:'cg',act:'▸ 按区间长度递增填表，答案在右上角',read:'状态 O(n²) 个、每个 O(1) 转移 → 时间 O(n²)',
+     desc:'区间 DP 的通用套路：<b>枚举区间长度</b>由小到大、再枚举左端点，转移把大区间拆成更短的子区间。典型题：最长回文子序列 / 子串、矩阵链乘法、戳气球。'},
+  ];
+  return{
+    steps,
+    id:'interval',label:'区间 DP',sub:'回文子序列',
+    code:'<span class="kw">for</span>(<span class="kw">int</span> i=n-1;i&gt;=0;--i){\n  dp[i][i]=1;\n  <span class="kw">for</span>(<span class="kw">int</span> j=i+1;j&lt;n;++j)\n    <span class="kw">if</span>(s[i]==s[j])\n      dp[i][j]=dp[i+1][j-1]+2;\n    <span class="kw">else</span>\n      dp[i][j]=max(dp[i+1][j], dp[i][j-1]);\n}\n<span class="kw">return</span> dp[0][n-1];',
+    build(){viz.innerHTML='<div class="vcap"><b>区间 DP · 最长回文子序列</b>（LC 516，s="bbbab"）：按区间长度从小到大填，答案在右上角</div>'+buildGrid('r6',5,5,rowL,colL,'l \\\\ r')+'<div class="mread" id="r6read"></div><div class="legend"><span class="bl">正在计算</span><span class="br">更短区间来源</span><span class="gr">已填 / 答案</span></div>';},
+    render(s){
+      for(let l=0;l<N;l++)for(let r=0;r<N;r++){
+        if(l>r){setGrid('r6',l,r,'hide','');continue;}
+        const len=r-l+1;
+        if(len<=s.len)setGrid('r6',l,r,len===1?'base':'done',T[l][r]);else setGrid('r6',l,r,'','·');
+      }
+      if(s.src)s.src.forEach(([l,r])=>setGrid('r6',l,r,'src',T[l][r]));
+      if(s.cur){const[l,r]=s.cur;setGrid('r6',l,r,'cur',T[l][r]);}
+      if(s.ans){const[l,r]=s.ans;setGrid('r6',l,r,'ans',T[l][r]);}
+      document.getElementById('r6read').innerHTML=s.read;
+    }
+  };
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[overlapScene,climbScene,robScene,knap2dScene,knap1dScene,intervalScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+const SC=()=>SCENES[si];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SC().build();codeBox.innerHTML=SC().code;
+  dotsBox.innerHTML='';dotEls=[];
+  SC().steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.chip;d.setAttribute('aria-label','第 '+idx+' 步：'+s.chip);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SC().steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SC().render(s);
+  stTitle.textContent=SC().label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;
+  stAct.innerHTML=s.act;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+  history.replaceState(null,'','#scene='+SC().id+'&step='+cur);
+}
+let timer=null,ms=3000;
+function play(){const steps=SC().steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SC().steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="19"></script>
+</body>
+</html>

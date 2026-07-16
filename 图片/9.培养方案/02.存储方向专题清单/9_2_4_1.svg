@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="480" viewBox="0 0 940 480">
+  <title>bitcask：内存哈希索引 + 磁盘追加日志</title>
+  <desc>bitcask 模型的两层结构：内存 KeyDir 哈希索引指向磁盘 append-only log 中最新记录的 offset，get 一次 pread，put 尾部追加后更新索引，旧记录变垃圾等待 compaction。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="940" height="480" fill="rgb(245, 244, 237)"/>
+
+  <text x="470" y="34" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">bitcask：内存哈希索引 + 磁盘追加日志（get 只读一跳）</text>
+
+  <!-- 内存层 -->
+  <text x="70" y="88" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="start" dominant-baseline="central">内存：KeyDir（哈希索引，全部 key 常驻）</text>
+
+  <rect x="70" y="112" width="360" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="250" y="134" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">cfg：重放到墓碑后已从索引移除</text>
+
+  <rect x="490" y="112" width="380" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="680" y="134" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C" text-anchor="middle" dominant-baseline="central">user:1 → {file 1, offset 144, size 86}</text>
+
+  <!-- 磁盘层 -->
+  <text x="70" y="272" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="start" dominant-baseline="central">磁盘：active log（append-only，只写尾部，记录物理上连续）</text>
+
+  <rect x="60" y="300" width="170" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="145" y="318" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">put cfg v1</text>
+  <text x="145" y="340" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="middle" dominant-baseline="central">offset 0 · 垃圾</text>
+
+  <rect x="290" y="300" width="170" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="375" y="318" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806" text-anchor="middle" dominant-baseline="central">del cfg（墓碑）</text>
+  <text x="375" y="340" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806" text-anchor="middle" dominant-baseline="central">offset 58</text>
+
+  <rect x="520" y="300" width="170" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="605" y="318" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">put user:1</text>
+  <text x="605" y="340" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041" text-anchor="middle" dominant-baseline="central">offset 144 · 最新</text>
+
+  <rect x="750" y="300" width="120" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="810" y="318" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">写入点</text>
+  <text x="810" y="340" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489" text-anchor="middle" dominant-baseline="central">append →</text>
+
+  <!-- append 顺序 -->
+  <line x1="230" y1="328" x2="284" y2="328" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="460" y1="328" x2="514" y2="328" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="690" y1="328" x2="744" y2="328" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- get 路径 -->
+  <polyline points="680,156 680,220 605,220 605,296" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="692" y="190" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C" text-anchor="start" dominant-baseline="central">get：查索引后一次 pread</text>
+
+  <!-- put 路径 -->
+  <line x1="810" y1="296" x2="810" y2="162" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="798" y="250" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806" text-anchor="end" dominant-baseline="central">put：append 后更新索引</text>
+
+  <!-- 底部注释 -->
+  <text x="60" y="400" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">put = 尾部 append 新记录 + 索引改指新 offset；旧记录原地变垃圾（灰），等 compaction 合并回收</text>
+  <text x="60" y="424" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441" text-anchor="start" dominant-baseline="central">get = 内存查 KeyDir + 一次 pread；delete = append 墓碑 + 从索引移除 —— 所有磁盘写都是顺序的</text>
+</svg>

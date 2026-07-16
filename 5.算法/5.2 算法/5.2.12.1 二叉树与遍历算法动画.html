@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二叉树与遍历算法动画 · 树结构 / 前中后序 / 层序</title>
+<style>
+:root{
+  /* Same teaching-tool system as the algorithm animation collection. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:490px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:8px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:218px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}
+
+.treearea{position:relative;height:246px;margin:0 14px;}.treeedge{position:absolute;height:2px;background:var(--line);transform-origin:left center;transition:background var(--dur) var(--ease),height var(--dur) var(--ease),opacity var(--dur) var(--ease);}.treeedge.hot{background:var(--brown);height:3px;}.treeedge.done{background:var(--green);height:3px;}
+.tnode{position:absolute;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;border:2px solid var(--line);background:var(--paper);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:17px;font-weight:800;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);}.tnode.root{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}.tnode.leaf{border-style:dashed;}.tnode.path{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}.tnode.done{border-color:var(--green);background:var(--greenbg);color:var(--green);}.tnode.active{border-color:var(--blue);background:var(--bluebg);color:var(--blue);transform:scale(1.12);box-shadow:0 0 0 4px rgba(24,95,165,.16);}.tnode .nidx{position:absolute;bottom:-16px;color:var(--faint);font-size:9px;font-weight:400;}.treeptr{position:absolute;z-index:3;font-family:var(--mono);font-size:12px;color:var(--ink);opacity:0;transform:translateX(-50%);transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .18s;}
+
+.structrow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px;}.structcell{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:9px 10px;min-height:55px;transition:all var(--dur) var(--ease);}.structcell .lbl{font-family:var(--mono);font-size:10px;color:var(--faint);display:block;}.structcell b{font-family:var(--mono);font-size:14px;color:var(--ink);}.structcell.hit{border-color:var(--brown);background:var(--brownbg);}.structcell.good{border-color:var(--green);background:var(--greenbg);}
+
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:11px 0 6px;}.strip{position:relative;display:flex;gap:6px;justify-content:center;min-height:55px;padding-top:18px;}.striptag{position:absolute;top:0;left:0;font-family:var(--mono);font-size:10px;color:var(--faint);}
+.slot{width:55px;height:42px;border:1.5px dashed var(--line);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease);}.slot.fill{border-style:solid;border-color:var(--brown);background:var(--brownbg);color:var(--brown);}.slot.top{border-color:var(--blue);background:var(--bluebg);color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.13);}.slot.front{border-color:var(--blue);background:var(--bluebg);color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.13);}.slot.back{border-color:var(--brown);}.slot.out{border-style:solid;border-color:var(--green);background:var(--greenbg);color:var(--green);}.slot.tmp{border-style:solid;border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.stacktip{font-family:var(--mono);font-size:10px;color:var(--faint);text-align:center;margin-top:2px;}.callstate{display:flex;justify-content:center;gap:8px;align-items:center;min-height:30px;font-family:var(--mono);font-size:12px;color:var(--muted);}.callstate b{color:var(--blue);}.null{color:var(--danger)!important;}
+.levels{display:grid;gap:6px;margin-top:2px;}.levelrow{display:flex;gap:6px;min-height:39px;align-items:center;justify-content:center;}.leveltag{width:41px;font-family:var(--mono);font-size:10px;color:var(--faint);text-align:right;}.levelcells{display:flex;gap:6px;}.levelcells .slot{width:47px;height:36px;}
+.op-note{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:auto;padding-top:10px;min-height:32px;}.op-note b{color:var(--ink);}.op-note .dg{color:var(--danger);font-weight:700;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.viz{min-height:454px;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:218px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;min-height:430px;}.tab{flex:1 1 132px}.treearea{height:215px;margin:0}.tnode{width:44px;height:44px;margin:-22px 0 0 -22px}.slot{width:39px}.strip{gap:4px}.levelcells{gap:4px}.levelcells .slot{width:35px}.structrow{gap:5px}.structcell{padding:7px}.controls{padding:12px;gap:8px}.dots{order:4;width:100%}.codebox{font-size:11px}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>二叉树与遍历算法动画 · 同一棵树的五种阅读方式</h1>
+    <p>树结构、前序 / 中序 / 后序 DFS、层序 BFS　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const NAMES=['A','B','C','D','E','F','G'];
+const NODE_POS={A:[50,12],B:[28,43],C:[72,43],D:[15,80],E:[41,80],F:[59,80],G:[85,80]};
+const EDGES=[['A','B'],['A','C'],['B','D'],['B','E'],['C','F'],['C','G']];
+const CHILDREN={A:['B','C'],B:['D','E'],C:['F','G'],D:[],E:[],F:[],G:[]};
+
+function treeMarkup(prefix,caption){
+  let edges='',nodes='';
+  EDGES.forEach((_,i)=>edges+='<span class="treeedge" id="'+prefix+'e'+i+'"></span>');
+  NAMES.forEach(name=>nodes+='<div class="tnode" id="'+prefix+'n'+name+'" style="left:'+NODE_POS[name][0]+'%;top:'+NODE_POS[name][1]+'%"><span>'+name+'</span><span class="nidx"></span></div>');
+  return '<div class="vcap">'+caption+'</div><div class="treearea" id="'+prefix+'tree">'+edges+nodes+'<span class="treeptr" id="'+prefix+'ptr">current ▼</span></div>';
+}
+function layoutTree(prefix){
+  const tree=document.getElementById(prefix+'tree');if(!tree)return;const w=tree.clientWidth,h=tree.clientHeight;
+  EDGES.forEach((edge,i)=>{const a=edge[0],b=edge[1],x1=NODE_POS[a][0]/100*w,y1=NODE_POS[a][1]/100*h,x2=NODE_POS[b][0]/100*w,y2=NODE_POS[b][1]/100*h,dx=x2-x1,dy=y2-y1,line=document.getElementById(prefix+'e'+i);line.style.left=x1+'px';line.style.top=y1+'px';line.style.width=Math.hypot(dx,dy)+'px';line.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';});
+}
+function paintTree(prefix,s){
+  const done=s.done||[],path=s.path||[],leaves=s.leaves||[],hot=s.hot||[];
+  NAMES.forEach(name=>{const el=document.getElementById(prefix+'n'+name);let cls='tnode';if(name==='A')cls+=' root';if(leaves.includes(name))cls+=' leaf';if(path.includes(name))cls+=' path';if(done.includes(name))cls+=' done';if(s.active===name)cls+=' active';el.className=cls;el.querySelector('.nidx').textContent=s.labels&&s.labels[name]?s.labels[name]:'';});
+  EDGES.forEach((edge,i)=>{const line=document.getElementById(prefix+'e'+i);line.className='treeedge'+(hot.includes(i)?' hot':'')+(done.includes(edge[0])&&done.includes(edge[1])?' done':'');});
+  const ptr=document.getElementById(prefix+'ptr');if(!s.active){ptr.style.opacity=0;return;}const active=document.getElementById(prefix+'n'+s.active);ptr.style.opacity=1;ptr.style.left=(active.offsetLeft+active.offsetWidth/2)+'px';ptr.style.top=(active.offsetTop-25)+'px';
+}
+function slotMarkup(prefix,count,kind){let html='';for(let i=0;i<count;i++)html+='<div class="slot" id="'+prefix+i+'">·</div>';return '<div class="strip"><span class="striptag">'+kind+'</span>'+html+'</div>';}
+function paintSlots(prefix,count,values,mode='stack'){
+  for(let i=0;i<count;i++){const el=document.getElementById(prefix+i),has=i<values.length;el.className='slot'+(has?' fill':'');el.textContent=has?values[i]:'·';if(has&&mode==='stack'&&i===values.length-1)el.classList.add('top');if(has&&mode==='queue'&&i===0)el.classList.add('front');if(has&&mode==='queue'&&i===values.length-1)el.classList.add('back');}
+}
+function paintOutput(prefix,count,values,kind='out'){
+  for(let i=0;i<count;i++){const el=document.getElementById(prefix+i),has=i<values.length;el.className='slot'+(has?' '+kind:'');el.textContent=has?values[i]:'·';}
+}
+
+const structureScene=(()=>{
+  const steps=[
+    {active:null,done:[],path:[],leaves:['D','E','F','G'],hot:[],node:'A',left:'B',right:'C',chip:'每个节点至多两个孩子',chipC:'c0',title:'先把树看成由节点和左右指针组成的层级结构',desc:'二叉树不是数组的特例，而是一组用 <code>left</code>、<code>right</code> 指针连接的节点。每个节点最多两个孩子；A 是根，D、E、F、G 没有孩子，因此是叶子。'},
+    {active:'A',done:[],path:['A'],leaves:['D','E','F','G'],hot:[0,1],node:'A',left:'B',right:'C',chip:'根节点 root',chipC:'cb',title:'A 是整棵树的入口，递归也从 A 开始',desc:'根节点没有父节点。从 A 出发能到达整棵树，因此遍历函数第一次收到的 <code>root</code> 就是 A。'},
+    {active:'B',done:[],path:['A','B'],leaves:['D','E','F','G'],hot:[0,2,3],node:'B',left:'D',right:'E',chip:'父 / 子 / 兄弟',chipC:'ch',title:'B 的孩子是 D、E；B 与 C 互为兄弟节点',desc:'B 是 A 的左孩子，也是 D、E 的父节点。树题经常让函数“只处理以当前节点为根的子树”，此时 B、D、E 就构成一棵完整子树。'},
+    {active:'D',done:[],path:['A','B','D'],leaves:['D','E','F','G'],hot:[0,2],node:'D',left:'nullptr',right:'nullptr',chip:'叶子节点',chipC:'cg',title:'D 没有左右孩子，递归会落到空指针边界',desc:'叶子 D 的两个孩子都是空指针。<code>if (root == nullptr) return;</code> 是所有树递归的第一道边界，避免继续访问不存在的子树。'},
+    {active:'C',done:[],path:['C'],leaves:['D','E','F','G'],hot:[4,5],node:'C',left:'F',right:'G',chip:'右子树',chipC:'cb',title:'同一套函数会对左、右子树递归复用',desc:'从 C 开始，函数根本不需要知道自己处于整棵树的右侧。它只处理“以 C 为根”的局部结构，再把工作拆给 F、G。'},
+    {active:null,done:NAMES,path:[],leaves:['D','E','F','G'],hot:[],node:'TreeNode',left:'left',right:'right',chip:'遍历的共同底座',chipC:'cg',title:'访问时机不同，才分出前序、中序、后序和层序',desc:'四种遍历都会访问这 7 个节点一次。DFS 的区别只在“什么时候处理当前根节点”；BFS 则改用队列，一层一层向下推进。'}
+  ];
+  const code='<span class="kw">struct</span> TreeNode {\n    <span class="kw">int</span> val;\n    TreeNode* left;\n    TreeNode* right;\n};\n\n<span class="kw">void</span> <span class="fn">dfs</span>(TreeNode* root) {\n    <span class="kw">if</span> (root == <span class="kw">nullptr</span>) <span class="kw">return</span>;\n    <span class="cmt">// visit / left / right</span>\n}';
+  function mount(){viz.innerHTML=treeMarkup('st','<b>树的结构</b>：A–G 同时用于后面的所有遍历')+'<div class="structrow"><div class="structcell" id="stnode"><span class="lbl">node.val</span><b></b></div><div class="structcell" id="stleft"><span class="lbl">node.left</span><b></b></div><div class="structcell" id="stright"><span class="lbl">node.right</span><b></b></div></div><div class="op-note" id="stnote"></div>';requestAnimationFrame(()=>layoutTree('st'));}
+  function paint(s){paintTree('st',s);[['stnode',s.node],['stleft',s.left],['stright',s.right]].forEach(([id,value])=>{const el=document.getElementById(id);el.className='structcell'+(value==='nullptr'?' hit':'')+(value==='TreeNode'?' good':'');el.querySelector('b').textContent=value;});document.getElementById('stnote').textContent=s.active?s.active+' 所在子树正在被单独处理':'同一棵树，后续只改变访问顺序';}
+  return{id:'structure',label:'树结构',sub:'节点 / 指针 / 子树',steps,mount,paint,layout:()=>layoutTree('st'),code};
+})();
+
+const preorderScene=(()=>{
+  const steps=[
+    {active:null,done:[],stack:['A'],out:[],hot:[],chip:'root → left → right',chipC:'c0',title:'初始化：根节点 A 入栈',desc:'迭代前序用一个栈保存“尚未处理”的节点。先把根 A 压栈，之后每次弹出一个节点就立刻访问它。'},
+    {active:'A',done:['A'],stack:['C','B'],out:['A'],hot:[0,1],chip:'pop A · 先右后左压栈',chipC:'cb',title:'访问 A，再先压 C、后压 B',desc:'栈是后进先出。为了让左孩子 B 先被处理，必须先压右孩子 C，再压左孩子 B；因此栈顶最终是 B。'},
+    {active:'B',done:['A','B'],stack:['C','E','D'],out:['A','B'],hot:[0,2,3],chip:'pop B · 先右后左压栈',chipC:'cb',title:'访问 B，E 先入栈、D 后入栈',desc:'B 的处理规则完全一样。D 在栈顶，会先于 E 访问；这就是“根、左、右”在显式栈里的实现方式。'},
+    {active:'D',done:['A','B','D'],stack:['C','E'],out:['A','B','D'],hot:[2],chip:'pop D',chipC:'cg',title:'D 是叶子，访问后不再压入孩子',desc:'D 没有左右孩子，弹出并输出后直接结束这一支。栈顶变成 E，算法自然回退到 B 的右子树。'},
+    {active:'E',done:['A','B','D','E'],stack:['C'],out:['A','B','D','E'],hot:[3],chip:'pop E',chipC:'cg',title:'B 的左、右子树都处理完，回到 C',desc:'E 访问结束后，栈里只剩 C。注意这个“回到”不需要手写父指针，是栈保存了待处理节点。'},
+    {active:'C',done:['A','B','D','E','C'],stack:['G','F'],out:['A','B','D','E','C'],hot:[1,4,5],chip:'pop C · 先右后左压栈',chipC:'cb',title:'访问 C，再把 G、F 依次压栈',desc:'同样先压右孩子 G，再压左孩子 F。接下来会先处理 F，最后处理 G。'},
+    {active:'F',done:['A','B','D','E','C','F'],stack:['G'],out:['A','B','D','E','C','F'],hot:[4],chip:'pop F',chipC:'cg',title:'F 访问完成，栈顶只剩 G',desc:'到这里左子树的节点已经全部先于右子树输出，正是前序遍历的顺序约束。'},
+    {active:'G',done:NAMES,stack:[],out:NAMES,hot:[5],chip:'遍历完成',chipC:'cg',title:'最后访问 G，得到前序序列',desc:'前序序列是 <b>A B D E C F G</b>。每个节点入栈、出栈各一次，时间复杂度为 O(n)，栈空间取决于树高。'}
+  ];
+  const code='stack&lt;TreeNode*&gt; st;\nst.<span class="fn">push</span>(root);\n<span class="kw">while</span> (!st.empty()) {\n    TreeNode* node = st.<span class="fn">top</span>(); st.<span class="fn">pop</span>();\n    ans.<span class="fn">push_back</span>(node-&gt;val);\n    <span class="kw">if</span> (node-&gt;right) st.<span class="fn">push</span>(node-&gt;right);\n    <span class="kw">if</span> (node-&gt;left)  st.<span class="fn">push</span>(node-&gt;left);\n}';
+  function mount(){viz.innerHTML=treeMarkup('pr','<b>前序遍历</b>：访问根后，优先深入左子树')+'<div class="collbl">显式栈 · 左端是栈底，右端是栈顶</div>'+slotMarkup('prs',7,'stack')+'<div class="stacktip">为了让左孩子先弹出：先 push right，再 push left</div><div class="collbl">输出序列</div>'+slotMarkup('pro',7,'output')+'<div class="op-note" id="prnote"></div>';requestAnimationFrame(()=>layoutTree('pr'));}
+  function paint(s){paintTree('pr',s);paintSlots('prs',7,s.stack,'stack');paintOutput('pro',7,s.out);document.getElementById('prnote').textContent=s.stack.length?'stack.top = '+s.stack[s.stack.length-1]:'stack 为空';}
+  return{id:'preorder',label:'前序 DFS',sub:'根 → 左 → 右',steps,mount,paint,layout:()=>layoutTree('pr'),code};
+})();
+
+const inorderScene=(()=>{
+  const steps=[
+    {active:'A',path:[],done:[],stack:[],curr:'A',out:[],hot:[],chip:'left → root → right',chipC:'c0',title:'从根 A 开始，先一路向左走',desc:'中序遍历不能见到节点就输出。它先把从根到最左节点的路径压栈，等左子树全部完成后才访问根。'},
+    {active:'D',path:['A','B','D'],done:[],stack:['A','B','D'],curr:'∅',out:[],hot:[0,2],chip:'A、B、D 依次入栈',chipC:'ch',title:'一路向左：A → B → D，D 的左孩子为空',desc:'每到一个非空节点就入栈并继续走左边。D 的左孩子为空，说明当前路径的最左端已经找到，可以开始弹栈。'},
+    {active:'D',path:['A','B'],done:['D'],stack:['A','B'],curr:'∅',out:['D'],hot:[2],chip:'pop D · visit D',chipC:'cg',title:'弹出 D，左子树已空，所以 D 可以输出',desc:'D 没有左子树，访问 D 后转向 D 的右子树；右子树也是空，因此下一步继续从栈顶 B 回退。'},
+    {active:'B',path:['A'],done:['D','B'],stack:['A'],curr:'E',out:['D','B'],hot:[0],chip:'pop B · 转向 E',chipC:'cb',title:'弹出 B 并输出，再把 curr 指向右孩子 E',desc:'B 的左子树 D 已完成，因此现在访问 B。接着不是立刻回 A，而是先进入 B 的右子树 E。'},
+    {active:'E',path:['A','E'],done:['D','B'],stack:['A','E'],curr:'∅',out:['D','B'],hot:[3],chip:'push E · left=null',chipC:'ch',title:'E 入栈后左侧为空，准备输出 E',desc:'E 没有左孩子。它成为当前最左节点，下一次弹栈就能访问 E。'},
+    {active:'E',path:['A'],done:['D','B','E'],stack:['A'],curr:'∅',out:['D','B','E'],hot:[3],chip:'pop E · visit E',chipC:'cg',title:'E 输出，B 的整棵子树完成',desc:'到这里 B 子树的中序结果是 D、B、E。此时栈顶是 A，说明终于轮到整棵树的根节点。'},
+    {active:'A',path:[],done:['D','B','E','A'],stack:[],curr:'C',out:['D','B','E','A'],hot:[1],chip:'pop A · 转向 C',chipC:'cb',title:'A 的左子树已完成，现在输出 A，再走右子树 C',desc:'中序中的“根在中间”指的就是这一刻：先完成 A 的左子树，再访问 A，最后才处理右子树。'},
+    {active:'F',path:['C','F'],done:['D','B','E','A'],stack:['C','F'],curr:'∅',out:['D','B','E','A'],hot:[4],chip:'C、F 一路入栈',chipC:'ch',title:'进入 C 后再次一路向左，先到 F',desc:'右子树内部仍复用同样的规则：先压 C，再压 F；F 左侧为空，因此 F 会先输出。'},
+    {active:'F',path:['C'],done:['D','B','E','A','F'],stack:['C'],curr:'∅',out:['D','B','E','A','F'],hot:[4],chip:'pop F · visit F',chipC:'cg',title:'F 输出，再回退到 C',desc:'F 是 C 的左孩子，因此在中序中必须先于 C 出现。'},
+    {active:'C',path:[],done:['D','B','E','A','F','C'],stack:[],curr:'G',out:['D','B','E','A','F','C'],hot:[5],chip:'pop C · 转向 G',chipC:'cb',title:'C 输出，再处理右孩子 G',desc:'C 的左子树 F 已结束，所以现在输出 C；再把 curr 指向右孩子 G。'},
+    {active:'G',path:[],done:NAMES,stack:[],curr:'∅',out:['D','B','E','A','F','C','G'],hot:[5],chip:'遍历完成',chipC:'cg',title:'G 输出，得到中序序列',desc:'中序序列是 <b>D B E A F C G</b>。如果这棵树满足二叉搜索树性质，中序结果会按值严格递增；普通二叉树没有这个保证。'}
+  ];
+  const code='TreeNode* curr = root;\n<span class="kw">while</span> (curr || !st.empty()) {\n    <span class="kw">while</span> (curr) {\n        st.<span class="fn">push</span>(curr);\n        curr = curr-&gt;left;\n    }\n    curr = st.<span class="fn">top</span>(); st.<span class="fn">pop</span>();\n    ans.<span class="fn">push_back</span>(curr-&gt;val);\n    curr = curr-&gt;right;\n}';
+  function mount(){viz.innerHTML=treeMarkup('in','<b>中序遍历</b>：先走到最左端，再按“左、根、右”回退')+'<div class="callstate">curr = <b id="incurr"></b></div><div class="collbl">显式栈 · 保存尚未访问根节点的路径</div>'+slotMarkup('ins',7,'stack')+'<div class="collbl">输出序列</div>'+slotMarkup('ino',7,'output')+'<div class="op-note" id="innote"></div>';requestAnimationFrame(()=>layoutTree('in'));}
+  function paint(s){paintTree('in',s);paintSlots('ins',7,s.stack,'stack');paintOutput('ino',7,s.out);const c=document.getElementById('incurr');c.textContent=s.curr;c.className=s.curr==='∅'?'null':'';document.getElementById('innote').textContent=s.stack.length?'stack.top = '+s.stack[s.stack.length-1]:'栈空，等待 curr 继续向右';}
+  return{id:'inorder',label:'中序 DFS',sub:'左 → 根 → 右',steps,mount,paint,layout:()=>layoutTree('in'),code};
+})();
+
+const postorderScene=(()=>{
+  const steps=[
+    {active:null,done:[],stack:['A'],tmp:[],out:[],hot:[],chip:'left → right → root',chipC:'c0',title:'用“根、右、左”再 reverse 模拟后序',desc:'后序迭代的一种简洁写法：先按“根、右、左”收集临时序列，再整体反转。反转后就得到“左、右、根”。'},
+    {active:'A',done:['A'],stack:['B','C'],tmp:['A'],out:[],hot:[0,1],chip:'pop A · 先左后右压栈',chipC:'cb',title:'访问 A，把左 B、右 C 依次压栈',desc:'这里和前序恰好相反：为了先弹出右孩子 C，需要先压左 B，再压右 C。临时序列的目标是根、右、左。'},
+    {active:'C',done:['A','C'],stack:['B','F','G'],tmp:['A','C'],out:[],hot:[1,4,5],chip:'pop C · 左后右压栈',chipC:'cb',title:'访问 C，再把 F、G 依次压栈',desc:'C 进入临时序列后，右孩子 G 会先于左孩子 F 弹出。这个顺序正是后续 reverse 所需要的镜像。'},
+    {active:'G',done:['A','C','G'],stack:['B','F'],tmp:['A','C','G'],out:[],hot:[5],chip:'pop G',chipC:'cg',title:'G 先进入临时序列',desc:'G 是 C 的右孩子，所以在临时序列中排在 F 前。它会在最后反转时被放到 F 后面。'},
+    {active:'F',done:['A','C','G','F'],stack:['B'],tmp:['A','C','G','F'],out:[],hot:[4],chip:'pop F',chipC:'cg',title:'F 进入临时序列，C 的右子树处理完',desc:'此刻临时序列是 A、C、G、F，局部顺序已经是根、右、左。'},
+    {active:'B',done:['A','C','G','F','B'],stack:['D','E'],tmp:['A','C','G','F','B'],out:[],hot:[0,2,3],chip:'pop B · 左后右压栈',chipC:'cb',title:'回到 B，压入 D、E',desc:'同样先压左 D、再压右 E，因此 E 先弹出。整棵树的临时序列会以 A 开头，以最左叶 D 结尾。'},
+    {active:'D',done:NAMES,stack:[],tmp:['A','C','G','F','B','E','D'],out:[],hot:[2],chip:'临时序列完成',chipC:'ch',title:'得到根、右、左序列：A C G F B E D',desc:'每个节点都已经访问一次，但这个顺序不是最终答案。只要把它整体反转，就能把根放到每个子树之后。'},
+    {active:null,done:NAMES,stack:[],tmp:['A','C','G','F','B','E','D'],out:['D','E','B','F','G','C','A'],hot:[],chip:'reverse 完成',chipC:'cg',title:'整体反转，得到后序序列',desc:'后序序列是 <b>D E B F G C A</b>。根节点永远最后出现，适合先收集左右子树信息再处理当前节点，例如高度、直径和树形 DP。'}
+  ];
+  const code='st.<span class="fn">push</span>(root);\n<span class="kw">while</span> (!st.empty()) {\n    TreeNode* node = st.<span class="fn">top</span>(); st.<span class="fn">pop</span>();\n    tmp.<span class="fn">push_back</span>(node-&gt;val); <span class="cmt">// root right left</span>\n    <span class="kw">if</span> (node-&gt;left)  st.<span class="fn">push</span>(node-&gt;left);\n    <span class="kw">if</span> (node-&gt;right) st.<span class="fn">push</span>(node-&gt;right);\n}\nreverse(tmp.begin(), tmp.end());';
+  function mount(){viz.innerHTML=treeMarkup('po','<b>后序遍历</b>：先得到“根、右、左”，整体反转为“左、右、根”')+'<div class="collbl">显式栈</div>'+slotMarkup('pos',7,'stack')+'<div class="collbl">临时序列 · root → right → left</div>'+slotMarkup('pot',7,'tmp')+'<div class="collbl">最终输出 · reverse 后</div>'+slotMarkup('poo',7,'output')+'<div class="op-note" id="ponote"></div>';requestAnimationFrame(()=>layoutTree('po'));}
+  function paint(s){paintTree('po',s);paintSlots('pos',7,s.stack,'stack');paintOutput('pot',7,s.tmp,'tmp');paintOutput('poo',7,s.out);document.getElementById('ponote').textContent=s.out.length?'根节点最后输出':'临时序列完成后统一 reverse';}
+  return{id:'postorder',label:'后序 DFS',sub:'左 → 右 → 根',steps,mount,paint,layout:()=>layoutTree('po'),code};
+})();
+
+const levelScene=(()=>{
+  const steps=[
+    {active:null,done:[],queue:['A'],levels:[[],[],[]],size:1,hot:[],chip:'queue = [A]',chipC:'c0',title:'根节点 A 入队，第一层大小固定为 1',desc:'层序遍历使用队列。按层输出时，先记录当前队列大小；这个 size 只代表当前层，后续入队的孩子必须留到下一层处理。'},
+    {active:'A',done:['A'],queue:['B','C'],levels:[['A'],[],[]],size:1,hot:[0,1],chip:'pop A · enqueue B,C',chipC:'cb',title:'处理第 1 层的 A，孩子 B、C 入队',desc:'开始时 size 为 1，所以这一轮只弹出 A。B、C 虽然已经进入队列，但属于下一层，不能与 A 混在同一层结果中。'},
+    {active:'B',done:['A','B'],queue:['C','D','E'],levels:[['A'],['B'],[]],size:2,hot:[0,2,3],chip:'第 2 层 size = 2',chipC:'ch',title:'新一层固定 size=2，先处理 B',desc:'队列开始为 B、C，因此第 2 层有且仅有两个节点。B 出队后把 D、E 入队，它们必须等待第 3 层。'},
+    {active:'C',done:['A','B','C'],queue:['D','E','F','G'],levels:[['A'],['B','C'],[]],size:2,hot:[1,4,5],chip:'处理 C · enqueue F,G',chipC:'cb',title:'仍在第 2 层，处理 C 并把 F、G 入队',desc:'即使队列此时已经有 D、E、F、G，当前层的 size 仍然是最初的 2。处理完 C 后，第 2 层才结束。'},
+    {active:'D',done:['A','B','C','D'],queue:['E','F','G'],levels:[['A'],['B','C'],['D']],size:4,hot:[2],chip:'第 3 层 size = 4',chipC:'ch',title:'新一层大小固定为 4，先输出 D',desc:'现在队列正好保存第 3 层的 D、E、F、G。层序遍历的空间峰值通常出现在最宽的一层，因此空间复杂度是 O(w)。'},
+    {active:'G',done:NAMES,queue:[],levels:[['A'],['B','C'],['D','E','F','G']],size:4,hot:[5],chip:'第 3 层完成',chipC:'cg',title:'依次处理 E、F、G，队列清空',desc:'最终按层结果为 <b>[A] / [B C] / [D E F G]</b>。BFS 第一次遇到叶子时可用于最小深度；按层输出、右视图和锯齿遍历都基于同一骨架。'}
+  ];
+  const code='queue&lt;TreeNode*&gt; q;\nq.<span class="fn">push</span>(root);\n<span class="kw">while</span> (!q.empty()) {\n    <span class="kw">int</span> size = q.<span class="fn">size</span>(); <span class="cmt">// 固定当前层</span>\n    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; size; ++i) {\n        TreeNode* node = q.<span class="fn">front</span>(); q.<span class="fn">pop</span>();\n        <span class="cmt">// push node->left / node->right</span>\n    }\n}';
+  function mount(){let levelHtml='';for(let r=0;r<3;r++){let cells='';for(let c=0;c<4;c++)cells+='<div class="slot" id="lvo'+r+'-'+c+'">·</div>';levelHtml+='<div class="levelrow"><span class="leveltag">level '+(r+1)+'</span><div class="levelcells">'+cells+'</div></div>';}viz.innerHTML=treeMarkup('lv','<b>层序遍历</b>：队列按层推进，同层从左到右访问')+'<div class="collbl">队列 · 左端 front 出队，右端 back 入队</div>'+slotMarkup('lvq',7,'queue')+'<div class="callstate">本层固定 size = <b id="lvsize"></b></div><div class="collbl">按层输出</div><div class="levels">'+levelHtml+'</div><div class="op-note" id="lvnote"></div>';requestAnimationFrame(()=>layoutTree('lv'));}
+  function paint(s){paintTree('lv',s);paintSlots('lvq',7,s.queue,'queue');document.getElementById('lvsize').textContent=s.size;for(let r=0;r<3;r++)for(let c=0;c<4;c++){const el=document.getElementById('lvo'+r+'-'+c),has=c<s.levels[r].length;el.className='slot'+(has?' out':'');el.textContent=has?s.levels[r][c]:'·';}document.getElementById('lvnote').textContent=s.queue.length?'front = '+s.queue[0]+' · back = '+s.queue[s.queue.length-1]:'queue 为空，遍历结束';}
+  return{id:'levelorder',label:'层序 BFS',sub:'队列 + 固定层大小',steps,mount,paint,layout:()=>layoutTree('lv'),code};
+})();
+
+const SCENES=[structureScene,preorderScene,inorderScene,postorderScene,levelScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2800;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((tab,idx)=>tab.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>SCENES[si].layout());
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(+hashStep[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="12"></script>
+</body>
+</html>

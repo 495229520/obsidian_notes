@@ -120,6 +120,8 @@ if (posix_memalign(&buf, 4096, block_size) != 0) { /* error */ }
 
 - [[S-Week 1 - 环境搭建 + Page Cache 基线]]
 - [[S-Week 3 - fio 对照与 Benchmark Matrix]]
+- [[S-Week 2 - 前置知识 - O_DIRECT + 持久化语义]]
+- [[O_DIRECT 与持久化语义专题]]
 - [[4.2 重定向、同步]]
 - [[4.3 文件锁]]
 - OSTEP Ch.39 / 40 / 42

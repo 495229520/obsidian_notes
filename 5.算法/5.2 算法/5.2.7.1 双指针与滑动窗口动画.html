@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双指针动画 · 对撞 / 快慢 / 同向 / 滑动窗口</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.72;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ---- 索引单元格（持久 DOM，靠 class 过渡）---- */
+.cwrap{margin:6px 0 4px;}
+.cellrow{display:flex;gap:8px;justify-content:center;position:relative;padding:24px 0 46px;flex-wrap:wrap;}
+.cell{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:18px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--muted);position:relative;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.cell.active{background:var(--panel);border-color:var(--muted);color:var(--ink);}
+.cell.excl{opacity:.3;}
+.cell.win{background:var(--bluebg);border-color:var(--blue);color:var(--blue);}
+.cell.lp{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.14);}
+.cell.rp{background:var(--brownbg);border-color:var(--brown);color:var(--brown);box-shadow:0 0 0 4px rgba(154,91,14,.14);}
+.cell.found{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px rgba(15,110,86,.2);}
+.cell.slow{background:var(--bluebg);border-color:var(--blue);color:var(--blue);}
+.cell.zero{opacity:.4;}
+.cell.dup{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);box-shadow:0 0 0 4px rgba(179,64,47,.18);}
+.cell.pop{animation:pop .55s var(--ease);}
+@keyframes pop{0%{transform:translateY(0);}42%{transform:translateY(-13px);}100%{transform:translateY(0);}}
+.cell .idx{position:absolute;top:-19px;left:0;right:0;text-align:center;font-size:10px;color:var(--faint);font-weight:400;}
+.cbadge{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .25s;line-height:1.05;pointer-events:none;z-index:3;}
+.cbadge .tri{font-size:9px;display:block;}
+.cbadge.a{color:var(--blue);}.cbadge.b{color:var(--brown);}.cbadge.g{color:var(--green);}
+
+.readbar{text-align:center;font-family:var(--mono);font-size:14px;color:var(--muted);margin-bottom:2px;min-height:22px;}
+.readbar b{color:var(--ink);}
+.readbar .ok{color:var(--green);font-weight:700;}.readbar .no{color:var(--danger);font-weight:700;}
+.setbar{display:flex;gap:7px;justify-content:center;align-items:center;margin:8px 0;flex-wrap:wrap;min-height:34px;}
+.setbar .lbl{font-family:var(--mono);font-size:11px;color:var(--faint);}
+.tok{width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:14px;border:1.5px solid var(--blue);border-radius:7px;background:var(--bluebg);color:var(--blue);}
+.tok.pop{animation:tokpop .5s var(--ease);}
+@keyframes tokpop{0%{transform:scale(.5);opacity:.2;}70%{transform:scale(1.14);}100%{transform:scale(1);opacity:1;}}
+.legend{display:flex;gap:14px;justify-content:center;font-size:11px;color:var(--faint);font-family:var(--mono);margin-top:auto;padding-top:12px;flex-wrap:wrap;}
+
+/* ---- 链表（快慢指针环检测）---- */
+.listbox{position:relative;width:560px;height:220px;margin:12px auto 2px;}
+.lnode{position:absolute;width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:17px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);transform:translate(-50%,-50%);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);z-index:2;box-shadow:0 1px 2px rgba(60,55,40,.06);}
+.lnode.slow{background:var(--bluebg);border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 4px rgba(24,95,165,.14);}
+.lnode.fast{background:var(--brownbg);border-color:var(--brown);color:var(--brown);box-shadow:0 0 0 4px rgba(154,91,14,.14);}
+.lnode.both{background:var(--greenbg);border-color:var(--green);color:var(--green);box-shadow:0 0 0 5px rgba(15,110,86,.22);animation:pulse .55s var(--ease);}
+@keyframes pulse{0%{transform:translate(-50%,-50%) scale(1);}50%{transform:translate(-50%,-50%) scale(1.15);}100%{transform:translate(-50%,-50%) scale(1);}}
+.lptr{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:12px;font-weight:700;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .25s;z-index:3;white-space:nowrap;}
+.lptr .tri{font-size:9px;display:block;}
+.lptr.s{color:var(--blue);}.lptr.f{color:var(--brown);}
+.lsvg{position:absolute;left:0;top:0;z-index:1;pointer-events:none;overflow:visible;}
+
+/* ---- 右侧 ---- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.desc-body{margin-top:13px;font-size:13.5px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.38;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:48px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>双指针与滑动窗口动画 · 四个核心套路</h1>
+    <p>对撞指针 / 快慢指针 / 同向双指针 / 可变滑动窗口　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* 持久单元格：cells 建一次，靠 class 过渡；badge 用像素 left 平滑滑动 */
+function buildCells(container,values,badges){
+  let h='<div class="cellrow" id="crow">';
+  values.forEach((v,i)=>{h+='<div class="cell" id="c'+i+'"><span class="idx">'+i+'</span><span class="v">'+v+'</span></div>';});
+  badges.forEach(b=>{h+='<div class="cbadge '+b.cls+'" id="bdg-'+b.name+'" style="opacity:0"><span class="tri">▲</span>'+b.label+'</div>';});
+  h+='</div>';
+  container.innerHTML=h;
+}
+function setCell(i,cls,val){const el=document.getElementById('c'+i);el.className='cell '+cls;if(val!=null)el.querySelector('.v').textContent=val;}
+function popCell(i){const el=document.getElementById('c'+i);el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');}
+function moveBadges(list){
+  const occ={};
+  list.forEach(p=>{const el=document.getElementById('bdg-'+p.name);if(!el)return;
+    if(p.at==null){el.style.opacity=0;return;}
+    const cell=document.getElementById('c'+p.at);
+    let top=cell.offsetTop+cell.offsetHeight+8; if(occ[p.at])top+=22; occ[p.at]=1;
+    el.style.left=(cell.offsetLeft+cell.offsetWidth/2)+'px';el.style.top=top+'px';el.style.opacity=1;});
+}
+
+/* ========== 场景 1：对撞指针 · 有序数组两数和（LC 167） ========== */
+const collideScene=(()=>{
+  const arr=[2,3,5,8,11,15],target=16;
+  return {
+    id:'collide',label:'对撞指针',sub:'有序两数和',
+    code:'<span class="kw">while</span>(l&lt;r){\n'+
+      '    <span class="kw">int</span> s = a[l] + a[r];\n'+
+      '    <span class="kw">if</span>(s == t) <span class="kw">return</span> {l,r};\n'+
+      '    <span class="kw">if</span>(s &lt; t) ++l;   <span class="cmt">// 和小 → 增大左端</span>\n'+
+      '    <span class="kw">else</span>      --r;   <span class="cmt">// 和大 → 减小右端</span>\n'+
+      '}',
+    steps:[
+      {l:0,r:5,chip:'target = 16',chipC:'c0',
+       act:'▸ l 在最左、r 在最右，按 sum 大小收缩一端',
+       desc:'升序数组里找两数之和 = <b class="dg">16</b>。<b>对撞指针</b>：l 在最左、r 在最右。当前和太小只能增大 l（往右取更大数），太大只能减小 r（往左取更小数）——这个移动规则依赖<b>数组有序</b>这一不变量，无序时不成立。'},
+      {l:0,r:4,chip:'2+15=17 > 16',chipC:'ch',
+       act:'▸ sum=17 > 16 → 右指针左移 --r',
+       desc:'sum = <span class="bl">2</span> + <span class="br">15</span> = 17 &gt; 16。和偏大，<b>右指针左移</b> <code>--r</code>。一次排除掉「与 15 配对」的所有可能，无需逐个枚举。'},
+      {l:1,r:4,chip:'2+11=13 < 16',chipC:'cb',
+       act:'▸ sum=13 < 16 → 左指针右移 ++l',
+       desc:'sum = <span class="bl">2</span> + <span class="br">11</span> = 13 &lt; 16。和偏小，<b>左指针右移</b> <code>++l</code>。'},
+      {l:2,r:4,chip:'3+11=14 < 16',chipC:'cb',
+       act:'▸ sum=14 < 16 → 继续 ++l',
+       desc:'sum = <span class="bl">3</span> + <span class="br">11</span> = 14 &lt; 16，仍偏小，继续 <code>++l</code>。'},
+      {l:2,r:4,chip:'5+11=16 命中',chipC:'cg',found:[2,4],
+       act:'▸ sum=16 = target → 返回下标 {2, 4}',
+       desc:'sum = <span class="gr">5 + 11 = 16</span> = target，返回下标 <b>{2, 4}</b>。l、r 各自单调移动、合计走过数组一遍，<b>O(n)</b>（已有序时）。三数之和 LC 15 就是「排序 + 固定一个数 + 对撞指针」，并在命中后跳过相邻重复值去重。'},
+    ],
+    build(){
+      viz.innerHTML='<div class="vcap"><b>对撞指针</b>：有序数组两数和，按和的大小移动某一端（LC 167）</div>'+
+        '<div class="readbar" id="cread"></div><div class="cwrap" id="cw"></div>'+
+        '<div class="legend"><span class="bl"><b>l</b> 左端</span><span class="br"><b>r</b> 右端</span><span class="gr">命中</span></div>';
+      buildCells(document.getElementById('cw'),arr,[{name:'l',cls:'a',label:'l'},{name:'r',cls:'b',label:'r'}]);
+    },
+    render(s){
+      arr.forEach((v,i)=>{
+        let cls='active';
+        if(s.found){cls=(i===s.found[0]||i===s.found[1])?'found':'active';}
+        else if(i===s.l&&i===s.r)cls='found';
+        else if(i===s.l)cls='lp';
+        else if(i===s.r)cls='rp';
+        else if(i<s.l||i>s.r)cls='excl';
+        setCell(i,cls);
+      });
+      moveBadges([{name:'l',at:s.l},{name:'r',at:s.r}]);
+      const sum=arr[s.l]+arr[s.r];
+      document.getElementById('cread').innerHTML='sum = a[l] + a[r] = <b>'+arr[s.l]+' + '+arr[s.r]+' = '+sum+'</b>　'+
+        (s.found?'<span class="ok">= target ✓</span>':(sum<target?'<span class="no">&lt; 16</span>':'<span class="no">&gt; 16</span>'));
+    }
+  };
+})();
+
+/* ========== 场景 2：快慢指针 · 链表环检测（LC 141 / 142） ========== */
+const cycleScene=(()=>{
+  const vals=[3,2,0,-4],N=4,cycleTo=1;
+  const cx=i=>78+i*138, cy=100;
+  return {
+    id:'cycle',label:'快慢指针',sub:'链表环检测',
+    code:'<span class="kw">while</span>(fast &amp;&amp; fast-&gt;next){\n'+
+      '    slow = slow-&gt;next;          <span class="cmt">// 每次一步</span>\n'+
+      '    fast = fast-&gt;next-&gt;next;     <span class="cmt">// 每次两步</span>\n'+
+      '    <span class="kw">if</span>(slow == fast) <span class="kw">return</span> true; <span class="cmt">// 环内相遇</span>\n'+
+      '}',
+    steps:[
+      {slow:0,fast:0,chip:'slow=fast=head',chipC:'c0',
+       act:'▸ slow 每次走 1 步，fast 每次走 2 步',
+       desc:'链表不能像数组随机访问。判断是否有环：<b>slow 每次走 1 步、fast 每次走 2 步</b>。若无环 fast 先到达 null；若有环，fast 在环里「套圈」追上 slow，两者必然相遇。这里尾节点 <b>-4</b> 指回 <b>2</b>，存在环。'},
+      {slow:1,fast:2,chip:'第 1 轮',chipC:'cb',
+       act:'▸ slow：3→2；fast：3→2→0',
+       desc:'slow：3 → <span class="bl">2</span>（1 步）。fast：3 → 2 → <span class="br">0</span>（2 步）。两者未相遇，继续。'},
+      {slow:2,fast:1,chip:'第 2 轮',chipC:'cb',
+       act:'▸ slow→0；fast 沿环绕回 → 2',
+       desc:'slow：2 → <span class="bl">0</span>。fast：0 → -4 →（沿环）<span class="br">2</span>。fast 已经绕回环内。slow(0) ≠ fast(2)。'},
+      {slow:3,fast:3,chip:'相遇！',chipC:'cg',meet:true,
+       act:'▸ slow→-4，fast→-4，slow == fast → 有环',
+       desc:'slow：0 → <span class="gr">-4</span>。fast：2 → 0 → <span class="gr">-4</span>。<b>slow == fast</b>，在节点 -4 相遇 → <b>有环</b>。因为每轮两者距离缩短 1，在长度有限的环里一定会追上。若还要找<b>环入口</b>（LC 142）：相遇后让一个指针从 head 重新出发，两者同速再走，相遇点即入口。'},
+      {slow:3,fast:3,chip:'O(n) · O(1)',chipC:'cg',meet:true,
+       act:'▸ Floyd 判圈：时间 O(n)、额外空间 O(1)',
+       desc:'Floyd 判圈法：时间 <b>O(n)</b>、额外空间 <b>O(1)</b>，优于用哈希表记录访问过的节点。空指针保护 <code>fast &amp;&amp; fast-&gt;next</code> 必不可少，否则 <code>fast-&gt;next-&gt;next</code> 可能解引用空指针。'},
+    ],
+    build(){
+      let nodes='';
+      for(let i=0;i<N;i++)nodes+='<div class="lnode" id="ln-'+i+'" style="left:'+cx(i)+'px;top:'+cy+'px">'+vals[i]+'</div>';
+      const ptrs='<div class="lptr s" id="lps"><span class="tri">▲</span>slow</div><div class="lptr f" id="lpf"><span class="tri">▲</span>fast</div>';
+      viz.innerHTML='<div class="vcap"><b>快慢指针</b>：slow 走 1 步 / fast 走 2 步，环内必相遇（Floyd 判圈）</div>'+
+        '<div class="listbox" id="lbox"><svg class="lsvg" id="lsvg" width="560" height="220"></svg>'+nodes+ptrs+'</div>'+
+        '<div class="legend"><span class="bl"><b>slow</b> 1×</span><span class="br"><b>fast</b> 2×</span><span class="gr">相遇=有环</span></div>';
+      let p='<defs><marker id="ah" markerWidth="10" markerHeight="10" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 Z" fill="#c9c7bf"/></marker>'+
+        '<marker id="ahr" markerWidth="10" markerHeight="10" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 Z" fill="#B3402F"/></marker></defs>';
+      for(let i=0;i<N-1;i++)p+='<line x1="'+(cx(i)+30)+'" y1="'+cy+'" x2="'+(cx(i+1)-30)+'" y2="'+cy+'" stroke="#c9c7bf" stroke-width="1.6" marker-end="url(#ah)"/>';
+      const x3=cx(3),x1=cx(1);
+      p+='<path d="M '+x3+' '+(cy+30)+' C '+x3+' 200 '+x1+' 200 '+x1+' '+(cy+30)+'" fill="none" stroke="#B3402F" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ahr)"/>';
+      document.getElementById('lsvg').innerHTML=p;
+    },
+    render(s){
+      for(let i=0;i<N;i++){const el=document.getElementById('ln-'+i);let cls='lnode';
+        if(s.meet&&i===s.slow)cls+=' both';
+        else if(i===s.slow&&i===s.fast)cls+=' both';
+        else if(i===s.slow)cls+=' slow';
+        else if(i===s.fast)cls+=' fast';
+        el.className=cls;}
+      const ps=document.getElementById('lps'),pf=document.getElementById('lpf');
+      ps.style.left=cx(s.slow)+'px';ps.style.top=(cy+34)+'px';
+      pf.style.left=cx(s.fast)+'px';pf.style.top=(cy+54)+'px';
+      ps.style.opacity=s.meet?.28:1;pf.style.opacity=s.meet?.28:1;
+    }
+  };
+})();
+
+/* ========== 场景 3：同向双指针 · 移动零（LC 283） ========== */
+const sameScene=(()=>{
+  return {
+    id:'same',label:'同向双指针',sub:'移动零',
+    code:'<span class="kw">int</span> slow=0;\n'+
+      '<span class="kw">for</span>(<span class="kw">int</span> fast=0; fast&lt;n; ++fast)\n'+
+      '    <span class="kw">if</span>(a[fast] != 0){\n'+
+      '        swap(a[slow], a[fast]); <span class="cmt">// 非零前移</span>\n'+
+      '        ++slow;                 <span class="cmt">// 有效区边界右移</span>\n'+
+      '    }',
+    steps:[
+      {arr:[0,1,0,3,12],slow:0,fast:null,swap:[],chip:'slow 写入位 / fast 扫描',chipC:'c0',
+       act:'▸ slow=下一个非零写入位，fast 逐个扫描',
+       desc:'把所有 0 移到末尾、非零保持相对顺序。<b>同向双指针</b>：<span class="br">fast</span> 逐个扫描，<span class="bl">slow</span> 指向「下一个非零应放的位置」。不变量：<code>[0, slow)</code> 已是紧凑排好的非零区。'},
+      {arr:[0,1,0,3,12],slow:0,fast:0,swap:[],chip:'a[0]=0 跳过',chipC:'c0',
+       act:'▸ a[0]=0 → 不动，slow 不前进',
+       desc:'fast=0，<b>a[0]=0</b> 是零 → 什么都不做，slow 不动。零元素被 fast 略过。'},
+      {arr:[1,0,0,3,12],slow:1,fast:1,swap:[0,1],chip:'a[1]=1 → swap',chipC:'cg',
+       act:'▸ a[1]=1≠0 → swap(a[0],a[1])，slow→1',
+       desc:'fast=1，<b>a[1]=1 ≠ 0</b> → 交换 a[slow=0] 与 a[fast=1]，非零的 1 换到有效区末尾，<code>++slow</code> → slow=1。'},
+      {arr:[1,0,0,3,12],slow:1,fast:2,swap:[],chip:'a[2]=0 跳过',chipC:'c0',
+       act:'▸ a[2]=0 → 跳过，slow 停在 1',
+       desc:'fast=2，<b>a[2]=0</b> → 跳过。slow 停在 1，等待下一个非零来填。'},
+      {arr:[1,3,0,0,12],slow:2,fast:3,swap:[1,3],chip:'a[3]=3 → swap',chipC:'cg',
+       act:'▸ a[3]=3≠0 → swap(a[1],a[3])，slow→2',
+       desc:'fast=3，<b>a[3]=3 ≠ 0</b> → 交换 a[slow=1] 与 a[fast=3]，3 填到位置 1，<code>++slow</code> → slow=2。'},
+      {arr:[1,3,12,0,0],slow:3,fast:4,swap:[2,4],chip:'a[4]=12 → swap',chipC:'cg',
+       act:'▸ a[4]=12≠0 → swap(a[2],a[4])，slow→3',
+       desc:'fast=4，<b>a[4]=12 ≠ 0</b> → 交换 a[slow=2] 与 a[fast=4]，12 填到位置 2，<code>++slow</code> → slow=3。扫描结束。'},
+      {arr:[1,3,12,0,0],slow:3,fast:null,swap:[],done:true,chip:'O(n) 原地',chipC:'cg',
+       act:'▸ 结果 [1,3,12,0,0]，O(n) 时间 / O(1) 空间',
+       desc:'结果 <b>[1,3,12,0,0]</b>：<code>[0,slow)</code> 是非零紧凑区，其余自动是 0。每个元素只被读写常数次 → <b>O(n)</b> 时间、<b>O(1)</b> 空间。关键是先想清 slow 表示「位置」还是「长度」——这里是<b>下一个写入位置</b>。'},
+    ],
+    build(){
+      viz.innerHTML='<div class="vcap"><b>同向双指针</b>：fast 扫描、slow 维护非零区边界（LC 283 移动零）</div>'+
+        '<div class="cwrap" id="cw"></div>'+
+        '<div class="legend"><span class="bl"><b>slow</b> 写入位</span><span class="br"><b>fast</b> 扫描位</span><span class="dg">0 待后移</span></div>';
+      buildCells(document.getElementById('cw'),[0,1,0,3,12],[{name:'slow',cls:'a',label:'slow'},{name:'fast',cls:'b',label:'fast'}]);
+    },
+    render(s){
+      s.arr.forEach((v,i)=>{
+        let cls='active';
+        if(s.done){cls=(i<s.slow)?'slow':'zero';}
+        else{
+          if(v===0&&i>=s.slow)cls='zero';
+          if(i<s.slow)cls='slow';
+          if(i===s.fast)cls='rp';
+        }
+        setCell(i,cls,v);
+      });
+      s.swap.forEach(i=>popCell(i));
+      moveBadges([{name:'slow',at:s.done?null:s.slow},{name:'fast',at:s.fast}]);
+    }
+  };
+})();
+
+/* ========== 场景 4：可变滑动窗口 · 最长无重复子串（LC 3） ========== */
+const winScene=(()=>{
+  const s="abcabcbb".split('');
+  return {
+    id:'window',label:'滑动窗口',sub:'最长无重复',
+    code:'<span class="kw">for</span>(<span class="kw">int</span> r=0; r&lt;n; ++r){\n'+
+      '    <span class="kw">while</span>(win.count(s[r])) win.erase(s[l++]); <span class="cmt">// 收缩到合法</span>\n'+
+      '    win.insert(s[r]);\n'+
+      '    best = max(best, r - l + 1);   <span class="cmt">// 更新最长</span>\n'+
+      '}',
+    steps:[
+      {l:0,r:-1,set:[],best:0,chip:'窗口 [l, r]',chipC:'c0',
+       act:'▸ r 右扩；一旦重复就右移 l 收缩到合法',
+       desc:'求最长<b>无重复字符</b>子串。可变窗口：<b>r 不断右扩</b>；一旦新字符已在窗口里（非法），就<b>右移 l</b> 逐个吐出左侧字符直到合法；每次合法后用 <code>r-l+1</code> 更新最长。<code>win</code> 记录窗口内字符集合。'},
+      {l:0,r:0,set:['a'],best:1,chip:"r=0 'a'",chipC:'cb',
+       act:"▸ 'a' 不在窗口 → 加入，窗口 [a]，best=1",
+       desc:"r=0，'a' 不在窗口 → 加入。窗口 [0,0]=<b>a</b>，长度 1，best=1。"},
+      {l:0,r:1,set:['a','b'],best:2,chip:"r=1 'b'",chipC:'cb',
+       act:"▸ 'b' 不在窗口 → 加入，窗口 [ab]，best=2",
+       desc:"r=1，'b' 不在窗口 → 加入。窗口 [0,1]=<b>ab</b>，长度 2，best=2。"},
+      {l:0,r:2,set:['a','b','c'],best:3,chip:"r=2 'c' → best=3",chipC:'cg',
+       act:"▸ 'c' 加入，窗口 [abc]，长度 3，best=3",
+       desc:"r=2，'c' 加入。窗口 [0,2]=<b>abc</b>，长度 <b>3</b>，best=3。目前全不重复，窗口一路扩张。"},
+      {l:1,r:3,set:['b','c','a'],best:3,chip:"r=3 'a' 重复→收缩",chipC:'cd',
+       act:"▸ 'a' 重复 → 吐出 s[l=0]，l=1，再加新 'a'",
+       desc:"r=3 又遇 <span class='dg'>'a'</span>，它已在窗口里 → <b>非法</b>。收缩：吐出左端 s[l=0]='a'，<code>l=1</code>，窗口变合法，再把新 'a' 加入。窗口 [1,3]=<b>bca</b>，长度 3。best 仍 3。"},
+      {l:2,r:4,set:['c','a','b'],best:3,chip:"r=4 'b' 重复→收缩",chipC:'cd',
+       act:"▸ 'b' 重复 → 吐出 s[l=1]，l=2，再加新 'b'",
+       desc:"r=4 遇 <span class='dg'>'b'</span>（已在窗口）→ 吐出 s[l=1]='b'，<code>l=2</code>，加入新 'b'。窗口 [2,4]=<b>cab</b>，长度 3。"},
+      {l:7,r:7,set:['b'],best:3,chip:'O(n) best=3',chipC:'cg',done:true,
+       act:'▸ 每遇重复即收缩，best 稳定在 3，全程 O(n)',
+       desc:"继续处理 'cbb'……每遇重复就收缩，窗口长度再没超过 3。最终 <b>best = 3</b>（如 abc）。<b>l、r 各自只单调右移</b>，每个字符最多进、出窗口各一次 → <b>O(n)</b>。这正是 LC 3 模板；LC 76 最小覆盖子串是「最短满足窗口」的变体。"},
+    ],
+    build(){
+      viz.innerHTML='<div class="vcap"><b>可变滑动窗口</b>：r 扩张、遇重复则收缩 l，维护窗口无重复（LC 3）</div>'+
+        '<div class="setbar" id="wset"></div><div class="cwrap" id="cw"></div>'+
+        '<div class="readbar" id="wread"></div>'+
+        '<div class="legend"><span class="bl"><b>l</b> 左界</span><span class="br"><b>r</b> 右界</span><span style="color:var(--blue)">窗口</span><span class="dg">重复触发收缩</span></div>';
+      buildCells(document.getElementById('cw'),s,[{name:'l',cls:'a',label:'l'},{name:'r',cls:'b',label:'r'}]);
+    },
+    render(st){
+      s.forEach((c,i)=>{
+        let cls='active';
+        if(st.done)cls=(i>=st.l&&i<=st.r)?'win':'excl';
+        else{
+          if(i>=st.l&&i<=st.r)cls='win';
+          if(st.chipC==='cd'&&i===st.r)cls='dup';
+        }
+        setCell(i,cls);
+      });
+      moveBadges([{name:'l',at:st.r>=st.l?st.l:null},{name:'r',at:st.r>=0?st.r:null}]);
+      document.getElementById('wset').innerHTML='<span class="lbl">win =</span>'+
+        (st.set.length?st.set.map((c,i)=>'<span class="tok'+(i===st.set.length-1&&!st.done?' pop':'')+'">'+c+'</span>').join(''):'<span class="lbl">∅</span>');
+      document.getElementById('wread').innerHTML='当前窗口长度 = <b>'+(st.r>=st.l?st.r-st.l+1:0)+'</b>　·　最长 best = <b class="ok">'+st.best+'</b>';
+    }
+  };
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[collideScene,cycleScene,sameScene,winScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+const SC=()=>SCENES[si];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SC().build();codeBox.innerHTML=SC().code;
+  dotsBox.innerHTML='';dotEls=[];
+  SC().steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.chip;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SC().steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SC().render(s);
+  stTitle.textContent=SC().label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;
+  stAct.innerHTML=s.act;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2700;
+function play(){const steps=SC().steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SC().steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="7"></script>
+</body>
+</html>

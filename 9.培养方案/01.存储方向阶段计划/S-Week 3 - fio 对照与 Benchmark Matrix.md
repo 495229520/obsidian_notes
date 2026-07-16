@@ -130,5 +130,7 @@ iodepth=1
 
 - [[S-Week 2 - O_DIRECT + 持久化语义]]
 - [[S-Week 4 - mmap 与读路径对比]]
+- [[S-Week 3 - 前置知识 - fio 对照与 Benchmark Matrix]]
+- [[存储性能分析专题 - fio 与 benchmark matrix]]
 - [[Week 5 - Serving Benchmark Harness]]（p99 / warmup / 可复现方法论同源）
 - OSTEP Ch.44（SSD）

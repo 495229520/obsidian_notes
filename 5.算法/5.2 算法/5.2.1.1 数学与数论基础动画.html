@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数学与数论基础动画 · gcd / lcm / 快速幂 / 模运算 / 埃氏筛 / 杨辉三角</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#854F0B;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:480ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+/* ---------- 主题 tab ---------- */
+.tabs{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 16px;cursor:pointer;transition:all .15s var(--ease);display:flex;flex-direction:column;gap:1px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:620px 1fr;gap:26px;margin-top:20px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:20px;min-height:440px;display:flex;flex-direction:column;}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* 通用数字盒 */
+.numbox{font-family:var(--mono);font-weight:700;border-radius:9px;border:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;transition:all var(--dur) var(--ease);}
+
+/* ---------- gcd ---------- */
+.gcd-pair{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0 22px;}
+.gcd-pair .numbox{width:96px;height:66px;font-size:26px;}
+.gcd-pair .op{font-family:var(--mono);font-size:22px;color:var(--faint);}
+.gcd-pair .a{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.gcd-pair .b{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.gcd-pair .r{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.gcd-pair .r.zero{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.gcd-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px;margin-top:6px;}
+.gcd-table th,.gcd-table td{border:1px solid var(--grid);padding:6px 10px;text-align:center;color:var(--muted);}
+.gcd-table th{background:var(--gray);color:var(--ink);font-weight:600;}
+.gcd-table tr.on td{background:var(--bluebg);color:var(--ink);font-weight:700;}
+.gcd-table tr.dim td{opacity:.4;}
+.gcd-ans{margin-top:18px;text-align:center;font-size:15px;color:var(--muted);}
+.gcd-ans b{font-family:var(--mono);font-size:22px;color:var(--green);}
+.gcd-ans .hide{visibility:hidden;}
+
+/* ---------- lcm ---------- */
+.lcm-eq{text-align:center;font-family:var(--mono);font-size:18px;font-weight:700;margin:2px 0 14px;color:var(--ink);min-height:28px;}
+.lcm-eq .bl{color:var(--blue);} .lcm-eq .br{color:var(--brown);} .lcm-eq .gr{color:var(--green);} .lcm-eq .dg{color:var(--danger);}
+.lcm-eq .hi{background:var(--greenbg);border-radius:6px;padding:1px 6px;}
+.lcm-rows{display:flex;flex-direction:column;gap:12px;margin:4px 0 14px;}
+.lcm-row{display:flex;align-items:center;gap:10px;}
+.lcm-lab{font-family:var(--mono);font-size:12px;color:var(--faint);width:72px;flex-shrink:0;}
+.lcm-chips{display:flex;flex-wrap:wrap;gap:7px;flex:1;}
+.lcm-chip{font-family:var(--mono);font-size:14px;font-weight:600;min-width:44px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all var(--dur) var(--ease);opacity:.35;}
+.lcm-chip.show{opacity:1;}
+.lcm-chip.a{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.lcm-chip.b{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.lcm-chip.both{color:var(--green);border-color:var(--green);background:var(--greenbg);font-weight:800;box-shadow:0 0 0 3px rgba(15,110,86,.28);transform:scale(1.08);}
+.lcm-chip.dim{opacity:.22;}
+.lcm-rel{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+.lcm-card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--paper);text-align:center;transition:all var(--dur) var(--ease);}
+.lcm-card .k{font-size:11px;color:var(--faint);font-family:var(--mono);margin-bottom:4px;}
+.lcm-card .v{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--ink);transition:color var(--dur) var(--ease);}
+.lcm-card.on{border-color:var(--blue);background:var(--bluebg);box-shadow:0 0 0 2px rgba(24,95,165,.18);}
+.lcm-card.on .v{color:var(--blue);}
+.lcm-card.ok{border-color:var(--green);background:var(--greenbg);}
+.lcm-card.ok .v{color:var(--green);}
+.lcm-card.warn{border-color:var(--danger);background:var(--dangerbg);}
+.lcm-card.warn .v{color:var(--danger);}
+.lcm-foot{margin-top:auto;padding-top:14px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);min-height:22px;}
+.lcm-foot b{color:var(--ink);} .lcm-foot .gr{color:var(--green);font-weight:700;} .lcm-foot .dg{color:var(--danger);font-weight:700;}
+
+/* ---------- 快速幂 ---------- */
+.pow-title{text-align:center;font-family:var(--mono);font-size:24px;font-weight:700;color:var(--ink);margin:4px 0 18px;}
+.pow-bits{display:flex;justify-content:center;gap:8px;margin-bottom:20px;}
+.pow-bit{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.pow-bit .b{width:46px;height:46px;font-size:20px;}
+.pow-bit .w{font-family:var(--mono);font-size:10px;color:var(--faint);}
+.pow-bit.one .b{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.pow-bit.zero .b{color:var(--faint);}
+.pow-bit.cur .b{box-shadow:0 0 0 3px rgba(24,95,165,.35);border-color:var(--blue);}
+.pow-stats{display:flex;gap:12px;justify-content:center;margin-bottom:18px;flex-wrap:wrap;}
+.pow-stat{border-radius:10px;padding:10px 16px;border:1px solid var(--line);background:var(--paper);text-align:center;min-width:120px;}
+.pow-stat .k{font-size:11px;color:var(--faint);font-family:var(--mono);}
+.pow-stat .v{font-family:var(--mono);font-size:20px;font-weight:700;margin-top:2px;transition:color var(--dur) var(--ease);}
+.pow-stat.result{border-color:var(--green);background:var(--greenbg);} .pow-stat.result .v{color:var(--green);}
+.pow-stat.base{border-color:var(--brown);background:var(--brownbg);} .pow-stat.base .v{color:var(--brown);}
+.pow-stat.exp{border-color:var(--blue);background:var(--bluebg);} .pow-stat.exp .v{color:var(--blue);}
+.pow-powers{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:auto;}
+.pow-pow{font-family:var(--mono);font-size:13px;border:1px solid var(--line);border-radius:7px;padding:4px 10px;color:var(--faint);transition:all var(--dur) var(--ease);}
+.pow-pow.picked{background:var(--greenbg);color:var(--green);border-color:var(--green);font-weight:700;}
+.pow-pow.curbase{box-shadow:0 0 0 2px rgba(133,79,11,.35);border-color:var(--brown);color:var(--brown);}
+
+/* ---------- 埃氏筛 ---------- */
+.sieve-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;}
+.svcell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:600;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--muted);position:relative;transition:all var(--dur) var(--ease);}
+.svcell.composite{background:var(--dangerbg);color:var(--danger);border-color:var(--danger);opacity:.72;}
+.svcell.composite::after{content:'';position:absolute;inset:24% 12%;border-top:2px solid var(--danger);transform:rotate(-18deg);opacity:.7;}
+.svcell.prime{background:var(--greenbg);color:var(--green);border-color:var(--green);font-weight:700;}
+.svcell.curp{box-shadow:0 0 0 3px rgba(15,110,86,.4);background:var(--greenbg);color:var(--green);border-color:var(--green);font-weight:800;}
+.svcell.flash{animation:pop .5s var(--ease);}
+@keyframes pop{0%{transform:scale(.7);}70%{transform:scale(1.12);}100%{transform:scale(1);}}
+.sieve-foot{margin-top:auto;padding-top:16px;font-family:var(--mono);font-size:13px;color:var(--muted);}
+.sieve-foot b{color:var(--green);}
+
+/* ---------- 杨辉三角 ---------- */
+.pascal{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:4px;}
+.prow{display:flex;gap:8px;justify-content:center;}
+.pcell{width:56px;height:44px;font-size:16px;opacity:0;transform:translateY(-6px);transition:all var(--dur) var(--ease);}
+.pcell.show{opacity:1;transform:none;}
+.pcell.edge{color:var(--muted);}
+.pcell.focus{color:var(--blue);border-color:var(--blue);background:var(--bluebg);font-weight:800;box-shadow:0 0 0 3px rgba(24,95,165,.25);}
+.pcell.parent{color:var(--brown);border-color:var(--brown);background:var(--brownbg);font-weight:700;}
+.pascal-foot{margin-top:20px;text-align:center;font-family:var(--mono);font-size:14px;color:var(--muted);min-height:22px;}
+.pascal-foot b{color:var(--ink);}
+
+/* ---------- 模运算 ---------- */
+.mod-banner{text-align:center;font-family:var(--mono);font-size:18px;font-weight:700;margin:2px 0 16px;color:var(--ink);}
+.mod-banner .modv{color:var(--blue);}
+.mod-ops{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.mod-op{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--paper);transition:all var(--dur) var(--ease);}
+.mod-op .k{font-size:11px;color:var(--faint);font-family:var(--mono);margin-bottom:4px;}
+.mod-op .f{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--muted);transition:color var(--dur) var(--ease);}
+.mod-op.on{border-color:var(--blue);background:var(--bluebg);box-shadow:0 0 0 2px rgba(24,95,165,.2);}
+.mod-op.on .f{color:var(--blue);}
+.mod-op.ok{border-color:var(--green);background:var(--greenbg);}
+.mod-op.ok .f{color:var(--green);}
+.mod-op.bad{border-color:var(--danger);background:var(--dangerbg);}
+.mod-op.bad .f{color:var(--danger);}
+.mod-op.dim{opacity:.45;}
+.mod-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0;flex-wrap:wrap;}
+.mod-row .numbox{width:72px;height:52px;font-size:20px;}
+.mod-row .op{font-family:var(--mono);font-size:18px;color:var(--faint);}
+.mod-row .eq{font-family:var(--mono);font-size:18px;color:var(--muted);}
+.mod-row .a{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.mod-row .b{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.mod-row .r{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.mod-row .r.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.mod-row .r.hi{box-shadow:0 0 0 3px rgba(15,110,86,.3);}
+.mod-note{margin-top:auto;padding-top:14px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);min-height:22px;}
+.mod-note b{color:var(--ink);}
+.mod-note .dg{color:var(--danger);font-weight:700;}
+.mod-note .gr{color:var(--green);font-weight:700;}
+
+/* ---------- 右侧讲解 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:180px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:10px;padding:12px 16px;font-family:var(--mono);font-size:12px;line-height:1.6;color:#D8D5CC;white-space:pre;overflow-x:auto;}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+
+/* ---------- 力扣练习链接 ---------- */
+.lc-box{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:12px 16px;}
+.lc-box .lc-h{font-size:12px;color:var(--faint);font-family:var(--mono);margin-bottom:3px;}
+.lc-box .lc-source{font-size:11px;color:var(--faint);margin-bottom:9px;}
+.lc-list{display:flex;flex-wrap:wrap;gap:8px;}
+.lc-a{font:inherit;font-size:12.5px;font-weight:500;color:var(--blue);background:var(--bluebg);border:1px solid var(--blue);border-radius:8px;padding:6px 10px;text-decoration:none;transition:background .15s var(--ease),transform .1s var(--ease);display:inline-flex;align-items:center;gap:8px;max-width:100%;}
+.lc-a:hover{background:var(--blue);color:var(--paper);transform:translateY(-1px);}
+.lc-a:active{transform:scale(.97);}
+.lc-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lc-freq{font-family:var(--mono);font-size:10.5px;line-height:1.3;padding:2px 6px;border-radius:5px;background:var(--panel);color:var(--muted);border:1px solid var(--line);white-space:nowrap;}
+.lc-freq.hot{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.lc-freq.mid{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.lc-freq.low{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.lc-freq.none{color:var(--faint);border-style:dashed;background:var(--gray);}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>数学与数论基础动画 · 六个必背模板的过程可视化</h1>
+    <p>gcd 辗转相除 / lcm 与 gcd 关系 / 快速幂 / 模运算 / 埃氏筛 / 杨辉三角组合数　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+      <div class="lc-box">
+        <div class="lc-h">相关力扣 · 点击跳转 leetcode.cn</div>
+        <div class="lc-source">CodeTop 高频题 Top300 快照 · 数字为 frequency 字段 · 未收录题目标为“不常考”</div>
+        <div class="lc-list" id="lcList"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ============================================================
+   场景 1：欧几里得算法 gcd(84, 30)
+   ============================================================ */
+const gcdScene=(()=>{
+  // 迭代序列：a, b, r=a%b
+  const trace=[[84,30,24],[30,24,6],[24,6,0],[6,0,null]];
+  const code='<span class="kw">long long</span> gcd(<span class="kw">long long</span> a, <span class="kw">long long</span> b){\n'+
+    '    <span class="kw">while</span> (b != 0){\n'+
+    '        <span class="kw">long long</span> r = a % b;  <span class="cmt">// 余数</span>\n'+
+    '        a = b;  b = r;         <span class="cmt">// 辗转相除</span>\n'+
+    '    }\n    <span class="kw">return</span> a;             <span class="cmt">// b==0 时 a 即答案</span>\n}';
+  const steps=[
+    {title:'步骤 0 · 目标 gcd(84, 30)',chip:'欧几里得算法',chipC:'c0',row:-1,pair:[84,30,null],ans:false,
+     desc:'求 <span class="bl">84</span> 与 <span class="br">30</span> 的最大公约数。核心恒等式：<b>gcd(a, b) = gcd(b, a mod b)</b>——用余数不断替换，直到某一步余数为 0。'},
+    {title:'步骤 1 · 84 mod 30 = 24',chip:'一次辗转',chipC:'cb',row:0,pair:[84,30,24],ans:false,
+     desc:'<span class="bl">84</span> ÷ 30 商 2 余 <span class="dg">24</span>。把 <span class="br">(a, b)</span> 换成 <span class="br">(b, r)</span> = <b>(30, 24)</b>。大问题被替换成了更小的同类问题。'},
+    {title:'步骤 2 · 30 mod 24 = 6',chip:'继续缩小',chipC:'cb',row:1,pair:[30,24,6],ans:false,
+     desc:'<span class="bl">30</span> mod 24 = <span class="dg">6</span> → 新的一对是 <b>(24, 6)</b>。每一步 b 严格变小，所以一定会终止。'},
+    {title:'步骤 3 · 24 mod 6 = 0',chip:'余数归零',chipC:'ch',row:2,pair:[24,6,0],ans:false,
+     desc:'<span class="bl">24</span> mod 6 = <span class="gr">0</span>！余数为 0，意味着 6 能整除 24——<b>此刻的 b（除数）就是最大公约数</b>。'},
+    {title:'步骤 4 · gcd = 6',chip:'得到答案',chipC:'cg',row:3,pair:[6,0,null],ans:true,ansV:6,
+     desc:'循环条件 <code>b != 0</code> 不再成立，返回 a = <span class="gr">6</span>。即 <b>gcd(84, 30) = 6</b>。'},
+    {title:'步骤 5 · 顺带求 lcm',chip:'先除后乘',chipC:'c0',row:3,pair:[6,0,null],ans:true,ansV:6,lcm:true,
+     desc:'有了 gcd 就能求最小公倍数：<b>lcm = a / gcd × b</b> = 84 / 6 × 30 = <span class="br">420</span>。<b class="dg">先除后乘</b>（不是 a×b/gcd）以防中间溢出——因为 gcd 一定整除 a，先除不丢精度。'},
+  ];
+  function mount(){
+    viz.innerHTML=
+      '<div class="vcap"><b>辗转相除</b>：用余数替换，直到余数为 0</div>'+
+      '<div class="gcd-pair">'+
+        '<div class="numbox a" id="gcd-a">84</div><div class="op">mod</div>'+
+        '<div class="numbox b" id="gcd-b">30</div><div class="op">=</div>'+
+        '<div class="numbox r" id="gcd-r">?</div></div>'+
+      '<table class="gcd-table"><thead><tr><th>a</th><th>b</th><th>a mod b</th></tr></thead>'+
+      '<tbody id="gcd-tbody"></tbody></table>'+
+      '<div class="gcd-ans" id="gcd-ans">gcd(84, 30) = <b id="gcd-ansv">?</b></div>';
+    const tb=document.getElementById('gcd-tbody');
+    trace.forEach((r,i)=>{
+      const tr=document.createElement('tr');tr.id='gcd-tr-'+i;
+      tr.innerHTML='<td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+(r[2]===null?'—':r[2])+'</td>';
+      tb.appendChild(tr);
+    });
+  }
+  function paint(s){
+    document.getElementById('gcd-a').textContent=s.pair[0];
+    document.getElementById('gcd-b').textContent=s.pair[1];
+    const r=document.getElementById('gcd-r');
+    r.textContent=s.pair[2]===null?'—':s.pair[2];
+    r.classList.toggle('zero',s.pair[2]===0);
+    trace.forEach((_,i)=>{
+      const tr=document.getElementById('gcd-tr-'+i);
+      tr.className='';
+      if(i===s.row)tr.classList.add('on');
+      else if(i>s.row)tr.classList.add('dim');
+    });
+    const ans=document.getElementById('gcd-ans');
+    document.getElementById('gcd-ansv').textContent=s.ans?s.ansV:'?';
+    ans.style.visibility=s.ans?'visible':'hidden';
+    if(s.lcm){ans.innerHTML='gcd(84, 30) = <b>6</b>　·　lcm = 84 / 6 × 30 = <b style="color:var(--brown)">420</b>';}
+  }
+  const links=[
+    {t:'1979. 找出数组的最大公约数',u:'https://leetcode.cn/problems/find-greatest-common-divisor-of-array/'},
+    {t:'1071. 字符串的最大公因子',u:'https://leetcode.cn/problems/greatest-common-divisor-of-strings/'},
+    {t:'365. 水壶问题',u:'https://leetcode.cn/problems/water-and-jug-problem/'},
+  ];
+  return {id:'gcd',label:'gcd 辗转相除',sub:'欧几里得算法',steps,mount,paint,code,links};
+})();
+
+/* ============================================================
+   场景 2：lcm 与 gcd 的关系 · lcm(12, 18) = 36
+   ============================================================ */
+const lcmScene=(()=>{
+  // 倍数列表（演示用）
+  const multA=[12,24,36,48,60,72];
+  const multB=[18,36,54,72,90,108];
+  const code='<span class="kw">long long</span> lcm(<span class="kw">long long</span> a, <span class="kw">long long</span> b){\n'+
+    '    <span class="kw">if</span> (a == 0 || b == 0) <span class="kw">return</span> 0;\n'+
+    '    <span class="cmt">// 恒等式：a × b = gcd × lcm</span>\n'+
+    '    <span class="cmt">// 先除后乘：gcd 必整除 a，不丢精度、防溢出</span>\n'+
+    '    <span class="kw">return</span> std::llabs(a / gcd(a, b) * b);\n}';
+  const steps=[
+    {title:'步骤 0 · 什么是 lcm',chip:'最小公倍数',chipC:'c0',
+      mode:'intro',eq:'lcm(12, 18) = ?',
+      aShow:0,bShow:0,both:null,g:null,prod:null,lc:null,order:'?',
+      foot:'公倍数 = 两边都能整除的数',
+      desc:'求 <span class="bl">12</span> 与 <span class="br">18</span> 的<strong>最小公倍数</strong>：能同时被两者整除的正整数里最小的那个。直觉：两个人分别每 12 / 18 步停一次，<b>第一次同时停下的位置</b>就是 lcm。'},
+    {title:'步骤 1 · 列出 12 的倍数',chip:'12 的倍数',chipC:'cb',
+      mode:'listA',eq:'12 的倍数：12, 24, 36, 48…',
+      aShow:4,bShow:0,both:null,g:null,prod:null,lc:null,order:'?',
+      foot:'12, 24, 36, 48, 60, 72…',
+      desc:'先列出 <span class="bl">12</span> 的倍数：12×1、12×2、12×3…。这些都是「能被 12 整除」的候选；lcm 一定落在其中。'},
+    {title:'步骤 2 · 列出 18 的倍数',chip:'18 的倍数',chipC:'ch',
+      mode:'listB',eq:'18 的倍数：18, 36, 54, 72…',
+      aShow:4,bShow:4,both:null,g:null,prod:null,lc:null,order:'?',
+      foot:'18, 36, 54, 72, 90, 108…',
+      desc:'再列 <span class="br">18</span> 的倍数。两边都出现的数就是<strong>公倍数</strong>；其中最小的那个才是 lcm。'},
+    {title:'步骤 3 · 交集最小 = 36',chip:'第一次重合',chipC:'cg',
+      mode:'both',eq:'lcm(12, 18) = 36',
+      aShow:6,bShow:4,both:36,g:null,prod:null,lc:36,order:'?',
+      foot:'公倍数：36, 72, …　→　最小 = 36',
+      desc:'两边都出现的最小数是 <span class="gr">36</span>。36÷12=3、36÷18=2，都能整除；更小的 12、18、24 都不能同时整除两边。所以 <b>lcm(12, 18) = 36</b>。'},
+    {title:'步骤 4 · 恒等式 a×b = gcd×lcm',chip:'核心关系',chipC:'cb',
+      mode:'rel',eq:'12 × 18 = gcd(12,18) × lcm(12,18)',
+      aShow:6,bShow:4,both:36,g:6,prod:216,lc:36,order:'?',
+      foot:'216 = 6 × 36　✓',
+      desc:'恒等式：<b>a × b = gcd(a,b) × lcm(a,b)</b>。这里 12×18=<span class="bl">216</span>，gcd(12,18)=<span class="gr">6</span>，6×36=216。直观：乘积 =「公共质因子（gcd）」×「拼在一起的最小公倍数」。'},
+    {title:'步骤 5 · 先除后乘防溢出',chip:'a/gcd × b',chipC:'cg',
+      mode:'safe',eq:'lcm = 12 / 6 × 18 = 36',
+      aShow:6,bShow:4,both:36,g:6,prod:216,lc:36,order:'safe',
+      foot:'✓ a/gcd×b = 36　·　✗ 先乘可能溢出',
+      desc:'由恒等式得 <b>lcm = a×b / gcd</b>。代码必须写成 <code>a / gcd * b</code>：因为 gcd 一定整除 a，先除不丢精度，且中间不会爆 <code>long long</code>。若写 <code>a * b / gcd</code>，a×b 可能先溢出。0 与任何数的 lcm 约定为 0。'},
+  ];
+  function mount(){
+    let chipsA='',chipsB='';
+    multA.forEach((v,i)=>{chipsA+='<div class="lcm-chip a" id="la-'+i+'">'+v+'</div>';});
+    multB.forEach((v,i)=>{chipsB+='<div class="lcm-chip b" id="lb-'+i+'">'+v+'</div>';});
+    viz.innerHTML=
+      '<div class="vcap"><b>lcm</b>：最小公倍数 = a / gcd × b（先除后乘）</div>'+
+      '<div class="lcm-eq" id="lcm-eq">lcm(12, 18) = ?</div>'+
+      '<div class="lcm-rows">'+
+        '<div class="lcm-row"><div class="lcm-lab">12 的倍数</div><div class="lcm-chips">'+chipsA+'</div></div>'+
+        '<div class="lcm-row"><div class="lcm-lab">18 的倍数</div><div class="lcm-chips">'+chipsB+'</div></div>'+
+      '</div>'+
+      '<div class="lcm-rel">'+
+        '<div class="lcm-card" id="lc-g"><div class="k">gcd(12, 18)</div><div class="v" id="lv-g">?</div></div>'+
+        '<div class="lcm-card" id="lc-l"><div class="k">lcm(12, 18)</div><div class="v" id="lv-l">?</div></div>'+
+        '<div class="lcm-card" id="lc-p"><div class="k">a × b</div><div class="v" id="lv-p">?</div></div>'+
+        '<div class="lcm-card" id="lc-o"><div class="k">写法</div><div class="v" id="lv-o" style="font-size:14px">?</div></div>'+
+      '</div>'+
+      '<div class="lcm-foot" id="lcm-foot"></div>';
+  }
+  function paint(s){
+    // 数字从长到短替换，避免 36 里的 6 被二次匹配
+    document.getElementById('lcm-eq').innerHTML=s.eq
+      .replace(/gcd/g,'§G§').replace(/lcm/g,'§L§')
+      .replace(/\b36\b/g,'<span class="hi gr">36</span>')
+      .replace(/\b216\b/g,'<span class="bl">216</span>')
+      .replace(/\b18\b/g,'<span class="br">18</span>')
+      .replace(/\b12\b/g,'<span class="bl">12</span>')
+      .replace(/\b6\b/g,'<span class="gr">6</span>')
+      .replace(/§G§/g,'<span class="gr">gcd</span>')
+      .replace(/§L§/g,'<span class="gr">lcm</span>');
+    multA.forEach((v,i)=>{
+      const el=document.getElementById('la-'+i);
+      el.className='lcm-chip a';
+      if(i<s.aShow)el.classList.add('show');
+      if(s.both===v)el.classList.add('both');
+      else if(s.mode==='both'||s.mode==='rel'||s.mode==='safe'){
+        if(v!==36&&v!==72)el.classList.add('dim');
+      }
+    });
+    multB.forEach((v,i)=>{
+      const el=document.getElementById('lb-'+i);
+      el.className='lcm-chip b';
+      if(i<s.bShow)el.classList.add('show');
+      if(s.both===v)el.classList.add('both');
+      else if(s.mode==='both'||s.mode==='rel'||s.mode==='safe'){
+        if(v!==36&&v!==72)el.classList.add('dim');
+      }
+    });
+    const g=document.getElementById('lc-g'),l=document.getElementById('lc-l');
+    const p=document.getElementById('lc-p'),o=document.getElementById('lc-o');
+    g.className='lcm-card';l.className='lcm-card';p.className='lcm-card';o.className='lcm-card';
+    document.getElementById('lv-g').textContent=s.g==null?'?':s.g;
+    document.getElementById('lv-l').textContent=s.lc==null?'?':s.lc;
+    document.getElementById('lv-p').textContent=s.prod==null?'?':s.prod;
+    if(s.g!=null)g.classList.add('ok');
+    if(s.lc!=null)l.classList.add('ok');
+    if(s.prod!=null)p.classList.add('on');
+    if(s.mode==='rel'){g.classList.add('on');l.classList.add('on');p.classList.add('ok');}
+    if(s.order==='safe'){
+      document.getElementById('lv-o').textContent='a/gcd × b';
+      o.classList.add('ok');
+    }else{
+      document.getElementById('lv-o').textContent='?';
+    }
+    document.getElementById('lcm-foot').innerHTML=s.foot||'';
+  }
+  const links=[
+    {t:'2413. 最小偶倍数',u:'https://leetcode.cn/problems/smallest-even-multiple/'},
+    {t:'878. 第 N 个神奇数字',u:'https://leetcode.cn/problems/nth-magical-number/'},
+    {t:'1201. 丑数 III',u:'https://leetcode.cn/problems/ugly-number-iii/'},
+    {t:'2470. 最小公倍数为 K 的子数组数目',u:'https://leetcode.cn/problems/number-of-subarrays-with-lcm-equal-to-k/'},
+    {t:'2197. 替换数组中的非互质数',u:'https://leetcode.cn/problems/replace-non-coprime-numbers-in-array/'},
+  ];
+  return {id:'lcm',label:'lcm 最小公倍数',sub:'与 gcd 恒等式',steps,mount,paint,code,links};
+})();
+
+/* ============================================================
+   场景 3：快速幂 3^13
+   ============================================================ */
+const powScene=(()=>{
+  // 位（高→低）：8 4 2 1，13=1101
+  const bitW=[8,4,2,1], bitV=[1,1,0,1];
+  const powVals=[['3^1',3],['3^2',9],['3^4',81],['3^8',6561]];
+  const code='<span class="kw">long long</span> fastPow(<span class="kw">long long</span> b, <span class="kw">long long</span> e){\n'+
+    '    <span class="kw">long long</span> r = 1;\n'+
+    '    <span class="kw">while</span> (e > 0){\n'+
+    '        <span class="kw">if</span> (e & 1) r *= b;   <span class="cmt">// 当前位为 1 → 乘进答案</span>\n'+
+    '        b *= b;               <span class="cmt">// 底数平方，对应下一位</span>\n'+
+    '        e >>= 1;              <span class="cmt">// 右移，看下一位</span>\n    }\n    <span class="kw">return</span> r;\n}';
+  // 每步：result, base, expBin(高位补空), lsb, picked[3^k], curBaseIdx
+  const steps=[
+    {title:'步骤 0 · 初始化 3^13',chip:'指数拆二进制',chipC:'c0',result:1,base:3,expDisp:'1101',lsb:-1,picked:[],curBase:0,
+     desc:'要算 <b>3^13</b>。把指数 13 写成二进制 <b>1101₂ = 8 + 4 + 1</b>,于是 <b>3^13 = 3^8 · 3^4 · 3^1</b>。快速幂就是从低位到高位扫描这些位，把该乘的幂乘进答案，复杂度 <b>O(log n)</b>。'},
+    {title:'步骤 1 · 最低位=1，乘 3^1',chip:'e & 1 = 1',chipC:'cg',result:3,base:9,expDisp:'110',lsb:0,picked:[0],curBase:1,
+     desc:'当前最低位是 <span class="gr">1</span> → 把当前底数 <span class="br">3</span>（即 3^1）乘进答案：result = 1 × 3 = <span class="gr">3</span>。然后底数平方 3→<span class="br">9</span>(=3^2)，指数右移 13→6(110)。'},
+    {title:'步骤 2 · 最低位=0，跳过',chip:'e & 1 = 0',chipC:'cd',result:3,base:81,expDisp:'11',lsb:0,picked:[0],curBase:2,
+     desc:'现在最低位是 <span class="dg">0</span> → 这一位不乘，result 保持 <span class="gr">3</span>。底数继续平方 9→<span class="br">81</span>(=3^4)，指数右移 6→3(11)。<b>底数每一步都在平方</b>,对应更高的 2 的幂。'},
+    {title:'步骤 3 · 最低位=1，乘 3^4',chip:'e & 1 = 1',chipC:'cg',result:243,base:6561,expDisp:'1',lsb:0,picked:[0,2],curBase:3,
+     desc:'最低位是 <span class="gr">1</span> → 乘进当前底数 <span class="br">81</span>(=3^4)：result = 3 × 81 = <span class="gr">243</span>。底数平方 81→<span class="br">6561</span>(=3^8)，指数右移 3→1。'},
+    {title:'步骤 4 · 最高位=1，乘 3^8',chip:'e & 1 = 1',chipC:'cg',result:1594323,base:6561,expDisp:'0',lsb:0,picked:[0,2,3],curBase:3,
+     desc:'最后一位是 <span class="gr">1</span> → 乘进 <span class="br">6561</span>(=3^8)：result = 243 × 6561 = <span class="gr">1594323</span>。指数右移后变 0。'},
+    {title:'步骤 5 · 完成',chip:'O(log n)',chipC:'cg',result:1594323,base:6561,expDisp:'0',lsb:-1,picked:[0,2,3],curBase:-1,done:true,
+     desc:'<code>e</code> 变成 0，循环结束。<b>3^13 = 3^8 · 3^4 · 3^1 = 6561 × 81 × 3 = 1594323</b>。只做了 4 轮（log₂13 向上取整）而不是 13 次乘法。<b>取模版</b>只需每次乘完 <code>% mod</code>。'},
+  ];
+  function mount(){
+    let bits='';
+    bitW.forEach((w,i)=>{bits+='<div class="pow-bit" id="pb-'+i+'"><div class="numbox b">'+bitV[i]+'</div><div class="w">'+w+'</div></div>';});
+    let pows='';
+    powVals.forEach((p,i)=>{pows+='<span class="pow-pow" id="pp-'+i+'">'+p[0]+' = '+p[1]+'</span>';});
+    viz.innerHTML=
+      '<div class="vcap"><b>二进制拆分</b>：指数每一位对应一个不断平方的底数</div>'+
+      '<div class="pow-title">3<sup>13</sup>　·　13 = 1101₂</div>'+
+      '<div class="pow-bits">'+bits+'</div>'+
+      '<div class="pow-stats">'+
+        '<div class="pow-stat result"><div class="k">result</div><div class="v" id="pv-r">1</div></div>'+
+        '<div class="pow-stat base"><div class="k">base</div><div class="v" id="pv-b">3</div></div>'+
+        '<div class="pow-stat exp"><div class="k">exp (二进制)</div><div class="v" id="pv-e">1101</div></div>'+
+      '</div>'+
+      '<div class="pow-powers">'+pows+'</div>';
+  }
+  function paint(s){
+    document.getElementById('pv-r').textContent=s.result;
+    document.getElementById('pv-b').textContent=s.base;
+    document.getElementById('pv-e').textContent=s.expDisp;
+    // 位高亮：把 expDisp 的最低位对应到 bit index 3（权 1）；这里简单地按 picked 高亮值为1且被选中的位
+    bitW.forEach((w,i)=>{
+      const el=document.getElementById('pb-'+i);
+      el.className='pow-bit '+(bitV[i]?'one':'zero');
+      // 当前正在处理的位：用 curBase 推断（curBase=k 表示刚平方到 3^(2^k)），高亮"上一位"
+    });
+    powVals.forEach((_,i)=>{
+      const el=document.getElementById('pp-'+i);
+      el.className='pow-pow'+(s.picked.includes(i)?' picked':'')+(s.curBase===i?' curbase':'');
+    });
+  }
+  const links=[
+    {t:'50. Pow(x, n)',u:'https://leetcode.cn/problems/powx-n/'},
+    {t:'372. 超级次方',u:'https://leetcode.cn/problems/super-pow/'},
+    {t:'1922. 统计好数字的数目',u:'https://leetcode.cn/problems/count-good-numbers/'},
+  ];
+  return {id:'pow',label:'快速幂',sub:'3^13 · O(log n)',steps,mount,paint,code,links};
+})();
+
+/* ============================================================
+   场景 3：模运算（演示用 MOD=7，题面常见 1e9+7）
+   ============================================================ */
+const modScene=(()=>{
+  const MOD=7;
+  const code='<span class="cmt">// 常见：const long long MOD = 1e9+7;</span>\n'+
+    '<span class="cmt">// 演示用小模数 7，规则完全相同</span>\n'+
+    '(a + b) % MOD\n'+
+    '(a - b + MOD) % MOD   <span class="cmt">// 防负数</span>\n'+
+    '(a * b) % MOD\n'+
+    '<span class="cmt">// 除法：a / b ≡ a * inv(b)  (MOD 质数)</span>\n'+
+    'inv = fastPow(b, MOD - 2) % MOD;  <span class="cmt">// 费马</span>\n'+
+    '(a * inv) % MOD';
+  // ops highlight index: 0+,1-,2*,3/  |  pair [a,b,raw,norm] | mode
+  const steps=[
+    {title:'步骤 0 · 为什么取模',chip:'MOD = 1e9+7',chipC:'c0',op:-1,pair:null,mode:'intro',
+     foot:'题面常见 MOD = 1 000 000 007（质数）',
+     desc:'答案很大、方案数爆炸时，题面要求对 <b>1e9+7</b> 取余。规则：<b>加、减、乘可以拆开取模</b>；<span class="dg">除法不能直接拆</span>，需要模逆元。下面用小模数 <span class="bl">MOD = 7</span> 演示（规则与 1e9+7 相同）。'},
+    {title:'步骤 1 · 加法 / 乘法可拆',chip:'(a±b)% · (a×b)%',chipC:'cg',op:0,pair:[5,6,11,4],mode:'addmul',
+     foot:'(5+6)%7 = 4　·　(5×6)%7 = 30%7 = 2',
+     desc:'<span class="bl">5 + 6 = 11</span> → 11 % 7 = <span class="gr">4</span>。乘法：5 × 6 = 30 → 30 % 7 = <span class="gr">2</span>。可写成 <code>((a%MOD)+(b%MOD))%MOD</code>，每步都取模防溢出。'},
+    {title:'步骤 2 · 减法会变负',chip:'C++ 负数取模',chipC:'cd',op:1,pair:[2,5,-3,-3],mode:'sub-bad',
+     foot:'(2−5)%7 在 C++ 里是 −3，不是 4',
+     desc:'<span class="bl">2 − 5 = −3</span>。C++ 里 <code>(-3) % 7 == −3</code>（向零取整），得到<span class="dg">负数余数</span>。数组下标、哈希桶、答案规范化都会踩坑。'},
+    {title:'步骤 3 · 负数规范化',chip:'(x%M+M)%M',chipC:'cg',op:1,pair:[2,5,-3,4],mode:'sub-ok',
+     foot:'(−3 % 7 + 7) % 7 = 4',
+     desc:'模板：<b>(x % MOD + MOD) % MOD</b>。把 −3 拉回正区间：−3 + 7 = 4 → 4 % 7 = <span class="gr">4</span>。减法稳写：<code>(a - b % MOD + MOD) % MOD</code>。'},
+    {title:'步骤 4 · 除法不能直接拆',chip:'禁止 a/b % MOD',chipC:'cd',op:3,pair:[6,3,2,null],mode:'div-bad',
+     foot:'6/3=2 碰巧对，换 6/4 就挂',
+     desc:'取模下<span class="dg">不能写</span> <code>a / b % MOD</code>。整数除法会先丢掉小数，且 6÷4 在模 7 下应有“商”却整除得不到。必须换成<span class="bl">乘以模逆元</span>：<b>a / b ≡ a · inv(b)</b>。'},
+    {title:'步骤 5 · 费马求逆元',chip:'inv = b^(MOD-2)',chipC:'cg',op:3,pair:[6,3,5,2],mode:'inv',
+     foot:'inv(3)=3^5%7=5　·　6×5%7=2 ≡ 6/3',
+     desc:'当 <b>MOD 是质数</b>且 b 与 MOD 互质时，费马小定理：<b>inv(b) = b<sup>MOD−2</sup> % MOD</b>（用快速幂）。例：inv(3)=3<sup>5</sup>%7=<span class="br">5</span>（因 3×5=15≡1）。于是 6/3 ≡ 6×5 % 7 = <span class="gr">2</span>。'},
+  ];
+  function mount(){
+    viz.innerHTML=
+      '<div class="vcap"><b>模运算</b>：加减乘可拆，负数要规范化，除法用逆元</div>'+
+      '<div class="mod-banner">演示 <span class="modv">MOD = '+MOD+'</span>（题面常见 1e9+7）</div>'+
+      '<div class="mod-ops">'+
+        '<div class="mod-op" id="mop-0"><div class="k">加法</div><div class="f" id="mf-0">(a + b) % MOD</div></div>'+
+        '<div class="mod-op" id="mop-1"><div class="k">减法</div><div class="f" id="mf-1">(a − b + MOD) % MOD</div></div>'+
+        '<div class="mod-op" id="mop-2"><div class="k">乘法</div><div class="f" id="mf-2">(a × b) % MOD</div></div>'+
+        '<div class="mod-op" id="mop-3"><div class="k">除法 → 逆元</div><div class="f" id="mf-3">a × inv(b) % MOD</div></div>'+
+      '</div>'+
+      '<div class="mod-row" id="mod-row">'+
+        '<div class="numbox a" id="m-a">—</div><div class="op" id="m-op">?</div>'+
+        '<div class="numbox b" id="m-b">—</div><div class="eq">=</div>'+
+        '<div class="numbox r" id="m-r">?</div>'+
+      '</div>'+
+      '<div class="mod-note" id="mod-note"></div>';
+  }
+  function paint(s){
+    for(let i=0;i<4;i++){
+      const el=document.getElementById('mop-'+i);
+      el.className='mod-op';
+      if(s.op===i)el.classList.add('on');
+      else if(s.op>=0 && i!==s.op)el.classList.add('dim');
+      if(s.mode==='addmul'&&(i===0||i===2))el.classList.add('ok');
+      if(s.mode==='sub-bad'&&i===1)el.classList.add('bad');
+      if(s.mode==='sub-ok'&&i===1)el.classList.add('ok');
+      if(s.mode==='div-bad'&&i===3)el.classList.add('bad');
+      if(s.mode==='inv'&&i===3)el.classList.add('ok');
+    }
+    document.getElementById('mf-0').textContent=s.mode==='addmul'?'(5+6)%7 = 4':'(a + b) % MOD';
+    document.getElementById('mf-1').textContent=
+      s.mode==='sub-bad'?'(2-5)%7 = −3 ✗':
+      s.mode==='sub-ok'?'(−3+7)%7 = 4 ✓':'(a − b + MOD) % MOD';
+    document.getElementById('mf-2').textContent=s.mode==='addmul'?'(5×6)%7 = 2':'(a × b) % MOD';
+    document.getElementById('mf-3').textContent=
+      s.mode==='div-bad'?'a/b % MOD 不可直写':
+      s.mode==='inv'?'6×inv(3)%7 = 2':'a × inv(b) % MOD';
+
+    const a=document.getElementById('m-a'),b=document.getElementById('m-b');
+    const op=document.getElementById('m-op'),r=document.getElementById('m-r');
+    r.className='numbox r';
+    if(!s.pair){
+      a.textContent='a';b.textContent='b';op.textContent='⊙';r.textContent='?';
+    }else if(s.mode==='addmul'){
+      a.textContent='5';b.textContent='6';op.textContent='+ / ×';
+      r.textContent='4 / 2';r.classList.add('hi');
+    }else if(s.mode==='sub-bad'){
+      a.textContent='2';b.textContent='5';op.textContent='−';
+      r.textContent='−3';r.classList.add('bad');
+    }else if(s.mode==='sub-ok'){
+      a.textContent='−3';b.textContent='+7';op.textContent='norm';
+      r.textContent='4';r.classList.add('hi');
+    }else if(s.mode==='div-bad'){
+      a.textContent='6';b.textContent='3';op.textContent='/';
+      r.textContent='?';r.classList.add('bad');
+    }else if(s.mode==='inv'){
+      a.textContent='6';b.textContent='inv3=5';op.textContent='×';
+      r.textContent='2';r.classList.add('hi');
+    }
+    document.getElementById('mod-note').innerHTML=s.foot||'';
+  }
+  const links=[
+    {t:'372. 超级次方（模幂）',u:'https://leetcode.cn/problems/super-pow/'},
+    {t:'剑指 Offer 62. 圆圈中最后剩下的数字',u:'https://leetcode.cn/problems/yuan-quan-zhong-zui-hou-sheng-xia-de-shu-zi-lcof/'},
+    {t:'974. 和可被 K 整除的子数组',u:'https://leetcode.cn/problems/subarray-sums-divisible-by-k/'},
+    {t:'523. 连续的子数组和',u:'https://leetcode.cn/problems/continuous-subarray-sum/'},
+  ];
+  return {id:'mod',label:'模运算',sub:'拆模 · 负数 · 逆元',steps,mount,paint,code,links};
+})();
+
+/* ============================================================
+   场景 4：埃拉托斯特尼筛法 n = 30
+   ============================================================ */
+const sieveScene=(()=>{
+  const N=30;
+  const code='<span class="kw">for</span> (<span class="kw">int</span> i=2; i*i&lt;=n; ++i)\n'+
+    '    <span class="kw">if</span> (isPrime[i])\n'+
+    '        <span class="kw">for</span> (<span class="kw">int</span> j=i*i; j&lt;=n; j+=i) <span class="cmt">// 从 i*i 起</span>\n'+
+    '            isPrime[j] = <span class="kw">false</span>;';
+  const mult=(p,from)=>{const a=[];for(let m=from;m<=N;m+=p)a.push(m);return a;};
+  const steps=[
+    {title:'步骤 0 · 列出 2…30',chip:'全部当候选',chipC:'c0',s:0,p:null,newly:[],
+     desc:'先把 <b>2 到 30</b> 全部当作"可能是质数"。<b>0 和 1 不是质数</b>（最常见的边界坑）。接下来从最小的质数 2 开始，逐个划掉它们的倍数。'},
+    {title:'步骤 1 · p=2，划掉 2 的倍数',chip:'从 2×2 起',chipC:'cd',s:1,p:2,newly:mult(2,4),
+     desc:'2 是质数（<span class="gr">绿</span>）。把它的倍数 <b>4, 6, 8, …, 30</b> 全划成合数（<span class="dg">红</span>）。为什么从 <b>2×2=4</b> 起而不是 2×2 之前？更小的倍数不存在，4 是第一个需要 2 来划的。'},
+    {title:'步骤 2 · p=3，划掉 3 的倍数',chip:'从 3×3 起',chipC:'cd',s:2,p:3,newly:[9,15,21,27],
+     desc:'下一个没被划的数是 3，它是质数。从 <b>3×3=9</b> 起划：<b>9, 15, 21, 27</b>（6, 12, 18, 24, 30 已被 2 划过）。<b>从 i×i 起</b>是因为更小的倍数早被更小的质因子划掉了。'},
+    {title:'步骤 3 · p=5，划掉 25',chip:'从 5×5 起',chipC:'cd',s:3,p:5,newly:[25],
+     desc:'再下一个是 5，质数。从 <b>5×5=25</b> 起划——只有 <b>25</b>（10, 15, 20, 30 都已划过）。'},
+    {title:'步骤 4 · 停在 √30',chip:'7×7 > 30',chipC:'cg',s:4,p:null,newly:[],
+     desc:'下一个是 7，但 <b>7×7 = 49 > 30</b>,超出范围，停止。<b>只需筛到 √n</b>:任何 ≤ n 的合数都有一个 ≤ √n 的质因子，早被划掉了。剩下没被划的全是质数（<span class="gr">绿</span>）。'},
+    {title:'步骤 5 · 结果 10 个质数',chip:'O(n log log n)',chipC:'cg',s:5,p:null,newly:[],
+     desc:'≤30 的质数：<b>2, 3, 5, 7, 11, 13, 17, 19, 23, 29</b>,共 <b>10</b> 个。总标记次数 ≈ n×Σ(1/p) = <b>O(n log log n)</b>,远快于逐个试除的 O(n√n)。频繁查询时保留 isPrime 数组即可 O(1) 查。'},
+  ];
+  function mount(){
+    let g='';
+    for(let n=2;n<=N;n++)g+='<div class="svcell" id="sv-'+n+'">'+n+'</div>';
+    viz.innerHTML='<div class="vcap"><b>埃氏筛</b>：质数保留，其倍数一律划掉</div>'+
+      '<div class="sieve-grid">'+g+'</div>'+
+      '<div class="sieve-foot" id="sv-foot">质数计数：<b id="sv-cnt">—</b></div>';
+  }
+  function paint(st){
+    const comp=new Set();
+    if(st.s>=1)for(let m=4;m<=N;m+=2)comp.add(m);
+    if(st.s>=2)for(let m=9;m<=N;m+=3)comp.add(m);
+    if(st.s>=3)for(let m=25;m<=N;m+=5)comp.add(m);
+    let cnt=0;
+    for(let n=2;n<=N;n++){
+      const el=document.getElementById('sv-'+n);
+      el.className='svcell';
+      if(comp.has(n))el.classList.add('composite');
+      else{cnt++; if(st.p===n||st.s>=4)el.classList.add(st.p===n?'curp':'prime');}
+      if(st.newly.includes(n))el.classList.add('flash');
+    }
+    document.getElementById('sv-cnt').textContent = st.s>=4 ? (cnt+' 个：2 3 5 7 11 13 17 19 23 29') : '筛选中…';
+  }
+  const links=[
+    {t:'204. 计数质数',u:'https://leetcode.cn/problems/count-primes/'},
+    {t:'263. 丑数',u:'https://leetcode.cn/problems/ugly-number/'},
+    {t:'264. 丑数 II',u:'https://leetcode.cn/problems/ugly-number-ii/'},
+  ];
+  return {id:'sieve',label:'埃氏筛',sub:'n = 30 素数筛',steps,mount,paint,code,links};
+})();
+
+/* ============================================================
+   场景 5：杨辉三角 / 组合数 C(n,k)
+   ============================================================ */
+const pascalScene=(()=>{
+  const rows=[[1],[1,1],[1,2,1],[1,3,3,1],[1,4,6,4,1],[1,5,10,10,5,1]];
+  const code='<span class="cmt">// C(i,j) = C(i-1,j-1) + C(i-1,j)</span>\n'+
+    '<span class="kw">for</span> (<span class="kw">int</span> i=0; i&lt;=n; ++i){\n'+
+    '    c[i][0] = c[i][i] = 1;      <span class="cmt">// 两条边全是 1</span>\n'+
+    '    <span class="kw">for</span> (<span class="kw">int</span> j=1; j&lt;i; ++j)\n'+
+    '        c[i][j] = c[i-1][j-1] + c[i-1][j];\n}';
+  // 每步显示到第 revealRow 行；focus=[i,j] 及其父 [i-1,j-1],[i-1,j]
+  const steps=[
+    {title:'步骤 0 · 顶点 C(0,0)=1',chip:'杨辉三角',chipC:'c0',reveal:0,focus:null,foot:'第 0 行：C(0,0) = 1',
+     desc:'组合数 <b>C(n, k)</b> = 从 n 个里选 k 个。递推式 <b>C(i,j) = C(i-1,j-1) + C(i-1,j)</b>——每个数等于它<b>肩上两个数之和</b>。顶点 C(0,0)=1。'},
+    {title:'步骤 1 · 第 1 行全是 1',chip:'两条边界',chipC:'cb',reveal:1,focus:null,foot:'C(1,0)=C(1,1)=1',
+     desc:'每行两端都是 <b>1</b>:C(i,0)=C(i,i)=1（从 i 个里选 0 个或全选，都只有 1 种）。这是递推的边界条件。'},
+    {title:'步骤 2 · C(2,1)=1+1=2',chip:'肩上求和',chipC:'ch',reveal:2,focus:[2,1],parents:[[1,0],[1,1]],foot:'C(2,1) = C(1,0)+C(1,1) = 1+1 = 2',
+     desc:'第一个非边界的数：<span class="bl">C(2,1)</span> = 肩上 <span class="br">C(1,0)</span> + <span class="br">C(1,1)</span> = 1 + 1 = <b>2</b>。'},
+    {title:'步骤 3 · C(3,1)=1+2=3',chip:'继续递推',chipC:'ch',reveal:3,focus:[3,1],parents:[[2,0],[2,1]],foot:'C(3,1) = C(2,0)+C(2,1) = 1+2 = 3',
+     desc:'<span class="bl">C(3,1)</span> = <span class="br">C(2,0)</span> + <span class="br">C(2,1)</span> = 1 + 2 = <b>3</b>。每一行都由上一行两两相加得到——这正是一维滚动 DP 的雏形。'},
+    {title:'步骤 4 · C(4,2)=3+3=6',chip:'中间最大',chipC:'ch',reveal:4,focus:[4,2],parents:[[3,1],[3,2]],foot:'C(4,2) = C(3,1)+C(3,2) = 3+3 = 6',
+     desc:'<span class="bl">C(4,2)</span> = <span class="br">C(3,1)</span> + <span class="br">C(3,2)</span> = 3 + 3 = <b>6</b>。每行中间的数最大——从 4 个里选 2 个的方案数就是 6。'},
+    {title:'步骤 5 · 完整 6 行',chip:'O(n²) 预处理',chipC:'cg',reveal:5,focus:[5,2],parents:[[4,1],[4,2]],foot:'C(5,2) = C(4,1)+C(4,2) = 4+6 = 10',
+     desc:'第 5 行完成，<span class="bl">C(5,2)</span> = <span class="br">4</span> + <span class="br">6</span> = <b>10</b>。整张表 O(n²) 预处理，之后任意 <b>C(n,k)</b> 直接查表。n 很大且多次查询时改用<b>阶乘 + 逆元</b>:C(n,k)=fact[n]·invFact[k]·invFact[n−k] % MOD。'},
+  ];
+  function mount(){
+    let h='';
+    rows.forEach((r,i)=>{
+      h+='<div class="prow" id="prow-'+i+'">';
+      r.forEach((v,j)=>{h+='<div class="pcell numbox" id="pc-'+i+'-'+j+'">'+v+'</div>';});
+      h+='</div>';
+    });
+    viz.innerHTML='<div class="vcap"><b>杨辉三角</b>：每个数 = 肩上两数之和</div>'+
+      '<div class="pascal">'+h+'</div>'+
+      '<div class="pascal-foot" id="pascal-foot"></div>';
+  }
+  function paint(s){
+    rows.forEach((r,i)=>{
+      r.forEach((v,j)=>{
+        const el=document.getElementById('pc-'+i+'-'+j);
+        el.className='pcell numbox';
+        if(i<=s.reveal)el.classList.add('show');
+        if(j===0||j===i)el.classList.add('edge');
+      });
+    });
+    if(s.parents)s.parents.forEach(([i,j])=>document.getElementById('pc-'+i+'-'+j).classList.add('parent'));
+    if(s.focus)document.getElementById('pc-'+s.focus[0]+'-'+s.focus[1]).classList.add('focus');
+    document.getElementById('pascal-foot').innerHTML=s.foot||'';
+  }
+  const links=[
+    {t:'118. 杨辉三角',u:'https://leetcode.cn/problems/pascals-triangle/'},
+    {t:'119. 杨辉三角 II',u:'https://leetcode.cn/problems/pascals-triangle-ii/'},
+    {t:'62. 不同路径',u:'https://leetcode.cn/problems/unique-paths/'},
+    {t:'96. 不同的二叉搜索树',u:'https://leetcode.cn/problems/unique-binary-search-trees/'},
+  ];
+  return {id:'pascal',label:'杨辉三角',sub:'组合数 C(n,k)',steps,mount,paint,code,links};
+})();
+
+/* ============================================================
+   引擎：主题切换 + 步骤驱动
+   ============================================================ */
+const SCENES=[gcdScene,lcmScene,powScene,modScene,sieveScene,pascalScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const lcList=document.getElementById('lcList');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+// CodeTop Top300 本地快照中与本页相关题目的频率；未列出的题目统一显示“不常考”。
+const CODETOP_FREQ={
+  'https://leetcode.cn/problems/powx-n':{value:43,rank:139},
+  'https://leetcode.cn/problems/yuan-quan-zhong-zui-hou-sheng-xia-de-shu-zi-lcof':{value:32,rank:172},
+  'https://leetcode.cn/problems/continuous-subarray-sum':{value:15,rank:274},
+  'https://leetcode.cn/problems/count-primes':{value:15,rank:279},
+  'https://leetcode.cn/problems/ugly-number-ii':{value:25,rank:191},
+  'https://leetcode.cn/problems/unique-paths':{value:78,rank:86},
+  'https://leetcode.cn/problems/unique-binary-search-trees':{value:32,rank:170}
+};
+const normaliseUrl=url=>url.replace(/\/$/,'');
+
+SCENES.forEach((sc,i)=>{
+  const b=document.createElement('button');b.className='tab';
+  b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';
+  b.onclick=()=>{stop();switchScene(i);};
+  tabsBox.appendChild(b);
+});
+
+function renderLinks(sc){
+  const arr=sc.links||[];
+  lcList.innerHTML=arr.map(x=>{
+    const record=CODETOP_FREQ[normaliseUrl(x.u)];
+    const frequency=record ? record.value : null;
+    const bucket=frequency===null?'none':frequency>=100?'hot':frequency>=30?'mid':'low';
+    const label=frequency===null?'不常考':'频率 '+frequency;
+    const title=record ? x.t+' · CodeTop 排名 '+record.rank+' · 频率 '+frequency : x.t+' · 未进入 CodeTop Top300';
+    return '<a class="lc-a" href="'+x.u+'" target="_blank" rel="noopener noreferrer" title="'+title+'">'+
+      '<span class="lc-name">'+x.t+'</span><span class="lc-freq '+bucket+'">'+label+'</span></a>';
+  }).join('');
+}
+
+let si=0, cur=0, dotEls=[];
+function switchScene(i){
+  si=i; cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();
+  codeBox.innerHTML=SCENES[si].code;
+  renderLinks(SCENES[si]);
+  // 重建圆点
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{
+    const d=document.createElement('button');d.className='dot';d.title=s.title;
+    d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);
+  });
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;
+  cur=Math.max(0,Math.min(steps.length-1,i));
+  const s=steps[cur];
+  SCENES[si].paint(s);
+  stTitle.textContent=s.title;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2400;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+
+// 支持 #scene=pow&step=2
+const hm=location.hash.match(/scene=(\w+)/), sm=location.hash.match(/step=(\d+)/);
+let initScene=0;
+if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);
+if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高精度动画 · 加法进位 / 减法借位 / 除法余数</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#854F0B;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:460ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 16px;cursor:pointer;transition:all .15s var(--ease);display:flex;flex-direction:column;gap:1px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:620px 1fr;gap:26px;margin-top:20px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:20px;min-height:440px;display:flex;flex-direction:column;}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* 竖式 */
+.calc{margin:14px auto 8px;}
+.crow{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-bottom:8px;}
+.sign{width:30px;text-align:center;font-family:var(--mono);font-size:22px;color:var(--muted);flex:0 0 30px;}
+.dcell{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:24px;font-weight:700;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);transition:all var(--dur) var(--ease);}
+.dcell.empty{border-color:transparent;background:transparent;}
+.dcell.cur{box-shadow:0 0 0 3px rgba(24,95,165,.3);border-color:var(--blue);}
+.dcell.res{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.dcell.reveal{animation:pop .5s var(--ease);}
+@keyframes pop{0%{transform:scale(.6);}70%{transform:scale(1.14);}100%{transform:scale(1);}}
+.bcell{width:52px;height:22px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;flex:0 0 52px;}
+.bcell.carry{color:var(--brown);}
+.bcell.borrow{color:var(--danger);}
+.hr{height:2px;background:var(--ink);margin:6px 0 10px;border-radius:2px;}
+.calc-note{text-align:center;font-family:var(--mono);font-size:14px;color:var(--muted);margin-top:14px;min-height:24px;}
+.calc-note b{color:var(--ink);}
+.calc-note .cy{color:var(--brown);} .calc-note .bo{color:var(--danger);} .calc-note .rs{color:var(--green);}
+
+/* 除法 */
+.div-wrap{display:flex;flex-direction:column;align-items:center;margin-top:8px;}
+.div-q{display:flex;gap:8px;margin-bottom:4px;}
+.div-line{border-bottom:2px solid var(--ink);padding-bottom:4px;display:flex;gap:8px;align-items:flex-end;}
+.div-divisor{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--brown);margin-right:8px;align-self:center;}
+.div-rem{margin-top:22px;text-align:center;}
+.div-rem .rbox{display:inline-flex;align-items:center;justify-content:center;min-width:80px;height:52px;padding:0 14px;font-family:var(--mono);font-size:22px;font-weight:700;color:var(--danger);background:var(--dangerbg);border:1px solid var(--danger);border-radius:9px;}
+.div-rem .lbl{font-family:var(--mono);font-size:12px;color:var(--faint);margin-bottom:6px;}
+.div-calc{margin-top:18px;text-align:center;font-family:var(--mono);font-size:15px;color:var(--muted);min-height:24px;}
+.div-calc b{color:var(--ink);} .div-calc .q{color:var(--green);} .div-calc .r{color:var(--danger);}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;min-height:180px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:10px;padding:12px 16px;font-family:var(--mono);font-size:12px;line-height:1.6;color:#D8D5CC;white-space:pre;overflow-x:auto;}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>高精度动画 · 用数组模拟手算竖式</h1>
+    <p>加法进位 / 减法借位 / 乘法进位（低→高）/ 除法余数（高→低）　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ========== 竖式渲染器（加法 / 减法共用） ========== */
+function mountColumn(cfg){
+  // cfg: {cols, signB, aDigits, bDigits, badgeClass}
+  const N=cfg.cols;
+  function row(id,sign){
+    let h='<div class="crow"><span class="sign">'+(sign||'')+'</span>';
+    for(let i=0;i<N;i++)h+='<div class="dcell" id="'+id+'-'+i+'"></div>';
+    return h+'</div>';
+  }
+  let badge='<div class="crow"><span class="sign"></span>';
+  for(let i=0;i<N;i++)badge+='<div class="bcell '+cfg.badgeClass+'" id="bd-'+i+'"></div>';
+  badge+='</div>';
+  viz.innerHTML='<div class="vcap"><b>'+cfg.cap+'</b></div>'+
+    '<div class="calc">'+badge+row('a','')+row('b',cfg.signB)+
+    '<div class="crow"><span class="sign"></span><div class="hr" style="flex:1"></div></div>'+
+    row('c','')+'</div>'+
+    '<div class="calc-note" id="cnote"></div>';
+  for(let i=0;i<N;i++){
+    const a=document.getElementById('a-'+i), b=document.getElementById('b-'+i);
+    setCell(a,cfg.aDigits[i]); setCell(b,cfg.bDigits[i]);
+  }
+}
+function setCell(el,v){ if(v===''||v===null){el.className='dcell empty';el.textContent='';} else {el.className='dcell';el.textContent=v;} }
+
+/* ---------- 加法 456 + 789 ---------- */
+const addScene=(()=>{
+  const cols=4;
+  const A=['','4','5','6'], B=['','7','8','9'];
+  const code='<span class="kw">for</span> (<span class="kw">int</span> i=0; i&lt;A.size()||i&lt;B.size(); i++){\n'+
+    '    <span class="kw">if</span> (i&lt;A.size()) t += A[i];\n'+
+    '    <span class="kw">if</span> (i&lt;B.size()) t += B[i];\n'+
+    '    C.push_back(t % 10);  <span class="cmt">// 本位</span>\n'+
+    '    t /= 10;              <span class="cmt">// 进位</span>\n}\n'+
+    '<span class="kw">if</span> (t) C.push_back(t);   <span class="cmt">// 末尾进位补一位</span>';
+  // 每步：cur 自然列(0=千,3=个), badges[列]=进位值, C[列]
+  const steps=[
+    {title:'步骤 0 · 456 + 789',chip:'逆序存储',chipC:'c0',cur:-1,badges:['','','',''],C:['','','',''],
+     desc:'读入后<b>逆序存储</b>:低位在数组低索引，A=[6,5,4]、B=[9,8,7]。从<b>个位（低位）开始</b>逐位相加，进位往高位走。<b>为什么逆序？</b>进位永远朝最高位走，逆序后新位直接 <code>push_back</code> 追加即可。'},
+    {title:'步骤 1 · 个位 6+9=15',chip:'进位 1',chipC:'ch',cur:3,badges:['','',1,''],C:['','','','5'],note:'t = 6 + 9 = <b>15</b> → 本位 <span class="rs">5</span>,进位 <span class="cy">1</span>',
+     desc:'个位：t = 6 + 9 = 15。本位 = <b>15 % 10 = 5</b>,进位 = <b>15 / 10 = 1</b> 送往十位。'},
+    {title:'步骤 2 · 十位 5+8+1=14',chip:'进位 1',chipC:'ch',cur:2,badges:['',1,1,''],C:['','','4','5'],note:'t = 5 + 8 + <span class="cy">1</span> = <b>14</b> → 本位 <span class="rs">4</span>,进位 <span class="cy">1</span>',
+     desc:'十位：t = 5 + 8 + 上一位进位 1 = 14 → 本位 <b>4</b>,进位 <b>1</b>。'},
+    {title:'步骤 3 · 百位 4+7+1=12',chip:'进位 1',chipC:'ch',cur:1,badges:[1,1,1,''],C:['','2','4','5'],note:'t = 4 + 7 + <span class="cy">1</span> = <b>12</b> → 本位 <span class="rs">2</span>,进位 <span class="cy">1</span>',
+     desc:'百位：t = 4 + 7 + 1 = 12 → 本位 <b>2</b>,进位 <b>1</b>。此时 A、B 都用完了，但进位还在。'},
+    {title:'步骤 4 · 末尾进位补一位',chip:'补最高位',chipC:'cg',cur:0,badges:[1,1,1,''],C:['1','2','4','5'],note:'循环结束仍有进位 <span class="cy">1</span> → <code>C.push_back(1)</code>',
+     desc:'循环结束后进位还是 1，必须再<b>补一位</b>:<code>if (t) C.push_back(t)</code>。这就是 456+789 比原数多一位的来源。'},
+    {title:'步骤 5 · 结果 1245',chip:'完成',chipC:'cg',cur:-1,badges:[1,1,1,''],C:['1','2','4','5'],note:'456 + 789 = <span class="rs">1245</span>',
+     desc:'结果数组 C=[5,4,2,1]（逆序），<b>倒着输出</b>即 <b>1245</b>。乘法是同一套进位机制，只是把"逐位相加"换成"逐位乘 b 再累加进位"。'},
+  ];
+  function mount(){mountColumn({cols,signB:'+',aDigits:A,bDigits:B,badgeClass:'carry',cap:'加法：从个位起，逐位相加 + 进位'});}
+  function paint(s){
+    for(let i=0;i<cols;i++){
+      const c=document.getElementById('c-'+i);
+      setCell(c,s.C[i]); if(s.C[i]!=='')c.classList.add('res'); if(i===s.cur&&s.C[i]!=='')c.classList.add('reveal');
+      document.getElementById('bd-'+i).textContent=s.badges[i]===''?'':s.badges[i];
+      const a=document.getElementById('a-'+i),b=document.getElementById('b-'+i);
+      a.classList.toggle('cur',i===s.cur);b.classList.toggle('cur',i===s.cur);
+    }
+    document.getElementById('cnote').innerHTML=s.note||'';
+  }
+  return {id:'add',label:'加法',sub:'456 + 789 进位',steps,mount,paint,code};
+})();
+
+/* ---------- 减法 205 - 47 ---------- */
+const subScene=(()=>{
+  const cols=3;
+  const A=['2','0','5'], B=['','4','7'];
+  const code='<span class="kw">for</span> (<span class="kw">int</span> i=0; i&lt;A.size(); i++){\n'+
+    '    t = A[i] - t;                <span class="cmt">// 先扣借位</span>\n'+
+    '    <span class="kw">if</span> (i&lt;B.size()) t -= B[i];\n'+
+    '    C.push_back((t + 10) % 10);  <span class="cmt">// 借则 +10</span>\n'+
+    '    t = t &lt; 0 ? 1 : 0;          <span class="cmt">// 新借位</span>\n}';
+  const steps=[
+    {title:'步骤 0 · 205 − 47',chip:'保证 A ≥ B',chipC:'c0',cur:-1,badges:['','',''],C:['','',''],
+     desc:'减法要求 <b>被减数 ≥ 减数</b>(A &lt; B 时交换并补负号)。逆序存储 A=[5,0,2]、B=[7,4]。从个位起，不够减就<b>向高位借 1</b>。'},
+    {title:'步骤 1 · 个位 5−7 不够',chip:'借位 1',chipC:'cd',cur:2,badges:['',1,''],C:['','','8'],note:'5 − 0 − 7 = <b>−2</b> → (−2+10)%10 = <span class="rs">8</span>,借位 <span class="bo">1</span>',
+     desc:'个位：5 − 7 = −2，<b>不够减</b>。用 <b>(t+10)%10</b> 得到本位 <b>8</b>（相当于借 10 后 15−7），并向十位<b>借 1</b>。<b class="dg">不能写 t%10</b>——C++ 负数取模仍为负。'},
+    {title:'步骤 2 · 十位 0−4−借1',chip:'借位 1',chipC:'cd',cur:1,badges:[1,1,''],C:['','5','8'],note:'0 − <span class="bo">1</span> − 4 = <b>−5</b> → (−5+10)%10 = <span class="rs">5</span>,借位 <span class="bo">1</span>',
+     desc:'十位：先扣掉被借走的 1，再减 4：0 − 1 − 4 = −5 → 本位 <b>5</b>,继续向百位借 1。'},
+    {title:'步骤 3 · 百位 2−借1',chip:'不再借',chipC:'cg',cur:0,badges:[1,1,''],C:['1','5','8'],note:'2 − <span class="bo">1</span> − 0 = <b>1</b> → 本位 <span class="rs">1</span>,借位 0',
+     desc:'百位：2 − 借位 1 = 1，够减，本位 <b>1</b>,不再借位。'},
+    {title:'步骤 4 · 结果 158',chip:'去前导零',chipC:'cg',cur:-1,badges:[1,1,''],C:['1','5','8'],note:'205 − 47 = <span class="rs">158</span>',
+     desc:'结果 <b>158</b>。若高位算出多余的 0（如 1000−2）要 <code>pop_back</code> 去前导零，但 <b>C.size()&gt;1 时才删</b>,避免把结果 0 也删空。'},
+  ];
+  function mount(){mountColumn({cols,signB:'−',aDigits:A,bDigits:B,badgeClass:'borrow',cap:'减法：不够减就向高位借 1，(t+10)%10 取本位'});}
+  function paint(s){
+    for(let i=0;i<cols;i++){
+      const c=document.getElementById('c-'+i);
+      setCell(c,s.C[i]);if(s.C[i]!=='')c.classList.add('res');if(i===s.cur&&s.C[i]!=='')c.classList.add('reveal');
+      document.getElementById('bd-'+i).textContent=s.badges[i]===''?'':s.badges[i];
+      const a=document.getElementById('a-'+i),b=document.getElementById('b-'+i);
+      a.classList.toggle('cur',i===s.cur);b.classList.toggle('cur',i===s.cur);
+    }
+    document.getElementById('cnote').innerHTML=s.note||'';
+  }
+  return {id:'sub',label:'减法',sub:'205 − 47 借位',steps,mount,paint,code};
+})();
+
+/* ---------- 乘法 456 × 8 ---------- */
+const mulScene=(()=>{
+  const cols=4;
+  const A=['','4','5','6'], B=['','','','8'];   // × 8
+  const code='<span class="kw">for</span> (<span class="kw">int</span> i=0; i&lt;A.size() || t; i++){  <span class="cmt">// t 非 0 继续</span>\n'+
+    '    <span class="kw">if</span> (i&lt;A.size()) t += A[i] * b;\n'+
+    '    C.push_back(t % 10);  <span class="cmt">// 本位</span>\n'+
+    '    t /= 10;              <span class="cmt">// 进位（可 &gt;1）</span>\n}\n'+
+    '<span class="kw">while</span> (C.size()&gt;1 &amp;&amp; !C.back()) C.pop_back(); <span class="cmt">// 处理 b==0</span>';
+  const steps=[
+    {title:'步骤 0 · 456 × 8',chip:'加法同款进位',chipC:'c0',cur:-1,badges:['','','',''],C:['','','',''],
+     desc:'乘法（大数 × <b>小数</b> b）和加法是<b>同一套进位机制</b>,只是把"逐位相加"换成 <b>t = A[i]×b + 进位</b>。逆序存储 A=[6,5,4]，b=8。从个位起逐位算：<b>本位 = t%10</b>、<b>进位 = t/10</b>。关键差别——<b class="dg">进位可能 &gt;1</b>(如 9×9=81)。'},
+    {title:'步骤 1 · 个位 6×8=48',chip:'进位 4',chipC:'ch',cur:3,badges:['','',4,''],C:['','','','8'],note:'t = 6×8 = <b>48</b> → 本位 <span class="rs">8</span>,进位 <span class="cy">4</span>',
+     desc:'个位：t = 6 × 8 = 48。本位 = <b>48 % 10 = 8</b>,进位 = <b>48 / 10 = 4</b> 送往十位。<b>进位一次就到了 4</b>——这正是乘法和加法的差别，加法进位最多是 1。'},
+    {title:'步骤 2 · 十位 5×8+4=44',chip:'进位 4',chipC:'ch',cur:2,badges:['',4,4,''],C:['','','4','8'],note:'t = 5×8 + <span class="cy">4</span> = <b>44</b> → 本位 <span class="rs">4</span>,进位 <span class="cy">4</span>',
+     desc:'十位：t = 5 × 8 + 上一位进位 4 = 44 → 本位 <b>4</b>,进位 <b>4</b>。<b>先乘再加进位</b>,顺序不能反。'},
+    {title:'步骤 3 · 百位 4×8+4=36',chip:'进位 3',chipC:'ch',cur:1,badges:[3,4,4,''],C:['','6','4','8'],note:'t = 4×8 + <span class="cy">4</span> = <b>36</b> → 本位 <span class="rs">6</span>,进位 <span class="cy">3</span>',
+     desc:'百位：t = 4 × 8 + 4 = 36 → 本位 <b>6</b>,进位 <b>3</b>。A 已经用完，但进位 3 还在，必须继续处理。'},
+    {title:'步骤 4 · 进位补位 t=3',chip:'循环条件 || t',chipC:'cg',cur:0,badges:[3,4,4,''],C:['3','6','4','8'],note:'A 用完但进位 <span class="cy">3</span> ≠ 0 → 再写一位 <span class="rs">3</span>',
+     desc:'A 没有下一位了，但进位 <b>t = 3</b> 仍非 0。循环条件 <code>i&lt;A.size() || t</code> 里的 <b>|| t</b> 让它继续，把进位单独写成新的一位 <code>C.push_back(3)</code>。<b class="dg">这里补的是 3 而非 1</b>,所以不能像加法那样写死 <code>push_back(1)</code>。'},
+    {title:'步骤 5 · 结果 3648',chip:'完成',chipC:'cg',cur:-1,badges:[3,4,4,''],C:['3','6','4','8'],note:'456 × 8 = <span class="rs">3648</span>',
+     desc:'结果数组 C=[8,4,6,3]（逆序），倒序输出得 <b>3648</b>（验证 456×8=3648 ✓）。<b>大数 × 大数</b>则要双重循环，把 <code>num1[i]×num2[j]</code> 累加到结果第 <code>i+j</code> 位（力扣 43 题）。'},
+  ];
+  function mount(){mountColumn({cols,signB:'×',aDigits:A,bDigits:B,badgeClass:'carry',cap:'乘法：逐位 A[i]×b + 进位，t%10 取本位（进位可 &gt;1）'});}
+  function paint(s){
+    for(let i=0;i<cols;i++){
+      const c=document.getElementById('c-'+i);
+      setCell(c,s.C[i]);if(s.C[i]!=='')c.classList.add('res');if(i===s.cur&&s.C[i]!=='')c.classList.add('reveal');
+      document.getElementById('bd-'+i).textContent=s.badges[i]===''?'':s.badges[i];
+      document.getElementById('a-'+i).classList.toggle('cur',i===s.cur);
+      document.getElementById('b-'+i).classList.toggle('cur',i===3&&s.cur>=1);
+    }
+    document.getElementById('cnote').innerHTML=s.note||'';
+  }
+  return {id:'mul',label:'乘法',sub:'456 × 8 进位',steps,mount,paint,code};
+})();
+
+/* ---------- 除法 1234 ÷ 7 ---------- */
+const divScene=(()=>{
+  const digits=[1,2,3,4], b=7;
+  const Q=[0,1,7,6];   // 商（高→低）
+  const rs=[1,5,4,2];  // 每步余数
+  const code='<span class="kw">for</span> (<span class="kw">int</span> i=A.size()-1; i&gt;=0; i--){  <span class="cmt">// 从最高位</span>\n'+
+    '    r = r*10 + A[i];\n'+
+    '    C.push_back(r / b);  <span class="cmt">// 商位（高→低）</span>\n'+
+    '    r %= b;\n}\n'+
+    'reverse(C.begin(), C.end());  <span class="cmt">// 翻成低→高</span>';
+  const steps=[
+    {title:'步骤 0 · 1234 ÷ 7',chip:'唯一从高位起',chipC:'c0',pos:-1,r:0,
+     desc:'除法是<b>唯一从最高位开始</b>的运算。维护余数 <b>r</b>,每步 <b>r = r×10 + 当前位</b>,商位 = <b>r / 7</b>,新余数 = <b>r % 7</b>。'},
+    {title:'步骤 1 · 取 1',chip:'r=1',chipC:'cb',pos:0,r:1,note:'r = 0×10 + 1 = 1;　1/7 = <span class="q">0</span>,　1%7 = <span class="r">1</span>',
+     desc:'第一位 1：r = 0×10 + 1 = 1。1 ÷ 7 = <b>0</b>（商位），余 <b>1</b>。这个前导 0 最后会被去掉。'},
+    {title:'步骤 2 · 取 2',chip:'r=5',chipC:'cb',pos:1,r:5,note:'r = 1×10 + 2 = 12;　12/7 = <span class="q">1</span>,　12%7 = <span class="r">5</span>',
+     desc:'第二位 2：r = 1×10 + 2 = 12。12 ÷ 7 = <b>1</b>,余 <b>5</b>。'},
+    {title:'步骤 3 · 取 3',chip:'r=4',chipC:'cb',pos:2,r:4,note:'r = 5×10 + 3 = 53;　53/7 = <span class="q">7</span>,　53%7 = <span class="r">4</span>',
+     desc:'第三位 3：r = 5×10 + 3 = 53。53 ÷ 7 = <b>7</b>,余 <b>4</b>。'},
+    {title:'步骤 4 · 取 4',chip:'r=2',chipC:'cb',pos:3,r:2,note:'r = 4×10 + 4 = 44;　44/7 = <span class="q">6</span>,　44%7 = <span class="r">2</span>',
+     desc:'第四位 4：r = 4×10 + 4 = 44。44 ÷ 7 = <b>6</b>,余 <b>2</b>。'},
+    {title:'步骤 5 · 商 176 余 2',chip:'reverse + 去零',chipC:'cg',pos:-1,r:2,done:true,
+     desc:'商位按高→低得到 <b>0176</b>,与逆序存储相反，所以要 <b>reverse</b> 再去前导零 → <b>176</b>,余数 <b>2</b>。验证：7 × 176 + 2 = 1234。'},
+  ];
+  function mount(){
+    let q='',d='';
+    for(let i=0;i<4;i++){q+='<div class="dcell" id="dq-'+i+'"></div>';d+='<div class="dcell" id="dd-'+i+'">'+digits[i]+'</div>';}
+    viz.innerHTML='<div class="vcap"><b>除法：从最高位起，r = r×10 + 当前位，商 = r / b</b></div>'+
+      '<div class="div-wrap">'+
+        '<div class="div-q">'+q+'</div>'+
+        '<div class="div-line"><span class="div-divisor">7 )</span>'+d+'</div>'+
+        '<div class="div-rem"><div class="lbl">当前余数 r</div><div class="rbox" id="drem">0</div></div>'+
+      '</div>'+
+      '<div class="div-calc" id="dcalc"></div>';
+  }
+  function paint(s){
+    for(let i=0;i<4;i++){
+      const dq=document.getElementById('dq-'+i), dd=document.getElementById('dd-'+i);
+      if(s.pos>=i || s.done){setCell(dq,Q[i]);dq.classList.add('res');if(i===s.pos)dq.classList.add('reveal');}
+      else setCell(dq,'');
+      dd.classList.toggle('cur',i===s.pos);
+    }
+    document.getElementById('drem').textContent=s.r;
+    document.getElementById('dcalc').innerHTML=s.done?'商 <b class="q">176</b>（去掉前导 0）　余数 <b class="r">2</b>':(s.note||'');
+  }
+  return {id:'div',label:'除法',sub:'1234 ÷ 7 余数',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[addScene,subScene,mulScene,divScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  stTitle.textContent=s.title;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2300;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="3"></script>
+</body>
+</html>

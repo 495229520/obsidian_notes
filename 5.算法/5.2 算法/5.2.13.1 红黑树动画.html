@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>红黑树动画 · 五大性质 / 旋转 / 插入修复 / 删除修复</title>
+<style>
+:root{
+  /* Same teaching-tool system as the algorithm animation collection. */
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8A887F;
+  --line:#C9C7BF;--grid:#E2E0D7;--gray:#F1EFE8;
+  --blue:#185FA5;--bluebg:#E6F1FB;--green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;--danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:540ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:0;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 15px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-height:58px;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+.tab .t{font-weight:600;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,626px) minmax(320px,1fr);gap:26px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:22px;min-height:498px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:12px;color:var(--muted);margin-bottom:6px;}.vcap b{color:var(--ink);}
+.right{display:flex;flex-direction:column;gap:16px;}.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:18px 20px;min-height:230px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:7px;}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}.desc-body b{color:var(--ink);}.desc-body .bl{color:var(--blue);font-weight:600;}.desc-body .gr{color:var(--green);font-weight:600;}.desc-body .br{color:var(--brown);font-weight:600;}.desc-body .dg{color:var(--danger);font-weight:600;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.codebox{background:#2E2C27;border-radius:8px;padding:14px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}.codebox .cmt{color:#8F8B80;}.codebox .kw{color:#E3A44C;}.codebox .fn{color:#8EC5EA;}.codebox .rd{color:#E08974;}
+
+/* red-black tree canvas */
+.rbarea{position:relative;height:300px;margin:6px 4px 0;}
+.rbedge{position:absolute;height:2px;background:var(--line);transform-origin:left center;z-index:1;opacity:0;transition:background .3s var(--ease),height .3s var(--ease);}
+.rbedge.hot{background:var(--brown);height:3px;}
+.rbnode{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:800;opacity:0;z-index:2;
+  transition:left var(--dur) var(--ease),top var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease),opacity .3s var(--ease);}
+.rbnode.b{background:var(--ink);border-color:#26251f;color:var(--paper);}
+.rbnode.r{background:var(--danger);border-color:#8a2f22;color:#fff;}
+.rbnode.g{background:var(--paper);border-color:var(--line);color:var(--muted);}
+.rbnode.nil{width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:6px;background:#26251f;border-color:#17160f;color:#B7B4AA;font-size:9px;font-weight:700;}
+.rbnode.db{width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:7px;background:#26251f;border-color:var(--danger);color:#E9C6BE;font-size:9px;font-weight:700;box-shadow:0 0 0 3px var(--panel),0 0 0 6px var(--danger);}
+.rbnode.focus{box-shadow:0 0 0 4px rgba(24,95,165,.22);transform:scale(1.09);z-index:4;}
+.rbnode.ring{box-shadow:0 0 0 4px rgba(154,91,14,.24);z-index:3;}
+.rbnode.dim{opacity:.4!important;}
+.rbnode .v{line-height:1;}
+.rbnode .tag{position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);white-space:nowrap;color:var(--faint);font-size:9.5px;font-weight:700;font-family:var(--mono);}
+.rbptr{position:absolute;z-index:5;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--blue);opacity:0;transform:translateX(-50%);transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .2s;}
+
+.collbl{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;margin:12px 0 4px;}
+.ordstrip{display:flex;gap:6px;justify-content:center;margin-top:2px;}
+.ordstrip span{width:46px;height:34px;border:1.5px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--muted);background:var(--paper);transition:all .35s var(--ease);}
+.ordstrip.lit span{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--faint);}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:4px;border:1.5px solid;}
+.legend .lb{background:var(--ink);border-color:#26251f;}.legend .lr{background:var(--danger);border-color:#8a2f22;}.legend .ln{background:#26251f;border-color:#17160f;border-radius:3px;}
+.op-note{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:auto;padding-top:12px;min-height:34px;}.op-note b{color:var(--ink);}.op-note .dg{color:var(--danger);font-weight:700;}.op-note .gr{color:var(--green);font-weight:700;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}.btn{font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;min-height:40px;}.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:46px;text-align:center;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.right{display:grid;grid-template-columns:1fr 1fr;}.codebox{min-height:230px;}}
+@media(max-width:720px){body{padding:20px 14px 32px;}.right{display:flex;}.viz{padding:16px;}.tab{flex:1 1 132px}.rbarea{height:270px;margin:6px 0 0}.rbnode{width:40px;height:40px;margin:-20px 0 0 -20px;font-size:13px}.controls{padding:12px;gap:8px}.dots{order:4;width:100%}.codebox{font-size:11px}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+<link rel="stylesheet" href="./算法动画题单.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>红黑树动画 · 一棵自平衡 BST 如何维持它的五条不变量</h1>
+    <p>五大性质、左旋 / 右旋、插入修复（情况 1→2→3）、删除修复（双黑）　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="动画主题"></nav>
+  <div class="layout">
+    <section class="viz" id="viz" aria-live="polite"></section>
+    <section class="right">
+      <div class="desc-card"><div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div><div class="act" id="stAct"></div><div class="desc-body" id="stDesc"></div></div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" aria-label="上一步">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" aria-label="播放动画">▶ 播放</button>
+    <button class="btn" id="btnNext" aria-label="下一步">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤跳转"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const EDGE_POOL=9;
+let edgeRAF=null,curStep=null;
+
+/* ---------- shared red-black tree renderer (build once, mutate per step) ---------- */
+function buildTree(prefix,keys,vals){
+  let edges='';for(let i=0;i<EDGE_POOL;i++)edges+='<span class="rbedge" id="'+prefix+'e'+i+'"></span>';
+  let nodes='';keys.forEach(k=>{nodes+='<div class="rbnode" id="'+prefix+'n'+k+'"><span class="v">'+(vals[k]!==undefined?vals[k]:k)+'</span><span class="tag"></span></div>';});
+  return '<div class="rbarea" id="'+prefix+'area">'+edges+nodes+'<span class="rbptr" id="'+prefix+'ptr"></span></div>';
+}
+function buildNodes(POS,COL,spec){
+  const o={};for(const k in spec){o[k]={x:POS[k][0],y:POS[k][1],c:(spec[k].c||COL[k]),hl:spec[k].hl||'',tag:spec[k].tag||''};}return o;
+}
+function positionEdges(prefix,edges,hot){
+  for(let i=0;i<EDGE_POOL;i++){
+    const el=document.getElementById(prefix+'e'+i);if(!el)continue;
+    if(edges&&i<edges.length){
+      const A=document.getElementById(prefix+'n'+edges[i][0]),B=document.getElementById(prefix+'n'+edges[i][1]);
+      if(!A||!B||A.style.opacity==='0'||B.style.opacity==='0'){el.style.opacity=0;continue;}
+      const ax=A.offsetLeft+A.offsetWidth/2,ay=A.offsetTop+A.offsetHeight/2,bx=B.offsetLeft+B.offsetWidth/2,by=B.offsetTop+B.offsetHeight/2,dx=bx-ax,dy=by-ay;
+      el.style.opacity=1;el.style.left=ax+'px';el.style.top=ay+'px';el.style.width=Math.hypot(dx,dy)+'px';el.style.transform='rotate('+Math.atan2(dy,dx)*180/Math.PI+'deg)';
+      el.className='rbedge'+(hot&&hot.some(h=>(h[0]===edges[i][0]&&h[1]===edges[i][1])||(h[0]===edges[i][1]&&h[1]===edges[i][0]))?' hot':'');
+    }else{el.style.opacity=0;el.className='rbedge';}
+  }
+}
+function animateEdges(prefix,edges,hot){
+  if(edgeRAF)cancelAnimationFrame(edgeRAF);
+  const t0=performance.now();
+  function frame(t){positionEdges(prefix,edges,hot);if(t-t0<720)edgeRAF=requestAnimationFrame(frame);else edgeRAF=null;}
+  positionEdges(prefix,edges,hot);edgeRAF=requestAnimationFrame(frame);
+}
+function renderTree(prefix,keys,vals,s){
+  const N=s.nodes||{};
+  keys.forEach(k=>{
+    const el=document.getElementById(prefix+'n'+k),d=N[k];
+    if(!d){el.style.opacity=0;el.className='rbnode';return;}
+    el.style.opacity=1;el.style.left=d.x+'%';el.style.top=d.y+'%';
+    let cls='rbnode '+(d.c==='r'?'r':d.c==='nil'?'nil':d.c==='db'?'db':d.c==='g'?'g':'b');
+    if(d.hl)cls+=' '+d.hl;el.className=cls;
+    el.querySelector('.v').textContent=(d.c==='nil'||d.c==='db')?'NIL':(vals[k]!==undefined?vals[k]:k);
+    el.querySelector('.tag').textContent=d.tag||'';
+  });
+  const area=document.getElementById(prefix+'area'),ptr=document.getElementById(prefix+'ptr');
+  if(s.ptr&&N[s.ptr]){const d=N[s.ptr];ptr.style.opacity=1;ptr.textContent=(s.ptrLabel||'z')+' ▼';ptr.style.left=(area.clientWidth*d.x/100)+'px';ptr.style.top=(area.clientHeight*d.y/100-30)+'px';}
+  else ptr.style.opacity=0;
+  animateEdges(prefix,s.edges||[],s.hotE||[]);
+}
+
+/* ================= Scene 1 · 五大性质 ================= */
+const propScene=(()=>{
+  const POS={'13':[50,11],'8':[27,34],'17':[73,34],'6':[15,59],'11':[39,59],'25':[85,59],q1:[8,82],q2:[22,82],q3:[78,82],q4:[93,82]};
+  const COL={'13':'b','8':'r','17':'b','6':'b','11':'b','25':'r',q1:'nil',q2:'nil',q3:'nil',q4:'nil'};
+  const E=[['13','8'],['13','17'],['8','6'],['8','11'],['17','25']];
+  const ENIL=E.concat([['6','q1'],['6','q2'],['25','q3'],['25','q4']]);
+  const base={'13':{},'8':{},'17':{},'6':{},'11':{},'25':{}};
+  const withnil=Object.assign({},base,{q1:{hl:'dim'},q2:{hl:'dim'},q3:{hl:'dim'},q4:{hl:'dim'}});
+  const steps=[
+    {edges:E,nodes:buildNodes(POS,COL,base),chip:'性质 1 · 节点非红即黑',chipC:'c0',title:'每个节点要么红、要么黑',note:'先把它当作一棵已经合法的红黑树，观察整体着色',
+     desc:'红黑树在普通 BST 的每个节点上多存一个 <b>颜色位</b>。<span class="dg">红</span>、<span class="bl">黑</span>两种颜色配合后面四条规则，把树的高度牢牢压在 <code>O(log n)</code>。'},
+    {edges:E,nodes:buildNodes(POS,COL,Object.assign({},base,{'13':{hl:'focus'}})),chip:'性质 2 · 根节点为黑',chipC:'cb',title:'根节点 13 必须是黑色',note:'root = 13（黑）',
+     desc:'根永远是黑。插入 / 删除结束时若根被染红，会<b>强制改回黑</b>——这条最容易在收尾时被忘掉。'},
+    {edges:ENIL,nodes:buildNodes(POS,COL,Object.assign({},base,{q1:{hl:'focus'},q2:{hl:'focus'},q3:{hl:'focus'},q4:{hl:'focus'}})),chip:'性质 3 · 叶子 NIL 为黑',chipC:'c0',title:'所有空指针都视为黑色 NIL 叶子',note:'真实数据都在内部节点，NIL 只表示“这条路到底了”',
+     desc:'红黑树把每个空指针看成一个统一的<b>黑色 NIL 哨兵</b>。这样“从节点到叶子的路径”都以 NIL 结尾，性质 5 的黑高才好定义。'},
+    {edges:ENIL,nodes:buildNodes(POS,COL,Object.assign({},withnil,{'8':{hl:'ring'},'25':{hl:'ring'},'6':{tag:'黑✓'},'11':{tag:'黑✓'},'17':{tag:'黑✓'}})),chip:'性质 4 · 不存在连续红',chipC:'cd',title:'红节点的两个孩子都必须是黑',note:'8(红) 的孩子 6、11 皆黑；25(红) 的父 17 也是黑',
+     desc:'不允许出现<b>父红子红</b>。这条把“最长路径”里红节点的数量卡死：红色只能与黑色交替出现，红节点最多占一半。'},
+    {edges:ENIL,nodes:buildNodes(POS,COL,Object.assign({},withnil,{'13':{hl:'ring',tag:'黑1'},'8':{hl:'dim'},'11':{hl:'dim'},'17':{hl:'dim'},'25':{hl:'dim'},'6':{hl:'ring',tag:'黑2'},q1:{hl:'ring',tag:'黑3'},q2:{hl:'dim'}})),chip:'性质 5 · 黑高相等',chipC:'cg',title:'路径 13→8→6→NIL：黑节点 = 3',note:'黑节点（含根与 NIL）：13 · 6 · NIL → <b>3</b>',
+     desc:'从任一节点到它的每个后代 NIL，路上的<b>黑节点数目相同</b>，这个数目叫<b>黑高</b>。先数左边这条：跳过红色的 8，黑节点是 13、6、NIL 共 <span class="gr">3</span> 个。'},
+    {edges:ENIL,nodes:buildNodes(POS,COL,Object.assign({},withnil,{'13':{hl:'ring',tag:'黑1'},'8':{hl:'dim'},'11':{hl:'dim'},'6':{hl:'dim'},'17':{hl:'ring',tag:'黑2'},'25':{hl:'ring'},q3:{hl:'ring',tag:'黑3'},q4:{hl:'dim'},q1:{hl:'dim'},q2:{hl:'dim'}})),chip:'性质 5 · 黑高相等',chipC:'cg',title:'另一条 13→17→25→NIL 同样 = 3',note:'13 · 17 · NIL → <b>3</b>　⇒　最长路径 ≤ 2 × 最短路径',
+     desc:'右边这条黑节点也是 <span class="gr">3</span>（跳过红色的 25）。性质 4 + 性质 5 联手：最短路径全黑、最长路径红黑相间，于是<b>最长 ≤ 2×最短</b>，高度必为 <code>O(log n)</code>。'}
+  ];
+  const code='<span class="cmt">// 红黑树的 5 条不变量</span>\n<span class="kw">1.</span> 每个节点是 <span class="rd">红</span> 或 黑\n<span class="kw">2.</span> 根节点是 黑\n<span class="kw">3.</span> 每个叶子 NIL 是 黑\n<span class="kw">4.</span> <span class="rd">红</span>节点的孩子必为黑   <span class="cmt">// 无连续红</span>\n<span class="kw">5.</span> 任一节点到其所有后代\n   NIL, 黑节点数相同     <span class="cmt">// 黑高</span>\n\n<span class="cmt">// 4 + 5  ⇒  最长 ≤ 2 × 最短\n//        ⇒  树高 O(log n)</span>';
+  const keys=['13','8','17','6','11','25','q1','q2','q3','q4'],vals={q1:'',q2:'',q3:'',q4:''};
+  return{id:'prop',label:'五大性质',sub:'颜色 / 黑高 / O(log n)',steps,code,keys,vals,
+    mount(){viz.innerHTML='<div class="vcap"><b>一棵合法红黑树</b>：颜色 + 黑高共同压住树的高度</div>'+buildTree('pr',keys,vals)+'<div class="legend"><span><i class="lb"></i>黑节点</span><span><i class="lr"></i>红节点</span><span><i class="ln"></i>NIL 叶子(黑)</span></div><div class="op-note" id="prnote"></div>';},
+    paint(s){renderTree('pr',keys,vals,s);document.getElementById('prnote').innerHTML=s.note;}};
+})();
+
+/* ================= Scene 2 · 旋转 ================= */
+const rotScene=(()=>{
+  const P0={x:[50,15],a:[27,45],y:[73,45],b:[58,77],c:[86,77]};
+  const P1={y:[50,15],x:[27,45],c:[73,45],a:[15,77],b:[41,77]};
+  const E0=[['x','a'],['x','y'],['y','b'],['y','c']];
+  const E1=[['y','x'],['y','c'],['x','a'],['x','b']];
+  const COL={x:'g',a:'g',y:'g',b:'g',c:'g'};
+  const TAGS={x:{tag:'x'},a:{tag:'a'},y:{tag:'y'},b:{tag:'b'},c:{tag:'c'}};
+  const mkS=(P,extra)=>buildNodes(P,COL,Object.assign(JSON.parse(JSON.stringify(TAGS)),extra));
+  const steps=[
+    {edges:E0,nodes:mkS(P0,{x:{tag:'x',hl:'focus'},y:{tag:'y',hl:'ring'}}),chip:'左旋 x · 轴 = x→y',chipC:'cb',title:'以 x 为支点，右孩子 y 将要上位',note:'旋转前中序：a x b y c',
+     desc:'旋转围绕一条边进行。<b>左旋 x</b> 抓住 x 与它右孩子 <span class="bl">y</span> 之间这条边，让 y 转上来、x 沉下去。此处用抽象节点，只看形状不看颜色。'},
+    {edges:E0,hotE:[['x','y']],nodes:mkS(P0,{x:{tag:'x',hl:'focus'},y:{tag:'y',hl:'ring'},b:{tag:'b',hl:'ring'}}),chip:'左旋 x · 定位待搬运的 b',chipC:'ch',title:'y 的左子树 b 会被“过继”给 x',note:'关键：b 介于 x 与 y 之间，换父后仍满足 x < b < y',
+     desc:'难点只有一处：y 的左孩子 <span class="br">b</span> 夹在 x 和 y 中间。旋转时 b 会从 <code>y.left</code> 改挂到 <code>x.right</code>——正因为 <code>x &lt; b &lt; y</code>，这样挂依旧合法。'},
+    {edges:E1,hotE:[['x','b']],nodes:mkS(P1,{y:{tag:'y',hl:'focus'},x:{tag:'x',hl:'ring'},b:{tag:'b',hl:'ring'}}),chip:'左旋 x · 执行',chipC:'cb',title:'y 上位成为子树根，x 变为 y 的左孩子',note:'x.right = y.left(b)　→　y.left = x',
+     desc:'三行指针操作：<code>y = x.right</code>、<code>x.right = y.left</code>（把 b 交给 x）、<code>y.left = x</code>。看 b 如何滑到 x 的右下方——它换了父亲，却没换在序列里的位置。'},
+    {edges:E1,nodes:mkS(P1,{}),chip:'左旋完成 · 中序不变',chipC:'cg',title:'形状变了，左 < 根 < 右 依然成立',lit:true,note:'旋转后中序：a x b y c　—— 与旋转前完全一致',
+     desc:'子树高度被重新分配，但<b>中序遍历序列一字不变</b>。这正是旋转能在保持 BST 有序性的前提下，充当红黑树 / AVL 树“调整形状”工具的原因。'},
+    {edges:E0,hotE:[['x','y']],nodes:mkS(P0,{y:{tag:'y',hl:'focus'},x:{tag:'x',hl:'ring'}}),chip:'右旋 y · 完全对称的逆操作',chipC:'ch',title:'对 y 右旋，把整棵子树旋回原状',lit:true,note:'right rotate 与 left rotate 互为逆运算',
+     desc:'现在对 y 做<b>右旋</b>：<code>x = y.left</code>、<code>y.left = x.right</code>、<code>x.right = y</code>。左旋与右旋是一对镜像逆操作，b 又被交还回 y。'},
+    {edges:E0,nodes:mkS(P0,{}),chip:'旋转 = O(1) 的局部改指针',chipC:'cg',title:'旋转只动常数个指针，不改变元素集合',lit:true,note:'插入最多 2 次旋转，删除最多 3 次旋转',
+     desc:'一次旋转只改<b>常数个指针</b>，是 <code>O(1)</code> 操作。红黑树靠“变色 + 少量旋转”就能修好平衡，这也是它比 AVL 树旋转更省、更适合频繁增删的根本。'}
+  ];
+  const code='<span class="fn">leftRotate</span>(x) {\n    y = x-&gt;right;        <span class="cmt">// y 上位</span>\n    x-&gt;right = y-&gt;left;   <span class="cmt">// b 改挂到 x</span>\n    y-&gt;left  = x;         <span class="cmt">// x 成为 y 左孩子</span>\n    <span class="cmt">// ... 修正三处 parent 指针</span>\n}\n<span class="cmt">// 右旋 = 完全对称的逆操作\n// 中序序列不变: a x b y c</span>';
+  const keys=['x','a','y','b','c'],vals={x:'20',a:'10',y:'40',b:'30',c:'50'};
+  return{id:'rotate',label:'旋转操作',sub:'左旋 / 右旋 · 保持中序',steps,code,keys,vals,
+    mount(){viz.innerHTML='<div class="vcap"><b>左旋 / 右旋</b>：节点滑动，中序序列保持不变</div>'+buildTree('rt',keys,vals)+'<div class="collbl">中序序列（左 → 根 → 右）· 旋转前后完全一致</div><div class="ordstrip" id="rtord"><span>10</span><span>20</span><span>30</span><span>40</span><span>50</span></div><div class="op-note" id="rtnote"></div>';},
+    paint(s){renderTree('rt',keys,vals,s);document.getElementById('rtord').className='ordstrip'+(s.lit?' lit':'');document.getElementById('rtnote').innerHTML=s.note;}};
+})();
+
+/* ================= Scene 3 · 插入修复 ================= */
+const insScene=(()=>{
+  // positions across the two rotations
+  const PA={'50':[50,9],'20':[30,29],'70':[74,29],'15':[16,50],'30':[42,50],'25':[33,72],'35':[52,72],'23':[26,91]};
+  const PB={'50':[50,9],'70':[74,29],'30':[30,29],'20':[18,50],'35':[44,50],'15':[10,72],'25':[26,72],'23':[20,91]};
+  const PC={'30':[50,9],'20':[28,29],'50':[72,29],'15':[16,50],'25':[40,50],'35':[60,50],'70':[84,50],'23':[34,72]};
+  // colours at three stages
+  const CA={'50':'b','20':'r','70':'b','15':'b','30':'b','25':'r','35':'r','23':'r'};
+  const CB={'50':'b','20':'r','70':'b','15':'b','30':'r','25':'b','35':'b','23':'r'};
+  const CC={'30':'b','20':'r','50':'r','15':'b','25':'b','35':'b','70':'b','23':'r'};
+  const EA=[['50','20'],['50','70'],['20','15'],['20','30'],['30','25'],['30','35'],['25','23']];
+  const EB=[['50','30'],['50','70'],['30','20'],['30','35'],['20','15'],['20','25'],['25','23']];
+  const EC=[['30','20'],['30','50'],['20','15'],['20','25'],['50','35'],['50','70'],['25','23']];
+  const base6={'50':{},'20':{},'70':{},'15':{},'30':{},'25':{},'35':{}};
+  const base7=Object.assign({},base6,{'23':{}});
+  const steps=[
+    {edges:EA.slice(0,6),nodes:buildNodes(PA,CA,Object.assign({},base6,{'50':{hl:'ring'},'20':{hl:'ring'},'30':{hl:'ring'},'25':{hl:'ring',tag:'插到这'}})),chip:'① 按 BST 找插入位置',chipC:'c0',title:'插入 23：沿 BST 一路比较到叶子',note:'23<50→左, 23>20→右, 23<30→左, 23<25→左',
+     desc:'红黑树插入 = <b>先做标准 BST 插入</b>，再修颜色。23 沿 50→20→30→25 下行，最终落在 25 的左空位。'},
+    {edges:EA,ptr:'23',ptrLabel:'z',nodes:buildNodes(PA,CA,Object.assign({},base7,{'23':{hl:'focus'}})),chip:'② 新节点染红',chipC:'cd',title:'新节点 z=23 初始为红',note:'新红节点只可能违反性质 4（父红子红）',
+     desc:'新节点<b>一律染红</b>：染黑会立刻破坏黑高（性质 5），最难修；染红最多只碰性质 4。但这里父亲 25 也是红——出现<b>连续红</b>，需要修复。'},
+    {edges:EA,ptr:'23',ptrLabel:'z',nodes:buildNodes(PA,CA,Object.assign({},base7,{'23':{hl:'focus'},'25':{hl:'ring',tag:'父(红)'},'35':{hl:'ring',tag:'叔(红)'},'30':{hl:'ring',tag:'祖'}})),chip:'情况 1 · 叔叔为红',chipC:'ch',title:'父 25 红、叔 35 红 → 命中情况 1',note:'z 的叔叔 = 父的兄弟 = 35（红）',
+     desc:'看 <b>叔叔</b>（父节点的兄弟）35：它是<span class="dg">红</span>的 → <b>情况 1</b>。情况 1 不需要旋转，只靠变色就能把矛盾往上推。'},
+    {edges:EA,ptr:'30',ptrLabel:'z',nodes:buildNodes(PA,CB,Object.assign({},base7,{'25':{tag:'变黑'},'35':{tag:'变黑'},'30':{hl:'focus',tag:'z 上移'}})),chip:'情况 1 → 变色后上溯',chipC:'ch',title:'父、叔变黑，祖父变红，z 跳到祖父',note:'父 25→黑, 叔 35→黑, 祖 30→红；z ← 30',
+     desc:'把父 25 和叔 35 都<b>染黑</b>、祖父 30 <b>染红</b>——这一小段的黑高保持不变。矛盾没消失，而是被搬到祖父：<code>z ← 30</code>，继续向上检查。'},
+    {edges:EA,ptr:'30',ptrLabel:'z',nodes:buildNodes(PA,CB,Object.assign({},base7,{'30':{hl:'focus'},'20':{hl:'ring',tag:'父(红)'},'70':{hl:'ring',tag:'叔(黑)'},'50':{hl:'ring',tag:'祖'}})),chip:'情况 2 · 叔黑 + z 在内侧',chipC:'cd',title:'新的 z=30 红、父 20 红，但叔 70 是黑',note:'z(30) 是父 20 的右孩子，20 是祖 50 的左孩子 → LR 内侧',
+     desc:'新一轮：z=30 与父 20 又是连续红，但这次叔叔 70 是<span class="bl">黑</span>。且 z 是父的<b>右</b>孩子、父是祖的<b>左</b>孩子——“一左一右”的<b>内侧</b>形状，先要掰直，这是<b>情况 2</b>。'},
+    {edges:EB,hotE:[['30','20']],ptr:'20',ptrLabel:'z',nodes:buildNodes(PB,CB,Object.assign({},base7,{'20':{hl:'focus',tag:'z 下移'},'30':{hl:'ring'}})),chip:'情况 2 → 左旋父节点',chipC:'ch',title:'对父 20 左旋，把内侧掰成外侧',note:'left rotate(20)：30 升、20 降；z ← 20，转为 LL',
+     desc:'对父节点 20 做<b>左旋</b>：30 转上来、20 沉下去成为 30 的左孩子。现在 <code>z ← 20</code>，它和父 30 都在祖父 50 的<b>左-左外侧</b>，正好转成可以一击修好的<b>情况 3</b>。'},
+    {edges:EB,ptr:'30',ptrLabel:'z',nodes:buildNodes(PB,CC,Object.assign({},base7,{'30':{hl:'focus',tag:'变黑'},'20':{hl:'ring'},'50':{hl:'ring',tag:'变红'}})),chip:'情况 3 · 变色',chipC:'cd',title:'父 30 变黑、祖 50 变红，准备旋转',note:'父 30→黑, 祖 50→红（旋转前先定好颜色）',
+     desc:'<b>情况 3</b> 先变色：父 30 <b>染黑</b>、祖父 50 <b>染红</b>。黑色的 30 即将顶替 50 的位置，红色下沉给 50——这样旋转后每条路径的黑数才对得上。'},
+    {edges:EC,hotE:[['30','50']],ptr:'30',ptrLabel:'z',nodes:buildNodes(PC,CC,Object.assign({},base7,{'30':{hl:'focus'},'50':{hl:'ring'}})),chip:'情况 3 → 右旋祖父',chipC:'ch',title:'对祖父 50 右旋，30 升为子树根',note:'right rotate(50)：30 上位，50 成为 30 的右孩子',
+     desc:'对祖父 50 做<b>右旋</b>：黑色的 30 升为整棵子树的根，红色的 20、50 分列两侧。连续红被消除，且因为 30 是黑、恰好补上原祖父那层黑，整棵树黑高重新一致。'},
+    {edges:EC,nodes:buildNodes(PC,CC,base7),chip:'修复完成 · 根置黑',chipC:'cg',title:'重新满足五大性质，高度仍 O(log n)',note:'情况 1→2→3 一条龙；最后别忘了 root.color = BLACK',
+     desc:'循环在“父节点为黑”时停下，收尾把<b>根强制染黑</b>（这里 30 本就是黑）。一次插入最多两次旋转，全程 <code>O(log n)</code>——这就是 <code>std::set / std::map</code> 底层每次 <code>insert</code> 背后发生的事。'}
+  ];
+  const code='<span class="fn">insertFixup</span>(z) {\n  <span class="kw">while</span> (z-&gt;parent-&gt;color == RED) {\n    <span class="kw">if</span> (uncle-&gt;color == RED) {   <span class="cmt">// 情况1</span>\n      parent-&gt;color = BLACK;\n      uncle -&gt;color = BLACK;\n      grand -&gt;color = RED;\n      z = grand;               <span class="cmt">// 上溯</span>\n    } <span class="kw">else</span> {\n      <span class="kw">if</span> (z 在内侧)              <span class="cmt">// 情况2</span>\n        rotate(parent);        <span class="cmt">// 掰成外侧</span>\n      parent-&gt;color = BLACK;    <span class="cmt">// 情况3</span>\n      grand -&gt;color = RED;\n      rotate(grand);\n    }\n  }\n  root-&gt;color = BLACK;\n}';
+  const keys=['50','20','70','15','30','25','35','23'],vals={};
+  return{id:'insert',label:'插入修复',sub:'情况 1 → 2 → 3',steps,code,keys,vals,
+    mount(){viz.innerHTML='<div class="vcap"><b>插入 23</b>：一次插入同时触发情况 1 变色、情况 2 左旋、情况 3 右旋</div>'+buildTree('in',keys,vals)+'<div class="op-note" id="innote"></div>';},
+    paint(s){renderTree('in',keys,vals,s);document.getElementById('innote').innerHTML=s.note;}};
+})();
+
+/* ================= Scene 4 · 删除修复（双黑） ================= */
+const delScene=(()=>{
+  const P0={'20':[50,15],'10':[25,45],'40':[75,45],'50':[88,73],db:[25,45]};
+  const P1={'40':[50,15],'20':[27,45],'50':[73,45]};
+  const C0={'20':'b','10':'b','40':'b','50':'r'};
+  const C1={'20':'b','40':'b','50':'b'};// after recolour: far nephew 50 -> black
+  const E0=[['20','10'],['20','40'],['40','50']];
+  const ED=[['20','db'],['20','40'],['40','50']];
+  const E1=[['40','20'],['40','50']];
+  const steps=[
+    {edges:E0,nodes:buildNodes(P0,C0,{'20':{},'10':{hl:'focus'},'40':{},'50':{}}),chip:'删除黑色节点 → 破坏黑高',chipC:'c0',title:'要删除黑色叶子 10',note:'删红节点无事；删黑节点会让一条路径少一个黑',
+     desc:'删除按 BST 规则找到目标。删<b>红</b>节点不破坏任何性质；但删<b>黑</b>节点会让经过它的路径凭空少一个黑，破坏性质 5——本例删的正是黑色的 10。'},
+    {edges:ED,ptr:'db',ptrLabel:'x',nodes:buildNodes(P0,C0,{'20':{},'40':{},'50':{},db:{c:'db',hl:'focus'}}),chip:'① 产生“双黑”缺口',chipC:'cd',title:'空出的位置背上一个多余的黑：双黑 x',note:'把“少一个黑”记为一个双黑节点 x，待修复',
+     desc:'删掉 10 后，它留下的空位这条路径缺了一个黑。红黑树用<b>“双黑”</b>记账：把这个亏空看成一个背着两层黑的节点 <span class="dg">x</span>，修复就是想办法把这多出来的黑消化掉。'},
+    {edges:ED,ptr:'db',ptrLabel:'x',nodes:buildNodes(P0,C0,{'20':{hl:'ring',tag:'父'},'40':{hl:'ring',tag:'兄弟(黑)'},'50':{hl:'ring',tag:'远侄(红)'},db:{c:'db',hl:'focus'}}),chip:'② 看兄弟与其孩子',chipC:'ch',title:'兄弟 40 黑、远侄 50 红 → 命中终止情况',note:'兄弟红 → 先旋转转黑；兄弟黑+俩孩子黑 → 兄弟染红,双黑上移',
+     desc:'删除修复看<b>兄弟 w=40</b>：它是黑，且它<b>远离 x 的那个孩子</b> 50 是红——这是能<b>一步收尾</b>的终止情况（CLRS 情况 4）。另两种分支（兄弟红 / 兄弟黑且俩孩子黑）见备注。'},
+    {edges:ED,ptr:'db',ptrLabel:'x',nodes:buildNodes(P0,C1,{'20':{hl:'ring'},'40':{hl:'ring',tag:'继承父色'},'50':{hl:'ring',tag:'变黑'},db:{c:'db',hl:'focus'}}),chip:'③ 变色：远侄 → 黑',chipC:'cd',title:'远侄 50 染黑，兄弟 40 继承父 20 的颜色',note:'50→黑；40 取父 20 的颜色(黑)；父 20→黑',
+     desc:'旋转前先摆好颜色：把远侄 50 <b>染黑</b>，兄弟 40 <b>继承父亲的颜色</b>，父亲 20 <b>染黑</b>。这样接下来的旋转能把那份多余的黑，恰好安放到缺口这一侧。'},
+    {edges:E1,hotE:[['40','20']],nodes:buildNodes(P1,C1,{'40':{hl:'focus'},'20':{hl:'ring'},'50':{}}),chip:'④ 左旋父节点 → 吸收双黑',chipC:'ch',title:'对父 20 左旋，双黑被这次旋转消化',note:'left rotate(20)：40 升为根；x 这条路径补回一个黑',
+     desc:'对父 20 做<b>左旋</b>：40 升为子树根、20 沉到缺口一侧。旋转后 20 这条路径正好补回一个黑，<span class="gr">双黑消失</span>，修复终止。'},
+    {edges:E1,nodes:buildNodes(P1,C1,{'40':{},'20':{},'50':{}}),chip:'删除修复完成',chipC:'cg',title:'各路径黑数恢复一致',note:'删除最多 3 次旋转，整体仍 O(log n)',
+     desc:'现在每条根→NIL 路径的黑数重新相等，五大性质全部满足。删除比插入的分支更多（双黑要顺兄弟颜色分类），但同样在<b>常数次旋转 + O(log n)</b> 内解决。'}
+  ];
+  const code='<span class="cmt">// 删黑节点 ⇒ 出现“双黑” x</span>\n<span class="fn">fixDoubleBlack</span>(x) {\n  w = sibling(x);\n  <span class="cmt">// 兄弟红      → 旋转,转黑兄弟\n  // 兄弟黑,俩孩子黑 → w染红,双黑上移\n  // 兄弟黑,远侄红 (情况4,终止):</span>\n  w-&gt;color      = parent-&gt;color;\n  parent-&gt;color = BLACK;\n  w-&gt;far-&gt;color = BLACK;\n  rotate(parent);   <span class="cmt">// 吸收双黑</span>\n}';
+  const keys=['20','10','40','50','db'],vals={db:''};
+  return{id:'delete',label:'删除修复',sub:'双黑 / 兄弟情况',steps,code,keys,vals,
+    mount(){viz.innerHTML='<div class="vcap"><b>删除黑色节点 10</b>：用“双黑”记账，靠一次旋转把亏空吸收掉</div>'+buildTree('dl',keys,vals)+'<div class="legend"><span><i class="lb"></i>黑</span><span><i class="lr"></i>红</span><span><i class="ln"></i>NIL / 双黑</span></div><div class="op-note" id="dlnote"></div>';},
+    paint(s){renderTree('dl',keys,vals,s);document.getElementById('dlnote').innerHTML=s.note;}};
+})();
+
+/* ================= engine ================= */
+const SCENES=[propScene,rotScene,insScene,delScene];
+const tabsBox=document.getElementById('tabs'),dotsBox=document.getElementById('dots');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc'),codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[],timer=null;const ms=2900;
+function switchScene(i){si=i;cur=0;[...tabsBox.children].forEach((tab,idx)=>tab.classList.toggle('on',idx===si));SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;dotsBox.innerHTML='';dotEls=[];SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.setAttribute('aria-label','第 '+idx+' 步：'+s.title);d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});go(0);requestAnimationFrame(()=>SCENES[si].paint(curStep));}
+function go(i){const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];curStep=s;SCENES[si].paint(s);stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.textContent='▸ '+s.title;stDesc.innerHTML=s.desc;dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});readout.textContent=cur+' / '+(steps.length-1);btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;if(cur===steps.length-1)stop();history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}
+function play(){if(cur===SCENES[si].steps.length-1)go(0);btnPlay.textContent='Ⅱ 暂停';btnPlay.setAttribute('aria-label','暂停动画');timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';btnPlay.setAttribute('aria-label','播放动画');}
+btnPlay.onclick=()=>timer?stop():play();btnPrev.onclick=()=>{stop();go(cur-1);};btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '&&!['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>{if(curStep)SCENES[si].paint(curStep);});
+const hashScene=location.hash.match(/scene=([a-z]+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(+hashStep[1]);
+</script>
+<script src="./算法动画题单.js" data-topic="13"></script>
+</body>
+</html>
