@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 8_0_1 / 8_0_2：
+       底色 rgb(245,244,237)
+       蓝 #E3EAF4 / #3D5A80 / #2C4460
+       绿 #DCE9E3 / #2F6B5E / #24473F
+       琥珀 #EFE7DA / #8A6A3A / #6B4E28
+       红 #F0E0DB / #A64B3C / #733428
+       中性 #F1EFE8 / #D8D5C8 / #4A473F / #6B675C / #2B2A26
+       面板底 #FBFBF6 · 实心三角箭头 #5A564B -->
+  <title>CPU 与设备的两条地址翻译路径</title>
+  <desc>上半：CPU 走 VA→PA（页表/TLB），设备走 IOVA→PA（IOMMU/IOTLB）。中部：同一组物理页是汇合点。下半：pin、DMA map、descriptor 是三个不同步骤。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">C++ 指针是 VA；设备描述符要的是 DMA address / IOVA</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">CPU 页表与 IOMMU 页表是两套系统 · 两套 TLB · 两套权限边界 —— 数值碰巧相同也不代表概念相同</text>
+
+  <!-- ============ Panel A：双路径 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 两条翻译路径：都落到同一组物理页，但中间绝不共用页表</text>
+
+  <rect x="48" y="124" width="560" height="280" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="124" width="560" height="36" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="48" y="148" width="560" height="12" fill="#E3EAF4"/>
+  <text x="68" y="148" font-size="13" font-weight="700" fill="#2C4460">CPU 路径 · 进程视角</text>
+
+  <rect x="80" y="180" width="200" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="180" y="202" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">进程 VA</text>
+  <text x="180" y="220" font-size="10.5" fill="#3D5A80" text-anchor="middle">用户态指针 / load·store</text>
+
+  <path d="M180,234 L180,258" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+
+  <rect x="80" y="262" width="200" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="180" y="284" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">CPU TLB / Page Table</text>
+  <text x="180" y="302" font-size="10.5" fill="#3D5A80" text-anchor="middle">miss → walk · 无效 → Page Fault</text>
+
+  <path d="M180,316 L180,340" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+
+  <rect x="80" y="344" width="200" height="40" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="180" y="370" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">PA</text>
+
+  <text x="310" y="220" font-size="11" fill="#6B675C">可缺页、可换出</text>
+  <text x="310" y="240" font-size="11" fill="#6B675C">OS 可重建映射</text>
+  <text x="310" y="288" font-size="11" fill="#6B675C">服务于 CPU 指令</text>
+  <text x="310" y="308" font-size="11" fill="#6B675C">权限：R/W/X · U/S</text>
+
+  <rect x="632" y="124" width="560" height="280" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="632" y="124" width="560" height="36" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="632" y="148" width="560" height="12" fill="#EFE7DA"/>
+  <text x="652" y="148" font-size="13" font-weight="700" fill="#6B4E28">设备路径 · DMA 视角</text>
+
+  <rect x="664" y="180" width="220" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="774" y="202" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">DMA address / IOVA</text>
+  <text x="774" y="220" font-size="10.5" fill="#8A6A3A" text-anchor="middle">描述符中填写的地址</text>
+
+  <path d="M774,234 L774,258" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arra)"/>
+
+  <rect x="664" y="262" width="220" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="774" y="284" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">IOTLB / IOMMU Page Table</text>
+  <text x="774" y="302" font-size="10.5" fill="#8A6A3A" text-anchor="middle">miss → walk · 无效 → IOMMU fault</text>
+
+  <path d="M774,316 L774,340" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arra)"/>
+
+  <rect x="664" y="344" width="220" height="40" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="774" y="370" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">PA</text>
+
+  <text x="910" y="220" font-size="11" fill="#6B675C">不会沿进程页表缺页</text>
+  <text x="910" y="240" font-size="11" fill="#6B675C">映射必须提前就绪</text>
+  <text x="910" y="288" font-size="11" fill="#6B675C">服务于设备事务</text>
+  <text x="910" y="308" font-size="11" fill="#6B675C">权限：domain 级隔离</text>
+
+  <!-- 汇合 DRAM -->
+  <path d="M180,384 L180,410 L620,410" fill="none" stroke="#2F6B5E" stroke-width="1.6"/>
+  <path d="M774,384 L774,410 L620,410" fill="none" stroke="#2F6B5E" stroke-width="1.6"/>
+  <path d="M620,410 L620,428" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+
+  <rect x="430" y="432" width="380" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="620" y="452" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">同一组物理页 · DRAM</text>
+  <text x="620" y="468" font-size="10.5" fill="#2F6B5E" text-anchor="middle">PA 是真实落点；VA 与 IOVA 只是两侧各自的入口名</text>
+
+  <!-- ============ Panel B：三步串起 ============ -->
+  <text x="48" y="520" font-size="13" font-weight="700" fill="#4A473F">B · pin · DMA map · descriptor：三个不同步骤，不能合并成“交给设备”</text>
+
+  <rect x="48" y="536" width="1144" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- steps -->
+  <rect x="68" y="560" width="150" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="143" y="588" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① 应用 buffer</text>
+  <text x="143" y="610" font-size="11" fill="#3D5A80" text-anchor="middle">用户 VA</text>
+
+  <path d="M222,596 L250,596" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="254" y="560" width="150" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="329" y="588" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">② 固定页面 pin</text>
+  <text x="329" y="610" font-size="11" fill="#A64B3C" text-anchor="middle">稳定生命周期</text>
+
+  <path d="M408,596 L436,596" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="440" y="560" width="170" height="72" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="525" y="580" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">③ DMA mapping</text>
+  <text x="525" y="600" font-size="11" fill="#8A6A3A" text-anchor="middle">得 IOVA · 设方向</text>
+  <text x="525" y="618" font-size="10.5" fill="#8A6A3A" text-anchor="middle">权限 / 属性</text>
+
+  <path d="M614,596 L642,596" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="646" y="560" width="160" height="72" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="726" y="588" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">④ 构造 Descriptor</text>
+  <text x="726" y="610" font-size="11" fill="#6B5B95" text-anchor="middle">填 DMA 地址 + 长度</text>
+
+  <path d="M810,596 L838,596" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="842" y="560" width="150" height="72" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="917" y="588" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">⑤ 发布 + Doorbell</text>
+  <text x="917" y="610" font-size="11" fill="#6B675C" text-anchor="middle">屏障后敲门铃</text>
+
+  <path d="M996,596 L1024,596" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="1028" y="560" width="140" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1098" y="588" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑥ 设备 DMA</text>
+  <text x="1098" y="610" font-size="11" fill="#2F6B5E" text-anchor="middle">读写物理页</text>
+
+  <!-- bottom callouts -->
+  <rect x="68" y="656" width="340" height="60" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="88" y="680" font-size="12" font-weight="700" fill="#733428">pin 不建立设备地址</text>
+  <text x="88" y="700" font-size="11" fill="#A64B3C">只保证页在 I/O 期间不被迁移/回收</text>
+
+  <rect x="428" y="656" width="360" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="448" y="680" font-size="12" font-weight="700" fill="#6B4E28">map 不自动 pin 用户页语义</text>
+  <text x="448" y="700" font-size="11" fill="#8A6A3A">返回 DMA address；权限与方向属映射属性</text>
+
+  <rect x="808" y="656" width="360" height="60" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="828" y="680" font-size="12" font-weight="700" fill="#4A3F68">descriptor 只消费已映射地址</text>
+  <text x="828" y="700" font-size="11" fill="#6B5B95">不要把用户 VA 或猜测的 PA 填进去</text>
+
+  <!-- bottom bar -->
+  <rect x="48" y="760" width="1144" height="68" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="788" font-size="13" font-weight="700" fill="#4A473F">判断准则</text>
+  <text x="68" y="810" font-size="12" fill="#6B675C">日志里每个地址都要标明类型（VA / PA / IOVA）· identity mapping 下数值可重合，仍必须走 DMA mapping API</text>
+</svg>

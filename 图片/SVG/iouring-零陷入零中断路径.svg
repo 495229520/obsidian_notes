@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 848" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>io_uring polling 全开路径对比</title>
+  <desc>左列为默认路径（每批一次陷入、每次完成一次中断），右列为 SQPOLL 与 IOPOLL 全开的零陷入零中断路径，底部为 registered buffers 与 registered files 的一次性注册摊销。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="848" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">polling 全开：把提交的陷入与完成的中断都换成轮询</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">左：默认路径，批量化后仍付「陷入 + 中断 + 唤醒」；右：SQPOLL + IOPOLL，数据路径零系统调用零中断，代价是烧核</text>
+
+  <line x1="620" y1="104" x2="620" y2="660" stroke="#D8D5C8" stroke-width="1.2" stroke-dasharray="6 5"/>
+
+  <!-- 左列：默认路径 -->
+  <text x="64" y="122" font-size="13.5" font-weight="700" fill="#4A473F">默认路径：批量化之后仍在付的钱</text>
+
+  <rect x="64" y="132" width="532" height="76" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="88" y="157" font-size="12" font-weight="700" fill="#2C4460">① 应用：填 SQE → store-release 推 SQ tail</text>
+  <text x="88" y="177" font-size="10.5" fill="#2C4460">普通内存写，零系统调用——2.1 的「门铃」</text>
+  <text x="88" y="194" font-size="10.5" fill="#2C4460">攒一批再提交：syscall 数已与 IO 数解耦</text>
+
+  <line x1="330" y1="210" x2="330" y2="232" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="64" y="236" width="532" height="76" rx="8" fill="#ECEAE0" stroke="#9B9685" stroke-width="1.4"/>
+  <text x="88" y="261" font-size="12" font-weight="700" fill="#4A473F">② io_uring_enter(提交 N，等待 M)</text>
+  <text x="88" y="281" font-size="10.5" fill="#A64B3C">成本 A：每批一次陷入返回</text>
+  <text x="88" y="298" font-size="10.5" fill="#A64B3C">成本 B：无事可做时睡眠——唤醒又是一次上下文切换</text>
+
+  <line x1="330" y1="314" x2="330" y2="336" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="64" y="340" width="532" height="76" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="88" y="365" font-size="12" font-weight="700" fill="#4A3F68">③ 内核提交 → 文件系统 → blk-mq → NVMe SQ</text>
+  <text x="88" y="385" font-size="10.5" fill="#4A3F68">1.8 的老路一步不少（O_DIRECT 直达块层，1.3）</text>
+  <text x="88" y="402" font-size="10.5" fill="#4A3F68">深度在 tag 池与设备 SQ 里排队（2.3）</text>
+
+  <line x1="330" y1="418" x2="330" y2="440" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="64" y="444" width="532" height="76" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="88" y="469" font-size="12" font-weight="700" fill="#733428">④ 设备完成 → 写 NVMe CQE → 硬中断 + softirq</text>
+  <text x="88" y="489" font-size="10.5" fill="#A64B3C">成本 C：每次完成打断一个核（1.8 固定成本三件套）</text>
+  <text x="88" y="506" font-size="10.5" fill="#733428">中断合并可摊薄，但打断与缓存污染仍在</text>
+
+  <line x1="330" y1="522" x2="330" y2="544" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="64" y="548" width="532" height="76" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="88" y="573" font-size="12" font-weight="700" fill="#24473F">⑤ 填 io_uring CQE → 唤醒应用 → 收割</text>
+  <text x="88" y="593" font-size="10.5" fill="#24473F">睡等 enter 返回：切换回来之后才拿到完成</text>
+  <text x="88" y="610" font-size="10.5" fill="#24473F">批量收割：一次唤醒收多条，成本被摊薄但没消失</text>
+
+  <text x="64" y="652" font-size="11.5" font-weight="700" fill="#A64B3C">批量化把成本从「每笔一次」摊成「每批一次」——但陷入、中断、唤醒还在账上</text>
+
+  <!-- 右列：SQPOLL + IOPOLL -->
+  <text x="644" y="122" font-size="13.5" font-weight="700" fill="#24473F">SQPOLL + IOPOLL：两侧都换成轮询</text>
+
+  <rect x="644" y="132" width="532" height="76" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="668" y="157" font-size="12" font-weight="700" fill="#2C4460">① 应用：填 SQE → 推 tail——提交到此结束</text>
+  <text x="668" y="177" font-size="10.5" fill="#2C4460">零系统调用：门铃只是共享内存里的一次原子写</text>
+  <text x="668" y="194" font-size="10.5" fill="#2C4460">应用线程立刻回去干别的（或继续填下一单）</text>
+
+  <line x1="910" y1="210" x2="910" y2="232" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrt)"/>
+
+  <rect x="644" y="236" width="532" height="76" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="668" y="261" font-size="12" font-weight="700" fill="#24473F">② SQPOLL：内核线程 iou-sqp 忙轮询 SQ tail</text>
+  <text x="668" y="281" font-size="10.5" fill="#24473F">看到新 tail 立刻代做提交——enter 从路径上消失</text>
+  <text x="668" y="298" font-size="10.5" fill="#24473F">空闲超时睡眠并置 NEED_WAKEUP，liburing 自动补一次 enter</text>
+
+  <line x1="910" y1="314" x2="910" y2="336" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrt)"/>
+
+  <rect x="644" y="340" width="532" height="76" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="668" y="365" font-size="12" font-weight="700" fill="#4A3F68">③ 内核提交 → blk-mq → NVMe「poll 队列」</text>
+  <text x="668" y="385" font-size="10.5" fill="#4A3F68">poll 队列不注册中断处理（nvme 模块参数配置）</text>
+  <text x="668" y="402" font-size="10.5" fill="#4A3F68">文件系统与块层照旧——内核栈并没有被绕开</text>
+
+  <line x1="910" y1="418" x2="910" y2="440" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrt)"/>
+
+  <rect x="644" y="444" width="532" height="76" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="668" y="469" font-size="12" font-weight="700" fill="#733428">④ IOPOLL：忙轮询设备 CQ 的 phase 位（3.2）</text>
+  <text x="668" y="489" font-size="10.5" fill="#733428">不等中断：完成靠「问」不靠「打断」</text>
+  <text x="668" y="506" font-size="10.5" fill="#733428">单开时在应用的 enter 里转；配 SQPOLL 由 iou-sqp 代转</text>
+
+  <line x1="910" y1="522" x2="910" y2="544" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrt)"/>
+
+  <rect x="644" y="548" width="532" height="76" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="668" y="573" font-size="12" font-weight="700" fill="#24473F">⑤ 填 io_uring CQE → 应用用户态 peek 收割</text>
+  <text x="668" y="593" font-size="10.5" fill="#24473F">全程无陷入、无中断、无唤醒——只剩轮询间隔</text>
+  <text x="668" y="610" font-size="10.5" fill="#24473F">代价：提交、完成两处忙轮询，各烧一份 CPU</text>
+
+  <text x="644" y="652" font-size="11.5" font-weight="700" fill="#24473F">数据路径零系统调用、零中断——买单方式从「事件成本」换成「烧核」</text>
+
+  <!-- 底部：registered 资源 -->
+  <text x="64" y="700" font-size="13.5" font-weight="700" fill="#2B2A26">第三笔账：每笔 IO 的内核簿记——register 一次，摊销给之后所有 IO</text>
+
+  <rect x="64" y="712" width="356" height="96" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="84" y="737" font-size="12" font-weight="700" fill="#4A3F68">registered buffers</text>
+  <text x="84" y="757" font-size="10.5" fill="#4A3F68">io_uring_register_buffers：一次 pin 住页</text>
+  <text x="84" y="774" font-size="10.5" fill="#4A3F68">之后 read_fixed / write_fixed 按 buf_index 引用</text>
+  <text x="84" y="791" font-size="10.5" fill="#4A3F68">省每笔 get_user_pages；计入 RLIMIT_MEMLOCK</text>
+
+  <rect x="442" y="712" width="356" height="96" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="462" y="737" font-size="12" font-weight="700" fill="#24473F">registered files</text>
+  <text x="462" y="757" font-size="10.5" fill="#24473F">fd 换成注册表下标 + IOSQE_FIXED_FILE</text>
+  <text x="462" y="774" font-size="10.5" fill="#24473F">省每笔 fget / fput 原子引用计数</text>
+  <text x="462" y="791" font-size="10.5" fill="#24473F">高 IOPS 下省的是缓存行争用，不只是指令数</text>
+
+  <rect x="820" y="712" width="356" height="96" rx="8" fill="#ECEAE0" stroke="#9B9685" stroke-width="1.4"/>
+  <text x="840" y="737" font-size="12" font-weight="700" fill="#4A473F">同一个思路的老朋友</text>
+  <text x="840" y="757" font-size="10.5" fill="#4A473F">RDMA 的 ibv_reg_mr（4.4）：pin 一次、DMA 多次</text>
+  <text x="840" y="774" font-size="10.5" fill="#4A473F">6.0 零拷贝发送 SEND_ZC 也建立在注册 buffer 上</text>
+  <text x="840" y="791" font-size="10.5" fill="#4A473F">纪律：注册的内存必须活到解注册——RAII</text>
+</svg>

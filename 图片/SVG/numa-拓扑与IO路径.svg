@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="780" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">NUMA：同一台机器里的"网络"</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">线程、内存页、设备三者不在同一节点时，每次 IO 都在交"跨界税"——吞吐降、p99 涨、CPU 反而更忙</text>
+
+  <!-- NUMA0 -->
+  <rect x="70" y="130" width="480" height="390" rx="10" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="90" y="158" font-size="14" font-weight="700" fill="#2C4460">NUMA 节点 0</text>
+
+  <rect x="90" y="180" width="200" height="94" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="190" y="206" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">CPU0：核 0–15</text>
+  <text x="190" y="228" font-size="10.5" fill="#2C4460" text-anchor="middle">nvme 中断默认打在这</text>
+  <text x="190" y="248" font-size="10.5" fill="#2C4460" text-anchor="middle">好路径：IO 线程也钉在这</text>
+
+  <rect x="90" y="300" width="200" height="94" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="190" y="326" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">节点 0 本地内存</text>
+  <text x="190" y="348" font-size="10.5" fill="#7A5518" text-anchor="middle">好路径：页缓存页/用户 buf</text>
+  <text x="190" y="368" font-size="10.5" fill="#7A5518" text-anchor="middle">都分配在这（first-touch）</text>
+
+  <rect x="320" y="180" width="210" height="260" rx="7" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="425" y="206" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">PCIe root（挂在 CPU0）</text>
+  <rect x="340" y="222" width="170" height="64" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="425" y="248" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">NVMe SSD</text>
+  <text x="425" y="268" font-size="10" fill="#733428" text-anchor="middle" font-family="'SF Mono',Menlo,monospace">numa_node = 0</text>
+  <rect x="340" y="304" width="170" height="64" rx="6" fill="#E2E9ED" stroke="#4E6E81" stroke-width="1.4"/>
+  <text x="425" y="330" font-size="12" font-weight="700" fill="#33505F" text-anchor="middle">网卡 NIC</text>
+  <text x="425" y="350" font-size="10" fill="#33505F" text-anchor="middle">RDMA 对此更敏感（第4章）</text>
+  <text x="340" y="416" font-size="10" fill="#6B675C">GPU 亲和同理：与 NVMe 同</text>
+  <text x="340" y="432" font-size="10" fill="#6B675C">PCIe switch 才能高效 P2P（8.2）</text>
+
+  <text x="90" y="480" font-size="10.5" fill="#2F6B5E" font-weight="700">好路径：DMA 本地写内存 → 中断在本地核 → 线程本地读 —— 零跨界</text>
+
+  <!-- 互联 -->
+  <line x1="554" y1="330" x2="686" y2="330" stroke="#5A564B" stroke-width="2.5"/>
+  <text x="620" y="310" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">UPI / QPI 互联</text>
+  <text x="620" y="356" font-size="10.5" fill="#6B675C" text-anchor="middle">带宽有限</text>
+  <text x="620" y="372" font-size="10.5" fill="#6B675C" text-anchor="middle">延迟 ~1.5–2×</text>
+
+  <!-- NUMA1 -->
+  <rect x="690" y="130" width="480" height="390" rx="10" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="710" y="158" font-size="14" font-weight="700" fill="#733428">NUMA 节点 1（坏路径示例）</text>
+
+  <rect x="710" y="180" width="200" height="94" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="810" y="206" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">CPU1：核 16–31</text>
+  <text x="810" y="228" font-size="10.5" fill="#A64B3C" text-anchor="middle">坏路径：IO 线程被调度到这</text>
+  <text x="810" y="248" font-size="10.5" fill="#2C4460" text-anchor="middle">（没钉核时随时可能发生）</text>
+
+  <rect x="710" y="300" width="200" height="94" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="810" y="326" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">节点 1 本地内存</text>
+  <text x="810" y="348" font-size="10.5" fill="#A64B3C" text-anchor="middle">坏路径：buf 被 first-touch</text>
+  <text x="810" y="368" font-size="10.5" fill="#A64B3C" text-anchor="middle">分配在这 → DMA 只能跨界</text>
+
+  <rect x="940" y="180" width="210" height="94" rx="7" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <text x="1045" y="222" font-size="11" fill="#6B675C" text-anchor="middle">PCIe（无存储设备）</text>
+  <text x="1045" y="242" font-size="10" fill="#6B675C" text-anchor="middle">这个节点没有"本地盘"</text>
+
+  <!-- 坏路径箭头 -->
+  <path d="M512,286 C580,290 640,296 706,318" fill="none" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#arrr)"/>
+  <text x="560" y="278" font-size="10.5" font-weight="700" fill="#A64B3C">① DMA 跨互联写远端内存</text>
+
+  <path d="M294,220 C450,150 600,150 706,208" fill="none" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#arrr)"/>
+  <text x="430" y="140" font-size="10.5" font-weight="700" fill="#A64B3C">② 中断在 CPU0 → 跨核唤醒 CPU1 上的线程（IPI + 冷 cache）</text>
+
+  <text x="710" y="480" font-size="10.5" fill="#A64B3C" font-weight="700">坏路径合计：互联带宽 + 远端访存 + 跨核唤醒 —— 每次 IO 都交三笔税</text>
+
+  <!-- 底部两卡 -->
+  <rect x="70" y="556" width="560" height="180" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="586" font-size="13.5" font-weight="700" fill="#2B2A26">跨 NUMA 的因果链</text>
+  <text x="94" y="614" font-size="11.5" fill="#4A473F">跨界 DMA + 远端访存 → 每次 IO 多烧 CPU 周期与互联带宽</text>
+  <text x="94" y="638" font-size="11.5" fill="#4A473F">→ 同样吞吐需要更多 CPU；CPU 或互联到顶后，吞吐反降</text>
+  <text x="94" y="662" font-size="11.5" fill="#4A473F">→ 服务时间变长 → 队列加深 → p99 上涨（1.7 利特尔法则）</text>
+  <text x="94" y="692" font-size="11.5" font-weight="700" fill="#A64B3C">识别签名：吞吐跌 + CPU 涨同时出现，而设备侧 iostat 正常</text>
+
+  <rect x="660" y="556" width="510" height="180" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="684" y="586" font-size="13.5" font-weight="700" fill="#2B2A26">验证命令（正文有完整实验）</text>
+  <text x="684" y="614" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">cat /sys/class/nvme/nvme0/device/numa_node</text>
+  <text x="684" y="638" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">numactl --cpunodebind=0 --membind=0 fio ...   # 好</text>
+  <text x="684" y="662" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">numactl --cpunodebind=1 --membind=1 fio ...   # 坏</text>
+  <text x="684" y="686" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">numastat -p &lt;pid&gt;; grep nvme /proc/interrupts</text>
+</svg>

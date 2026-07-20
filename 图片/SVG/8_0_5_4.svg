@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 920" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>每 Socket 数据面闭环与反模式</title>
+  <desc>上半：正确的双 Socket 闭环。中部：三种反模式。下半：设备亲和与 p99 放大链条。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="920" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">正确模式：每个 Socket 建立数据面闭环</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">中断“平均分散”不一定正确 · 目标是中断/poller、队列、buffer、设备同节点</text>
+
+  <!-- ============ Panel A：正确闭环 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 双路闭环：大块 payload 不跨节点，跨节点只传控制意图</text>
+
+  <!-- Socket 0 -->
+  <rect x="48" y="128" width="520" height="220" rx="10" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.6"/>
+  <rect x="48" y="128" width="520" height="34" rx="10" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.6"/>
+  <rect x="48" y="150" width="520" height="12" fill="#E3EAF4"/>
+  <text x="68" y="151" font-size="13" font-weight="700" fill="#2C4460">Socket 0 闭环</text>
+
+  <rect x="80" y="184" width="120" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="140" y="210" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">NIC 0</text>
+  <text x="140" y="228" font-size="10.5" fill="#8A6A3A" text-anchor="middle">本地 DMA</text>
+
+  <path d="M200,212 L230,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+
+  <rect x="234" y="184" width="120" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="294" y="210" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">worker 0</text>
+  <text x="294" y="228" font-size="10.5" fill="#3D5A80" text-anchor="middle">钉核 N0</text>
+
+  <path d="M354,212 L384,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+
+  <rect x="388" y="184" width="140" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="458" y="210" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">pool 0</text>
+  <text x="458" y="228" font-size="10.5" fill="#2F6B5E" text-anchor="middle">本地 buffer</text>
+
+  <rect x="80" y="268" width="448" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="304" y="294" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">NVMe 0..N  ·  本地 DMA 读写 pool 0</text>
+  <text x="304" y="312" font-size="11" fill="#8A6A3A" text-anchor="middle">IRQ / poller 也落在 Node 0</text>
+
+  <!-- Socket 1 -->
+  <rect x="672" y="128" width="520" height="220" rx="10" fill="#FBFBF6" stroke="#8A6A3A" stroke-width="1.6"/>
+  <rect x="672" y="128" width="520" height="34" rx="10" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.6"/>
+  <rect x="672" y="150" width="520" height="12" fill="#EFE7DA"/>
+  <text x="692" y="151" font-size="13" font-weight="700" fill="#6B4E28">Socket 1 闭环</text>
+
+  <rect x="704" y="184" width="120" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="764" y="210" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">NIC 1</text>
+  <text x="764" y="228" font-size="10.5" fill="#8A6A3A" text-anchor="middle">本地 DMA</text>
+
+  <path d="M824,212 L854,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+
+  <rect x="858" y="184" width="120" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="918" y="210" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">worker 1</text>
+  <text x="918" y="228" font-size="10.5" fill="#3D5A80" text-anchor="middle">钉核 N1</text>
+
+  <path d="M978,212 L1008,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+
+  <rect x="1012" y="184" width="140" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1082" y="210" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">pool 1</text>
+  <text x="1082" y="228" font-size="10.5" fill="#2F6B5E" text-anchor="middle">本地 buffer</text>
+
+  <rect x="704" y="268" width="448" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="928" y="294" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">NVMe N+1..M  ·  本地 DMA 读写 pool 1</text>
+  <text x="928" y="312" font-size="11" fill="#8A6A3A" text-anchor="middle">IRQ / poller 也落在 Node 1</text>
+
+  <!-- dashed control between sockets -->
+  <path d="M568,238 L672,238" fill="none" stroke="#6B675C" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrn)"/>
+  <text x="620" y="228" font-size="10.5" fill="#6B675C" text-anchor="middle">控制/调度</text>
+
+  <!-- ============ Panel B：反模式 ============ -->
+  <text x="48" y="384" font-size="13" font-weight="700" fill="#4A473F">B · 三种反模式：绑对了一半，反而更糟</text>
+
+  <rect x="48" y="398" width="370" height="170" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.3"/>
+  <rect x="48" y="398" width="370" height="32" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <rect x="48" y="418" width="370" height="12" fill="#F0E0DB"/>
+  <text x="68" y="420" font-size="12" font-weight="700" fill="#733428">① 只绑线程，不管内存</text>
+  <text x="68" y="454" font-size="12" fill="#4A473F">主线程 node0 初始化 buffer</text>
+  <text x="68" y="478" font-size="12" fill="#4A473F">worker 钉到 node1</text>
+  <text x="68" y="502" font-size="12" fill="#A64B3C">→ 稳定远端访存</text>
+  <text x="68" y="530" font-size="11.5" fill="#6B675C">affinity 脱离 first-touch 无效</text>
+  <text x="68" y="550" font-size="11.5" fill="#6B675C">偶发错位变成永久错位</text>
+
+  <rect x="434" y="398" width="370" height="170" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.3"/>
+  <rect x="434" y="398" width="370" height="32" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <rect x="434" y="418" width="370" height="12" fill="#F0E0DB"/>
+  <text x="454" y="420" font-size="12" font-weight="700" fill="#733428">② 共享跨节点 buffer pool</text>
+  <text x="454" y="454" font-size="12" fill="#4A473F">任意线程补充/初始化</text>
+  <text x="454" y="478" font-size="12" fill="#4A473F">页位置逐渐混杂</text>
+  <text x="454" y="502" font-size="12" fill="#A64B3C">→ 本地/远端不可预测</text>
+  <text x="454" y="530" font-size="11.5" fill="#6B675C">每节点独立 pool 更稳</text>
+  <text x="454" y="550" font-size="11.5" fill="#6B675C">跨节点只传小描述符</text>
+
+  <rect x="820" y="398" width="372" height="170" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.3"/>
+  <rect x="820" y="398" width="372" height="32" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <rect x="820" y="418" width="372" height="12" fill="#F0E0DB"/>
+  <text x="840" y="420" font-size="12" font-weight="700" fill="#733428">③ 中断平均撒到所有 CPU</text>
+  <text x="840" y="454" font-size="12" fill="#4A473F">设备在 node0</text>
+  <text x="840" y="478" font-size="12" fill="#4A473F">一半队列 IRQ 落 node1</text>
+  <text x="840" y="502" font-size="12" fill="#A64B3C">→ 完成路径穿节点</text>
+  <text x="840" y="530" font-size="11.5" fill="#6B675C">目标不是视觉均衡</text>
+  <text x="840" y="550" font-size="11.5" fill="#6B675C">而是与队列/worker 拓扑一致</text>
+
+  <!-- ============ Panel C：p99 放大 ============ -->
+  <text x="48" y="602" font-size="13" font-weight="700" fill="#4A473F">C · 为什么均值变化不大，p99 却可能明显变坏</text>
+
+  <rect x="48" y="616" width="1144" height="100" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="68" y="636" width="180" height="60" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="158" y="662" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① 远端访存</text>
+  <text x="158" y="682" font-size="11" fill="#3D5A80" text-anchor="middle">CPU 等待↑</text>
+
+  <path d="M248,666 L272,666" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="276" y="636" width="180" height="60" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="366" y="662" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">② 跨节点 DMA</text>
+  <text x="366" y="682" font-size="11" fill="#8A6A3A" text-anchor="middle">挤占互联</text>
+
+  <path d="M456,666 L480,666" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="484" y="636" width="180" height="60" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="574" y="662" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">③ 迁移/缓存冷却</text>
+  <text x="574" y="682" font-size="11" fill="#3D5A80" text-anchor="middle">服务时间抖动</text>
+
+  <path d="M664,666 L688,666" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="692" y="636" width="180" height="60" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="782" y="662" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">④ 队列积压</text>
+  <text x="782" y="682" font-size="11" fill="#A64B3C" text-anchor="middle">排队时间↑</text>
+
+  <path d="M872,666 L896,666" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="900" y="636" width="260" height="60" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="1030" y="662" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">⑤ 尾延迟放大</text>
+  <text x="1030" y="682" font-size="11" fill="#A64B3C" text-anchor="middle">p99/p999 先恶化</text>
+
+  <!-- bottom observation -->
+  <rect x="48" y="740" width="1144" height="140" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="772" font-size="13" font-weight="700" fill="#4A473F">观测签名 · 只是线索，需受控对照</text>
+  <text x="68" y="800" font-size="12" fill="#4A473F">吞吐↓ CPU↑ 但设备未饱和 · 同命令时好时坏 · 均值尚可 p99 尖刺 · 加另一 Socket 线程后变慢 · 应用慢但 iostat 设备延迟正常</text>
+  <text x="68" y="828" font-size="12" fill="#4A473F">排障顺序：lscpu / numactl -H / lstopo → 线程 affinity → 内存页位置 → 设备 numa_node → 再调整绑定</text>
+  <text x="68" y="856" font-size="12" fill="#3D5A80">对照实验只改一个位置变量：CPU 同 node 改 membind，或设备固定改 cpunodebind+membind</text>
+</svg>

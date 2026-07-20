@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reactor 与 EventLoop 动画 · 角色映射 · 事件循环 · 读写路径 · one loop per thread</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;
+  --blue:#3D5A80;--bluebg:#E3EAF4;--bluetx:#2C4460;
+  --green:#2F6B5E;--greenbg:#DCE9E3;--greentx:#24473F;
+  --amber:#8A6A3A;--amberbg:#EFE7DA;--ambertx:#6B4E28;
+  --danger:#A64B3C;--dangerbg:#F0E0DB;--dangertx:#733428;
+  --gray:#F1EFE8;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:.2px;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:10px 18px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:680px 1fr;gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1140px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;}
+.viz .vcap b{color:var(--ink);font-weight:700;}
+
+/* ===== 通用箭头层 ===== */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.arr-layer .flow{fill:none;stroke:var(--arrow);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease);}
+.arr-layer .flow.on{opacity:1;}
+.arr-layer .flow.dash{stroke-dasharray:9 7;}
+.arr-layer .flow.pulse.on{animation:flowPulse 1.15s linear infinite;}
+.arr-layer .flow.amber{stroke:var(--amber);}
+.arr-layer .flow.green{stroke:var(--green);}
+.arr-layer .flow.blue{stroke:var(--blue);}
+.arr-layer .flow.danger{stroke:var(--danger);}
+.arr-label{position:absolute;z-index:2;font-family:var(--mono);font-size:12px;font-weight:700;line-height:1.3;color:var(--amber);background:var(--panel);padding:1px 4px;border-radius:4px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;text-align:center;pointer-events:none;}
+.arr-label.on{opacity:1;}
+@keyframes flowPulse{to{stroke-dashoffset:-28;}}
+
+/* ===== 角色映射 ===== */
+.role-stage{position:relative;width:632px;height:420px;margin:0 auto;}
+.role-box{position:absolute;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);transform:scale(1);transform-origin:center;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);opacity:.32;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px 14px;gap:4px;}
+.role-box.lit{opacity:1;border-color:var(--ink);box-shadow:0 0 0 1.5px rgba(43,42,38,.08);transform:scale(1.012);}
+.role-box.b{border-color:var(--blue);background:var(--bluebg);}
+.role-box.g{border-color:var(--green);background:var(--greenbg);}
+.role-box.h{border-color:var(--amber);background:var(--amberbg);}
+.role-box .zt{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);line-height:1.2;}
+.role-box.b .zt{color:var(--blue);}
+.role-box.g .zt{color:var(--green);}
+.role-box.h .zt{color:var(--amber);}
+.role-box .nm{font-size:14px;font-weight:700;color:var(--ink);line-height:1.25;white-space:nowrap;}
+.role-box .ds{font-size:11.5px;color:var(--muted);line-height:1.35;white-space:nowrap;}
+.role-badge{position:absolute;font-size:12px;font-weight:700;border:1.5px solid;border-radius:999px;padding:6px 14px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;text-align:center;}
+.role-badge.on{opacity:1;}
+.role-badge.b{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.role-badge.g{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.role-badge.h{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+
+/* ===== 事件循环 ===== */
+.loop-stage{position:relative;width:632px;height:420px;margin:0 auto;}
+.loop-shell{position:absolute;inset:4px;border:1.5px solid var(--grid);border-radius:14px;background:var(--paper);transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.loop-shell.lit{border-color:var(--ink);background:#F9F8F2;}
+.loop-shell-title{position:absolute;left:18px;top:10px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);}
+.loop-shell-sub{position:absolute;right:18px;top:10px;font-size:11px;color:var(--faint);}
+.loop-track{position:absolute;font-size:10.5px;font-weight:700;color:var(--faint);letter-spacing:.3px;}
+.loop-box{position:absolute;border:1.5px solid var(--line);border-radius:10px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;opacity:.28;transform:scale(.985);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.loop-box.preview{opacity:.35;border-style:dashed;}
+.loop-box.on{opacity:1;transform:scale(1);border-style:solid;}
+.loop-box.active{transform:scale(1.025);box-shadow:0 0 0 1.5px rgba(43,42,38,.08);}
+.loop-box.done{opacity:.66;}
+.loop-box.blue{border-color:var(--blue);background:var(--bluebg);}
+.loop-box.green{border-color:var(--green);background:var(--greenbg);}
+.loop-box.amber{border-color:var(--amber);background:var(--amberbg);}
+.loop-box .k{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;}
+.loop-box .s,.loop-status{font-size:10.5px;color:var(--muted);white-space:nowrap;}
+.loop-list{justify-content:flex-start;padding-top:9px;}
+.loop-list .k{margin-bottom:4px;}
+.loop-item{position:absolute;left:10px;right:10px;height:31px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;opacity:0;transform:translateX(-5px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);white-space:nowrap;}
+.loop-item.on{opacity:1;transform:translateX(0);}
+.loop-item.current{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 1.5px rgba(47,107,94,.14);transform:scale(1.025);}
+.loop-item.done{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.loop-item.task{border-color:var(--amber);background:var(--amberbg);color:var(--amber);}
+.loop-empty{position:absolute;left:10px;right:10px;bottom:10px;height:31px;border:1.5px dashed var(--line);border-radius:7px;font-family:var(--mono);font-size:10.5px;color:var(--faint);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity var(--dur) var(--ease);}
+.loop-empty.on{opacity:1;}
+.loop-note{position:absolute;left:50%;top:374px;transform:translateX(-50%);width:max-content;max-width:580px;border:1.5px solid var(--line);border-radius:999px;padding:5px 13px;font-size:11px;font-weight:700;color:var(--muted);background:var(--panel);opacity:0;transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),background-color var(--dur) var(--ease);white-space:nowrap;}
+.loop-note.on{opacity:1;}.loop-note.g{border-color:var(--green);color:var(--green);background:var(--greenbg);}.loop-note.h{border-color:var(--amber);color:var(--amber);background:var(--amberbg);}.loop-note.d{border-color:var(--danger);color:var(--danger);background:var(--dangerbg);}
+.loop-label{position:absolute;z-index:3;font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--muted);background:var(--paper);padding:1px 4px;border-radius:4px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;}
+.loop-label.on{opacity:1;}
+.loop-wire{--loop-color:var(--arrow);fill:none;stroke:var(--loop-color);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.loop-arrow{--loop-color:var(--arrow);fill:var(--loop-color);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}
+.loop-port{--loop-color:var(--arrow);fill:var(--panel);stroke:var(--loop-color);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.loop-wire.on,.loop-arrow.on,.loop-port.on{opacity:1;}.loop-wire.hint{stroke-width:2;opacity:.1;}.loop-arrow.hint,.loop-port.hint{opacity:.1;}.loop-arrow.drawing{transition-delay:200ms;}
+.loop-wire.blue,.loop-arrow.blue,.loop-port.blue{--loop-color:var(--blue);}.loop-wire.green,.loop-arrow.green,.loop-port.green{--loop-color:var(--green);}.loop-wire.amber,.loop-arrow.amber,.loop-port.amber{--loop-color:var(--amber);}
+
+/* ===== 读写路径 ===== */
+.path-stage{position:relative;width:632px;height:420px;margin:0 auto;}
+.path-lane{position:absolute;left:4px;right:4px;height:108px;border:1.5px solid var(--grid);border-radius:12px;background:var(--paper);transform:scale(1);transform-origin:center;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);opacity:.35;}
+.path-lane.lit{opacity:1;transform:scale(1.006);}
+.path-lane.done{opacity:.66;}
+.path-lane.future{opacity:.3;}
+#pl1.lit{border-color:var(--blue);background:#F8FAFC;}
+#pl2.lit{border-color:var(--green);background:#F7FAF8;}
+#pl3.lit{border-color:var(--amber);background:#FBF9F5;}
+.path-lane .zt{position:absolute;top:10px;left:16px;font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--faint);white-space:nowrap;transition:color var(--dur) var(--ease),transform var(--dur) var(--ease);}
+#pl1.lit .zt{color:var(--blue);transform:translateX(3px);}
+#pl2.lit .zt{color:var(--green);transform:translateX(3px);}
+#pl3.lit .zt{color:var(--amber);transform:translateX(3px);}
+.path-step{position:absolute;height:40px;min-width:96px;border-radius:8px;border:1.5px solid var(--line);background:var(--gray);font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;padding:0 12px;transform:scale(1);transform-origin:center;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);opacity:0;white-space:nowrap;text-align:center;}
+.path-step.on{opacity:1;}
+.path-step.preview{opacity:.25;transform:scale(.985);background:transparent;border-style:dashed;}
+.path-step.enter{animation:pathStepIn 360ms var(--ease) both;}
+.path-step.act{border-color:var(--blue);background:var(--bluebg);color:var(--blue);box-shadow:0 0 0 1.5px rgba(61,90,128,.16);transform:scale(1.04);}
+.path-step.ok{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.path-step.warn{border-color:var(--amber);background:var(--amberbg);color:var(--amber);}
+.path-step.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+@keyframes pathStepIn{from{opacity:0;transform:translateX(-7px) scale(.98);}to{opacity:1;}}
+.path-wire{--path-color:var(--arrow);fill:none;stroke:var(--path-color);stroke-width:3;stroke-linecap:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.path-arrow{--path-color:var(--arrow);fill:var(--path-color);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}
+.path-port{--path-color:var(--arrow);fill:var(--panel);stroke:var(--path-color);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.path-wire.on,.path-arrow.on,.path-port.on{opacity:1;}
+.path-wire.hint{stroke-width:2;opacity:.1;}
+.path-arrow.hint,.path-port.hint{opacity:.1;}
+.path-arrow.drawing{transition-delay:200ms;}
+.path-wire.blue,.path-arrow.blue,.path-port.blue{--path-color:var(--blue);}
+.path-wire.green,.path-arrow.green,.path-port.green{--path-color:var(--green);}
+.path-wire.amber,.path-arrow.amber,.path-port.amber{--path-color:var(--amber);}
+.path-wire.danger,.path-arrow.danger,.path-port.danger{--path-color:var(--danger);}
+.path-tag{position:absolute;font-size:12px;font-weight:700;border-radius:999px;border:1.5px solid;padding:6px 14px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;text-align:center;}
+.path-tag.on{opacity:1;}
+.path-tag.g{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.path-tag.d{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.path-tag.h{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+
+/* ===== 多线程 ===== */
+.mt-stage{position:relative;width:632px;height:420px;margin:0 auto;}
+.mt-box{position:absolute;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);transform:scale(1);transform-origin:center;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);opacity:.35;display:flex;flex-direction:column;align-items:center;padding:12px 12px 14px;}
+.mt-box.lit{opacity:1;border-color:var(--ink);box-shadow:0 0 0 2px rgba(43,42,38,.08);transform:scale(1.012);}
+.mt-box.main{border-color:var(--blue);background:linear-gradient(180deg,#F7FAFD 0%,var(--paper) 48%);}
+.mt-box.sub{border-color:var(--green);background:linear-gradient(180deg,#F5FAF7 0%,var(--paper) 48%);}
+.mt-box.work{border-color:var(--amber);background:linear-gradient(180deg,#FBF7F0 0%,var(--paper) 48%);}
+.mt-box.lit.main{background:var(--bluebg);}
+.mt-box.lit.sub{background:var(--greenbg);}
+.mt-box.lit.work{background:var(--amberbg);}
+.mt-box .zt{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);white-space:nowrap;line-height:1.2;}
+.mt-box.main .zt{color:var(--blue);}
+.mt-box.sub .zt{color:var(--green);}
+.mt-box.work .zt{color:var(--amber);}
+.mt-box .nm{margin-top:4px;font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;text-align:center;line-height:1.25;}
+.mt-box .subline{margin-top:2px;font-size:11px;color:var(--muted);white-space:nowrap;text-align:center;}
+.mt-chip{position:absolute;height:38px;min-width:0;border-radius:8px;border:1.5px solid var(--line);background:var(--gray);font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;padding:0 10px;transform:scale(1);transform-origin:center;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);opacity:0;white-space:nowrap;text-align:center;}
+.mt-chip.on{opacity:1;}
+.mt-chip.b{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.mt-chip.g{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.mt-chip.h{border-color:var(--amber);background:var(--amberbg);color:var(--amber);}
+.mt-chip.fly{box-shadow:0 0 0 2px rgba(138,106,58,.22);transform:scale(1.045);}
+.mt-note{position:absolute;left:50%;width:max-content;max-width:590px;transform:translateX(-50%);font-size:12.5px;font-weight:700;border:1.5px solid var(--line);border-radius:10px;padding:8px 18px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;text-align:center;}
+.mt-note.on{opacity:1;}
+.mt-note.g{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.mt-note.d{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.mt-note.h{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:700;}
+.desc-body .gr{color:var(--green);font-weight:700;}
+.desc-body .dg{color:var(--danger);font-weight:700;}
+.desc-body .hb{color:var(--amber);font-weight:700;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Reactor 与 EventLoop · 从 epoll 就绪到对象回调</h1>
+    <p>配套笔记《13.6 Reactor模式与EventLoop》《13.6.1 回调函数与Reactor事件分发》 · epoll 发现就绪 · EventLoop 分发 · Channel 回调 · EPOLLOUT 按需 · one loop per thread　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+
+/* 实心三角 marker 定义（教学图同款） */
+const ARROW_DEFS=`
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0.5,0.5 L9.5,5 L0.5,9.5 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0.5,0.5 L9.5,5 L0.5,9.5 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0.5,0.5 L9.5,5 L0.5,9.5 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0.5,0.5 L9.5,5 L0.5,9.5 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrd" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0.5,0.5 L9.5,5 L0.5,9.5 z" fill="#A64B3C"/>
+    </marker>
+  </defs>`;
+
+/* ========== 场景 1：角色映射 ========== */
+const rolesScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// epoll：发现谁就绪</span>',
+    'n = epoll_wait(epfd, events, MAX, -1);',
+    '',
+    '<span class="cmt">// Reactor：把就绪分发给对象回调</span>',
+    'channel = events[i].data.ptr;',
+    'channel->handleEvent();  <span class="cmt">// → TcpConnection::handleRead</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · epoll 只回答「谁就绪」',chip:'epoll 边界',chipC:'c0',lines:[0,1],
+     lit:['ep'],arrow:0,badge:'',
+     desc:'学完 epoll 后，已知一个线程能高效等待大量 fd。但 <code>epoll_wait</code> 只回答：<b>哪些 fd 可读/可写/异常</b>——不回答「这个 fd 是谁、该调哪个回调」。'},
+    {title:'步骤 1 · Handle = fd / socket',chip:'Handle',chipC:'cb',lines:[1],
+     lit:['ep','hd'],arrow:0,badge:'b',
+     desc:'事件源是 <span class="bl">Handle</span>：<code>listen_fd</code> 或 <code>conn_fd</code>。epoll 面向的是这些整数 fd，还不知道背后的连接对象。'},
+    {title:'步骤 2 · Demultiplexer = epoll_wait',chip:'Demultiplexer',chipC:'cb',lines:[0,1],
+     lit:['ep','hd','dm'],arrow:1,badge:'b',
+     desc:'<span class="bl">Synchronous Event Demultiplexer</span> 在 Linux 上就是 <code>epoll_wait</code>（或 select/poll）：同步阻塞，直到有就绪事件返回。'},
+    {title:'步骤 3 · EventLoop 负责分发',chip:'EventLoop',chipC:'ch',lines:[3,4],
+     lit:['ep','hd','dm','lp'],arrow:2,badge:'h',
+     desc:'<span class="hb">EventLoop / Dispatcher</span> 取出本轮活跃 Channel，逐个调用 <code>handleEvent()</code>，并在循环末尾执行 <code>doPendingFunctors()</code>。'},
+    {title:'步骤 4 · Channel 绑定 fd + 回调',chip:'Channel',chipC:'cg',lines:[4,5],
+     lit:['ep','hd','dm','lp','ch'],arrow:3,badge:'g',
+     desc:'<span class="gr">Channel</span> 不拥有 fd，只绑定「fd + 关注事件 + 回调」。<code>epoll_event.data.ptr</code> 常指向它——生命周期必须清晰。'},
+    {title:'步骤 5 · Concrete Handler 做真实 IO',chip:'Acceptor / Conn',chipC:'cg',lines:[5],
+     lit:['ep','hd','dm','lp','ch','hn'],arrow:3,badge:'g',
+     desc:'真正的 <code>accept</code> / <code>read</code> / <code>write</code> / <code>close</code> 在 <span class="gr">Acceptor</span> 与 <span class="gr">TcpConnection</span> 里完成。一句话：<b>epoll 面向 fd，Reactor 面向对象和回调</b>。'},
+  ];
+  function mount(){
+    let h='';
+    // 三列顶层：间距拉开
+    h+='<div class="role-box" id="rb-ep" style="left:16px;top:16px;width:176px;height:100px"><span class="zt">内核机制</span><div class="nm">epoll</div><div class="ds">发现「谁就绪了」</div></div>';
+    h+='<div class="role-box" id="rb-hd" style="left:228px;top:16px;width:176px;height:100px"><span class="zt">Handle</span><div class="nm">fd / socket</div><div class="ds">listen_fd · conn_fd</div></div>';
+    h+='<div class="role-box" id="rb-dm" style="left:440px;top:16px;width:176px;height:100px"><span class="zt">Demultiplexer</span><div class="nm">epoll_wait</div><div class="ds">同步等待就绪</div></div>';
+    // 中层
+    h+='<div class="role-box" id="rb-lp" style="left:16px;top:168px;width:288px;height:108px"><span class="zt">Dispatcher</span><div class="nm">EventLoop</div><div class="ds">poll → handleEvent → functors</div></div>';
+    h+='<div class="role-box" id="rb-ch" style="left:328px;top:168px;width:288px;height:108px"><span class="zt">Event Handler</span><div class="nm">Channel</div><div class="ds">fd + events + callbacks</div></div>';
+    // 底层
+    h+='<div class="role-box" id="rb-hn" style="left:88px;top:324px;width:456px;height:78px"><span class="zt">Concrete Handler</span><div class="nm">Acceptor / TcpConnection</div><div class="ds">accept · read · write · close 真实逻辑</div></div>';
+    // SVG 箭头层
+    h+='<svg class="arr-layer" viewBox="0 0 632 420" preserveAspectRatio="none">'+ARROW_DEFS;
+    h+='<line id="ra1" class="flow blue" x1="192" y1="66" x2="224" y2="66" marker-end="url(#arrb)"/>';
+    h+='<line id="ra2" class="flow blue" x1="404" y1="66" x2="436" y2="66" marker-end="url(#arrb)"/>';
+    h+='<line id="ra3" class="flow amber" x1="304" y1="222" x2="324" y2="222" marker-end="url(#arra)"/>';
+    h+='<path id="ra4" class="flow green dash" d="M304 276 L304 312 L316 312" marker-end="url(#arrg)"/>';
+    h+='</svg>';
+    h+='<span class="role-badge b" id="rBadge" style="left:150px;top:288px">epoll 面向 fd · Reactor 面向对象</span>';
+    viz.innerHTML='<div class="vcap"><b>角色映射</b>：epoll 发现就绪 · Reactor 分发到对象回调</div><div class="role-stage">'+h+'</div>';
+  }
+  function paint(s){
+    ['ep','hd','dm','lp','ch','hn'].forEach(k=>{
+      const e=el('rb-'+k);
+      const on=s.lit.includes(k);
+      let c='role-box'+(on?' lit':'');
+      if(k==='ep'||k==='hd'||k==='dm')c+=' b';
+      else if(k==='lp')c+=' h';
+      else c+=' g';
+      e.className=c;
+    });
+    el('ra1').classList.toggle('on',s.arrow>=1);
+    el('ra2').classList.toggle('on',s.arrow>=1);
+    el('ra3').classList.toggle('on',s.arrow>=2);
+    el('ra4').classList.toggle('on',s.arrow>=3);
+    el('ra1').classList.toggle('pulse',s.arrow>=1);
+    el('ra2').classList.toggle('pulse',s.arrow>=1);
+    el('ra3').classList.toggle('pulse',s.arrow>=2);
+    el('ra4').classList.toggle('pulse',s.arrow>=3);
+    const b=el('rBadge');
+    b.className='role-badge '+(s.badge||'b')+(s.badge?' on':'');
+    b.textContent=s.badge==='g'?'epoll 面向 fd · Reactor 面向对象':s.badge==='h'?'EventLoop 把就绪变成回调':s.badge==='b'?'Handle + Demultiplexer 仍是底层':'';
+  }
+  return {id:'roles',label:'角色映射',sub:'epoll → Channel → Handler',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：EventLoop 循环 ========== */
+const loopScene=(()=>{
+  const code=codeOf(['while (!quit) {','  activeChannels = poller.poll(timeout);','  for (Channel* ch : activeChannels)','    ch->handleEvent();','  doPendingFunctors();','}']);
+  const steps=[
+    {phase:'overview',title:'步骤 0 · EventLoop 是一轮轮迭代',chip:'loop()',chipC:'c0',lines:[0,5],desc:'<code>EventLoop::loop()</code> 是外层回环；poll、逐个 Channel 分发、循环尾检查 pending functors，都是<span class="bl">同一线程的一轮</span>。'},
+    {phase:'poll',title:'步骤 1 · poller.poll 阻塞等待',chip:'poll',chipC:'cb',lines:[1],desc:'<code>poller.poll()</code> 封装 <code>epoll_wait()</code>。没有就绪事件时线程睡在这里；此时 activeChannels 尚未返回，pending 队列也可以为空。'},
+    {phase:'ready',title:'步骤 2 · 唤醒后返回 activeChannels',chip:'就绪列表',chipC:'cg',lines:[1,2],desc:'本轮示例：其他线程先投递任务，再写 <code>eventfd</code> 唤醒 poll。poll 返回普通 socket Channel 与 wakeupChannel；<b>普通轮次不一定包含 wakeupChannel</b>。'},
+    {phase:'dispatch',title:'步骤 3 · for 循环逐个分发 Channel',chip:'逐个分发',chipC:'cg',lines:[2,3],desc:'同一 loop 线程依次调用 <code>Channel::handleEvent()</code>。wakeupChannel 的回调会 <code>read(eventfd)</code> 消费通知，但不会在这里直接执行 pending 任务。'},
+    {phase:'pending',title:'步骤 4 · 循环尾检查 pending functors',chip:'loop-tail work',chipC:'ch',lines:[4],desc:'activeChannels 全部处理完后才进入 loop-tail。<code>doPendingFunctors()</code> 独立检查投递队列：可能执行若干任务，也可能队列为空而立即返回。'},
+    {phase:'next',title:'步骤 5 · 短任务结束，进入下一轮 poll',chip:'下一轮',chipC:'cb',lines:[0,5],desc:'本轮完成后回到下一次 poll。I/O 回调和 functor 都必须<span class="dg">短小且不阻塞</span>；DB、重计算、慢磁盘应交给线程池。'}
+  ];
+  const wireIds=['lwPollActive','lwActiveHandle','lwHandleTail','lwQueuePending','lwWakePoll','lwPendingRun','lwReturnPoll'];
+  let timers=[],observer=null,token=0;
+  const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const parts=id=>[el(id),el(id+'-head'),el(id+'-port')];
+  function clearMotion(){token++;timers.forEach(clearTimeout);timers=[];wireIds.forEach(id=>{const p=el(id);if(!p)return;p.style.strokeDasharray='';p.style.strokeDashoffset='';p.style.transition='';el(id+'-head').classList.remove('drawing');});}
+  function schedule(fn,delay){const t=token;if(reduced())fn();else timers.push(setTimeout(()=>{if(t===token)fn();},delay));}
+  function setBox(id,state='preview',color=''){const list=id==='lActive'||id==='lPending'?' loop-list':'';el(id).className='loop-box'+list+' '+state+(color?' '+color:'');}
+  function setWire(id,state='',color=''){const suffix=(state?' '+state:'')+(color?' '+color:'');const [p,a,o]=parts(id);p.setAttribute('class','loop-wire'+suffix);a.setAttribute('class','loop-arrow'+suffix);o.setAttribute('class','loop-port'+suffix);p.style.strokeDasharray='';p.style.strokeDashoffset='';p.style.transition='';}
+  function drawWire(id,color){setWire(id,'on',color);const [p,a]=parts(id);if(reduced())return;const L=p.getTotalLength();p.style.transition='none';p.style.strokeDasharray=L;p.style.strokeDashoffset=L;a.classList.add('drawing');void p.getBoundingClientRect();p.style.transition='';p.style.strokeDashoffset='0';const t=token;timers.push(setTimeout(()=>{if(t!==token)return;p.style.strokeDasharray='';p.style.strokeDashoffset='';a.classList.remove('drawing');},560));}
+  function arrow(id,points){const p=el(id),a=el(id+'-head'),o=el(id+'-port'),start=points[0],tip=points[points.length-1],prev=points[points.length-2];let base={x:tip.x,y:tip.y};const horizontal=Math.abs(tip.x-prev.x)>=Math.abs(tip.y-prev.y);let dHead;if(horizontal){const dir=Math.sign(tip.x-prev.x)||1;base.x=tip.x-dir*9;dHead=`M ${tip.x} ${tip.y} L ${base.x} ${tip.y-5} L ${base.x} ${tip.y+5} Z`;}else{const dir=Math.sign(tip.y-prev.y)||1;base.y=tip.y-dir*9;dHead=`M ${tip.x} ${tip.y} L ${tip.x-5} ${base.y} L ${tip.x+5} ${base.y} Z`;}
+    const pts=[...points.slice(0,-1),base];let d=`M ${pts[0].x} ${pts[0].y}`;for(let i=1;i<pts.length;i++)d+=` L ${pts[i].x} ${pts[i].y}`;p.setAttribute('d',d);a.setAttribute('d',dHead);o.setAttribute('cx',start.x);o.setAttribute('cy',start.y);}
+  function layout(){const s=el('loopStage'),svg=el('loopSvg');if(!s||!svg)return;const r=s.getBoundingClientRect(),rect=id=>{const q=el(id).getBoundingClientRect();return {l:q.left-r.left,r:q.right-r.left,t:q.top-r.top,b:q.bottom-r.top,cx:(q.left+q.right)/2-r.left,cy:(q.top+q.bottom)/2-r.top};};svg.setAttribute('viewBox',`0 0 ${r.width} ${r.height}`);const poll=rect('lPoll'),active=rect('lActive'),handle=rect('lHandle'),producer=rect('lProducer'),pending=rect('lPending'),run=rect('lDoPending');
+    arrow('lwPollActive',[{x:poll.r,y:poll.cy},{x:active.l,y:active.cy}]);arrow('lwActiveHandle',[{x:active.r,y:active.cy},{x:handle.l,y:handle.cy}]);arrow('lwHandleTail',[{x:handle.cx,y:handle.b},{x:handle.cx,y:run.t}]);arrow('lwQueuePending',[{x:producer.r,y:producer.cy},{x:pending.l,y:pending.cy}]);arrow('lwPendingRun',[{x:pending.r,y:pending.cy},{x:run.l,y:run.cy}]);arrow('lwWakePoll',[{x:producer.cx,y:producer.t},{x:16,y:producer.t},{x:16,y:poll.cy},{x:poll.l,y:poll.cy}]);arrow('lwReturnPoll',[{x:run.cx,y:run.b},{x:run.cx,y:366},{x:48,y:366},{x:48,y:poll.b},{x:poll.cx,y:poll.b}]);}
+  function mount(){cancel();let h='<div class="loop-shell lit" id="loopShell"><span class="loop-shell-title">EventLoop::loop()</span><span class="loop-shell-sub">同一线程 · 一轮一轮迭代</span></div>';
+    h+='<span class="loop-track" style="left:28px;top:42px">I/O 就绪与 Channel 分发</span><span class="loop-track" style="left:28px;top:226px">独立投递的 loop-tail work</span>';
+    h+='<div class="loop-box" id="lPoll" style="left:28px;top:72px;width:142px;height:68px"><span class="k">poller.poll</span><span class="s" id="lPollState">epoll_wait</span></div>';
+    h+='<div class="loop-box loop-list" id="lActive" style="left:214px;top:58px;width:190px;height:146px"><span class="k">activeChannels</span><span class="loop-status" id="lActiveState">尚未返回</span><div class="loop-item" id="lAcConn" style="top:58px">conn8Channel · EPOLLIN</div><div class="loop-item" id="lAcWake" style="top:99px">wakeupChannel · EPOLLIN</div></div>';
+    h+='<div class="loop-box" id="lHandle" style="left:446px;top:72px;width:158px;height:68px"><span class="k">Channel::handleEvent</span><span class="s" id="lHandleState">idle</span></div>';
+    h+='<div class="loop-box" id="lProducer" style="left:28px;top:260px;width:142px;height:70px"><span class="k">其他线程</span><span class="s" id="lProducerState">queueInLoop(task)</span></div>';
+    h+='<div class="loop-box loop-list" id="lPending" style="left:214px;top:246px;width:190px;height:108px"><span class="k">pendingFunctors_</span><span class="loop-status" id="lPendingState">0 pending · 可为空</span><div class="loop-item task" id="lFnTask" style="top:58px">writeResponse()</div><div class="loop-empty on" id="lFnEmpty">empty · 0 tasks</div></div>';
+    h+='<div class="loop-box" id="lDoPending" style="left:446px;top:260px;width:158px;height:70px"><span class="k">doPendingFunctors</span><span class="s" id="lDoState">循环尾检查</span></div>';
+    h+='<span class="loop-note" id="lLoopNote"></span><svg class="arr-layer" id="loopSvg" preserveAspectRatio="none">';wireIds.forEach(id=>h+=`<path id="${id}" class="loop-wire"/><path id="${id}-head" class="loop-arrow"/><circle id="${id}-port" class="loop-port" r="4"/>`);h+='</svg>';
+    h+='<span class="loop-label" id="llWake" style="left:25px;top:183px">write(eventfd)</span><span class="loop-label" id="llTail" style="left:518px;top:205px">for 结束</span><span class="loop-label" id="llReturn" style="left:238px;top:350px">下一轮：再次 poll</span>';
+    viz.innerHTML='<div class="vcap"><b>EventLoop 一轮</b>：poll → activeChannels → Channel::handleEvent → pending → next poll</div><div class="loop-stage" id="loopStage">'+h+'</div>';layout();observer=new ResizeObserver(layout);observer.observe(el('loopStage'));}
+  function note(text,kind='g'){const n=el('lLoopNote');n.textContent=text;n.className='loop-note on '+kind;}
+  function channels(state='on'){el('lAcConn').className='loop-item '+state;el('lAcWake').className='loop-item '+state;el('lActiveState').textContent='2 active Channels';}
+  function queued(){el('lFnEmpty').className='loop-empty';el('lFnTask').className='loop-item task on';el('lPendingState').textContent='1 pending';}
+  function baseline(){clearMotion();layout();['lPoll','lActive','lHandle','lProducer','lPending','lDoPending'].forEach(id=>setBox(id));wireIds.forEach(id=>setWire(id));el('lAcConn').className=el('lAcWake').className='loop-item';el('lFnTask').className='loop-item task';el('lFnEmpty').className='loop-empty on';el('lPollState').textContent='epoll_wait';el('lActiveState').textContent='尚未返回';el('lHandleState').textContent='idle';el('lProducerState').textContent='queueInLoop(task)';el('lPendingState').textContent='0 pending · 可为空';el('lDoState').textContent='循环尾检查';el('lLoopNote').className='loop-note';['llWake','llTail','llReturn'].forEach(id=>el(id).className='loop-label');}
+  function paint(s){baseline();
+    if(s.phase==='overview'){['lPoll','lActive','lHandle','lProducer','lPending','lDoPending'].forEach(id=>setBox(id,'preview'));wireIds.forEach((id,i)=>schedule(()=>setWire(id,'hint',i===3||i===5?'amber':i<3?'green':'blue'),i*45));note('一轮：poll → 逐个 Channel → 检查 pending → 下一轮');return;}
+    if(s.phase==='poll'){setBox('lPoll','on active','blue');setBox('lActive','preview');setBox('lPending','preview');el('lPollState').textContent='waiting…';note('没有就绪事件时，loop 睡在 epoll_wait','g');return;}
+    if(['ready','dispatch','pending','next'].includes(s.phase)){setBox('lPoll','on done','blue');setBox('lProducer','on done','amber');setBox('lPending','on','amber');queued();setWire('lwQueuePending','on','amber');setWire('lwWakePoll','on','blue');setWire('lwPollActive','on','blue');setBox('lActive','on','green');channels();el('lPollState').textContent='2 ready';}
+    if(s.phase==='ready'){setBox('lProducer','on active','amber');setBox('lActive','on active','green');setWire('lwQueuePending');setWire('lwWakePoll');setWire('lwPollActive');el('lAcConn').className=el('lAcWake').className='loop-item';schedule(()=>drawWire('lwQueuePending','amber'),120);schedule(()=>queued(),360);schedule(()=>{el('lProducerState').textContent='write(eventfd)';el('llWake').className='loop-label on';drawWire('lwWakePoll','blue');},520);schedule(()=>{el('lPollState').textContent='2 ready';drawWire('lwPollActive','blue');},900);schedule(()=>{el('lAcConn').className='loop-item on';},1120);schedule(()=>{el('lAcWake').className='loop-item on';el('lActiveState').textContent='2 active Channels';},1300);note('本轮示例：socket 就绪 + eventfd 唤醒','g');return;}
+    if(['dispatch','pending','next'].includes(s.phase)){setBox('lHandle','on done','green');setWire('lwActiveHandle','on','green');el('lAcConn').className=el('lAcWake').className='loop-item on done';el('lHandleState').textContent='2 / 2 handled';}
+    if(s.phase==='dispatch'){setBox('lHandle','on active','green');setWire('lwActiveHandle');el('lAcConn').className='loop-item on current';el('lAcWake').className='loop-item on';el('lHandleState').textContent='conn8 → readCallback';schedule(()=>drawWire('lwActiveHandle','green'),100);schedule(()=>{el('lAcConn').className='loop-item on done';el('lAcWake').className='loop-item on current';el('lHandleState').textContent='wakeup → read(eventfd)';},820);schedule(()=>{el('lAcWake').className='loop-item on done';el('lHandleState').textContent='2 / 2 handled';note('eventfd 已读取；pending 任务仍在独立队列','g');},1400);return;}
+    if(['pending','next'].includes(s.phase)){setWire('lwHandleTail','on','green');setWire('lwPendingRun','on','amber');setBox('lDoPending','on done','amber');el('llTail').className='loop-label on';el('lFnTask').className='loop-item task';el('lFnEmpty').className='loop-empty on';el('lPendingState').textContent='0 pending';el('lDoState').textContent='task complete';}
+    if(s.phase==='pending'){setWire('lwHandleTail');setWire('lwPendingRun');setBox('lDoPending','preview');queued();schedule(()=>{el('llTail').className='loop-label on';drawWire('lwHandleTail','green');},120);schedule(()=>{setBox('lDoPending','on active','amber');drawWire('lwPendingRun','amber');},420);schedule(()=>{el('lFnTask').className='loop-item task';el('lFnEmpty').className='loop-empty on';el('lPendingState').textContent='0 pending';el('lDoState').textContent='task complete';note('与 I/O 回调独立；队列为空时立即返回','h');},1100);return;}
+    if(s.phase==='next'){setWire('lwReturnPoll');setBox('lPoll','on done','blue');schedule(()=>{el('llReturn').className='loop-label on';drawWire('lwReturnPoll','blue');},140);schedule(()=>{setBox('lPoll','on active','blue');el('lPollState').textContent='next wait';},700);schedule(()=>note('回调与 functor 必须短小：不要拖住下一轮 poll','d'),1050);}
+  }
+  function cancel(){clearMotion();if(observer){observer.disconnect();observer=null;}}
+  return {id:'loop',label:'事件循环',sub:'poll · handleEvent · functors',steps,mount,paint,cancel,code};
+})();
+
+/* ========== 场景 3：读写路径 + EPOLLOUT 按需 ========== */
+const pathScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// 写路径：EPOLLOUT 按需注册</span>',
+    'output.append(data);',
+    'n = send(fd, ...);',
+    'if (partial) enableWriting();  <span class="cmt">// 注册 EPOLLOUT</span>',
+    '/* handleWrite 发完后 */',
+    'if (output.empty()) disableWriting();'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 三条路径：accept / read / write',chip:'连接路径',chipC:'c0',lines:[],lane:0,step:0,tag:'',desc:'理解 Reactor 不能停在「等事件」。要从 accept 到 read/write/close 看完整路径。先总览三条路径，再逐条聚焦。'},
+    {title:'步骤 1 · accept：listen_fd 可读',chip:'accept',chipC:'cb',lines:[],lane:1,step:1,tag:'',desc:'<code>listen_fd</code> 可读 → <code>Acceptor::handleRead</code>。ET/高并发下应<span class="bl">循环 accept4</span> 到 EAGAIN；新连接设非阻塞并挂到某个 EventLoop。'},
+    {title:'步骤 2 · read：EPOLLIN → 填 input buffer',chip:'read',chipC:'cg',lines:[],lane:2,step:2,tag:'',desc:'<code>conn_fd</code> 可读 → 循环 <code>recv</code> 到 EAGAIN → 追加 input buffer → 协议解析。TCP 是字节流，消息边界在应用层（见 8.9 粘包）。'},
+    {title:'步骤 3 · write 错误：长期监听 EPOLLOUT',chip:'空转陷阱',chipC:'cd',lines:[0],lane:3,step:3,tag:'d',desc:'大多数 socket <span class="dg">大部分时间可写</span>。若常驻监听 <code>EPOLLOUT</code>，EventLoop 会被频繁唤醒空转——这是写路径最常见错误。'},
+    {title:'步骤 4 · 正确：有待发数据才注册',chip:'按需注册',chipC:'ch',lines:[1,2,3],lane:3,step:4,tag:'h',desc:'响应追加 output buffer → 尝试立即 <code>send</code> → <span class="hb">一次没发完才 enableWriting</span>。可写时继续发。'},
+    {title:'步骤 5 · 发完立即取消 EPOLLOUT',chip:'disableWriting',chipC:'cg',lines:[4,5],lane:3,step:5,tag:'g',desc:'output buffer 清空后 <code>disableWriting()</code>。结论：<b>EPOLLOUT 不是默认常驻事件</b>，只在「有待发且暂时发不完」时打开。'},
+  ];
+  const links={
+    pa1a:['ps1a','ps1b'],pa1b:['ps1b','ps1c'],pa2a:['ps2a','ps2b'],pa2b:['ps2b','ps2c'],
+    pa3a:['ps3a','ps3b'],pa3b:['ps3b','ps3c'],pa3c:['ps3c','ps3d']
+  };
+  const nodeIds=['ps1a','ps1b','ps1c','ps2a','ps2b','ps2c','ps3a','ps3b','ps3c','ps3d'];
+  let motionTimers=[],resizeObserver=null,runToken=0;
+  const reduced=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const parts=id=>[el(id),el(id+'-head'),el(id+'-port')];
+  function clearMotion(){
+    runToken++;
+    motionTimers.forEach(clearTimeout);motionTimers=[];
+    nodeIds.forEach(id=>{const n=el(id);if(n)n.classList.remove('enter');});
+    Object.keys(links).forEach(id=>{const p=el(id);if(!p)return;p.style.strokeDasharray='';p.style.strokeDashoffset='';p.style.transition='';const a=el(id+'-head');if(a)a.classList.remove('drawing');});
+  }
+  function schedule(fn,delay){
+    const token=runToken;
+    if(reduced()){fn();return;}
+    motionTimers.push(setTimeout(()=>{if(token===runToken)fn();},delay));
+  }
+  function setNode(id,state,animate=false){
+    const n=el(id);n.className='path-step '+state;
+    if(animate&&!reduced()){n.classList.remove('enter');void n.offsetWidth;n.classList.add('enter');}
+  }
+  function setWire(id,state='',color=''){
+    const [wire,head,port]=parts(id);
+    const suffix=(state?' '+state:'')+(color?' '+color:'');
+    wire.setAttribute('class','path-wire'+suffix);
+    head.setAttribute('class','path-arrow'+suffix);
+    port.setAttribute('class','path-port'+suffix);
+    wire.style.strokeDasharray='';wire.style.strokeDashoffset='';wire.style.transition='';
+  }
+  function drawWire(id,color){
+    const [wire,head,port]=parts(id);
+    setWire(id,'on',color);
+    if(reduced())return;
+    const length=wire.getTotalLength();
+    wire.style.transition='none';wire.style.strokeDasharray=length;wire.style.strokeDashoffset=length;
+    head.classList.add('drawing');void wire.getBoundingClientRect();
+    wire.style.transition='';wire.style.strokeDashoffset='0';
+    const token=runToken;
+    motionTimers.push(setTimeout(()=>{if(token!==runToken)return;wire.style.strokeDasharray='';wire.style.strokeDashoffset='';head.classList.remove('drawing');},560));
+  }
+  function layoutConnectors(){
+    const stage=el('pathStage'),svg=el('pathSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${sr.width} ${sr.height}`);
+    Object.entries(links).forEach(([id,[fromId,toId]])=>{
+      const from=el(fromId).getBoundingClientRect(),to=el(toId).getBoundingClientRect();
+      const x1=from.right-sr.left,y1=from.top-sr.top+from.height/2,tipX=to.left-sr.left,tipY=to.top-sr.top+to.height/2;
+      const baseX=tipX-9,gap=Math.max(1,baseX-x1),c1=x1+gap*.45,c2=x1+gap*.55;
+      el(id).setAttribute('d',`M ${x1} ${y1} C ${c1} ${y1}, ${c2} ${tipY}, ${baseX} ${tipY}`);
+      el(id+'-head').setAttribute('d',`M ${tipX} ${tipY} L ${baseX} ${tipY-5} L ${baseX} ${tipY+5} Z`);
+      el(id+'-port').setAttribute('cx',x1);el(id+'-port').setAttribute('cy',y1);
+    });
+  }
+  function mount(){
+    cancel();
+    let h='';
+    h+='<div class="path-lane" id="pl1" style="top:8px"><span class="zt">accept 路径</span></div>';
+    h+='<div class="path-lane" id="pl2" style="top:136px"><span class="zt">read 路径</span></div>';
+    h+='<div class="path-lane" id="pl3" style="top:264px"><span class="zt">write 路径 · EPOLLOUT 按需</span></div>';
+    h+='<div class="path-step" id="ps1a" style="left:96px;top:52px;width:120px">listen 可读</div><div class="path-step" id="ps1b" style="left:270px;top:52px;width:130px">accept4 循环</div><div class="path-step" id="ps1c" style="left:454px;top:52px;width:140px">挂到 EventLoop</div>';
+    h+='<div class="path-step" id="ps2a" style="left:96px;top:180px;width:110px">EPOLLIN</div><div class="path-step" id="ps2b" style="left:260px;top:180px;width:140px">recv → EAGAIN</div><div class="path-step" id="ps2c" style="left:454px;top:180px;width:120px">协议解析</div>';
+    h+='<div class="path-step" id="ps3a" style="left:56px;top:308px;width:120px">append outbuf</div><div class="path-step" id="ps3b" style="left:220px;top:308px;width:100px">send 部分</div><div class="path-step" id="ps3c" style="left:364px;top:308px;width:110px">enable OUT</div><div class="path-step" id="ps3d" style="left:518px;top:308px;width:90px">发完 disable</div>';
+    h+='<span class="path-tag d" id="pTag" style="left:190px;top:378px">常驻 EPOLLOUT → 空转</span>';
+    h+='<svg class="arr-layer" id="pathSvg" preserveAspectRatio="none">';
+    Object.keys(links).forEach(id=>{h+=`<path id="${id}" class="path-wire"/><path id="${id}-head" class="path-arrow"/><circle id="${id}-port" class="path-port" r="4"/>`;});
+    h+='</svg>';
+    viz.innerHTML='<div class="vcap"><b>连接读写路径</b>：accept / read / write · EPOLLOUT 按需</div><div class="path-stage" id="pathStage">'+h+'</div>';
+    layoutConnectors();resizeObserver=new ResizeObserver(layoutConnectors);resizeObserver.observe(el('pathStage'));
+  }
+  function settleLane(lane,color){
+    const ids=lane===1?['ps1a','ps1b','ps1c']:['ps2a','ps2b','ps2c'];
+    const wires=lane===1?['pa1a','pa1b']:['pa2a','pa2b'];
+    ids.forEach(id=>setNode(id,'on ok'));wires.forEach(id=>setWire(id,'on',color));
+  }
+  function revealSequence(ids,wires,color,states,tag){
+    schedule(()=>setNode(ids[0],`on ${states[0]}`,true),0);
+    schedule(()=>drawWire(wires[0],color),140);
+    schedule(()=>setNode(ids[1],`on ${states[1]}`,true),400);
+    schedule(()=>drawWire(wires[1],color),540);
+    schedule(()=>setNode(ids[2],`on ${states[2]}`,true),800);
+    if(tag)schedule(tag,1160);
+  }
+  function showTag(kind){
+    const t=el('pTag');t.className='path-tag '+kind+' on';
+    t.textContent=kind==='g'?'发完 disableWriting · 停止空转':kind==='h'?'有待发且未发完 → enableWriting':'常驻 EPOLLOUT → 空转';
+  }
+  function paint(s){
+    clearMotion();layoutConnectors();
+    for(let i=1;i<=3;i++)el('pl'+i).className='path-lane future';
+    nodeIds.forEach(id=>setNode(id,''));Object.keys(links).forEach(id=>setWire(id));
+    const tag=el('pTag');tag.className='path-tag d';tag.textContent='';
+    if(s.step===0){
+      for(let i=1;i<=3;i++)el('pl'+i).className='path-lane lit';
+      const groups=[
+        [['ps1a','ps1b','ps1c'],['pa1a','pa1b'],'blue'],
+        [['ps2a','ps2b','ps2c'],['pa2a','pa2b'],'green'],
+        [['ps3a','ps3b','ps3c','ps3d'],['pa3a','pa3b','pa3c'],'amber']
+      ];
+      groups.forEach((g,index)=>schedule(()=>{g[0].forEach(id=>setNode(id,'preview'));g[1].forEach(id=>setWire(id,'hint',g[2]));},index*140));
+      return;
+    }
+    if(s.step>=2){el('pl1').className='path-lane done';settleLane(1,'blue');}
+    if(s.step>=3){el('pl2').className='path-lane done';settleLane(2,'green');}
+    el('pl'+s.lane).className='path-lane lit';
+    if(s.step===1)revealSequence(['ps1a','ps1b','ps1c'],['pa1a','pa1b'],'blue',['act','act','act']);
+    if(s.step===2)revealSequence(['ps2a','ps2b','ps2c'],['pa2a','pa2b'],'green',['ok','ok','ok']);
+    if(s.step===3)revealSequence(['ps3a','ps3b','ps3c'],['pa3a','pa3b'],'danger',['bad','bad','bad'],()=>showTag('d'));
+    if(s.step===4)revealSequence(['ps3a','ps3b','ps3c'],['pa3a','pa3b'],'amber',['act','warn','act'],()=>showTag('h'));
+    if(s.step===5){
+      setNode('ps3a','on ok');setNode('ps3b','on ok');setNode('ps3c','on ok');
+      setWire('pa3a','on','amber');setWire('pa3b','on','amber');
+      schedule(()=>drawWire('pa3c','green'),140);
+      schedule(()=>setNode('ps3d','on ok',true),400);
+      schedule(()=>showTag('g'),760);
+    }
+  }
+  function cancel(){clearMotion();if(resizeObserver){resizeObserver.disconnect();resizeObserver=null;}}
+  return {id:'path',label:'读写路径',sub:'accept · read · EPOLLOUT 按需',steps,mount,paint,cancel,code};
+})();
+
+/* ========== 场景 4：one loop per thread ========== */
+const multiScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// main loop：只 accept</span>',
+    'conn = accept4(listen_fd, ...);',
+    'sub = ioLoops[roundRobin++];',
+    'sub->runInLoop([=]{ conn->registerIn(sub); });',
+    '',
+    '<span class="cmt">// 连接归属固定，禁止跨线程直接改</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 单线程 CPU 成为瓶颈',chip:'扩展动机',chipC:'c0',lines:[],
+     lit:['main'],chipOn:0,arrow:0,note:'',
+     desc:'单线程 Reactor 已能管很多连接；业务再涨时，一个线程的 CPU 成为瓶颈。扩展方式：<b>one loop per thread</b>。'},
+    {title:'步骤 1 · main EventLoop 只负责 accept',chip:'main loop',chipC:'cb',lines:[0,1],
+     lit:['main'],chipOn:1,arrow:0,note:'',
+     desc:'<span class="bl">main loop</span> 监听 <code>listen_fd</code>，专职 accept 新连接。不把所有读写都堆在主线程。'},
+    {title:'步骤 2 · 轮询选一个 sub EventLoop',chip:'负载分配',chipC:'cg',lines:[2],
+     lit:['main','sub'],chipOn:2,arrow:1,note:'',
+     desc:'按轮询/负载选一个 <span class="gr">sub loop</span>。每个 sub loop 绑定一个 IO 线程，管理一批已建立连接的读写。'},
+    {title:'步骤 3 · 连接注册进 sub loop',chip:'归属固定',chipC:'cg',lines:[3,5],
+     lit:['main','sub'],chipOn:3,arrow:2,note:'g',
+     desc:'通过 <code>runInLoop</code> 把 <code>conn_fd</code> 注册到目标 sub loop。之后该连接的 read/write/close <span class="gr">全部在同一线程</span>——显著减少锁与竞态。'},
+    {title:'步骤 4 · worker 线程池做重活',chip:'业务与 IO 分离',chipC:'ch',lines:[],
+     lit:['main','sub','work'],chipOn:3,arrow:3,note:'h',
+     desc:'<span class="hb">worker pool</span> 跑耗时业务；做完后把写响应任务<span class="hb">投递回</span>连接所属 EventLoop，禁止业务线程长期直接操作 fd。'},
+    {title:'步骤 5 · 两条线正交',chip:'选型记忆',chipC:'cg',lines:[5],
+     lit:['main','sub','work'],chipOn:3,arrow:3,note:'g',
+     desc:'<b>Reactor</b> 解决大量连接的 I/O 等待与分发；<b>线程池</b> 解决耗时任务并发。二者互补，不是互相替代。'},
+  ];
+  function mount(){
+    let h='';
+    // 三列大面板：等高、对称留白，左右列等宽
+    h+='<div class="mt-box main" id="mb-main" style="left:8px;top:24px;width:160px;height:280px">';
+    h+='  <span class="zt">main EventLoop</span><div class="nm">accept only</div><div class="subline">只接新连接</div>';
+    h+='</div>';
+    h+='<div class="mt-box sub" id="mb-sub" style="left:212px;top:24px;width:208px;height:280px">';
+    h+='  <span class="zt">sub EventLoops</span><div class="nm">IO threads</div><div class="subline">读写 · 归属固定</div>';
+    h+='</div>';
+    h+='<div class="mt-box work" id="mb-work" style="left:464px;top:24px;width:160px;height:280px">';
+    h+='  <span class="zt">worker pool</span><div class="nm">业务线程池</div><div class="subline">执行耗时任务</div>';
+    h+='</div>';
+    // chips 以各自面板中心线对齐，保持一致内边距
+    h+='<div class="mt-chip b" id="mc-listen" style="left:24px;top:108px;width:128px">listen_fd</div>';
+    h+='<div class="mt-chip" id="mc-conn" style="left:24px;top:168px;width:128px">new conn</div>';
+    h+='<div class="mt-chip g" id="mc-s0" style="left:228px;top:104px;width:176px">loop-0 · conn×N</div>';
+    h+='<div class="mt-chip g" id="mc-s1" style="left:228px;top:156px;width:176px">loop-1 · conn×N</div>';
+    h+='<div class="mt-chip g" id="mc-s2" style="left:228px;top:208px;width:176px">loop-2 · conn×N</div>';
+    h+='<div class="mt-chip h" id="mc-w0" style="left:480px;top:130px;width:128px">task-0</div>';
+    h+='<div class="mt-chip h" id="mc-w1" style="left:480px;top:186px;width:128px">task-1</div>';
+    // 底部结论始终按舞台中心定位，文案变化不改变中心线
+    h+='<span class="mt-note g" id="mNote" style="top:336px">一连接同时只归属一个 EventLoop</span>';
+    // SVG 箭头：正交连接到对应卡片中心，端点与边框留出间隙
+    h+='<svg class="arr-layer" viewBox="0 0 632 420" preserveAspectRatio="none">'+ARROW_DEFS;
+    // new conn → loop-0：先转向再进入目标卡片
+    h+='<path id="ma1" class="flow amber dash" d="M172 187 H190 V123 H208" marker-end="url(#arra)"/>';
+    // sub loop → worker：派发耗时任务
+    h+='<line id="ma2" class="flow amber dash" x1="424" y1="149" x2="460" y2="149" marker-end="url(#arra)"/>';
+    // worker → sub loop：queueInLoop 回投
+    h+='<line id="ma3" class="flow green dash" x1="460" y1="205" x2="424" y2="205" marker-end="url(#arrg)"/>';
+    h+='</svg>';
+    h+='<span class="arr-label" id="ma1t" style="left:190px;top:145px;transform:translateX(-50%)">分配</span>';
+    h+='<span class="arr-label" id="ma2t" style="left:442px;top:122px;transform:translateX(-50%)">派发</span>';
+    h+='<span class="arr-label" id="ma3t" style="left:442px;top:219px;transform:translateX(-50%)">回投</span>';
+    viz.innerHTML='<div class="vcap"><b>one loop per thread</b>：main accept · sub 读写 · worker 业务</div><div class="mt-stage">'+h+'</div>';
+  }
+  function paint(s){
+    ['main','sub','work'].forEach(k=>{
+      el('mb-'+k).className='mt-box '+k+(s.lit.includes(k)?' lit':'');
+    });
+    el('mc-listen').className='mt-chip b'+(s.chipOn>=1?' on':'');
+    el('mc-conn').className='mt-chip'+(s.chipOn>=1?' on b':'')+(s.chipOn===2?' fly':'');
+    el('mc-s0').className='mt-chip g'+(s.chipOn>=2?' on':'')+(s.chipOn===3&&s.arrow===2?' fly':'');
+    el('mc-s1').className='mt-chip g'+(s.chipOn>=2?' on':'');
+    el('mc-s2').className='mt-chip g'+(s.chipOn>=2?' on':'');
+    el('mc-w0').className='mt-chip h'+(s.lit.includes('work')?' on':'');
+    el('mc-w1').className='mt-chip h'+(s.lit.includes('work')?' on':'');
+    // arrows
+    el('ma1').classList.toggle('on',s.arrow>=1);
+    el('ma1').classList.toggle('pulse',s.arrow===1||s.arrow===2);
+    el('ma1t').classList.toggle('on',s.arrow>=1);
+    el('ma2').classList.toggle('on',s.arrow>=3);
+    el('ma2').classList.toggle('pulse',s.arrow>=3&&s.note==='h');
+    el('ma2t').classList.toggle('on',s.arrow>=3);
+    el('ma3').classList.toggle('on',s.arrow>=3);
+    el('ma3').classList.toggle('pulse',s.arrow>=3&&s.note==='h');
+    el('ma3t').classList.toggle('on',s.arrow>=3);
+    const n=el('mNote');
+    n.className='mt-note '+(s.note||'g')+(s.note?' on':'');
+    n.textContent=s.note==='h'?'业务做完 → queueInLoop 回投所属 loop':s.note==='g'?'一连接同时只归属一个 EventLoop':'';
+  }
+  return {id:'multi',label:'多线程 Reactor',sub:'one loop per thread',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[rolesScene,loopScene,pathScene,multiScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  SCENES[si]?.cancel?.();
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

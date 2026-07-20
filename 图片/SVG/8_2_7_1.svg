@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>SQPOLL 线程状态与 IOPOLL 请求生命周期</title>
+  <desc>上半：SQPOLL 内核线程 Active / Idle / NEED_WAKEUP / Waking 状态机与共享内存协议。下半：IOPOLL 请求从 SQE 到 CQE 的七阶段与 buffer 所有权边界。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">状态与所有权：SQPOLL 线程睡醒 + IOPOLL 请求七阶段</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">先发布 SQ tail 再查 NEED_WAKEUP · buffer 活到 CQE 收割 · 参数在内核复制前不可失效</text>
+
+  <!-- ========== A: SQPOLL thread state machine ========== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · SQPOLL 内核线程状态机</text>
+
+  <rect x="48" y="128" width="1144" height="300" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+
+  <!-- states -->
+  <rect x="80" y="168" width="200" height="88" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="180" y="200" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">Active</text>
+  <text x="180" y="222" font-size="11" fill="#2F6B5E" text-anchor="middle">持续检查 SQ tail</text>
+  <text x="180" y="240" font-size="11" fill="#2F6B5E" text-anchor="middle">消费 SQE 并提交</text>
+
+  <rect x="360" y="168" width="200" height="88" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="460" y="200" font-size="14" font-weight="700" fill="#6B4E28" text-anchor="middle">Idle polling</text>
+  <text x="460" y="222" font-size="11" fill="#8A6A3A" text-anchor="middle">SQ 暂时为空</text>
+  <text x="460" y="240" font-size="11" fill="#8A6A3A" text-anchor="middle">未超 sq_thread_idle</text>
+
+  <rect x="640" y="168" width="220" height="88" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="750" y="196" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">Sleeping</text>
+  <text x="750" y="216" font-size="12" font-weight="700" fill="#A64B3C" text-anchor="middle">NEED_WAKEUP</text>
+  <text x="750" y="238" font-size="11" fill="#733428" text-anchor="middle">共享 SQ flags 置位</text>
+
+  <rect x="940" y="168" width="200" height="88" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1040" y="200" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">Waking</text>
+  <text x="1040" y="222" font-size="11" fill="#3D5A80" text-anchor="middle">ENTER_SQ_WAKEUP</text>
+  <text x="1040" y="240" font-size="11" fill="#3D5A80" text-anchor="middle">重新进入 Active</text>
+
+  <!-- forward arrows -->
+  <path d="M288,212 L348,212" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="318" y="200" font-size="10" fill="#6B675C" text-anchor="middle">SQ 空</text>
+
+  <path d="M568,212 L628,212" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+  <text x="598" y="198" font-size="10" fill="#A64B3C" text-anchor="middle">idle 超时</text>
+
+  <path d="M868,212 L928,212" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+  <text x="898" y="198" font-size="10" fill="#3D5A80" text-anchor="middle">应用唤醒</text>
+
+  <!-- back: Waking → Active -->
+  <path d="M1040,264 L1040,300 L180,300 L180,264" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+  <text x="620" y="292" font-size="11" fill="#2F6B5E" text-anchor="middle">唤醒完成 → Active</text>
+
+  <!-- back: Idle → Active when new SQE -->
+  <path d="M460,264 L460,280 L180,280 L180,264" fill="none" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arra)"/>
+  <text x="320" y="274" font-size="10" fill="#8A6A3A" text-anchor="middle">见新 tail</text>
+
+  <!-- protocol strip -->
+  <rect x="72" y="328" width="1096" height="80" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="92" y="356" font-size="13" font-weight="700" fill="#2C4460">共享内存协议（顺序不能反）</text>
+  <text x="92" y="380" font-size="12" fill="#2C4460">① 填 SQE  →  ② release 发布 SQ tail  →  ③ acquire 读 SQ flags  →  ④ NEED_WAKEUP 则 io_uring_enter(..., SQ_WAKEUP)</text>
+  <text x="92" y="398" font-size="11" fill="#6B675C">先 tail 后 flag：否则应用以为线程醒着，内核已睡 → SQE 停在环中无人消费 · liburing submit 已封装此路径</text>
+
+  <!-- ========== B: IOPOLL request lifecycle ========== -->
+  <text x="48" y="468" font-size="13" font-weight="700" fill="#4A473F">B · IOPOLL 请求生命周期（设备完成 ≠ 用户可见）</text>
+
+  <rect x="48" y="484" width="1144" height="248" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+
+  <!-- 7 stage boxes in two rows -->
+  <!-- row 1: 1-4 -->
+  <rect x="68" y="508" width="150" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="143" y="534" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">1 · SQE 已发布</text>
+  <text x="143" y="556" font-size="10" fill="#3D5A80" text-anchor="middle">应用持有参数</text>
+
+  <rect x="246" y="508" width="160" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="326" y="534" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">2 · 已提交 DI</text>
+  <text x="326" y="556" font-size="10" fill="#3D5A80" text-anchor="middle">复制校验 + O_DIRECT</text>
+
+  <rect x="434" y="508" width="170" height="72" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="519" y="530" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">3 · iopoll_list</text>
+  <text x="519" y="550" font-size="10" fill="#8A6A3A" text-anchor="middle">设备 I/O 在途</text>
+  <text x="519" y="568" font-size="10" fill="#6B675C" text-anchor="middle">buffer 禁释放</text>
+
+  <rect x="632" y="508" width="180" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="722" y="530" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">4 · 设备已完成</text>
+  <text x="722" y="550" font-size="10" fill="#A64B3C" text-anchor="middle">DMA 写完 + 设备 CQ</text>
+  <text x="722" y="568" font-size="10" fill="#733428" text-anchor="middle">CPU 尚未 poll 到</text>
+
+  <rect x="840" y="508" width="160" height="72" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="920" y="534" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">5 · 驱动 poll</text>
+  <text x="920" y="556" font-size="10" fill="#6B5B95" text-anchor="middle">读 CQ phase / head</text>
+
+  <!-- arrows row1 -->
+  <path d="M222,544 L240,544" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M410,544 L428,544" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M608,544 L626,544" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M816,544 L834,544" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- row 2: 6-7 + ownership note -->
+  <path d="M920,588 L920,620 L326,620" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="246" y="636" width="160" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="326" y="662" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">6 · CQE 已发布</text>
+  <text x="326" y="684" font-size="10" fill="#2F6B5E" text-anchor="middle">用户可见完成</text>
+
+  <path d="M410,672 L428,672" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="434" y="636" width="170" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="519" y="662" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">7 · 应用收割</text>
+  <text x="519" y="684" font-size="10" fill="#2F6B5E" text-anchor="middle">buffer 所有权返回</text>
+
+  <rect x="640" y="636" width="500" height="72" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="660" y="662" font-size="12" font-weight="700" fill="#6B4E28">谁在做 poll？</text>
+  <text x="660" y="684" font-size="11" fill="#6B4E28">仅 IOPOLL：应用 enter(GETEVENTS) · 组合 SQPOLL+IOPOLL：内核线程代 poll · 仅 peek 不够</text>
+
+  <!-- ========== C: ownership bar ========== -->
+  <rect x="48" y="756" width="1144" height="108" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="68" y="786" font-size="13" font-weight="700" fill="#4A473F">C · 所有权边界（SQPOLL 异步消费）</text>
+
+  <!-- timeline ownership -->
+  <rect x="68" y="804" width="220" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="178" y="826" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">SQE 参数：复制前有效</text>
+
+  <rect x="300" y="804" width="280" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="440" y="826" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">I/O buffer：直到 CQE 收割</text>
+
+  <rect x="592" y="804" width="260" height="36" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="722" y="826" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">收割后：应用可复用/释放</text>
+
+  <rect x="864" y="804" width="300" height="36" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="1014" y="826" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">过早 free = UAF / DMA 踩内存</text>
+</svg>

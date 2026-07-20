@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">Ceph：对象 → PG → OSD 两级映射，摆放靠计算不靠查表</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">客户端自己算出数据在哪（CRUSH），数据路径上没有中心目录；同一 PG 的操作在 primary 上串行——并发控制的粒度就是 PG</text>
+
+  <!-- ======== 第一级映射 ======== -->
+  <rect x="70" y="110" width="190" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="165" y="134" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">对象名 "img_004217"</text>
+  <text x="165" y="153" font-size="10.5" fill="#2C4460" text-anchor="middle">亿级对象</text>
+
+  <line x1="260" y1="138" x2="330" y2="138" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="295" y="126" font-size="10.5" fill="#6B675C" text-anchor="middle">hash</text>
+
+  <rect x="332" y="110" width="150" height="56" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="407" y="134" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">PG 7.1f</text>
+  <text x="407" y="153" font-size="10.5" fill="#4A3F68" text-anchor="middle">聚合成万级 PG</text>
+
+  <line x1="482" y1="138" x2="552" y2="138" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="517" y="126" font-size="10.5" fill="#6B675C" text-anchor="middle">CRUSH(pg, map, rule)</text>
+
+  <rect x="554" y="110" width="240" height="56" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="674" y="134" font-size="12.5" font-weight="700" fill="#48562B" text-anchor="middle">[osd.3*, osd.12, osd.21]</text>
+  <text x="674" y="153" font-size="10.5" fill="#48562B" text-anchor="middle">有序列表，第一个是 primary</text>
+
+  <rect x="830" y="104" width="350" height="70" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="1005" y="128" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">为什么两级：PG 是复制/迁移/一致性的单位</text>
+  <text x="1005" y="147" font-size="10.5" fill="#6B675C" text-anchor="middle">按对象管理 = 亿级状态机；按 PG 管理 = 万级</text>
+  <text x="1005" y="164" font-size="10.5" fill="#6B675C" text-anchor="middle">对象只需一次 hash 归组，无需单独记录</text>
+
+  <!-- ======== CRUSH 层级 ======== -->
+  <text x="70" y="216" font-size="14" font-weight="700" fill="#4A473F">CRUSH map：故障域层级 + 规则「3 副本跨机架」</text>
+
+  <rect x="290" y="232" width="130" height="36" rx="6" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="355" y="255" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">root（集群）</text>
+
+  <g stroke="#5A564B" stroke-width="1.2">
+    <line x1="355" y1="268" x2="165" y2="296"/>
+    <line x1="355" y1="268" x2="355" y2="296"/>
+    <line x1="355" y1="268" x2="545" y2="296"/>
+  </g>
+
+  <rect x="100" y="298" width="130" height="34" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="165" y="320" font-size="11" font-weight="700" fill="#7A5518" text-anchor="middle">rack A</text>
+  <rect x="290" y="298" width="130" height="34" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="355" y="320" font-size="11" font-weight="700" fill="#7A5518" text-anchor="middle">rack B</text>
+  <rect x="480" y="298" width="130" height="34" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="545" y="320" font-size="11" font-weight="700" fill="#7A5518" text-anchor="middle">rack C</text>
+
+  <g stroke="#5A564B" stroke-width="1">
+    <line x1="165" y1="332" x2="165" y2="356"/>
+    <line x1="355" y1="332" x2="355" y2="356"/>
+    <line x1="545" y1="332" x2="545" y2="356"/>
+  </g>
+
+  <rect x="112" y="358" width="106" height="32" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="165" y="379" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">osd.3 ★</text>
+  <rect x="302" y="358" width="106" height="32" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="355" y="379" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">osd.12</text>
+  <rect x="492" y="358" width="106" height="32" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="545" y="379" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">osd.21</text>
+
+  <text x="165" y="410" font-size="10" fill="#6B675C" text-anchor="middle">每盘一个 OSD 进程</text>
+
+  <rect x="680" y="252" width="500" height="140" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="706" y="278" font-size="12" font-weight="700" fill="#2B2A26">CRUSH 的三条性质：</text>
+  <text x="706" y="302" font-size="11.5" fill="#4A473F">① 确定性：同样输入（pg、map 版本、规则）永远同样输出</text>
+  <text x="706" y="324" font-size="11.5" fill="#4A473F">　→ 任何客户端独立算出位置，数据路径零查表、零目录服务</text>
+  <text x="706" y="348" font-size="11.5" fill="#4A473F">② 受控搬迁：加/减 OSD 只挪 ~变化比例 的 PG，不全局洗牌</text>
+  <text x="706" y="372" font-size="11.5" fill="#4A473F">③ 规则可表达故障域：跨 rack 选 3 个叶子（对照 7.1 前提）</text>
+
+  <!-- ======== 写路径 ======== -->
+  <text x="70" y="446" font-size="14" font-weight="700" fill="#2F6B5E">一次写的路径：PG 串行点 + 全副本持久才 ack</text>
+
+  <rect x="70" y="464" width="120" height="50" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="130" y="485" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">client</text>
+  <text x="130" y="503" font-size="10" fill="#2C4460" text-anchor="middle">自己算好目标</text>
+
+  <line x1="190" y1="489" x2="256" y2="489" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="258" y="452" width="300" height="118" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.8"/>
+  <text x="408" y="476" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">primary（osd.3）</text>
+  <rect x="278" y="488" width="176" height="30" rx="4" fill="#F5F4ED" stroke="#6B5B95" stroke-width="1"/>
+  <text x="366" y="507" font-size="10.5" fill="#4A3F68" text-anchor="middle">PG 7.1f 的操作队列</text>
+  <text x="472" y="507" font-size="10.5" font-weight="700" fill="#A64B3C">串行执行</text>
+  <text x="408" y="540" font-size="10.5" fill="#4A3F68" text-anchor="middle">同一 PG 的写在这里排队定序——</text>
+  <text x="408" y="558" font-size="10.5" fill="#4A3F68" text-anchor="middle">写写冲突不用分布式锁，路由 + 单点排队解决</text>
+
+  <line x1="558" y1="478" x2="640" y2="478" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrTeal)"/>
+  <line x1="558" y1="512" x2="640" y2="540" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrTeal)"/>
+  <text x="600" y="466" font-size="10" fill="#2F6B5E" text-anchor="middle">并行扇出</text>
+
+  <rect x="642" y="456" width="190" height="44" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="737" y="474" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">replica osd.12</text>
+  <text x="737" y="492" font-size="10" fill="#48562B" text-anchor="middle">BlueStore WAL 持久 → ack</text>
+
+  <rect x="642" y="522" width="190" height="44" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="737" y="540" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">replica osd.21</text>
+  <text x="737" y="558" font-size="10" fill="#48562B" text-anchor="middle">BlueStore WAL 持久 → ack</text>
+
+  <rect x="880" y="470" width="300" height="80" rx="8" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1030" y="496" font-size="12" font-weight="700" fill="#A64B3C" text-anchor="middle">★ 全部副本持久后才向 client ack</text>
+  <text x="1030" y="518" font-size="10.5" fill="#A64B3C" text-anchor="middle">延迟 = max(三个节点的网络 + 落盘)</text>
+  <text x="1030" y="536" font-size="10.5" fill="#A64B3C" text-anchor="middle">尾延迟被最慢副本决定（7.1 §2）</text>
+
+  <!-- ======== C++ 对照条 ======== -->
+  <rect x="70" y="600" width="1110" height="136" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="96" y="628" font-size="13" font-weight="700" fill="#2B2A26">C++ 线程模型对照（为什么这些机制决定延迟）：</text>
+  <text x="96" y="654" font-size="11.5" fill="#4A473F">并发控制：PG = 锁的粒度。「同 PG 路由到同一 primary 排队」≈ 把共享状态交给一个 strand（单线程执行器），消息传递代替 mutex——省了锁，代价是该队列成为延迟汇聚点</text>
+  <text x="96" y="680" font-size="11.5" fill="#4A473F">内存可见性：读默认也走 primary，排在同一队列里 ≈ 同一把锁下的 release/acquire——ack 过的写必可见；改读副本（balanced reads）= 放弃同步点，可能读到旧值</text>
+  <text x="96" y="706" font-size="11.5" fill="#4A473F">队列：client→messenger→PG 队列→BlueStore→盘，四级排队；任何一级 λ 逼近 μ，延迟按 Little 定律发散——p99 毛刺多数是「某级队列深了」</text>
+  <text x="96" y="728" font-size="11.5" fill="#4A473F">背压：OSD/客户端限制 in-flight ops（有界窗口）；恢复/scrub 限速礼让前台——无界接收只会把排队延迟改名叫超时</text>
+</svg>

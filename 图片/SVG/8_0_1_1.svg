@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 920" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 9.7 / 9.2：
+       底色 rgb(245,244,237)
+       蓝 #E3EAF4 / #3D5A80 / #2C4460
+       绿 #DCE9E3 / #2F6B5E / #24473F
+       琥珀 #EFE7DA / #8A6A3A / #6B4E28
+       红 #F0E0DB / #A64B3C / #733428
+       中性 #F1EFE8 / #D8D5C8 / #4A473F / #6B675C / #2B2A26
+       面板底 #FBFBF6 · 实心三角箭头 #5A564B -->
+  <title>CPU Cache：层次、Cache Line 与 MESI 所有权</title>
+  <desc>上半：CPU 到 DRAM 的多级缓存层次与时间/空间局部性。中部：Cache Line 是传输与一致性的基本单位。下半：MESI 状态机与写路径需要独占所有权，以及 cache line bouncing。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="920" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">CPU Cache：多核交换的是缓存行所有权，不是单个变量</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">层次解决速度差 · Cache Line 是搬运与一致性的基本单位 · 写需要独占，读可以共享</text>
+
+  <!-- ============ Panel A：层次 ============ -->
+  <text x="48" y="108" font-size="13" font-weight="700" fill="#4A473F">A · 为什么需要 Cache：执行速度与 DRAM 不在同一量级，用多级小而快的存储保存近期数据</text>
+
+  <rect x="48" y="120" width="720" height="236" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 金字塔式层次：从快到慢 -->
+  <rect x="248" y="140" width="200" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="348" y="156" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 核心 · 执行单元</text>
+  <text x="348" y="172" font-size="10" fill="#2C4460" text-anchor="middle">最快 · 寄存器侧</text>
+  <path d="M348,180 L348,194" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="208" y="196" width="280" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="348" y="212" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L1 · 每核私有（I/D 常分离）</text>
+  <text x="348" y="228" font-size="10" fill="#2C4460" text-anchor="middle">容量最小 · 离执行单元最近</text>
+  <path d="M348,236 L348,250" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="168" y="252" width="360" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="348" y="268" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">L2 · 通常每核私有</text>
+  <text x="348" y="284" font-size="10" fill="#24473F" text-anchor="middle">比 L1 大 · 访问更慢</text>
+  <path d="M348,292 L348,306" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="108" y="308" width="480" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="348" y="330" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">LLC / L3 · 多核共享或按簇共享 · 跨核数据常经过这里</text>
+
+  <!-- 右侧 DRAM + 局部性 -->
+  <rect x="620" y="160" width="128" height="160" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="684" y="200" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">DRAM</text>
+  <text x="684" y="224" font-size="10.5" fill="#4A473F" text-anchor="middle">片外内存</text>
+  <text x="684" y="246" font-size="10.5" fill="#4A473F" text-anchor="middle">容量大</text>
+  <text x="684" y="268" font-size="10.5" fill="#4A473F" text-anchor="middle">延迟远高于</text>
+  <text x="684" y="288" font-size="10.5" fill="#4A473F" text-anchor="middle">片上缓存</text>
+  <path d="M588,326 L610,260" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <!-- 局部性卡片 -->
+  <rect x="792" y="120" width="400" height="236" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="812" y="148" font-size="12.5" font-weight="700" fill="#2C4460">Cache 能工作，依赖两种局部性</text>
+  <text x="812" y="176" font-size="12" font-weight="700" fill="#2C4460">时间局部性</text>
+  <text x="812" y="196" font-size="11" fill="#2C4460">刚访问过的数据，接下来还可能访问</text>
+  <text x="812" y="226" font-size="12" font-weight="700" fill="#2C4460">空间局部性</text>
+  <text x="812" y="246" font-size="11" fill="#2C4460">访问一个地址后，附近地址也可能被访问</text>
+  <line x1="812" y1="262" x2="1172" y2="262" stroke="#A8BFD4" stroke-width="1"/>
+  <text x="812" y="284" font-size="11" fill="#2C4460">顺序扫描数组：一次取回的行含后续数据</text>
+  <text x="812" y="306" font-size="11" fill="#2C4460">链表散落堆上：预取难，Miss 更多</text>
+  <text x="812" y="332" font-size="10.5" fill="#3D5A80">层次/共享范围随处理器变 · 用 lscpu -C 查本机</text>
+
+  <!-- ============ Panel B：Cache Line 单位 ============ -->
+  <text x="48" y="388" font-size="13" font-weight="700" fill="#4A473F">B · Cache Line 才是传输与一致性的基本单位（语言里的 int 不是）</text>
+
+  <rect x="48" y="400" width="1144" height="132" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 一条 cache line 可视化 -->
+  <text x="68" y="426" font-size="11.5" font-weight="700" fill="#4A473F">一条 Cache Line（常见 64 B，以硬件为准）</text>
+  <rect x="68" y="440" width="720" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <!-- 分段格子 -->
+  <line x1="158" y1="440" x2="158" y2="496" stroke="#3D5A80" stroke-width="1" opacity="0.35"/>
+  <line x1="248" y1="440" x2="248" y2="496" stroke="#3D5A80" stroke-width="1" opacity="0.35"/>
+  <line x1="338" y1="440" x2="338" y2="496" stroke="#3D5A80" stroke-width="1" opacity="0.35"/>
+  <line x1="428" y1="440" x2="428" y2="496" stroke="#3D5A80" stroke-width="1" opacity="0.35"/>
+  <line x1="518" y1="440" x2="518" y2="496" stroke="#3D5A80" stroke-width="1" opacity="0.35"/>
+  <line x1="608" y1="440" x2="608" y2="496" stroke="#3D5A80" stroke-width="1" opacity="0.35"/>
+  <line x1="698" y1="440" x2="698" y2="496" stroke="#3D5A80" stroke-width="1" opacity="0.35"/>
+  <text x="428" y="472" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">整行一起搬 · 整行一起一致性</text>
+
+  <rect x="820" y="420" width="348" height="96" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="840" y="446" font-size="12" font-weight="700" fill="#6B4E28">C++17 布局提示常量</text>
+  <text x="840" y="470" font-size="11" fill="#6B4E28">destructive_interference_size · 避免伪共享间隔</text>
+  <text x="840" y="492" font-size="11" fill="#6B4E28">constructive_interference_size · 希望放近的数据</text>
+  <text x="840" y="512" font-size="10.5" fill="#8A6A3A">实现相关 · 不保证 = 真实 line size</text>
+
+  <!-- ============ Panel C：MESI ============ -->
+  <text x="48" y="564" font-size="13" font-weight="700" fill="#4A473F">C · MESI 心智模型：多核只读可共享；要写必须取得独占所有权并让他核副本失效</text>
+
+  <!-- 四个状态 -->
+  <rect x="48" y="576" width="200" height="92" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="148" y="604" font-size="16" font-weight="700" fill="#733428" text-anchor="middle">M</text>
+  <text x="148" y="626" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">Modified</text>
+  <text x="148" y="648" font-size="10.5" fill="#733428" text-anchor="middle">唯一 · 已修改</text>
+
+  <rect x="264" y="576" width="200" height="92" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="364" y="604" font-size="16" font-weight="700" fill="#6B4E28" text-anchor="middle">E</text>
+  <text x="364" y="626" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">Exclusive</text>
+  <text x="364" y="648" font-size="10.5" fill="#6B4E28" text-anchor="middle">唯一 · 未修改</text>
+
+  <rect x="480" y="576" width="200" height="92" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="580" y="604" font-size="16" font-weight="700" fill="#24473F" text-anchor="middle">S</text>
+  <text x="580" y="626" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">Shared</text>
+  <text x="580" y="648" font-size="10.5" fill="#24473F" text-anchor="middle">多核只读副本</text>
+
+  <rect x="696" y="576" width="200" height="92" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="796" y="604" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">I</text>
+  <text x="796" y="626" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">Invalid</text>
+  <text x="796" y="648" font-size="10.5" fill="#4A473F" text-anchor="middle">副本不可再用</text>
+
+  <rect x="912" y="576" width="280" height="92" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1052" y="604" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">真实芯片可能是</text>
+  <text x="1052" y="626" font-size="11" fill="#2C4460" text-anchor="middle">MOESI / MESIF 等变体</text>
+  <text x="1052" y="648" font-size="10.5" fill="#3D5A80" text-anchor="middle">软件抓住写=独占即可</text>
+
+  <!-- 写路径 + bouncing -->
+  <rect x="48" y="688" width="560" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="714" font-size="12" font-weight="700" fill="#2B2A26">写路径（软件最有用的结论）</text>
+  <rect x="68" y="728" width="150" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="143" y="748" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">多核只读</text>
+  <text x="143" y="766" font-size="10" fill="#24473F" text-anchor="middle">共享 S 副本</text>
+  <path d="M218,752 L246,752" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <rect x="248" y="728" width="160" height="48" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="328" y="748" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">某核要写</text>
+  <text x="328" y="766" font-size="10" fill="#6B4E28" text-anchor="middle">请求独占所有权</text>
+  <path d="M408,752 L436,752" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <rect x="438" y="728" width="150" height="48" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="513" y="748" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">他核副本 → I</text>
+  <text x="513" y="766" font-size="10" fill="#733428" text-anchor="middle">本核 M / E</text>
+  <text x="68" y="804" font-size="11" fill="#4A473F">一致性回答：同一地址的写，核心最终如何形成一致观察</text>
+  <text x="68" y="822" font-size="11" fill="#A64B3C">≠ 内存顺序：不同地址的多个读写，他核允许按什么顺序观察</text>
+
+  <rect x="628" y="688" width="564" height="140" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="648" y="714" font-size="12" font-weight="700" fill="#733428">Cache Line Bouncing · 所有权来回甩</text>
+  <!-- 两核对打示意 -->
+  <rect x="668" y="732" width="120" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="728" y="756" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 0 写</text>
+  <text x="728" y="774" font-size="10.5" fill="#2C4460" text-anchor="middle">取得该行</text>
+  <path d="M800,760 L860,760" fill="none" stroke="#A64B3C" stroke-width="2" marker-end="url(#arrr)"/>
+  <path d="M860,780 L800,780" fill="none" stroke="#A64B3C" stroke-width="2" marker-end="url(#arrr)"/>
+  <rect x="872" y="732" width="120" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="932" y="756" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 1 写</text>
+  <text x="932" y="774" font-size="10.5" fill="#2C4460" text-anchor="middle">抢回该行</text>
+  <text x="1020" y="752" font-size="11" fill="#733428">同一行上轮流写</text>
+  <text x="1020" y="772" font-size="11" fill="#733428">→ 所有权乒乓</text>
+  <text x="1020" y="792" font-size="11" fill="#733428">→ 一致性流量暴涨</text>
+  <text x="648" y="812" font-size="10.5" fill="#733428">这是性能问题的硬件根因；伪共享是「变量没共享、行共享了」的特例</text>
+
+  <rect x="48" y="848" width="1144" height="48" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="68" y="876" font-size="12" fill="#2B2A26">记住：读共享通常便宜 · 多核反复写同一行贵 · 一致性 ≠ 源码顺序（发布协议见下一张图）</text>
+</svg>

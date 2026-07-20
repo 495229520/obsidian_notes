@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">同一个字节出网：内核 TCP 与 RDMA 各花了什么</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">RDMA 的快 = 从数据路径拿走三样东西：每字节的拷贝、每条消息的陷入、每个包的中断——CPU 只下指令，搬运全由网卡 DMA</text>
+
+  <!-- TCP 泳道 -->
+  <rect x="70" y="110" width="520" height="540" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="90" y="138" font-size="14" font-weight="700" fill="#4A473F">内核 TCP（发送侧）</text>
+
+  <rect x="130" y="156" width="400" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="330" y="176" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">应用 buffer（用户态）</text>
+  <text x="330" y="196" font-size="10.5" fill="#2C4460" text-anchor="middle">刚被 SSD DMA 填好（3.8）</text>
+
+  <path d="M330,212 L330,232" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="130" y="236" width="400" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="330" y="256" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">send() 陷入内核</text>
+  <text x="330" y="276" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">成本：每条消息 ≥ 1 次系统调用</text>
+
+  <path d="M330,292 L330,312" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="130" y="316" width="400" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="330" y="336" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">拷贝进内核 skb</text>
+  <text x="330" y="356" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">成本：CPU 逐字节搬——拷贝①，还占内存带宽</text>
+
+  <path d="M330,372 L330,392" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="130" y="396" width="400" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="330" y="416" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">TCP/IP 协议处理</text>
+  <text x="330" y="436" font-size="10.5" fill="#2C4460" text-anchor="middle">分段·确认·重传·拥塞（TSO/GRO 只能卸载一部分）</text>
+
+  <path d="M330,452 L330,472" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="130" y="476" width="400" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="330" y="496" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">qdisc → 驱动环 → NIC DMA 读 skb</text>
+  <text x="330" y="516" font-size="10.5" fill="#2C4460" text-anchor="middle">此后才轮到网线</text>
+
+  <rect x="110" y="556" width="440" height="72" rx="7" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <text x="330" y="580" font-size="10.5" fill="#4A473F" text-anchor="middle">接收端镜像：中断 → softirq → 协议 → 拷贝② 到用户 buffer</text>
+  <text x="330" y="602" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">高负载时 softirq 排队 + 调度唤醒 = 尾延迟的主要来源</text>
+
+  <!-- RDMA 泳道 -->
+  <rect x="650" y="110" width="520" height="540" rx="10" fill="#E7F1EC" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="670" y="138" font-size="14" font-weight="700" fill="#1F4A3E">RDMA（发送侧就是全部）</text>
+
+  <rect x="710" y="156" width="400" height="64" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="910" y="178" font-size="12.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">应用 buffer = 已注册 MR（4.4）</text>
+  <text x="910" y="200" font-size="10.5" fill="#1F4A3E" text-anchor="middle">物理页钉住、网卡页表认识它</text>
+
+  <path d="M910,220 L910,248" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+
+  <rect x="710" y="252" width="400" height="64" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="910" y="274" font-size="12.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">用户态填 WQE → 写 doorbell</text>
+  <text x="910" y="296" font-size="10.5" fill="#1F4A3E" text-anchor="middle">一次 MMIO：0 系统调用（2.1/3.2 的环，第三次见）</text>
+
+  <path d="M910,316 L910,344" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+
+  <rect x="710" y="348" width="400" height="64" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="910" y="370" font-size="12.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">网卡硬件传输层</text>
+  <text x="910" y="392" font-size="10.5" fill="#1F4A3E" text-anchor="middle">分段·确认·重传·拥塞全在 NIC 里跑，不烧 CPU</text>
+
+  <path d="M910,412 L910,440" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+
+  <rect x="710" y="444" width="400" height="64" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="910" y="466" font-size="12.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">NIC DMA 直读 buffer → 网线</text>
+  <text x="910" y="488" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">0 次 CPU 拷贝：数据只被 DMA 碰</text>
+
+  <rect x="690" y="540" width="440" height="88" rx="7" fill="#E7F1EC" stroke="#2F6B5E" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <text x="910" y="566" font-size="10.5" fill="#1F4A3E" text-anchor="middle">远端：NIC DMA 直写目标内存——单边 WRITE/READ 时</text>
+  <text x="910" y="588" font-size="10.5" fill="#1F4A3E" text-anchor="middle">远端 CPU 全程不参与（4.5）</text>
+  <text x="910" y="610" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">完成靠轮询 CQ：0 中断、不经调度器（2.4 同一逻辑）</text>
+
+  <!-- 对账表 -->
+  <rect x="70" y="678" width="600" height="180" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="708" font-size="13.5" font-weight="700" fill="#2B2A26">每单位成本对账</text>
+  <text x="270" y="736" font-size="11.5" font-weight="700" fill="#4A473F">内核 TCP</text>
+  <text x="470" y="736" font-size="11.5" font-weight="700" fill="#4A473F">RDMA</text>
+  <text x="94" y="760" font-size="11.5" fill="#4A473F">拷贝 / 字节</text>
+  <text x="270" y="760" font-size="11.5" fill="#4A473F">2 次（收+发各一）</text>
+  <text x="470" y="760" font-size="11.5" fill="#2F6B5E">0 次</text>
+  <text x="94" y="784" font-size="11.5" fill="#4A473F">陷入 / 消息</text>
+  <text x="270" y="784" font-size="11.5" fill="#4A473F">≥ 1 次</text>
+  <text x="470" y="784" font-size="11.5" fill="#2F6B5E">0 次</text>
+  <text x="94" y="808" font-size="11.5" fill="#4A473F">中断 / 包</text>
+  <text x="270" y="808" font-size="11.5" fill="#4A473F">有（NAPI 合并）</text>
+  <text x="470" y="808" font-size="11.5" fill="#2F6B5E">0（轮询 CQ）</text>
+  <text x="94" y="832" font-size="11.5" fill="#4A473F">远端 CPU</text>
+  <text x="270" y="832" font-size="11.5" fill="#4A473F">参与协议 + 拷贝</text>
+  <text x="470" y="832" font-size="11.5" fill="#2F6B5E">单边操作不参与</text>
+
+  <rect x="690" y="678" width="480" height="180" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="714" y="708" font-size="13.5" font-weight="700" fill="#2B2A26">贯穿案例的账（出口 50 GB/s）</text>
+  <text x="714" y="736" font-size="11.5" fill="#4A473F">内核 TCP：内存流量 ~200 GB/s，拷贝烧 ~10 核</text>
+  <text x="714" y="760" font-size="11.5" fill="#4A473F">RDMA：内存流量 ~100 GB/s，数据路径 0 拷贝核</text>
+  <text x="714" y="784" font-size="11.5" fill="#4A473F">延迟：几十 μs（含调度唤醒）→ ~2 μs（轮询）</text>
+  <text x="714" y="812" font-size="11.5" font-weight="700" fill="#A64B3C">代价去了哪：注册、连接态、无损网络——正文 §5</text>
+</svg>

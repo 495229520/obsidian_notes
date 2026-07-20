@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>从应用到介质：端到端写路径与 fflush / fsync 边界</title>
+  <desc>七层写路径栈：应用缓冲区→page cache→文件系统→块层→驱动→设备易失缓存→非易失域。标注 write/writeback/bio/协议写/落盘，以及 fflush 与 fsync 跨越的边界。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="820" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">从应用到介质：端到端写路径</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">fflush 只越过应用缓冲区 · fsync 推动并等待 page cache 之后直到非易失域 · 普通写完成可停在易失缓存</text>
+
+  <!-- 主栈背景 -->
+  <rect x="48" y="100" width="720" height="560" rx="12" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="128" font-size="13" font-weight="700" fill="#4A473F">七层栈 · 数据向下推进</text>
+
+  <!-- Layer A 应用 -->
+  <rect x="80" y="148" width="280" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="220" y="172" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">A · 应用缓冲区</text>
+  <text x="220" y="192" font-size="11" fill="#3D5A80" text-anchor="middle">用户态内存 / stdio 缓冲</text>
+
+  <!-- write arrow -->
+  <line x1="220" y1="204" x2="220" y2="228" stroke="#3D5A80" stroke-width="1.7" marker-end="url(#arr-blue)"/>
+  <text x="248" y="222" font-size="11" font-weight="700" fill="#3D5A80">write()</text>
+
+  <!-- Layer B page cache -->
+  <rect x="80" y="232" width="280" height="56" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="220" y="256" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">B · page cache 脏页</text>
+  <text x="220" y="276" font-size="11" fill="#8A6A3A" text-anchor="middle">内核 DRAM · folio 标脏</text>
+
+  <line x1="220" y1="288" x2="220" y2="312" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="252" y="306" font-size="11" fill="#4A473F">writeback</text>
+
+  <!-- Layer C FS -->
+  <rect x="80" y="316" width="280" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="220" y="340" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">C · 文件系统数据与日志</text>
+  <text x="220" y="360" font-size="11" fill="#3D5A80" text-anchor="middle">inode / 映射 / journal 事务</text>
+
+  <line x1="220" y1="372" x2="220" y2="396" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="248" y="390" font-size="11" fill="#4A473F">bio</text>
+
+  <!-- Layer D block -->
+  <rect x="80" y="400" width="280" height="52" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="220" y="422" font-size="13" font-weight="700" fill="#6B5B95" text-anchor="middle">D · Linux 块层</text>
+  <text x="220" y="440" font-size="11" fill="#6B5B95" text-anchor="middle">bio → request · blk-mq</text>
+
+  <line x1="220" y1="452" x2="220" y2="472" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Layer E driver -->
+  <rect x="80" y="476" width="280" height="52" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="220" y="498" font-size="13" font-weight="700" fill="#6B5B95" text-anchor="middle">E · 设备映射层与驱动</text>
+  <text x="220" y="516" font-size="11" fill="#6B5B95" text-anchor="middle">dm / NVMe · SCSI · ATA</text>
+
+  <line x1="220" y1="528" x2="220" y2="548" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="268" y="544" font-size="10.5" fill="#4A473F">协议写命令</text>
+
+  <!-- Layer F volatile cache - 危险 -->
+  <rect x="80" y="552" width="280" height="48" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.7"/>
+  <text x="220" y="572" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">F · 设备易失写缓存</text>
+  <text x="220" y="590" font-size="10.5" fill="#A64B3C" text-anchor="middle">普通写可在此报告完成</text>
+
+  <line x1="220" y1="600" x2="220" y2="620" stroke="#2F6B5E" stroke-width="1.7" marker-end="url(#arr-green)"/>
+  <text x="290" y="616" font-size="10" fill="#2F6B5E">后台落盘 / Flush·FUA</text>
+
+  <!-- Layer G nonvolatile -->
+  <rect x="80" y="624" width="280" height="24" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.7"/>
+  <text x="220" y="641" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">G · 非易失域（介质 / PLP 缓存）</text>
+
+  <!-- 右侧：fflush / fsync 跨度 -->
+  <rect x="400" y="148" width="340" height="500" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="420" y="176" font-size="13" font-weight="700" fill="#4A473F">同步原语跨越哪几层</text>
+
+  <!-- fflush 短箭头区 -->
+  <rect x="430" y="198" width="48" height="72" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="454" y="230" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" transform="rotate(-90 454 230)">fflush</text>
+  <line x1="488" y1="210" x2="520" y2="210" stroke="#3D5A80" stroke-width="1.4"/>
+  <line x1="488" y1="258" x2="520" y2="258" stroke="#3D5A80" stroke-width="1.4"/>
+  <line x1="520" y1="210" x2="520" y2="258" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="536" y="228" font-size="12" font-weight="700" fill="#2C4460">fflush</text>
+  <text x="536" y="248" font-size="11" fill="#4A473F">A → B 仅此一段</text>
+  <text x="536" y="268" font-size="10.5" fill="#6B675C">stdio 缓冲 → 内核 write</text>
+  <text x="536" y="286" font-size="10.5" fill="#A64B3C">不碰设备，不保证持久</text>
+
+  <!-- fsync 长箭头区 -->
+  <rect x="430" y="310" width="48" height="310" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="454" y="470" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle" transform="rotate(-90 454 470)">fsync 推动并等待</text>
+  <line x1="488" y1="320" x2="530" y2="320" stroke="#2F6B5E" stroke-width="1.5"/>
+  <line x1="488" y1="610" x2="530" y2="610" stroke="#2F6B5E" stroke-width="1.5"/>
+  <line x1="530" y1="320" x2="530" y2="610" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="548" y="380" font-size="12" font-weight="700" fill="#24473F">fsync / fdatasync</text>
+  <text x="548" y="404" font-size="11" fill="#4A473F">从 B 脏页开始</text>
+  <text x="548" y="424" font-size="11" fill="#4A473F">经 C → D → E → F</text>
+  <text x="548" y="444" font-size="11" fill="#24473F">直到 G 非易失条件满足</text>
+  <text x="548" y="472" font-size="11" fill="#6B675C">路径中插入 Flush / FUA</text>
+  <text x="548" y="492" font-size="11" fill="#6B675C">完成状态沿栈回传</text>
+  <text x="548" y="520" font-size="11" font-weight="700" fill="#A64B3C">停在 F 不算成功</text>
+  <text x="548" y="544" font-size="11" fill="#733428">普通写完成 ≠ 持久</text>
+  <text x="548" y="580" font-size="11" fill="#24473F">只有 G 满足协议后</text>
+  <text x="548" y="600" font-size="11" fill="#24473F">才允许 fsync 返回 0</text>
+
+  <!-- 右上：故障丢哪层 -->
+  <rect x="800" y="100" width="392" height="280" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="820" y="128" font-size="13" font-weight="700" fill="#4A473F">故障会丢掉哪一层</text>
+
+  <rect x="820" y="148" width="352" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="836" y="171" font-size="11.5" fill="#2C4460">进程崩溃：丢 A，保留 B 及以下</text>
+
+  <rect x="820" y="194" width="352" height="36" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="836" y="217" font-size="11.5" fill="#6B4E28">内核崩溃：丢 A+B，设备层或保留</text>
+
+  <rect x="820" y="240" width="352" height="36" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="836" y="263" font-size="11.5" fill="#733428">整机掉电无 PLP：丢到 F，只留 G</text>
+
+  <rect x="820" y="286" width="352" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="836" y="309" font-size="11.5" fill="#24473F">掉电 + PLP 在规格内：F 由设备保护</text>
+
+  <text x="820" y="350" font-size="11" fill="#6B675C">「保留」前提：驱动 / 固件如实报告完成</text>
+  <text x="820" y="368" font-size="11" fill="#6B675C">忽略 Flush 时上层无法补回语义</text>
+
+  <!-- 右下：关键判断 -->
+  <rect x="800" y="400" width="392" height="260" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="820" y="428" font-size="13" font-weight="700" fill="#4A473F">“下发”不是“持久”</text>
+
+  <text x="820" y="460" font-size="12" fill="#2B2A26">① submit_bio → 进入块层</text>
+  <text x="820" y="484" font-size="12" fill="#2B2A26">② 驱动 doorbell → 设备已见命令</text>
+  <text x="820" y="508" font-size="12" fill="#2B2A26">③ 普通写完成 → 可能只到 F</text>
+  <text x="820" y="532" font-size="12" fill="#733428">④ Flush / FUA 完成 → 才到 G</text>
+  <text x="820" y="556" font-size="12" fill="#24473F">⑤ fsync 返回 0 → 应用可发布成功</text>
+
+  <rect x="820" y="580" width="352" height="56" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="996" y="604" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">判断准则</text>
+  <text x="996" y="624" font-size="11" fill="#733428" text-anchor="middle">看请求语义 + 整条栈是否兑现，不看「写完」</text>
+
+  <!-- 底栏 -->
+  <rect x="48" y="688" width="1144" height="100" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="720" font-size="13" font-weight="700" fill="#4A473F">与 mermaid 对照</text>
+  <text x="68" y="746" font-size="12" fill="#4A473F">实线边：write → writeback → bio → 协议写 → 后台落盘 / 持久化命令（主数据路径）</text>
+  <text x="68" y="770" font-size="12" fill="#3D5A80">虚线语义：A -.fflush.→ B 只跨应用边界；B -.fsync.→ G 推动并等待后续整条路径</text>
+</svg>

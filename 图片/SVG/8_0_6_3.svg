@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 920" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Busy Polling：轮询 CQ 内存结构与完成发现延迟</title>
+  <desc>上半模拟主机 DRAM 中的完成队列与 poller load 循环；中部对比中断路径与轮询路径的发现延迟组成；下半空轮询比率与烧 CPU 代价。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="920" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">Busy Polling：轮询的是主机 DRAM 里的完成队列，不是设备本身</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">设备 DMA 写 CQE → CPU 循环 load phase bit → 看见即处理 · 优化「设备完成 → 软件发现」这一段</text>
+
+  <!-- ============ A: CQ 内存结构 + poll 循环 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 内存结构：设备是生产者，poller 是消费者；可见性依赖 DMA 一致性与内存顺序</text>
+
+  <rect x="48" y="126" width="1144" height="300" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Device box -->
+  <rect x="68" y="148" width="220" height="256" rx="8" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="178" y="176" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">设备（生产者）</text>
+
+  <rect x="88" y="196" width="180" height="48" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="178" y="216" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">① DMA 写数据缓冲</text>
+  <text x="178" y="234" font-size="10.5" fill="#A64B3C" text-anchor="middle">payload 先可见</text>
+
+  <rect x="88" y="260" width="180" height="48" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="178" y="280" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">② DMA 写 CQE</text>
+  <text x="178" y="298" font-size="10.5" fill="#A64B3C" text-anchor="middle">最后翻 phase bit</text>
+
+  <rect x="88" y="328" width="180" height="48" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="178" y="348" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 完成项对 CPU 可见</text>
+  <text x="178" y="366" font-size="10.5" fill="#8A6A3A" text-anchor="middle">无 MSI-X（纯 poll 模式）</text>
+
+  <!-- DRAM CQ -->
+  <rect x="340" y="148" width="520" height="256" rx="8" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="360" y="176" font-size="13" font-weight="700" fill="#2C4460">主机 DRAM · Completion Queue</text>
+  <text x="360" y="198" font-size="11" fill="#6B675C">每槽：status · SQ Head · CID · phase bit P</text>
+
+  <!-- CQ slots as memory cells -->
+  <rect x="360" y="220" width="64" height="72" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="392" y="248" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">CQE0</text>
+  <text x="392" y="268" font-size="12" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#2F6B5E" text-anchor="middle">P=1</text>
+  <text x="392" y="284" font-size="9.5" fill="#6B675C" text-anchor="middle">done</text>
+
+  <rect x="432" y="220" width="64" height="72" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="464" y="248" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">CQE1</text>
+  <text x="464" y="268" font-size="12" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#2F6B5E" text-anchor="middle">P=1</text>
+  <text x="464" y="284" font-size="9.5" fill="#6B675C" text-anchor="middle">done</text>
+
+  <rect x="504" y="220" width="64" height="72" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="2"/>
+  <text x="536" y="248" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">CQE2</text>
+  <text x="536" y="268" font-size="12" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#A64B3C" text-anchor="middle">P=1</text>
+  <text x="536" y="284" font-size="9.5" fill="#A64B3C" text-anchor="middle">刚写入</text>
+
+  <rect x="576" y="220" width="64" height="72" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="608" y="248" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">CQE3</text>
+  <text x="608" y="268" font-size="12" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#9B968A" text-anchor="middle">P=0</text>
+  <text x="608" y="284" font-size="9.5" fill="#9B968A" text-anchor="middle">空</text>
+
+  <rect x="648" y="220" width="64" height="72" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="680" y="248" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">CQE4</text>
+  <text x="680" y="268" font-size="12" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#9B968A" text-anchor="middle">P=0</text>
+  <text x="680" y="284" font-size="9.5" fill="#9B968A" text-anchor="middle">空</text>
+
+  <rect x="720" y="220" width="64" height="72" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="752" y="248" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">…</text>
+  <text x="752" y="268" font-size="12" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#9B968A" text-anchor="middle">P=0</text>
+
+  <!-- head pointer -->
+  <line x1="536" y1="296" x2="536" y2="312" stroke="#2C4460" stroke-width="1.6"/>
+  <text x="536" y="328" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">head · 下次检查这里</text>
+
+  <text x="360" y="360" font-size="11" fill="#4A473F">判新：load(CQE[head].P) ≟ 期望相位 · 相等则有完成，处理并 head++</text>
+  <text x="360" y="382" font-size="11" fill="#6B675C">看见 P 之后必须能正确看到先前 DMA 的数据（屏障 / 协议顺序）</text>
+
+  <!-- Poller CPU -->
+  <rect x="900" y="148" width="268" height="256" rx="8" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1034" y="176" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">CPU · Poller 核</text>
+
+  <rect x="920" y="196" width="228" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1034" y="221" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">while (!stop)</text>
+
+  <rect x="920" y="252" width="228" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1034" y="277" font-size="12" fill="#24473F" text-anchor="middle">poll_completions()</text>
+
+  <rect x="920" y="308" width="228" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1034" y="333" font-size="12" fill="#24473F" text-anchor="middle">process / 回收描述符</text>
+
+  <text x="1034" y="376" font-size="11" fill="#2F6B5E" text-anchor="middle">不睡眠 · 持续 runnable</text>
+
+  <!-- arrows device -> CQ, poller -> CQ -->
+  <path d="M290,284 L336,256" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+  <text x="300" y="256" font-size="10" fill="#A64B3C">DMA</text>
+  <path d="M896,284 L788,256" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+  <text x="840" y="256" font-size="10" fill="#2F6B5E">load</text>
+
+  <!-- ============ B: 发现延迟对比 ============ -->
+  <text x="48" y="460" font-size="13" font-weight="700" fill="#4A473F">B · 完成发现延迟：设备已完成 → 软件开始处理 · 轮询砍掉唤醒与调度段</text>
+
+  <!-- Interrupt latency bar -->
+  <rect x="48" y="478" width="1144" height="100" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="68" y="506" font-size="12" font-weight="700" fill="#2C4460">Interrupt 路径</text>
+
+  <rect x="200" y="488" width="120" height="36" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="260" y="511" font-size="11" fill="#733428" text-anchor="middle">设备完成</text>
+
+  <rect x="330" y="488" width="140" height="36" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="400" y="511" font-size="11" fill="#6B4E28" text-anchor="middle">中断投递/处理</text>
+
+  <rect x="480" y="488" width="120" height="36" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="540" y="511" font-size="11" fill="#6B4E28" text-anchor="middle">延后处理</text>
+
+  <rect x="610" y="488" width="140" height="36" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.1"/>
+  <text x="680" y="511" font-size="11" fill="#4A3F68" text-anchor="middle">唤醒 + 调度</text>
+
+  <rect x="760" y="488" width="140" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="830" y="511" font-size="11" fill="#2C4460" text-anchor="middle">线程恢复运行</text>
+
+  <rect x="910" y="488" width="120" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="970" y="511" font-size="11" fill="#24473F" text-anchor="middle">处理 CQE</text>
+
+  <text x="68" y="552" font-size="11" fill="#A64B3C">发现延迟 = 中断 + 延后 + 唤醒 + 调度 · 抖动来源多</text>
+
+  <!-- Poll latency bar -->
+  <rect x="48" y="594" width="1144" height="100" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="68" y="622" font-size="12" font-weight="700" fill="#24473F">Busy Poll 路径</text>
+
+  <rect x="200" y="604" width="120" height="36" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="260" y="627" font-size="11" fill="#733428" text-anchor="middle">设备完成</text>
+
+  <rect x="330" y="604" width="200" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="430" y="627" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">下次 poll 循环 load 看见</text>
+
+  <rect x="540" y="604" width="140" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="610" y="627" font-size="11" fill="#24473F" text-anchor="middle">同线程处理</text>
+
+  <text x="720" y="627" font-size="11" fill="#6B675C">无中断 · 无唤醒 · 无调度等待</text>
+
+  <text x="68" y="668" font-size="11" fill="#2F6B5E">发现延迟 ≈ 轮询周期 · 前提：poller 已在正确 CPU 上运行且未被抢占</text>
+
+  <!-- ============ C: 空轮询与烧 CPU ============ -->
+  <text x="48" y="728" font-size="13" font-weight="700" fill="#4A473F">C · 空轮询 vs 有效轮询：CPU 100% 可能是设计结果，关键是 R_useful</text>
+
+  <rect x="48" y="744" width="560" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="772" font-size="12.5" font-weight="700" fill="#4A473F">R_useful = N_poll_with_work / N_poll_total</text>
+  <text x="68" y="800" font-size="12" fill="#4A473F">有效轮询：本次检查拿到 CQE</text>
+  <text x="68" y="824" font-size="12" fill="#4A473F">空轮询：检查后无完成 · load + 分支白转</text>
+  <text x="68" y="856" font-size="11.5" fill="#A64B3C">长期满载且几乎全空转 → 负载撑不起永久 poll · 考虑 hybrid / 中断</text>
+
+  <rect x="632" y="744" width="560" height="140" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="652" y="772" font-size="12.5" font-weight="700" fill="#733428">烧 CPU 的副作用</text>
+  <text x="652" y="800" font-size="12" fill="#4A473F">· 逻辑 CPU 接近满占用 · 难进深度休眠</text>
+  <text x="652" y="824" font-size="12" fill="#4A473F">· 同核其他任务被挤压 · 功耗 / 温度上升</text>
+  <text x="652" y="848" font-size="12" fill="#4A473F">· 远端 NUMA 上轮询 = 持续跨节点 load</text>
+  <text x="652" y="868" font-size="11.5" fill="#6B675C">多 poller 抢同一 CQ → cache line 抖动</text>
+</svg>

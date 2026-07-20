@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">mmap 读路径：登记 VMA、缺页异常、填页表</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">mmap() 本身一个字节都不读；第一次访问才付代价，之后是纯内存访问</text>
+
+  <!-- 主链 -->
+  <rect x="90" y="112" width="520" height="66" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="350" y="139" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">p = mmap(len, PROT_READ, MAP_SHARED, fd)</text>
+  <text x="350" y="162" font-size="11.5" fill="#2C4460" text-anchor="middle">只登记 VMA：地址区间 ↔ 文件区间；不分配内存、不读盘</text>
+  <line x1="350" y1="178" x2="350" y2="205" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="364" y="198" font-size="11.5" fill="#6B675C" font-family="'SF Mono',Menlo,Consolas,monospace">首次访问 *p</text>
+
+  <rect x="90" y="210" width="520" height="66" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="350" y="237" font-size="14" font-weight="700" fill="#4A3F68" text-anchor="middle">MMU 查页表：没有映射 → 缺页异常</text>
+  <text x="350" y="260" font-size="11.5" fill="#4A3F68" text-anchor="middle">硬件触发的被动陷入，与系统调用同级的模式切换（1.1）</text>
+  <line x1="350" y1="276" x2="350" y2="303" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="90" y="308" width="520" height="66" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="350" y="335" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">内核：查 VMA 确认合法 → 是文件映射</text>
+  <text x="350" y="358" font-size="11.5" fill="#24473F" text-anchor="middle">定位 inode 的 address_space —— 与 read 同一套页缓存（1.2）</text>
+  <line x1="350" y1="374" x2="350" y2="401" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="210" y="406" width="280" height="46" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="350" y="434" font-size="13.5" font-weight="700" fill="#7A5518" text-anchor="middle">该页在 Page Cache？</text>
+
+  <path d="M296,456 C296,478 324,476 324,496" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrt)"/>
+  <text x="160" y="480" font-size="12.5" font-weight="700" fill="#2F6B5E">在 · minor fault</text>
+  <path d="M494,429 C700,429 916,462 916,496" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+  <text x="700" y="470" font-size="12.5" font-weight="700" fill="#A64B3C">不在 · major fault</text>
+
+  <!-- minor 列 -->
+  <rect x="64" y="502" width="520" height="58" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="324" y="526" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">页已在缓存：只是页表里还没登记</text>
+  <text x="324" y="546" font-size="11.5" fill="#24473F" text-anchor="middle">填 PTE（虚拟页 → 页缓存物理页）→ 返回用户态</text>
+  <line x1="324" y1="560" x2="324" y2="587" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="64" y="592" width="520" height="56" rx="8" fill="#2F6B5E"/>
+  <text x="324" y="616" font-size="14" font-weight="700" fill="#F5F4ED" text-anchor="middle">量级：~μs；无设备等待</text>
+  <text x="324" y="636" font-size="11.5" fill="#F5F4ED" opacity="0.92" text-anchor="middle">成本 = 一次异常陷入 + 页表操作</text>
+
+  <rect x="64" y="680" width="520" height="96" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="88" y="708" font-size="13" font-weight="700" fill="#2B2A26">首次访问每个 4 KiB 页都至少一次 fault</text>
+  <text x="88" y="734" font-size="12" fill="#4A473F">大映射逐页 fault 也不便宜；MAP_POPULATE 或</text>
+  <text x="88" y="756" font-size="12" fill="#4A473F">madvise(WILLNEED) 可预填页表【取舍：启动变慢换访问平滑】</text>
+
+  <!-- major 列 -->
+  <rect x="656" y="502" width="520" height="58" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="916" y="526" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">页不在缓存：走 1.2 的未命中路径</text>
+  <text x="916" y="546" font-size="11.5" fill="#733428" text-anchor="middle">分配 folio → 提交 bio（带预读）→ 进程睡眠</text>
+  <line x1="916" y1="560" x2="916" y2="587" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="656" y="592" width="520" height="58" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="916" y="616" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">设备完成 → 中断 → 唤醒 → 填 PTE</text>
+  <text x="916" y="636" font-size="11.5" fill="#733428" text-anchor="middle">两次上下文切换，与 read 未命中完全相同</text>
+  <line x1="916" y1="650" x2="916" y2="677" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="656" y="682" width="520" height="56" rx="8" fill="#A64B3C"/>
+  <text x="916" y="706" font-size="14" font-weight="700" fill="#F5F4ED" text-anchor="middle">量级 = 介质延迟（几十 μs ~ ms）</text>
+  <text x="916" y="726" font-size="11.5" fill="#F5F4ED" opacity="0.92" text-anchor="middle">阻塞发生在一条普通 load 指令上 —— 代码里看不见等待点</text>
+
+  <!-- 汇合 -->
+  <rect x="64" y="800" width="1112" height="56" rx="8" fill="#E9EFDA" stroke="#6A7F3F" stroke-width="1.5"/>
+  <text x="620" y="824" font-size="14" font-weight="700" fill="#48562B" text-anchor="middle">恢复执行：此后访问该页 = 纯内存 —— 0 系统调用、0 CPU 拷贝</text>
+  <text x="620" y="845" font-size="11.5" fill="#48562B" text-anchor="middle">用户页表直接指向页缓存的物理页，读文件的"拷贝"彻底消失</text>
+
+  <!-- 右侧对账卡 -->
+  <rect x="656" y="112" width="520" height="180" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="680" y="142" font-size="14" font-weight="700" fill="#2B2A26">与 read 的对账（稳态，页已热）</text>
+  <text x="680" y="172" font-size="12" fill="#4A473F">· read：每次 1 次系统调用 + 1 次 CPU 拷贝（页缓存 → 用户 buf）</text>
+  <text x="680" y="196" font-size="12" fill="#4A473F">· mmap：0 次系统调用、0 次拷贝 —— 直接读页缓存物理页</text>
+  <text x="680" y="220" font-size="12" fill="#4A473F">· 代价搬家：缺页异常、页表与 TLB 压力、不可控的阻塞点</text>
+  <text x="680" y="244" font-size="12" fill="#A64B3C">· 映射期间文件被截断 → 访问触发 SIGBUS，C++ 异常接不住</text>
+  <text x="680" y="268" font-size="12" fill="#4A473F">· 观测：perf stat -e minor-faults,major-faults</text>
+</svg>

@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrp" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5B4F9A"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrm" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07A3E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="#F5F4ED"/>
+
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">eBPF 块 IO 观测：同一组事件，两种输出</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">biolatency 在内核聚合延迟桶；biosnoop 逐请求输出。常见默认边界 block_rq_issue → block_rq_complete（≈ D→C）</text>
+
+  <!-- ① 块层时间线 -->
+  <text x="48" y="106" font-size="13" font-weight="700" fill="#2B2A26">① 块请求生命周期（观测边界）</text>
+
+  <rect x="48" y="120" width="88" height="54" rx="6" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="92" y="142" font-size="14" font-weight="700" fill="#5A564B" text-anchor="middle">Q / I</text>
+  <text x="92" y="160" font-size="10" fill="#6B675C" text-anchor="middle">queue / insert</text>
+
+  <line x1="136" y1="147" x2="168" y2="147" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="172" y="120" width="150" height="54" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="247" y="142" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">D · issue</text>
+  <text x="247" y="160" font-size="10" fill="#2C4460" text-anchor="middle">block_rq_issue</text>
+
+  <line x1="322" y1="147" x2="354" y2="147" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+
+  <rect x="358" y="120" width="280" height="54" rx="6" fill="#F0E3D3" stroke="#B07A3E" stroke-width="1.4"/>
+  <text x="498" y="142" font-size="13" font-weight="700" fill="#7A5426" text-anchor="middle">驱动 / 传输 / 设备</text>
+  <text x="498" y="160" font-size="10" fill="#7A5426" text-anchor="middle">本地 NVMe 或网络 target</text>
+
+  <line x1="638" y1="147" x2="670" y2="147" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrt)"/>
+
+  <rect x="674" y="120" width="160" height="54" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="754" y="142" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">C · complete</text>
+  <text x="754" y="160" font-size="10" fill="#24473F" text-anchor="middle">block_rq_complete</text>
+
+  <!-- D→C 量尺 -->
+  <line x1="247" y1="190" x2="754" y2="190" stroke="#B07A3E" stroke-width="1.4"/>
+  <line x1="247" y1="184" x2="247" y2="196" stroke="#B07A3E" stroke-width="1.4"/>
+  <line x1="754" y1="184" x2="754" y2="196" stroke="#B07A3E" stroke-width="1.4"/>
+  <text x="500" y="210" font-size="11" font-weight="700" fill="#7A5426" text-anchor="middle">常见 delta：D→C（启用 queue time 时起点可前移到 Q/I）</text>
+
+  <!-- 分区条 -->
+  <rect x="48" y="230" width="780" height="18" rx="3" fill="#EDEBE3"/>
+  <text x="58" y="243" font-size="11" font-weight="700" fill="#5A564B">Linux 内核：tracepoint + eBPF maps</text>
+  <rect x="860" y="230" width="332" height="18" rx="3" fill="#EDEBE3"/>
+  <text x="870" y="243" font-size="11" font-weight="700" fill="#5A564B">用户态工具</text>
+  <line x1="844" y1="230" x2="844" y2="520" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="844" y="536" font-size="10" fill="#6B675C" text-anchor="middle">syscall / mmap 边界</text>
+
+  <!-- ② 关联路径 -->
+  <text x="48" y="280" font-size="13" font-weight="700" fill="#2B2A26">② 关联与双输出路径</text>
+
+  <rect x="48" y="294" width="200" height="62" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="148" y="316" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">issue BPF program</text>
+  <text x="148" y="336" font-size="10.5" fill="#2C4460" text-anchor="middle">ktime + PID/comm + dev + bytes</text>
+  <text x="148" y="350" font-size="10.5" fill="#2C4460" text-anchor="middle">attach @ block_rq_issue</text>
+
+  <line x1="247" y1="174" x2="247" y2="280" stroke="#3D5A80" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <line x1="247" y1="280" x2="200" y2="294" stroke="#3D5A80" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrb)"/>
+
+  <line x1="248" y1="325" x2="300" y2="325" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arrb)"/>
+  <text x="274" y="316" font-size="10" fill="#2C4460" text-anchor="middle">write</text>
+
+  <rect x="304" y="294" width="220" height="62" rx="6" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.3"/>
+  <text x="414" y="316" font-size="12.5" font-weight="700" fill="#3D356E" text-anchor="middle">HASH start map</text>
+  <text x="414" y="336" font-size="10.5" fill="#3D356E" text-anchor="middle">key = request_id</text>
+  <text x="414" y="350" font-size="10.5" fill="#3D356E" text-anchor="middle">value = issue state</text>
+
+  <line x1="524" y1="325" x2="576" y2="325" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrt)"/>
+  <text x="550" y="316" font-size="10" fill="#24473F" text-anchor="middle">lookup</text>
+
+  <rect x="580" y="294" width="220" height="62" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="690" y="316" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">complete BPF program</text>
+  <text x="690" y="336" font-size="10.5" fill="#24473F" text-anchor="middle">lookup → delta → delete</text>
+  <text x="690" y="350" font-size="10.5" fill="#24473F" text-anchor="middle">monotonic clock 求差</text>
+
+  <line x1="754" y1="174" x2="754" y2="280" stroke="#2F6B5E" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <line x1="754" y1="280" x2="720" y2="294" stroke="#2F6B5E" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrt)"/>
+
+  <!-- 双分叉 -->
+  <line x1="690" y1="356" x2="690" y2="384" stroke="#5A564B" stroke-width="1.4"/>
+  <line x1="220" y1="384" x2="690" y2="384" stroke="#5A564B" stroke-width="1.4"/>
+  <line x1="220" y1="384" x2="220" y2="400" stroke="#5B4F9A" stroke-width="1.5" marker-end="url(#arrp)"/>
+  <line x1="560" y1="384" x2="560" y2="400" stroke="#B07A3E" stroke-width="1.5" marker-end="url(#arrm)"/>
+
+  <rect x="48" y="406" width="344" height="72" rx="6" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.3"/>
+  <text x="64" y="428" font-size="12.5" font-weight="700" fill="#3D356E">④ per-CPU histogram map</text>
+  <text x="64" y="448" font-size="11" fill="#3D356E">bucket = log2(delta)；热路径只更新本 CPU 副本</text>
+  <text x="64" y="466" font-size="11" fill="#3D356E">低输出量，适合先看分布形态</text>
+
+  <rect x="416" y="406" width="360" height="72" rx="6" fill="#F0E3D3" stroke="#B07A3E" stroke-width="1.3"/>
+  <text x="432" y="428" font-size="12.5" font-weight="700" fill="#7A5426">⑤ ring buffer / perf buffer</text>
+  <text x="432" y="448" font-size="11" fill="#7A5426">每笔完成提交一条定长 event；用户态消费</text>
+  <text x="432" y="466" font-size="11" fill="#7A5426">有界且不可阻塞；满时 lost / 丢事件</text>
+
+  <!-- 用户态 -->
+  <rect x="870" y="294" width="312" height="72" rx="6" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.3"/>
+  <text x="886" y="318" font-size="14" font-weight="700" fill="#3D356E">⑥ biolatency</text>
+  <text x="886" y="338" font-size="11" fill="#3D356E">周期读取 · 合并 CPU 副本 · 打印桶</text>
+  <text x="886" y="356" font-size="11" fill="#3D356E">先看分布，再决定是否下钻</text>
+
+  <rect x="870" y="406" width="312" height="72" rx="6" fill="#F0E3D3" stroke="#B07A3E" stroke-width="1.3"/>
+  <text x="886" y="430" font-size="14" font-weight="700" fill="#7A5426">⑦ biosnoop</text>
+  <text x="886" y="450" font-size="11" fill="#7A5426">poll → 定长校验 → 入用户态队列</text>
+  <text x="886" y="468" font-size="11" fill="#7A5426">格式化与落盘交给其他线程</text>
+
+  <!-- 跨界：紫=hist→biolatency，琥珀=ring→biosnoop -->
+  <path d="M392 442 H820 V330 H870" fill="none" stroke="#5B4F9A" stroke-width="1.5" marker-end="url(#arrp)"/>
+  <line x1="776" y1="442" x2="870" y2="442" stroke="#B07A3E" stroke-width="1.5" marker-end="url(#arrm)"/>
+
+  <!-- ③ 字段剖面 -->
+  <text x="48" y="568" font-size="13" font-weight="700" fill="#2B2A26">③ Map 与输出字段剖面</text>
+
+  <text x="48" y="592" font-size="11.5" font-weight="700" fill="#3D356E">start map entry：完成时按 request_id 对号</text>
+  <rect x="48" y="602" width="190" height="34" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.2"/>
+  <text x="143" y="623" font-size="11" font-weight="700" fill="#3D356E" text-anchor="middle">request_id（key）</text>
+  <rect x="238" y="602" width="130" height="34" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.2"/>
+  <text x="303" y="623" font-size="11" fill="#3D356E" text-anchor="middle">issue_ns</text>
+  <rect x="368" y="602" width="130" height="34" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.2"/>
+  <text x="433" y="623" font-size="11" fill="#3D356E" text-anchor="middle">PID / comm</text>
+  <rect x="498" y="602" width="140" height="34" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.2"/>
+  <text x="568" y="623" font-size="11" fill="#3D356E" text-anchor="middle">MAJ:MIN / op</text>
+  <rect x="638" y="602" width="150" height="34" fill="#E8E6F5" stroke="#5B4F9A" stroke-width="1.2"/>
+  <text x="713" y="623" font-size="11" fill="#3D356E" text-anchor="middle">sector / bytes</text>
+
+  <!-- 直方图示意 -->
+  <text x="48" y="664" font-size="11.5" font-weight="700" fill="#24473F">biolatency：log2 桶，尾部只能定位到范围（柱高示意）</text>
+  <line x1="48" y1="720" x2="788" y2="720" stroke="#9B968A" stroke-width="1"/>
+  <rect x="56" y="704" width="52" height="16" rx="2" fill="#2F6B5E"/>
+  <text x="82" y="734" font-size="9.5" fill="#6B675C" text-anchor="middle">0–1</text>
+  <rect x="128" y="692" width="52" height="28" rx="2" fill="#2F6B5E"/>
+  <text x="154" y="734" font-size="9.5" fill="#6B675C" text-anchor="middle">2–3</text>
+  <rect x="200" y="676" width="52" height="44" rx="2" fill="#2F6B5E"/>
+  <text x="226" y="734" font-size="9.5" fill="#6B675C" text-anchor="middle">4–7</text>
+  <rect x="272" y="688" width="52" height="32" rx="2" fill="#2F6B5E"/>
+  <text x="298" y="734" font-size="9.5" fill="#6B675C" text-anchor="middle">8–15</text>
+  <rect x="344" y="700" width="52" height="20" rx="2" fill="#2F6B5E"/>
+  <text x="370" y="734" font-size="9.5" fill="#6B675C" text-anchor="middle">16–31</text>
+  <rect x="416" y="708" width="52" height="12" rx="2" fill="#2F6B5E"/>
+  <text x="442" y="734" font-size="9.5" fill="#6B675C" text-anchor="middle">32–63</text>
+  <rect x="488" y="712" width="52" height="8" rx="2" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="514" y="734" font-size="9.5" fill="#6B675C" text-anchor="middle">64–127</text>
+  <rect x="560" y="684" width="228" height="36" rx="4" fill="none" stroke="#2F6B5E" stroke-width="1.2" stroke-dasharray="3 2"/>
+  <text x="674" y="700" font-size="11" fill="#24473F" text-anchor="middle">继续 ×2 … 尾部只到范围</text>
+  <text x="674" y="716" font-size="9.5" fill="#6B675C" text-anchor="middle">μs</text>
+
+  <!-- biosnoop 字段条 -->
+  <text x="48" y="760" font-size="11.5" font-weight="700" fill="#7A5426">biosnoop event：逐请求证据，字段随工具版本变化</text>
+  <rect x="48" y="770" width="740" height="36" rx="4" fill="#F0E3D3" stroke="#B07A3E" stroke-width="1.2"/>
+  <text x="418" y="792" font-size="11" fill="#7A5426" text-anchor="middle">time · PID/comm · disk · R/W · sector · bytes · queue_ms（可选）· latency_ms</text>
+
+  <!-- 一眼对账 -->
+  <rect x="820" y="568" width="372" height="238" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="836" y="596" font-size="13" font-weight="700" fill="#2B2A26">一眼对账</text>
+  <text x="836" y="624" font-size="11.5" fill="#2B2A26">时间：同机 delta 用 monotonic clock</text>
+  <text x="836" y="646" font-size="11.5" fill="#2B2A26">关联：issue 写 map，complete 查后删</text>
+  <text x="836" y="668" font-size="11.5" fill="#2B2A26">聚合：per-CPU 桶减少缓存行争用</text>
+  <text x="836" y="690" font-size="11.5" fill="#2B2A26">逐笔：ring buffer 满时不能阻塞 IO</text>
+  <text x="836" y="712" font-size="11.5" fill="#2B2A26">边界：Page Cache 命中不进块层</text>
+  <text x="836" y="734" font-size="11.5" fill="#2B2A26">网络块：D→C 可跨网络与 target</text>
+  <text x="836" y="756" font-size="11.5" fill="#2B2A26">报告：版本、attach 点、lost 数必填</text>
+  <text x="836" y="784" font-size="11" fill="#6B675C">口径不同的数字不能直接相减对账</text>
+</svg>

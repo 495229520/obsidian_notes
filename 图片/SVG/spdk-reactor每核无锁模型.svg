@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       硬件专色 #EFE7D6/#8A6D3B；健康/无锁 #E2EFE9/#2F6B5E；代价 #F4E3DE/#B0503F；与本库既有 SVG 同一套 -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6D3B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">SPDK 线程模型：每核一个 reactor，数据按核分片，跨核只传消息</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">IO 热路径零锁 —— 不是不同步，而是把「共享 + 锁」改写成「私有 + 消息」，剩下的同步只有 release/acquire</text>
+
+  <!-- ═══ 左：对照组 ═══ -->
+  <rect x="48" y="104" width="330" height="560" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">对照：共享队列 ＋ 互斥锁</text>
+
+  <rect x="76" y="152" width="84" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="118" y="176" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 0</text>
+  <rect x="170" y="152" width="84" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="212" y="176" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 1</text>
+  <rect x="264" y="152" width="84" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="306" y="176" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 2</text>
+
+  <path d="M118,192 L200,232" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arrn)"/>
+  <path d="M212,192 L212,232" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arrn)"/>
+  <path d="M306,192 L224,232" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arrn)"/>
+
+  <rect x="128" y="236" width="170" height="46" rx="7" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.5"/>
+  <text x="213" y="255" font-size="12" font-weight="700" fill="#B0503F" text-anchor="middle">std::mutex</text>
+  <text x="213" y="273" font-size="10.5" fill="#B0503F" text-anchor="middle">同一时刻只放一个进去</text>
+  <path d="M213,282 L213,304" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arrn)"/>
+
+  <rect x="96" y="308" width="234" height="50" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="213" y="328" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">共享提交队列</text>
+  <text x="213" y="346" font-size="10.5" fill="#2C4460" text-anchor="middle">所有线程读写同一份数据</text>
+
+  <rect x="96" y="396" width="234" height="46" rx="7" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.3"/>
+  <text x="213" y="415" font-size="11" font-weight="700" fill="#B0503F" text-anchor="middle">锁竞争</text>
+  <text x="213" y="432" font-size="10" fill="#B0503F" text-anchor="middle">高并发下提交被串行化</text>
+
+  <rect x="96" y="454" width="234" height="46" rx="7" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.3"/>
+  <text x="213" y="473" font-size="11" font-weight="700" fill="#B0503F" text-anchor="middle">缓存行乒乓</text>
+  <text x="213" y="490" font-size="10" fill="#B0503F" text-anchor="middle">队列头尾在核间来回搬运</text>
+
+  <rect x="96" y="512" width="234" height="46" rx="7" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.3"/>
+  <text x="213" y="531" font-size="11" font-weight="700" fill="#B0503F" text-anchor="middle">睡眠-唤醒</text>
+  <text x="213" y="548" font-size="10" fill="#B0503F" text-anchor="middle">抢不到锁 → 让核，回来 μs 级</text>
+
+  <text x="213" y="600" font-size="12" font-weight="700" fill="#B0503F" text-anchor="middle">延迟随线程数上升：</text>
+  <text x="213" y="620" font-size="12" font-weight="700" fill="#B0503F" text-anchor="middle">加核越加越慢</text>
+
+  <!-- ═══ 右：SPDK ═══ -->
+  <rect x="410" y="104" width="782" height="560" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="434" y="132" font-size="14" font-weight="700" fill="#4A473F">SPDK：每核私有，消息路由</text>
+  <rect x="1006" y="112" width="166" height="26" rx="13" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1089" y="129" font-size="11" font-weight="700" fill="#2F6B5E" text-anchor="middle">IO 热路径：全程无锁</text>
+
+  <!-- core 0 -->
+  <rect x="434" y="150" width="310" height="250" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="589" y="174" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">core 0 —— reactor（绑核线程）</text>
+
+  <rect x="454" y="186" width="270" height="100" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="464" y="206" font-size="10.5" font-weight="700" fill="#2C4460">死循环，永不阻塞：</text>
+  <text x="464" y="226" font-size="10.5" fill="#2C4460">① 收消息环 → 执行别核发来的闭包</text>
+  <text x="464" y="246" font-size="10.5" fill="#2C4460">② 跑 poller → 轮询本核 CQ 的 phase bit</text>
+  <text x="464" y="266" font-size="10.5" fill="#2C4460">③ run-to-completion：原地调完成回调</text>
+
+  <rect x="454" y="310" width="270" height="64" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.5"/>
+  <text x="589" y="333" font-size="11.5" font-weight="700" fill="#5C4A28" text-anchor="middle">独占 qpair 0 ＋ 私有内存池</text>
+  <text x="589" y="353" font-size="10.5" fill="#5C4A28" text-anchor="middle">本核数据只有本核碰 → 无锁无乒乓</text>
+
+  <!-- core 1 -->
+  <rect x="858" y="150" width="310" height="250" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="1013" y="174" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">core 1 —— reactor（绑核线程）</text>
+
+  <rect x="878" y="186" width="270" height="100" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="888" y="206" font-size="10.5" font-weight="700" fill="#2C4460">同一份死循环：</text>
+  <text x="888" y="226" font-size="10.5" fill="#2C4460">① 收消息环 → 执行别核发来的闭包</text>
+  <text x="888" y="246" font-size="10.5" fill="#2C4460">② 跑 poller → 轮询本核 CQ 的 phase bit</text>
+  <text x="888" y="266" font-size="10.5" fill="#2C4460">③ run-to-completion：原地调完成回调</text>
+
+  <rect x="878" y="310" width="270" height="64" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.5"/>
+  <text x="1013" y="333" font-size="11.5" font-weight="700" fill="#5C4A28" text-anchor="middle">独占 qpair 1 ＋ 私有内存池</text>
+  <text x="1013" y="353" font-size="10.5" fill="#5C4A28" text-anchor="middle">qpair 明文不是线程安全的：分片是前提</text>
+
+  <!-- 消息环 -->
+  <path d="M744,206 L752,206" fill="none" stroke="#2F6B5E" stroke-width="1.8"/>
+  <rect x="754" y="188" width="94" height="36" rx="17" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="801" y="210" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">消息环 →</text>
+  <path d="M848,206 L856,206" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <path d="M858,268 L850,268" fill="none" stroke="#2F6B5E" stroke-width="1.8"/>
+  <rect x="754" y="250" width="94" height="36" rx="17" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="801" y="272" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">← 消息环</text>
+  <path d="M754,268 L746,268" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <text x="801" y="316" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">SPSC 无锁环：</text>
+  <text x="801" y="332" font-size="9.5" fill="#2F6B5E" text-anchor="middle">写侧 release 发布</text>
+  <text x="801" y="348" font-size="9.5" fill="#2F6B5E" text-anchor="middle">读侧 acquire 消费</text>
+  <text x="801" y="364" font-size="9.5" fill="#2F6B5E" text-anchor="middle">满 = 显式背压</text>
+
+  <!-- 与盘的连线 -->
+  <path d="M560,404 L640,552" fill="none" stroke="#8A6D3B" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <path d="M700,556 L620,408" fill="none" stroke="#8A6D3B" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <text x="446" y="452" font-size="10.5" fill="#8A6D3B">提交：填 SQE →（写屏障）→ 敲 doorbell</text>
+  <text x="446" y="470" font-size="10.5" fill="#8A6D3B">完成：轮询 phase bit ＝ acquire 读</text>
+
+  <path d="M1042,404 L962,552" fill="none" stroke="#8A6D3B" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <path d="M902,556 L982,408" fill="none" stroke="#8A6D3B" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <text x="1156" y="452" font-size="10.5" fill="#8A6D3B" text-anchor="end">数据先写全，发布动作殿后 ——</text>
+  <text x="1156" y="470" font-size="10.5" fill="#8A6D3B" text-anchor="end">与 SPSC 环同一对语义，对端是盘</text>
+
+  <!-- SSD -->
+  <rect x="520" y="536" width="560" height="112" rx="10" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.6"/>
+  <text x="800" y="560" font-size="12.5" font-weight="700" fill="#5C4A28" text-anchor="middle">NVMe SSD（多队列硬件：为无锁并发提供原生分片）</text>
+  <rect x="545" y="574" width="240" height="52" rx="7" fill="#FAF9F2" stroke="#8A6D3B" stroke-width="1.3"/>
+  <text x="665" y="595" font-size="11" font-weight="700" fill="#5C4A28" text-anchor="middle">硬件队列对 0（SQ0/CQ0）</text>
+  <text x="665" y="613" font-size="10" fill="#5C4A28" text-anchor="middle">只被 core 0 触碰</text>
+  <rect x="815" y="574" width="240" height="52" rx="7" fill="#FAF9F2" stroke="#8A6D3B" stroke-width="1.3"/>
+  <text x="935" y="595" font-size="11" font-weight="700" fill="#5C4A28" text-anchor="middle">硬件队列对 1（SQ1/CQ1）</text>
+  <text x="935" y="613" font-size="10" fill="#5C4A28" text-anchor="middle">只被 core 1 触碰</text>
+
+  <!-- ═══ 底部：C++ 对应 ═══ -->
+  <rect x="48" y="690" width="1144" height="150" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="718" font-size="14" font-weight="700" fill="#4A473F">同一套军规，你在 C++ 里都写过</text>
+
+  <text x="76" y="748" font-size="11.5" font-weight="700" fill="#2C4460">每核 qpair / 内存池 ＝ thread_local 分片</text>
+  <text x="76" y="768" font-size="10.5" fill="#6B675C">消灭锁竞争与 false sharing</text>
+
+  <text x="452" y="748" font-size="11.5" font-weight="700" fill="#2C4460">send_msg 消息环 ＝ SPSC lock-free ring</text>
+  <text x="452" y="768" font-size="10.5" fill="#6B675C">「共享状态＋锁」改写为「消息＋单线程状态」</text>
+
+  <text x="828" y="748" font-size="11.5" font-weight="700" fill="#2C4460">poller 禁止阻塞 ＝ 事件循环军规</text>
+  <text x="828" y="768" font-size="10.5" fill="#6B675C">一次 sleep 冻结整核所有 spdk_thread</text>
+
+  <text x="620" y="812" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle">与设备的同步也是同一对语义：doorbell 前的写屏障 ≈ release 发布，CQ phase bit 轮询 ≈ acquire 消费</text>
+</svg>

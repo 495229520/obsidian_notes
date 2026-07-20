@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">StorageBenchmark Operator：把 fio 矩阵变成集群对象</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">一次声明 → 串行展开 → 结果归档；所有设计决策都为同一件事服务：结果可比</text>
+
+  <!-- CR -->
+  <rect x="70" y="130" width="300" height="160" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="90" y="158" font-size="13.5" font-weight="700" fill="#2C4460">StorageBenchmark CR（10.3）</text>
+  <text x="90" y="184" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">spec.matrix:</text>
+  <text x="90" y="204" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">  bs:      [4k, 128k]</text>
+  <text x="90" y="224" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">  iodepth: [1, 32]</text>
+  <text x="90" y="244" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">  rw: [randread, read]</text>
+  <text x="90" y="272" font-size="11.5" font-weight="700" fill="#2C4460">→ 2 × 2 × 2 = 8 个 cell</text>
+
+  <line x1="374" y1="210" x2="426" y2="210" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+
+  <!-- Controller -->
+  <rect x="430" y="130" width="300" height="160" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="450" y="158" font-size="13.5" font-weight="700" fill="#24473F">Controller（10.2 的循环）</text>
+  <text x="450" y="184" font-size="11.5" fill="#24473F">展开矩阵 → 8 个 fio Job</text>
+  <text x="450" y="206" font-size="11.5" fill="#24473F">串行执行：同一时刻只跑一个</text>
+  <text x="450" y="228" font-size="11.5" fill="#24473F">幂等：Job 已存在则不重建</text>
+  <text x="450" y="250" font-size="11.5" fill="#24473F">cell 完成 → 解析 fio JSON</text>
+  <text x="450" y="272" font-size="11.5" fill="#24473F">全部完成 → phase = Completed</text>
+
+  <line x1="734" y1="210" x2="786" y2="210" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+
+  <!-- Job queue -->
+  <rect x="790" y="130" width="380" height="160" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="810" y="158" font-size="13.5" font-weight="700" fill="#4A3F68">Job 队列（串行推进）</text>
+
+  <rect x="810" y="176" width="76" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="848" y="196" font-size="10.5" fill="#24473F" text-anchor="middle">cell 1 完成</text>
+  <rect x="896" y="176" width="76" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="934" y="196" font-size="10.5" fill="#24473F" text-anchor="middle">cell 2 完成</text>
+  <rect x="982" y="176" width="76" height="30" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.6"/>
+  <text x="1020" y="196" font-size="10.5" font-weight="700" fill="#7A5518" text-anchor="middle">cell 3 运行</text>
+  <rect x="1068" y="176" width="76" height="30" rx="5" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="1106" y="196" font-size="10.5" fill="#6B675C" text-anchor="middle">cell 4 待跑</text>
+  <rect x="810" y="214" width="76" height="30" rx="5" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="848" y="234" font-size="10.5" fill="#6B675C" text-anchor="middle">cell 5</text>
+  <rect x="896" y="214" width="76" height="30" rx="5" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="934" y="234" font-size="10.5" fill="#6B675C" text-anchor="middle">cell 6</text>
+  <rect x="982" y="214" width="76" height="30" rx="5" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="1020" y="234" font-size="10.5" fill="#6B675C" text-anchor="middle">cell 7</text>
+  <rect x="1068" y="214" width="76" height="30" rx="5" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="1106" y="234" font-size="10.5" fill="#6B675C" text-anchor="middle">cell 8</text>
+
+  <text x="810" y="272" font-size="10.5" fill="#6B675C">每个 cell 一个 Job：失败可单独重试，互不污染</text>
+
+  <!-- 结果 -->
+  <line x1="580" y1="294" x2="580" y2="336" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="980" y1="294" x2="980" y2="336" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="430" y="340" width="300" height="110" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="450" y="368" font-size="13" font-weight="700" fill="#7A5518">status（只放摘要）</text>
+  <text x="450" y="392" font-size="11" fill="#7A5518">phase · 当前 cell · 每 cell 的 iops / p99</text>
+  <text x="450" y="414" font-size="11" fill="#7A5518">etcd 对象有大小上限（~1.5 MB）</text>
+  <text x="450" y="436" font-size="11" fill="#7A5518">CR 不是数据库（10.3 的纪律）</text>
+
+  <rect x="790" y="340" width="380" height="110" rx="8" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="810" y="368" font-size="13" font-weight="700" fill="#2B2A26">ConfigMap / 对象存储（放全量）</text>
+  <text x="810" y="392" font-size="11" fill="#4A473F">完整 fio JSON：延迟直方图、逐秒曲线</text>
+  <text x="810" y="414" font-size="11" fill="#4A473F">供 9.7 的回归比对与归档追溯</text>
+
+  <!-- 防干扰 -->
+  <rect x="70" y="340" width="300" height="110" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="90" y="368" font-size="13" font-weight="700" fill="#733428">防干扰三板斧（结果可比的前提）</text>
+  <text x="90" y="392" font-size="11" fill="#733428">① 串行：并行 cell 互抢带宽 = 全废</text>
+  <text x="90" y="412" font-size="11" fill="#733428">② 钉住节点与 NUMA 拓扑（10.5）</text>
+  <text x="90" y="432" font-size="11" fill="#733428">③ direct=1 或测前清缓存（1.2 / 1.3）</text>
+
+  <!-- 矩阵读法 -->
+  <rect x="70" y="490" width="1100" height="190" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="520" font-size="13.5" font-weight="700" fill="#2B2A26">一张矩阵回答四个问题（读法即结论）</text>
+
+  <rect x="94" y="540" width="255" height="116" rx="7" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="110" y="566" font-size="12" font-weight="700" fill="#2C4460">4k · QD1 · randread</text>
+  <text x="110" y="590" font-size="11" fill="#4A473F">介质延迟基线：单请求</text>
+  <text x="110" y="610" font-size="11" fill="#4A473F">全路径耗时（1.8 的 ⑦）</text>
+  <text x="110" y="634" font-size="11" font-weight="700" fill="#6B675C">看 clat p99</text>
+
+  <rect x="369" y="540" width="255" height="116" rx="7" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="385" y="566" font-size="12" font-weight="700" fill="#2C4460">4k · QD32 · randread</text>
+  <text x="385" y="590" font-size="11" fill="#4A473F">IOPS 上限：设备并行度</text>
+  <text x="385" y="610" font-size="11" fill="#4A473F">吃没吃满（1.7 利特尔法则）</text>
+  <text x="385" y="634" font-size="11" font-weight="700" fill="#6B675C">看 iops 与 p99 的交换比</text>
+
+  <rect x="644" y="540" width="255" height="116" rx="7" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="660" y="566" font-size="12" font-weight="700" fill="#2C4460">128k · QD32 · read</text>
+  <text x="660" y="590" font-size="11" fill="#4A473F">顺序带宽上限：大块摊薄</text>
+  <text x="660" y="610" font-size="11" fill="#4A473F">每 IO 固定成本</text>
+  <text x="660" y="634" font-size="11" font-weight="700" fill="#6B675C">看 bw；对比标称值</text>
+
+  <rect x="919" y="540" width="230" height="116" rx="7" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="935" y="566" font-size="12" font-weight="700" fill="#2C4460">buffered 重跑一遍</text>
+  <text x="935" y="590" font-size="11" fill="#4A473F">缓存收益：命中路径 vs</text>
+  <text x="935" y="610" font-size="11" fill="#4A473F">介质路径（1.2 / 1.3）</text>
+  <text x="935" y="634" font-size="11" font-weight="700" fill="#6B675C">看两轮差距的数量级</text>
+</svg>

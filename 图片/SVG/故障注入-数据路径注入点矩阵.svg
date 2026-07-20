@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 812" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；步骤/层框 #E3EAF4/#3D5A80/#2C4460；灰色故障/危险 #F0E0DB/#A64B3C/#733428；
+       安全/断路器 #DCE9E3/#2F6B5E/#24473F；中性军规 #F1EFE8/#D8D5C8/#4A473F；与 崩溃注入-*.svg / 健康检查-*.svg 同一套 -->
+  <title>故障注入矩阵：沿数据路径的注入点与爆炸半径纪律</title>
+  <desc>顶部区分 fail-stop（有信号、ms 级检测）与 gray failure（灰色故障、无带外信号）；主体是沿数据路径自顶向下的六层注入点矩阵——应用、系统调用、文件系统/块层、内核、网络、节点/电源，各自列出工具、可注入故障与主要抓的 bug；底部是爆炸半径纪律五步与自动中止军规。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="812" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">故障注入矩阵：沿数据路径系统地制造故障，并框住爆炸半径</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">6.10 崩溃注入只是其中一列；本图把注入点铺满整条路径——最难的不是让它死，是让它变慢却不死</text>
+
+  <!-- 两类故障 -->
+  <text x="48" y="110" font-size="12.5" font-weight="700" fill="#4A473F">两类故障（检测难度天差地别，决定用什么手段兜底）</text>
+  <rect x="48" y="120" width="558" height="66" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="68" y="146" font-size="12.5" font-weight="700" fill="#24473F">fail-stop · 有信号的死</text>
+  <text x="68" y="169" font-size="10.5" fill="#24473F">link down / TCP RST / QP error（4.3）/ 进程退出 → 事件上报，ms 级可检测</text>
+  <rect x="634" y="120" width="558" height="66" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="654" y="146" font-size="12.5" font-weight="700" fill="#733428">gray failure · 灰色故障（本图重点）</text>
+  <text x="654" y="169" font-size="10.5" fill="#733428">慢盘 / 静默丢包 / target hang → 无带外信号，只能靠超时兜底 + 同伴对比（10.6）</text>
+
+  <!-- 矩阵 -->
+  <text x="48" y="214" font-size="12.5" font-weight="700" fill="#4A473F">注入点矩阵：层 × 工具 × 可注入故障 × 抓什么　（↓ 行序即数据路径：应用在上、设备 / 网络在下）</text>
+
+  <!-- Row 1 应用 -->
+  <rect x="48" y="228" width="1144" height="54" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="56" y="235" width="46" height="40" rx="7" fill="#3D5A80"/>
+  <text x="79" y="258" font-size="17" font-weight="700" fill="#F5F4ED" text-anchor="middle" dominant-baseline="central">①</text>
+  <text x="112" y="250" font-size="10.5" fill="#2C4460"><tspan font-weight="700">应用内部</tspan> · 工具：failpoint / SyncPoint 代码埋点、libfiu（fiu-run 拦截库调用）</text>
+  <text x="112" y="270" font-size="10.5" fill="#4A473F">可注入：<tspan font-weight="700" fill="#A64B3C">延迟 · 错误 · 特定交错时序</tspan>　→ 抓：外部够不着的分支「刷 A 成功、刷 B 失败」（6.10）</text>
+
+  <!-- Row 2 系统调用 -->
+  <rect x="48" y="290" width="1144" height="54" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="56" y="297" width="46" height="40" rx="7" fill="#3D5A80"/>
+  <text x="79" y="320" font-size="17" font-weight="700" fill="#F5F4ED" text-anchor="middle" dominant-baseline="central">②</text>
+  <text x="112" y="312" font-size="10.5" fill="#2C4460"><tspan font-weight="700">系统调用层</tspan> · 工具：LD_PRELOAD 包装 read / write / fsync、seccomp 注错、libfiu</text>
+  <text x="112" y="332" font-size="10.5" fill="#4A473F">可注入：<tspan font-weight="700" fill="#A64B3C">EIO / ENOSPC / EINTR、延迟</tspan>　→ 抓：错误处理与重试路径、短读短写（6.3）</text>
+
+  <!-- Row 3 文件系统/块层 -->
+  <rect x="48" y="352" width="1144" height="54" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="56" y="359" width="46" height="40" rx="7" fill="#3D5A80"/>
+  <text x="79" y="382" font-size="17" font-weight="700" fill="#F5F4ED" text-anchor="middle" dominant-baseline="central">③</text>
+  <text x="112" y="374" font-size="10.5" fill="#2C4460"><tspan font-weight="700">文件系统 / 块层（1.7）</tspan> · 工具：device-mapper — dm-delay 延迟、dm-flakey 丢写 / 注错、dm-dust 坏扇区、dm-log-writes 记录回放</text>
+  <text x="112" y="394" font-size="10.5" fill="#4A473F">可注入：<tspan font-weight="700" fill="#A64B3C">延迟 · 错误 · 丢写 · 坏扇区 · 撕裂</tspan>　→ 抓：EIO（6.3）、torn write（6.4）、崩溃一致（6.10）</text>
+
+  <!-- Row 4 内核 -->
+  <rect x="48" y="414" width="1144" height="54" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="56" y="421" width="46" height="40" rx="7" fill="#3D5A80"/>
+  <text x="79" y="444" font-size="17" font-weight="700" fill="#F5F4ED" text-anchor="middle" dominant-baseline="central">④</text>
+  <text x="112" y="436" font-size="10.5" fill="#2C4460"><tspan font-weight="700">内核 fault injection</tspan> · 工具：/sys/kernel/debug 下 fail_make_request、should_fail_bio、failslab、fail_page_alloc（需 CONFIG_FAULT_INJECTION）</text>
+  <text x="112" y="456" font-size="10.5" fill="#4A473F">可注入：<tspan font-weight="700" fill="#A64B3C">注错 · 资源耗尽 ENOMEM</tspan>　→ 抓：内存 / bio 分配失败的传播与降级路径</text>
+
+  <!-- Row 5 网络 -->
+  <rect x="48" y="476" width="1144" height="54" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="56" y="483" width="46" height="40" rx="7" fill="#A64B3C"/>
+  <text x="79" y="506" font-size="17" font-weight="700" fill="#F5F4ED" text-anchor="middle" dominant-baseline="central">⑤</text>
+  <text x="112" y="498" font-size="10.5" fill="#2C4460"><tspan font-weight="700">网络（第 4 / 5 章）</tspan> · 工具：tc netem — delay / loss / reorder / corrupt / duplicate、iptables DROP 单向分区、PFC / ECN 风暴（4.7）</text>
+  <text x="112" y="518" font-size="10.5" fill="#4A473F">可注入：<tspan font-weight="700" fill="#A64B3C">延迟 · 丢失 · 乱序 · 分区</tspan>　→ 抓：超时 / 重传、多路径切换（5.5）、hung IO（5.1）</text>
+
+  <!-- Row 6 节点/电源 -->
+  <rect x="48" y="538" width="1144" height="54" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="56" y="545" width="46" height="40" rx="7" fill="#A64B3C"/>
+  <text x="79" y="568" font-size="17" font-weight="700" fill="#F5F4ED" text-anchor="middle" dominant-baseline="central">⑥</text>
+  <text x="112" y="560" font-size="10.5" fill="#2C4460"><tspan font-weight="700">节点 / 电源</tspan> · 工具：virsh destroy 强杀、cgroup freeze 冻结、断电（真掉电，无 UPS）</text>
+  <text x="112" y="580" font-size="10.5" fill="#4A473F">可注入：<tspan font-weight="700" fill="#A64B3C">fail-stop · 掉电 · 冻结→灰色</tspan>　→ 抓：崩溃恢复、故障摘除与副本重建（10.6 / 7.1）</text>
+
+  <!-- 爆炸半径纪律 -->
+  <text x="48" y="622" font-size="12.5" font-weight="700" fill="#4A473F">爆炸半径纪律：把注入约束成一次受控实验，而不是一次真事故</text>
+  <rect x="48" y="632" width="1144" height="150" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+
+  <rect x="66" y="650" width="196" height="48" rx="7" fill="#FBFDFB" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="164" y="670" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">① 定义稳态</text>
+  <text x="164" y="688" font-size="10" fill="#24473F" text-anchor="middle">SLI 基线（9.7）</text>
+  <path d="M262,674 L286,674" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <rect x="288" y="650" width="196" height="48" rx="7" fill="#FBFDFB" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="386" y="670" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">② 最小爆炸半径</text>
+  <text x="386" y="688" font-size="10" fill="#24473F" text-anchor="middle">单一变量、限一副本 / 一机架</text>
+  <path d="M484,674 L508,674" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <rect x="510" y="650" width="196" height="48" rx="7" fill="#FBFDFB" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="608" y="670" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">③ 注入并实时观测</text>
+  <text x="608" y="688" font-size="10" fill="#24473F" text-anchor="middle">9.2 / 9.3 / 9.4 / 9.5</text>
+  <path d="M706,674 L730,674" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <rect x="732" y="650" width="196" height="48" rx="7" fill="#FBFDFB" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="830" y="670" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">④ 越界即中止</text>
+  <text x="830" y="688" font-size="10" fill="#24473F" text-anchor="middle">自动回滚 + 恢复</text>
+  <path d="M928,674 L952,674" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <rect x="954" y="650" width="220" height="48" rx="7" fill="#FBFDFB" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1064" y="670" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">⑤ 固化可复现</text>
+  <text x="1064" y="688" font-size="10" fill="#24473F" text-anchor="middle">种子 / flush 边界 / 拓扑</text>
+
+  <rect x="66" y="714" width="1108" height="52" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="86" y="736" font-size="11.5" font-weight="700" fill="#A64B3C">军规</text>
+  <text x="86" y="756" font-size="11" fill="#4A473F">注入 = 制造真实故障：没有自动中止的生产演练本身就是一次事故。先在预发跑绿，生产演练必须挂 SLO 燃尽熔断（9.7）与摘除限速（10.6），并与控制面分工（10.1）。</text>
+</svg>

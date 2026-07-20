@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       警示 #A64B3C；安全/绿色 #2F6B5E；与本库既有 SVG 同一套 -->
+  <title>Multipart Upload 与 Range GET</title>
+  <desc>左侧为 Multipart 三步状态机：Create 获得 UploadId、N 个 part 并行乱序上传、Complete 原子拼接发布或 Abort 丢弃；右侧为 Range GET 并行扇出、TTFB 与传输段分解；底部为三条误读警示。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Multipart 与 Range GET：把一个大对象切成一批可并行、可重试的 HTTP 请求</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">成立前提：对象不可变——字节区间永不变化，切开才有意义（一个版本内）</text>
+
+  <!-- 左：Multipart -->
+  <rect x="48" y="104" width="560" height="420" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="328" y="132" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">写：Multipart Upload 三步状态机</text>
+
+  <rect x="128" y="156" width="400" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="172" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">① CreateMultipartUpload → UploadId</text>
+  <text x="328" y="192" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">上传会话的句柄</text>
+  <path d="M228,204 L168,240" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M328,204 L328,240" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M428,204 L488,240" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="78" y="244" width="160" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="158" y="264" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">part 1 → ETag₁</text>
+  <text x="158" y="286" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">独立 PUT · 可重传</text>
+  <rect x="248" y="244" width="160" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="264" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">part 2 → ETag₂</text>
+  <text x="328" y="286" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">并行 · 乱序皆可</text>
+  <rect x="418" y="244" width="160" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="498" y="264" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">… part N → ETagₙ</text>
+  <text x="498" y="286" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">5 MiB~5 GiB · ≤10000 个</text>
+
+  <path d="M158,300 L268,340" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M328,300 L328,340" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M498,300 L388,340" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="118" y="344" width="420" height="56" rx="7" fill="#E3EAF4" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="328" y="362" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">③ Complete：提交 (partNumber, ETag) 清单</text>
+  <text x="328" y="386" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">服务端原子拼接 · 此刻才可见（rename 式提交点，≈ 6.1）</text>
+
+  <rect x="118" y="424" width="420" height="76" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="328" y="444" font-size="11.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">泄漏坑：崩溃后没人 Abort</text>
+  <text x="328" y="466" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">孤儿 part 占存储且 GET 不到——ListMultipartUploads 巡检</text>
+  <text x="328" y="486" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">或生命周期规则自动 Abort（正规部署必配）</text>
+
+  <!-- 右：Range GET -->
+  <rect x="632" y="104" width="560" height="420" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="912" y="132" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">读：Range GET 并行扇出</text>
+
+  <rect x="762" y="156" width="300" height="44" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="912" y="178" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">client：按 8~64 MiB 切段，8~32 并发</text>
+  <path d="M812,200 L752,236" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M912,200 L912,236" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M1012,200 L1072,236" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="662" y="240" width="160" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="742" y="260" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">Range: bytes=0-8M</text>
+  <text x="742" y="282" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">→ 206 + Content-Range</text>
+  <rect x="832" y="240" width="160" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="260" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">bytes=8M-16M</text>
+  <text x="912" y="282" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">失败只重传这一段</text>
+  <rect x="1002" y="240" width="160" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1082" y="260" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">… bytes=…</text>
+  <text x="1082" y="282" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">EC 直读所在数据分片</text>
+
+  <rect x="662" y="320" width="500" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="340" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">每段耗时 = TTFB + 传输段</text>
+  <text x="912" y="362" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">TTFB：认证 + 元数据（7.2）+ 寻址 · 不随 range 大小变</text>
+  <text x="912" y="380" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">太小 → TTFB 占比飙升；太大 → 并行不足——实验校准</text>
+
+  <rect x="662" y="416" width="500" height="84" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="912" y="436" font-size="11.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">并行读的两道正确性闸门</text>
+  <text x="912" y="458" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">每段带 If-Match: ETag——版本变了返 412 整体重启，否则拼出混血文件</text>
+  <text x="912" y="482" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">只认 206——服务端可无视 Range 返 200 全量体</text>
+
+  <!-- 底部误读 -->
+  <rect x="48" y="548" width="1144" height="112" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="70" y="572" font-size="12.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">三条高频误读</text>
+  <text x="70" y="596" font-size="11" fill="#4A473F" dominant-baseline="central">· multipart 对象的 ETag 不是整体 MD5（= 各 part MD5 再 MD5 + "-N"）——拿它对比 md5sum 永远不等</text>
+  <text x="70" y="620" font-size="11" fill="#4A473F" dominant-baseline="central">· 吞吐随并发先线性后饱和（client 网卡 / 网关 / 单节点盘到顶）——饱和后加并发只加 p99，与 iodepth 曲线同一读法</text>
+  <text x="70" y="644" font-size="11" fill="#4A473F" dominant-baseline="central">· 429/503 是限流不是网络故障——指数退避 + 抖动，硬重试是自我 DDoS</text>
+</svg>

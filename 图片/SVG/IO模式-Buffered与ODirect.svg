@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrp" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">四条路径的拷贝与等待点：Buffered 对比 O_DIRECT</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">实线箭头 = CPU 拷贝（消耗 CPU 与内存带宽）；虚线箭头 = DMA（设备搬运，CPU 不参与）；每格标出线程真正阻塞的位置</text>
+
+  <text x="334" y="126" font-size="15" font-weight="700" fill="#2B2A26" text-anchor="middle">Buffered（经 Page Cache，默认）</text>
+  <text x="906" y="126" font-size="15" font-weight="700" fill="#2B2A26" text-anchor="middle">O_DIRECT（绕过 Page Cache）</text>
+
+  <!-- ===== Cell A: Buffered write ===== -->
+  <rect x="64" y="140" width="540" height="280" rx="10" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="84" y="170" font-size="14" font-weight="700" fill="#2B2A26">① Buffered write（默认写路径）</text>
+  <rect x="454" y="152" width="130" height="26" rx="13" fill="none" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="519" y="169" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">CPU 拷贝 ×1</text>
+
+  <rect x="80" y="210" width="120" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="140" y="230" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">用户缓冲区</text>
+  <text x="140" y="247" font-size="10" fill="#2C4460" text-anchor="middle">应用地址空间</text>
+
+  <rect x="274" y="210" width="120" height="48" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="334" y="230" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">Page Cache 页</text>
+  <text x="334" y="247" font-size="10" fill="#7A5518" text-anchor="middle">标记 Dirty</text>
+
+  <rect x="468" y="210" width="120" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="528" y="230" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">设备</text>
+  <text x="528" y="247" font-size="10" fill="#733428" text-anchor="middle">NVMe / HDD</text>
+
+  <line x1="204" y1="234" x2="268" y2="234" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <text x="236" y="202" font-size="11" fill="#4A473F" text-anchor="middle">CPU 拷贝</text>
+  <line x1="398" y1="234" x2="462" y2="234" stroke="#6B5B95" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#arrp)"/>
+  <text x="430" y="202" font-size="11" fill="#6B5B95" text-anchor="middle">DMA · 稍后异步</text>
+
+  <rect x="84" y="288" width="500" height="42" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="334" y="314" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">等待点：通常无 —— 标脏即返回；脏页超水位时被限速（1.2）</text>
+
+  <text x="84" y="360" font-size="11.5" fill="#6B675C">写回由 flusher 异步完成，DMA 从页缓存直达设备</text>
+  <text x="84" y="382" font-size="11.5" fill="#A64B3C">write 返回 ≠ 落盘：数据停在内核内存里（→ 1.4）</text>
+
+  <!-- ===== Cell B: O_DIRECT write ===== -->
+  <rect x="636" y="140" width="540" height="280" rx="10" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="656" y="170" font-size="14" font-weight="700" fill="#2B2A26">② O_DIRECT write</text>
+  <rect x="1026" y="152" width="130" height="26" rx="13" fill="none" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="1091" y="169" font-size="11.5" font-weight="700" fill="#A64B3C" text-anchor="middle">CPU 拷贝 ×0</text>
+
+  <rect x="652" y="210" width="120" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="712" y="230" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">用户缓冲区</text>
+  <text x="712" y="247" font-size="10" fill="#2C4460" text-anchor="middle">地址须对齐</text>
+
+  <rect x="846" y="210" width="120" height="48" rx="7" fill="none" stroke="#8A8574" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <text x="906" y="230" font-size="12" fill="#8A8574" text-anchor="middle">Page Cache</text>
+  <text x="906" y="247" font-size="10" fill="#8A8574" text-anchor="middle">被绕过</text>
+
+  <rect x="1040" y="210" width="120" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="1100" y="230" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">设备</text>
+  <text x="1100" y="247" font-size="10" fill="#733428" text-anchor="middle">NVMe / HDD</text>
+
+  <path d="M732,206 C790,176 1024,176 1082,206" fill="none" stroke="#6B5B95" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#arrp)"/>
+  <text x="906" y="180" font-size="11" fill="#6B5B95" text-anchor="middle">DMA：用户缓冲区 ↔ 设备直达</text>
+
+  <rect x="656" y="288" width="500" height="42" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="906" y="314" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">等待点：阻塞到设备报告完成 —— 同步，延迟 = 介质</text>
+
+  <text x="656" y="360" font-size="11.5" fill="#6B675C">内核只做转发：组装 bio、钉住用户页、等完成</text>
+  <text x="656" y="382" font-size="11.5" fill="#A64B3C">绕过页缓存 ≠ 持久化：数据仍可能停在设备写缓存（→ 1.4）</text>
+
+  <!-- ===== Cell C: Buffered read ===== -->
+  <rect x="64" y="440" width="540" height="280" rx="10" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="84" y="470" font-size="14" font-weight="700" fill="#2B2A26">③ Buffered read</text>
+  <rect x="454" y="452" width="130" height="26" rx="13" fill="none" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="519" y="469" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">CPU 拷贝 ×1</text>
+
+  <rect x="80" y="510" width="120" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="140" y="530" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">设备</text>
+  <text x="140" y="547" font-size="10" fill="#733428" text-anchor="middle">NVMe / HDD</text>
+
+  <rect x="274" y="510" width="120" height="48" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="334" y="530" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">Page Cache 页</text>
+  <text x="334" y="547" font-size="10" fill="#7A5518" text-anchor="middle">跨进程共享</text>
+
+  <rect x="468" y="510" width="120" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="528" y="530" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">用户缓冲区</text>
+  <text x="528" y="547" font-size="10" fill="#2C4460" text-anchor="middle">应用地址空间</text>
+
+  <line x1="204" y1="534" x2="268" y2="534" stroke="#6B5B95" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#arrp)"/>
+  <text x="236" y="502" font-size="11" fill="#6B5B95" text-anchor="middle">DMA · 仅未命中</text>
+  <line x1="398" y1="534" x2="462" y2="534" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <text x="430" y="502" font-size="11" fill="#4A473F" text-anchor="middle">CPU 拷贝</text>
+
+  <rect x="84" y="588" width="500" height="42" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="334" y="614" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">等待点：未命中时睡眠等 folio 解锁（1.2）；命中无等待</text>
+
+  <text x="84" y="660" font-size="11.5" fill="#6B675C">命中：只剩右边一次拷贝，~μs 级返回</text>
+  <text x="84" y="682" font-size="11.5" fill="#6B675C">顺序读靠预读窗口把未命中摊薄（→ 1.6）</text>
+
+  <!-- ===== Cell D: O_DIRECT read ===== -->
+  <rect x="636" y="440" width="540" height="280" rx="10" fill="#FAF9F2" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="656" y="470" font-size="14" font-weight="700" fill="#2B2A26">④ O_DIRECT read</text>
+  <rect x="1026" y="452" width="130" height="26" rx="13" fill="none" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="1091" y="469" font-size="11.5" font-weight="700" fill="#A64B3C" text-anchor="middle">CPU 拷贝 ×0</text>
+
+  <rect x="652" y="510" width="120" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="712" y="530" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">设备</text>
+  <text x="712" y="547" font-size="10" fill="#733428" text-anchor="middle">NVMe / HDD</text>
+
+  <rect x="846" y="510" width="120" height="48" rx="7" fill="none" stroke="#8A8574" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <text x="906" y="530" font-size="12" fill="#8A8574" text-anchor="middle">Page Cache</text>
+  <text x="906" y="547" font-size="10" fill="#8A8574" text-anchor="middle">被绕过</text>
+
+  <rect x="1040" y="510" width="120" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1100" y="530" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">用户缓冲区</text>
+  <text x="1100" y="547" font-size="10" fill="#2C4460" text-anchor="middle">地址须对齐</text>
+
+  <path d="M732,506 C790,476 1024,476 1082,506" fill="none" stroke="#6B5B95" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#arrp)"/>
+  <text x="906" y="480" font-size="11" fill="#6B5B95" text-anchor="middle">DMA：设备 → 用户缓冲区</text>
+
+  <rect x="656" y="588" width="500" height="42" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="906" y="614" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">等待点：每次读都阻塞到设备完成 —— 没有"命中"一说</text>
+
+  <text x="656" y="660" font-size="11.5" fill="#6B675C">没有预读、没有缓存：每次都是冷读</text>
+  <text x="656" y="682" font-size="11.5" fill="#6B675C">小 IO 想快，要配异步深队列（→ 第2章 io_uring）</text>
+
+  <!-- ===== 底部结论 ===== -->
+  <rect x="64" y="760" width="540" height="110" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="88" y="790" font-size="13.5" font-weight="700" fill="#2B2A26">O_DIRECT 三对齐【事实】</text>
+  <text x="88" y="816" font-size="12" fill="#4A473F">缓冲区地址、文件偏移、IO 长度都必须对齐</text>
+  <text x="88" y="840" font-size="12" fill="#4A473F">常见要求 512 B（逻辑块），按 4 KiB 最稳；违反 → EINVAL</text>
+
+  <rect x="636" y="760" width="540" height="110" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="660" y="790" font-size="13.5" font-weight="700" fill="#2B2A26">绕过的不只是拷贝【取舍】</text>
+  <text x="660" y="816" font-size="12" fill="#4A473F">同时放弃：预读、写合并、跨进程共享的缓存</text>
+  <text x="660" y="840" font-size="12" fill="#4A473F">适合自带缓存池的数据库，不是通用"加速开关"</text>
+</svg>

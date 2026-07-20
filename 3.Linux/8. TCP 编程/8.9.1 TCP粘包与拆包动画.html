@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP 粘包与拆包动画 · 三种现象 / 边界方案对比 / 长度前缀解析状态机</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+@keyframes pop{0%{transform:scale(.7);}70%{transform:scale(1.14);}100%{transform:scale(1);}}
+
+/* ===== 场景 1：粘包 / 半包 / 拆包 ===== */
+.sp-send{display:flex;align-items:center;gap:10px;justify-content:center;margin:2px 0 16px;}
+.sp-lbl{font-family:var(--mono);font-size:11px;color:var(--faint);}
+.sp-msg{font-family:var(--mono);font-size:13px;font-weight:700;padding:8px 16px;border-radius:9px;border:1.5px solid;transition:all var(--dur) var(--ease);}
+.sp-msg.a{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.sp-msg.b{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.sp-msg.gone{opacity:.35;transform:translateY(6px) scale(.94);}
+.sp-pipe{position:relative;border:1.5px dashed var(--line);border-radius:12px;padding:18px 14px 14px;background:var(--paper);margin:0 4px 24px;}
+.sp-pipecap{position:absolute;top:-9px;left:14px;font-size:10.5px;font-family:var(--mono);color:var(--faint);background:var(--paper);padding:0 6px;}
+.sp-tag{position:absolute;bottom:-12px;font-size:10.5px;font-weight:700;font-family:var(--mono);border-radius:999px;border:1.5px solid var(--brown);color:var(--brown);background:var(--brownbg);padding:1px 10px;opacity:0;transform:translateY(4px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);white-space:nowrap;}
+.sp-tag.on{opacity:1;transform:none;}
+.sp-tag.merge{left:16px;}
+.sp-tag.split{right:16px;}
+.sp-bytes{display:flex;gap:3px;justify-content:center;align-items:stretch;}
+.spb{width:36px;height:40px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:700;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);color:var(--faint);opacity:0;transform:translateY(-12px);transition:all var(--dur) var(--ease);}
+.spb.ba{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.spb.bb{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.spb.in{opacity:1;transform:none;}
+.sp-bnd{width:0;border-left:2px dashed var(--ink);margin:0 3px;opacity:.7;align-self:stretch;transition:opacity var(--dur) var(--ease);}
+.sp-bnd.gone{opacity:0;}
+.sp-recv{display:flex;flex-direction:column;gap:11px;}
+.sp-row{display:flex;align-items:center;gap:10px;opacity:.3;transition:opacity var(--dur) var(--ease);}
+.sp-row.act{opacity:1;}
+.sp-row.done{opacity:.62;}
+.sp-row .rl{font-family:var(--mono);font-size:11px;color:var(--muted);width:86px;text-align:right;flex:none;transition:color var(--dur) var(--ease);}
+.sp-row.act .rl{color:var(--ink);font-weight:700;}
+.sp-row .note{font-size:11px;color:var(--faint);}
+.sp-res{display:inline-flex;gap:1px;padding:5px 9px;border:1.5px solid var(--line);border-radius:8px;background:var(--panel);font-family:var(--mono);font-size:13px;font-weight:700;opacity:0;transform:translateY(8px);transition:all var(--dur) var(--ease);}
+.sp-res.in{opacity:1;transform:none;}
+.sp-res.warn{border-color:var(--danger);border-style:dashed;}
+.sp-res .A{color:var(--blue);}
+.sp-res .B{color:var(--brown);}
+
+/* ===== 场景 2：三种边界方案 ===== */
+.sc-rows{display:flex;flex-direction:column;gap:22px;margin-top:4px;}
+.sc-row{display:flex;align-items:center;gap:10px;opacity:.32;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.sc-row.act{opacity:1;}
+.sc-row.done{opacity:.62;}
+.sc-row .rl{width:74px;flex:none;text-align:right;font-size:12px;font-weight:600;color:var(--muted);transition:color var(--dur) var(--ease);}
+.sc-row.act .rl{color:var(--ink);}
+.sc-row .note{font-size:11px;color:var(--faint);}
+.sc-row.sc-bad{opacity:0;transform:translateY(-6px);}
+.sc-row.sc-bad.on{opacity:1;transform:none;}
+.sc-row.sc-bad.on.dim2{opacity:.5;}
+.sc-bytes{display:flex;gap:3px;}
+.scb{width:34px;height:38px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease);position:relative;}
+.scb.ba{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.scb.pad{color:var(--faint);background:var(--gray);border-style:dashed;}
+.scb.dl{color:var(--green);background:var(--greenbg);border-color:var(--green);font-size:11px;}
+.scb.hd{color:#F5F4ED;background:#4A4842;border-color:#4A4842;font-size:10px;}
+.scb.bad{color:var(--danger);background:var(--dangerbg);border-color:var(--danger);box-shadow:0 0 0 3px rgba(179,64,47,.22);font-size:11px;}
+.scb .w{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--faint);white-space:nowrap;font-weight:400;}
+.scb.bad .w{color:var(--danger);font-weight:700;}
+.sc-tbl{margin-top:auto;}
+.ss-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+.ss-table th,.ss-table td{border:1px solid var(--grid);padding:4px 8px;text-align:center;color:var(--muted);transition:background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.ss-table th{background:var(--gray);color:var(--ink);}
+.ss-table tr.on td{background:var(--bluebg);color:var(--ink);font-weight:700;}
+
+/* ===== 场景 3：长度前缀解析状态机 ===== */
+.pm-sm{position:relative;margin:2px 2px 0;padding:4px 2px 42px;}
+.pm-nodes{display:flex;justify-content:space-between;gap:26px;position:relative;z-index:1;}
+.pmnode{flex:1;text-align:center;border:1.5px solid var(--line);border-radius:11px;background:var(--paper);padding:9px 6px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--muted);transition:all var(--dur) var(--ease);}
+.pmnode span{display:block;font-size:10px;font-weight:400;color:var(--faint);margin-top:1px;}
+.pmnode.on.nh{color:var(--blue);border-color:var(--blue);background:var(--bluebg);box-shadow:0 0 0 3px rgba(24,95,165,.18);}
+.pmnode.on.nb{color:var(--brown);border-color:var(--brown);background:var(--brownbg);box-shadow:0 0 0 3px rgba(154,91,14,.18);}
+.pmnode.on.nd{color:var(--green);border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 3px rgba(15,110,86,.18);}
+.pm-wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.pm-wires .ln{fill:none;stroke-width:2;opacity:.12;transition:opacity .32s var(--ease),stroke-dashoffset .52s var(--ease);}
+.pm-wires .ln.on{opacity:1;stroke-width:3;}
+.pm-wires .ln.off{opacity:0;}
+.pm-wires .arrow{stroke:none;opacity:.12;transition:opacity .3s var(--ease);}
+.pm-wires .arrow.on{opacity:1;transition-delay:200ms;}
+.pm-wires .arrow.off{opacity:0;transition-delay:0ms;}
+.pm-wires .port{opacity:.55;}
+.pm-status{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:10px 0 14px;}
+.pm-status b{color:var(--ink);}
+.pm-status b.sh{color:var(--blue);} .pm-status b.sb{color:var(--brown);} .pm-status b.sd{color:var(--green);}
+.pm-line{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.pm-lbl{font-family:var(--mono);font-size:11px;color:var(--faint);width:66px;text-align:right;flex:none;}
+.pm-chip{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);border:1.5px solid var(--line);border-radius:8px;padding:5px 9px;background:var(--paper);transition:all var(--dur) var(--ease);white-space:nowrap;}
+.pm-chip.now{color:var(--blue);border-color:var(--blue);background:var(--bluebg);transform:translateY(-2px);box-shadow:0 3px 8px rgba(24,95,165,.18);}
+.pm-chip.used{opacity:.35;text-decoration:line-through;}
+.pm-bytes{display:flex;gap:2px;flex-wrap:wrap;}
+.pmb{width:30px;height:34px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12.5px;font-weight:700;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);color:var(--faint);opacity:0;transform:translateY(-10px);transition:all var(--dur) var(--ease);}
+.pmb.ba{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.pmb.bb{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.pmb.hd1{color:#E6F1FB;background:#4A4842;border-color:var(--blue);font-size:9.5px;}
+.pmb.hd2{color:#FAEEDA;background:#4A4842;border-color:var(--brown);font-size:9.5px;}
+.pmb.in{opacity:1;transform:none;}
+.pmb.used{opacity:.22;transform:scale(.9);filter:grayscale(.6);}
+.pm-out{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:8px;}
+.pm-msg{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--green);border:1.5px solid var(--green);background:var(--greenbg);border-radius:9px;padding:7px 14px;opacity:0;transform:scale(.7);transition:all var(--dur) var(--ease);}
+.pm-msg.show{opacity:1;transform:none;animation:pop .5s var(--ease);}
+
+/* ===== 右侧 ===== */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;} .codebox .str{color:#B5C98E;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TCP 粘包与拆包动画 · 三种现象 / 边界方案对比 / 长度前缀解析状态机</h1>
+    <p>配套笔记《8.9 TCP的粘包和拆包》 · TCP 是字节流，没有消息边界　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+
+/* ========== 场景 1：粘包 / 半包 / 拆包三种现象 ========== */
+const stickScene=(()=>{
+  const code=[
+    '<span class="cmt">// 发送方：两次独立的 send()</span>',
+    'send(fd, <span class="str">"Hello"</span>, 5, 0);',
+    'send(fd, <span class="str">"World"</span>, 5, 0);',
+    '',
+    '<span class="cmt">// 接收方：一次 recv 读到什么并不确定</span>',
+    'n = recv(fd, buf, 1024, 0);',
+    '<span class="cmt">// 可能 "Hello"      —— 恰好一条</span>',
+    '<span class="cmt">// 可能 "HelloWorld" —— 粘包</span>',
+    '<span class="cmt">// 可能 "Hel"        —— 半包/拆包</span>',
+    '<span class="cmt">// 可能 "loWorld"    —— 上条尾 + 下条</span>'
+  ];
+  const steps=[
+    {title:'步骤 0 · send 两次 ≠ recv 两次',chip:'TCP = 字节流',chipC:'c0',sent:false,rn:0,rs:0,rh:0,hb:0,tm:false,ts:false,hl:[0,4],
+     desc:'发送方打算发两条消息：<span class="bl">A = "Hello"</span> 和 <span class="br">B = "World"</span>。TCP 只保证字节<b>按序、可靠</b>地到达，但<b>不保留消息边界</b>——调了两次 send()，绝不意味着对端恰好 recv() 两次。'},
+    {title:'步骤 1 · 两次 send 写入字节流',chip:'send("Hello") · send("World")',chipC:'cb',sent:true,rn:0,rs:0,rh:0,hb:0,tm:false,ts:false,hl:[1,2],
+     desc:'两条消息进入 TCP 字节流后，<b>块边界"融化"</b>——管道里只剩 10 个连续字节（虚线边界消失）。颜色只是给我们看的归属标记，<b>TCP 自己完全不知道</b>哪里是一条消息的结尾。字节顺序不变，边界信息丢失。'},
+    {title:'步骤 2 · 对照组：恰好两次各拿一条',chip:'理想情况',chipC:'cb',sent:true,rn:1,rs:0,rh:0,hb:0,tm:false,ts:false,hl:[5,6],
+     desc:'如果时机凑巧，两次 recv() 正好各拿到一条完整消息——看起来一切正常。但这只是<b>运气</b>：局域网、小数据量时经常如此，于是很多 bug 直到上生产环境才暴露。<b>正确性不能建立在运气上。</b>'},
+    {title:'步骤 3 · 粘包：一次 recv 拿到 "HelloWorld"',chip:'粘包 Sticky Packet',chipC:'cd',sent:true,rn:2,rs:1,rh:0,hb:0,tm:false,ts:false,hl:[7],
+     desc:'一次 recv() 把<b>两条消息一起</b>读了出来：蓝、棕两色字节挤在同一个结果框里，<span class="dg">边界彻底消失</span>。这就是<b>粘包</b>——多个独立数据包在接收方被合并成一次接收。若按"一次 recv = 一条消息"处理，业务立刻解析错乱。'},
+    {title:'步骤 4 · 半包/拆包：只拿到 "Hel"',chip:'拆包 / 半包',chipC:'cd',sent:true,rn:2,rs:2,rh:1,hb:1,tm:false,ts:false,hl:[8],
+     desc:'这次 recv() 只读到 <span class="bl">"Hel"</span>——消息 A 被<b>切成两半</b>，结果框里的蓝色并不完整。一条消息被拆成多次接收叫<b>拆包</b>；读到的"不完整的消息"也常被叫作<b>半包</b>。此刻直接解析同样是错的。'},
+    {title:'步骤 5 · 再 recv："loWorld"',chip:'粘包 + 拆包混合',chipC:'cd',sent:true,rn:2,rs:2,rh:1,hb:2,tm:false,ts:false,hl:[9],
+     desc:'下一次 recv() 拿到 <span class="bl">A 的后半 "lo"</span> + <span class="br">B 整条 "World"</span>——拆包与粘包<b>同时发生</b>的混合情况。注意字节顺序始终正确（TCP 保证），乱的只是"每次 read 切在哪里"。'},
+    {title:'步骤 6 · 原因盘点 · 发送端',chip:'Nagle / 发送缓冲区',chipC:'ch',sent:true,rn:2,rs:2,rh:2,hb:2,tm:true,ts:false,hl:[1,2],
+     desc:'发送端就可能<b>合并</b>：<b>Nagle 算法</b>为提高网络利用率会把小包攒起来一起发；多次 write() 的数据也可能先在<b>发送缓冲区</b>里累积，再一次性发出。所以两次 send() 常常在同一个 TCP 段里离开本机。'},
+    {title:'步骤 7 · 原因盘点 · 传输与接收端',chip:'MSS 分段 / 读取时机',chipC:'ch',sent:true,rn:2,rs:2,rh:2,hb:2,tm:true,ts:true,hl:[4,5],
+     desc:'传输途中会<b>切分</b>：数据超过 <b>MSS</b> 被 TCP 分段（超过 MTU 还会被 IP 分片）。接收端这边，数据先堆在<b>接收缓冲区</b>，应用什么时候调 read()、一次读多少都不确定——读到多条、半条都属正常。'},
+    {title:'步骤 8 · 特性而非 bug',chip:'应用层必须定边界',chipC:'cg',sent:true,rn:2,rs:2,rh:2,hb:2,tm:true,ts:true,hl:[5],
+     desc:'粘包/拆包<b>不是 bug，是字节流协议的固有特性</b>——就像水管里的水没有"一杯一杯"的边界。结论：<b>应用层协议必须自己划定消息边界</b>。下一场景看三种经典方案：固定长度 / 分隔符 / 长度前缀。'}
+  ];
+  let prevSent=false;
+  function mount(){
+    const chars=['H','e','l','l','o','W','o','r','l','d'];
+    let bs='';
+    chars.forEach((c,i)=>{
+      if(i===5)bs+='<span class="sp-bnd" id="spBnd"></span>';
+      bs+='<div class="spb '+(i<5?'ba':'bb')+'" id="sp-b'+i+'">'+c+'</div>';
+    });
+    viz.innerHTML='<div class="vcap"><b>粘包与拆包</b>：字节流没有消息边界，一次 recv 拿到什么不确定（<span style="color:var(--blue)">蓝 = 消息 A</span> · <span style="color:var(--brown)">棕 = 消息 B</span>）</div>'+
+      '<div class="sp-send"><span class="sp-lbl">发送方</span>'+
+        '<div class="sp-msg a" id="spMsgA">send("Hello")</div>'+
+        '<div class="sp-msg b" id="spMsgB">send("World")</div></div>'+
+      '<div class="sp-pipe"><span class="sp-pipecap">TCP 字节流：发送缓冲区 → 网络 → 接收缓冲区</span>'+
+        '<div class="sp-bytes">'+bs+'</div>'+
+        '<span class="sp-tag merge" id="spTagM">合并：Nagle / 发送缓冲区攒批</span>'+
+        '<span class="sp-tag split" id="spTagS">切分：MSS 分段 / 读取时机</span></div>'+
+      '<div class="sp-recv">'+
+        '<div class="sp-row" id="rowN"><span class="rl">recv 正常</span>'+
+          '<div class="sp-res" id="bxN1"><span class="A">Hello</span></div>'+
+          '<div class="sp-res" id="bxN2"><span class="B">World</span></div>'+
+          '<span class="note">恰好两次各一条（碰运气）</span></div>'+
+        '<div class="sp-row" id="rowS"><span class="rl">recv 粘包</span>'+
+          '<div class="sp-res warn" id="bxS1"><span class="A">Hello</span><span class="B">World</span></div>'+
+          '<span class="note">一次读到两条，边界消失</span></div>'+
+        '<div class="sp-row" id="rowH"><span class="rl">recv 半包</span>'+
+          '<div class="sp-res warn" id="bxH1"><span class="A">Hel</span></div>'+
+          '<div class="sp-res warn" id="bxH2"><span class="A">lo</span><span class="B">World</span></div>'+
+          '<span class="note">消息 A 被切成两半，再混上 B</span></div>'+
+      '</div>';
+    prevSent=false;
+  }
+  function rowCls(v){return v===1?' act':(v===2?' done':'');}
+  function paint(s){
+    document.getElementById('spMsgA').className='sp-msg a'+(s.sent?' gone':'');
+    document.getElementById('spMsgB').className='sp-msg b'+(s.sent?' gone':'');
+    document.getElementById('spBnd').classList.toggle('gone',s.sent);
+    for(let i=0;i<10;i++){
+      const el=document.getElementById('sp-b'+i);
+      el.style.transitionDelay=(s.sent&&!prevSent)?(i*50+'ms'):'0ms';
+      el.classList.toggle('in',s.sent);
+    }
+    prevSent=s.sent;
+    document.getElementById('rowN').className='sp-row'+rowCls(s.rn);
+    document.getElementById('rowS').className='sp-row'+rowCls(s.rs);
+    document.getElementById('rowH').className='sp-row'+rowCls(s.rh);
+    document.getElementById('bxN1').classList.toggle('in',s.rn>0);
+    document.getElementById('bxN2').classList.toggle('in',s.rn>0);
+    document.getElementById('bxS1').classList.toggle('in',s.rs>0);
+    document.getElementById('bxH1').classList.toggle('in',s.hb>=1);
+    document.getElementById('bxH2').classList.toggle('in',s.hb>=2);
+    document.getElementById('spTagM').classList.toggle('on',s.tm);
+    document.getElementById('spTagS').classList.toggle('on',s.ts);
+  }
+  return {id:'stick',label:'粘包与拆包',sub:'字节流无边界',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：三种边界方案对比 ========== */
+const schemeScene=(()=>{
+  const code=[
+    '<span class="cmt">// 1) 固定长度：每条固定 8B，不足补填充</span>',
+    'readn(fd, buf, 8);',
+    '',
+    '<span class="cmt">// 2) 分隔符：读到 \'\\n\' 为止（HTTP 头用 \\r\\n）</span>',
+    'pos = buffer.find(<span class="str">\'\\n\'</span>);',
+    'msg = buffer.substr(0, pos); <span class="cmt">// 内容含 \'\\n\' 会错切！</span>',
+    '',
+    '<span class="cmt">// 3) 长度前缀：先读头，再精确读体（推荐）</span>',
+    'readn(fd, &amp;net_len, 4);     <span class="cmt">// 读 4B 长度头</span>',
+    'len = ntohl(net_len);       <span class="cmt">// 网络字节序 → 主机</span>',
+    'readn(fd, body, len);       <span class="cmt">// 精确读 len 字节</span>'
+  ];
+  const steps=[
+    {title:'步骤 0 · 应用层如何划定边界？',chip:'三种思路',chipC:'c0',r1:0,r2:0,r3:0,bad:0,tbl:false,hl:[0,3,7],
+     desc:'既然 TCP 不给边界，就得在<b>应用层协议</b>里自己划。三种经典思路：<b>固定长度</b>（每条一样长）、<b>分隔符</b>（尾部加特殊字符）、<b>长度前缀</b>（头部先声明 body 多长）。下面逐个点亮。'},
+    {title:'步骤 1 · 固定长度',chip:'定长消息',chipC:'cb',r1:1,r2:0,r3:0,bad:0,tbl:false,hl:[0,1],
+     desc:'每条消息固定长度（图中 8B），"Hello" 只有 5 字节，剩下 3 格用<b>填充字符补齐</b>（灰格）。接收方每次 readn 固定 8 字节即得一条。<span class="gr">优点：实现最简单</span>；<span class="dg">缺点：短消息浪费带宽，长消息装不下，极不灵活</span>。'},
+    {title:'步骤 2 · 分隔符（含反例）',chip:'\\n 或 \\r\\n',chipC:'cd',r1:2,r2:1,r3:0,bad:1,tbl:false,hl:[3,4,5],
+     desc:'消息尾部放一个分隔符（绿格 <code>\\n</code>），读到它就算一条。HTTP/1.1 头部用 <code>\\r\\n</code> 就是此方案。<b>致命限制</b>：消息体里不能出现分隔符——反例中内容 <code>ab\\ncd</code> 自带 <span class="dg">\\n</span>，接收方在<span class="dg">红格处错切</span>，只收到 "ab"。二进制数据几乎必然踩中，需转义或改用别的方案。'},
+    {title:'步骤 3 · 长度前缀',chip:'4B 头 + body',chipC:'cb',r1:2,r2:2,r3:1,bad:2,tbl:false,hl:[7,8,9,10],
+     desc:'消息前加 <b>4 字节长度头</b>（深色格，网络字节序）：接收方先读 4B 得知 <code>len=5</code>，再<b>精确读 5 字节</b> body。body 内容任意，天然<b>二进制安全</b>；代价是要分两次读（先头后体）。'},
+    {title:'步骤 4 · 三方案对比',chip:'对比表',chipC:'c0',r1:2,r2:2,r3:2,bad:2,tbl:true,hl:[],
+     desc:'逐行对照：<b>固定长度</b>胜在简单、败在浪费；<b>分隔符</b>适合文本协议（HTTP），败在内容受限；<b>长度前缀</b>灵活且无内容限制，只是要多次读取——这正是 readn 循环读的用武之地。'},
+    {title:'步骤 5 · 工程推荐：长度前缀',chip:'推荐方案',chipC:'cg',r1:2,r2:2,r3:1,bad:2,tbl:true,hl:[8,9,10],
+     desc:'二进制协议一律<b>推荐长度前缀</b>。工程上还要再加一层防御：<b>长度上限</b>（防恶意超大 len 撑爆内存）、<b>魔数 + 版本号</b>（快速识别协议、留扩展余地），body 再配 Protobuf 等序列化。接收端怎么解析？下一场景：状态机。'}
+  ];
+  function mount(){
+    const cells=(arr)=>arr.map(c=>'<div class="scb '+c.k+'">'+c.t+(c.w?'<span class="w">'+c.w+'</span>':'')+'</div>').join('');
+    const r1=cells([{k:'ba',t:'H'},{k:'ba',t:'e'},{k:'ba',t:'l'},{k:'ba',t:'l'},{k:'ba',t:'o'},{k:'pad',t:'·',w:'填充'},{k:'pad',t:'·'},{k:'pad',t:'·'}]);
+    const r2=cells([{k:'ba',t:'H'},{k:'ba',t:'e'},{k:'ba',t:'l'},{k:'ba',t:'l'},{k:'ba',t:'o'},{k:'dl',t:'\\n',w:'分隔符'}]);
+    const rb=cells([{k:'ba',t:'a'},{k:'ba',t:'b'},{k:'bad',t:'\\n',w:'在此错切!'},{k:'ba',t:'c'},{k:'ba',t:'d'},{k:'dl',t:'\\n'}]);
+    const r3=cells([{k:'hd',t:'00'},{k:'hd',t:'00'},{k:'hd',t:'00'},{k:'hd',t:'05',w:'len=5'},{k:'ba',t:'H'},{k:'ba',t:'e'},{k:'ba',t:'l'},{k:'ba',t:'l'},{k:'ba',t:'o'}]);
+    viz.innerHTML='<div class="vcap"><b>三种边界方案</b>：固定长度 / 分隔符 / 长度前缀 —— 逐行点亮对比</div>'+
+      '<div class="sc-rows">'+
+        '<div class="sc-row" id="scR1"><span class="rl">固定长度</span><div class="sc-bytes">'+r1+'</div><span class="note">每条 8B</span></div>'+
+        '<div class="sc-row" id="scR2"><span class="rl">分隔符</span><div class="sc-bytes">'+r2+'</div><span class="note">读到 \\n 为止</span></div>'+
+        '<div class="sc-row sc-bad" id="scBad"><span class="rl">反例</span><div class="sc-bytes">'+rb+'</div><span class="note">内容含 \\n → 只收到 "ab"</span></div>'+
+        '<div class="sc-row" id="scR3"><span class="rl">长度前缀</span><div class="sc-bytes">'+r3+'</div><span class="note">读 4B 头 → 精确读 5B</span></div>'+
+      '</div>'+
+      '<div class="sc-tbl"><table class="ss-table"><thead><tr><th>方案</th><th>优点</th><th>缺点</th><th>适用</th></tr></thead><tbody>'+
+        '<tr id="scT0"><td>固定长度</td><td>实现简单</td><td>浪费空间，不灵活</td><td>定长消息</td></tr>'+
+        '<tr id="scT1"><td>分隔符</td><td>简单，可变长</td><td>内容不能含分隔符</td><td>文本协议（HTTP）</td></tr>'+
+        '<tr id="scT2"><td>长度前缀</td><td>灵活，二进制安全</td><td>需要多次读取</td><td>二进制协议（推荐）</td></tr>'+
+      '</tbody></table></div>';
+  }
+  function rowCls(v){return v===1?' act':(v===2?' done':'');}
+  function paint(s){
+    document.getElementById('scR1').className='sc-row'+rowCls(s.r1);
+    document.getElementById('scR2').className='sc-row'+rowCls(s.r2);
+    document.getElementById('scR3').className='sc-row'+rowCls(s.r3);
+    document.getElementById('scBad').className='sc-row sc-bad'+(s.bad===1?' on':(s.bad===2?' on dim2':''));
+    for(let i=0;i<3;i++){
+      const tr=document.getElementById('scT'+i);
+      tr.classList.toggle('on',s.tbl);
+      [...tr.children].forEach(td=>{td.style.transitionDelay=s.tbl?(i*160+'ms'):'0ms';});
+    }
+  }
+  return {id:'scheme',label:'边界方案',sub:'定长/分隔符/长度前缀',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：长度前缀解析状态机 ========== */
+const parserScene=(()=>{
+  const code=[
+    '<span class="kw">while</span> (<span class="kw">true</span>) {',
+    '  <span class="kw">if</span> (state == READ_HEADER) {',
+    '    <span class="kw">if</span> (buf.size() &lt; 4) <span class="kw">break</span>;   <span class="cmt">// 头不足 4B，等</span>',
+    '    len = ntohl(peek32(buf));    <span class="cmt">// 网络序 → 主机序</span>',
+    '    buf.consume(4);              <span class="cmt">// 消费头部</span>',
+    '    state = READ_BODY;',
+    '  } <span class="kw">else</span> {                       <span class="cmt">// READ_BODY</span>',
+    '    <span class="kw">if</span> (buf.size() &lt; len) <span class="kw">break</span>; <span class="cmt">// body 不够，等</span>',
+    '    deliver(buf.pop(len));       <span class="cmt">// 组包 → 派发</span>',
+    '    state = READ_HEADER;         <span class="cmt">// 回环下一条</span>',
+    '  }',
+    '}'
+  ];
+  // 字节流：msg1 = [00 00 00 05]"Hello"，msg2 = [00 00 00 02]"Hi"，共 15B
+  const BYTES=['00','00','00','05','H','e','l','l','o','00','00','00','02','H','i'];
+  const TYPE=['hd1','hd1','hd1','hd1','ba','ba','ba','ba','ba','hd2','hd2','hd2','hd2','bb','bb'];
+  const ARRIVED=[0,2,7,11,15];              // 分片累计字节数
+  const FR=[[0,2],[2,7],[7,11],[11,15]];    // 各分片覆盖的字节区间
+  const steps=[
+    {title:'步骤 0 · 状态机 + 累积缓冲区',chip:'READ_HEADER 起步',chipC:'c0',frags:0,arrive:-1,consumed:0,st:'H',len:null,msgs:0,edge:null,hl:[0],
+     desc:'接收端两件套：<b>累积缓冲区</b>（append buffer，每次 read 到的字节先追加进去）+ <b>状态机</b>（<span class="bl">READ_HEADER</span> → <span class="br">READ_BODY</span> → <span class="gr">组包派发</span> → 回环）。两条消息 msg1=[len=5]"Hello"、msg2=[len=2]"Hi" 共 15 字节，网络故意切成 <b>2B / 5B / 4B / 4B</b> 四片刁钻到达。'},
+    {title:'步骤 1 · 到达 2B：连头都不够',chip:'2B < 4B，等待',chipC:'cb',frags:1,arrive:0,consumed:0,st:'H',len:null,msgs:0,edge:null,hl:[2],
+     desc:'第一片只有 <b>2 字节</b>——连 4 字节长度头都凑不齐（<b>头被拆</b>）。状态机停在 <span class="bl">READ_HEADER</span>，什么也不做：<b>不足就等，绝不猜</b>。break 出循环，等下一次 read 事件。'},
+    {title:'步骤 2 · 又到 5B：头凑齐，len=5',chip:'ntohl(头) = 5',chipC:'ch',frags:2,arrive:1,consumed:4,st:'B',len:5,msgs:0,edge:'e1',hl:[3,4,5],
+     desc:'第二片 5 字节到达，缓冲区 7B ≥ 4B：取前 4 字节，<b>ntohl</b> 从网络字节序转回主机序得 <b>len=5</b>，消费掉头部（变淡），状态机沿边迁移到 <span class="br">READ_BODY</span>。缓冲区还剩 3 字节 body。'},
+    {title:'步骤 3 · 3B < 5B：停在 READ_BODY',chip:'body 不够，继续等',chipC:'ch',frags:2,arrive:-1,consumed:4,st:'B',len:5,msgs:0,edge:null,hl:[7],
+     desc:'body 需要 5 字节，缓冲区只有 3 字节——<b>体也被拆了</b>。状态机停在 <span class="br">READ_BODY</span> 继续等。对状态机来说，半包不是异常，只是"再等等"。'},
+    {title:'步骤 4 · 到达 4B："Hello" 组包！',chip:'组包 "Hello"',chipC:'cg',frags:3,arrive:2,consumed:9,st:'D',len:5,msgs:1,edge:'e2',hl:[8],
+     desc:'第三片 4 字节到达，body 凑齐 5B：弹出完整消息 <span class="gr">"Hello"</span> 派发给业务层（产出区），消费掉的字节变淡。注意这一片里还带着 <b>msg2 头部的前 2 字节</b>——"消息尾 + 新头"同片到达。'},
+    {title:'步骤 5 · 回环 → READ_HEADER',chip:'环形边亮起',chipC:'cb',frags:3,arrive:-1,consumed:9,st:'H',len:null,msgs:1,edge:'e3',hl:[9],
+     desc:'处理完一条立刻沿<b>回环边</b>回到 <span class="bl">READ_HEADER</span>，用缓冲区剩下的 2 字节继续。<b>循环是关键</b>：一次 read 之后能组几条组几条，组不了就 break 等数据。'},
+    {title:'步骤 6 · 最后 4B：头凑齐，len=2',chip:'len = 2',chipC:'ch',frags:4,arrive:3,consumed:13,st:'B',len:2,msgs:1,edge:'e1',hl:[3,4,5],
+     desc:'最后一片 4 字节到达：msg2 头部凑齐（2+2=4B），解析出 <b>len=2</b>，消费头部，进入 <span class="br">READ_BODY</span>。此刻 body "Hi" 的 2 字节<b>恰好也已经在缓冲区里</b>了。'},
+    {title:'步骤 7 · "Hi" 立即组包',chip:'组包 "Hi"',chipC:'cg',frags:4,arrive:-1,consumed:15,st:'D',len:2,msgs:2,edge:'e2',hl:[7,8],
+     desc:'<code>buf.size()=2 ≥ len=2</code> 立即成立——<b>不需要任何新数据</b>，同一次到达内连续穿过 READ_HEADER → READ_BODY → 组包两个状态。while(true) 保证"能处理就一直处理"，这就是它必须是循环的原因。'},
+    {title:'步骤 8 · 缓冲区清空，回 READ_HEADER',chip:'等下一条',chipC:'cb',frags:4,arrive:-1,consumed:15,st:'H',len:null,msgs:2,edge:'e3',hl:[9],
+     desc:'两条消息全部派发完毕，缓冲区消费殆尽。状态机沿回环边回到 <span class="bl">READ_HEADER</span>，安静地等待下一条消息——无论它将来被切成什么样。'},
+    {title:'步骤 9 · 万能解法总结',chip:'循环 + 状态机',chipC:'cg',frags:4,arrive:-1,consumed:15,st:'H',len:null,msgs:2,edge:null,hl:[0],
+     desc:'<b>累积缓冲区 + while 循环 + 状态机</b>能应对任意切分：头被拆、体被拆、多条同片全都正确组包。铁律：<b>永远不要假设一次 read 能读到完整消息</b>。muduo 的 TcpConnection + Buffer、以及 readn 先读头再读体，都是这个模式的落地实现。'}
+  ];
+  const lit=new Set();
+  function mount(){
+    let frag='';['2B','5B','4B','4B'].forEach((t,i)=>{frag+='<div class="pm-chip" id="pmf-'+i+'">分片'+(i+1)+' · '+t+'</div>';});
+    let bytes='';BYTES.forEach((b,i)=>{bytes+='<div class="pmb '+TYPE[i]+'" id="pmb-'+i+'">'+b+'</div>';});
+    viz.innerHTML='<div class="vcap"><b>长度前缀解析状态机</b>：读头 → 读体 → 组包派发 → 回环（深色格 = 4B 长度头，<span style="color:var(--blue)">蓝 = msg1</span> · <span style="color:var(--brown)">棕 = msg2</span>）</div>'+
+      '<div class="pm-sm" id="pmSm"><svg class="pm-wires" id="pmWires" aria-hidden="true"></svg><div class="pm-nodes">'+
+        '<div class="pmnode nh" id="pmNH">READ_HEADER<span>等 4B 长度头</span></div>'+
+        '<div class="pmnode nb" id="pmNB">READ_BODY<span>等 len 字节 body</span></div>'+
+        '<div class="pmnode nd" id="pmND">组包 · 派发<span>弹出完整消息</span></div>'+
+      '</div></div>'+
+      '<div class="pm-status" id="pmStatus"></div>'+
+      '<div class="pm-line"><span class="pm-lbl">网络分片</span>'+frag+'</div>'+
+      '<div class="pm-line"><span class="pm-lbl">累积缓冲区</span><div class="pm-bytes">'+bytes+'</div></div>'+
+      '<div class="pm-out"><span class="pm-lbl">产出</span>'+
+        '<div class="pm-msg" id="pmM0">msg1 · "Hello"（len=5）</div>'+
+        '<div class="pm-msg" id="pmM1">msg2 · "Hi"（len=2）</div></div>';
+    lit.clear();
+    buildWires();layout();
+  }
+  function buildWires(){
+    const svg=document.getElementById('pmWires');
+    const mk=(e,color)=>'<circle class="port" id="pmp-'+e+'" r="4" fill="var(--panel)" stroke="var(--'+color+')" stroke-width="1.5"></circle>'+
+      '<path class="ln" id="pml-'+e+'" stroke="var(--'+color+')"></path>'+
+      '<path class="arrow" id="pma-'+e+'" fill="var(--'+color+')"></path>';
+    svg.innerHTML=mk('e1','brown')+mk('e2','green')+mk('e3','blue');
+  }
+  function layout(){
+    const sm=document.getElementById('pmSm');if(!sm)return;
+    const svg=document.getElementById('pmWires');
+    const R=sm.getBoundingClientRect();
+    svg.setAttribute('viewBox','0 0 '+R.width+' '+R.height);
+    const r=id=>{const b=document.getElementById(id).getBoundingClientRect();
+      return{l:b.left-R.left,r:b.right-R.left,t:b.top-R.top,b:b.bottom-R.top,cx:(b.left+b.right)/2-R.left,cy:(b.top+b.bottom)/2-R.top};};
+    const H=r('pmNH'),B=r('pmNB'),D=r('pmND');
+    const seg=(e,a,b2)=>{ // 水平连线 a→b2（矩形对象）
+      const x1=a.r+2,y1=a.cy,tipX=b2.l-1,y2=b2.cy,x2=tipX-9;
+      document.getElementById('pmp-'+e).setAttribute('cx',x1);
+      document.getElementById('pmp-'+e).setAttribute('cy',y1);
+      document.getElementById('pml-'+e).setAttribute('d',
+        'M '+x1+' '+y1+' C '+(x1+(x2-x1)*.45)+' '+y1+', '+(x1+(x2-x1)*.55)+' '+y2+', '+x2+' '+y2);
+      document.getElementById('pma-'+e).setAttribute('d',
+        'M '+tipX+' '+y2+' L '+(tipX-9)+' '+(y2-5)+' L '+(tipX-9)+' '+(y2+5)+' Z');
+    };
+    seg('e1',H,B);seg('e2',B,D);
+    // e3：组包节点底部 → 回环到 READ_HEADER 底部，箭头朝上
+    const lane=R.height-8,x1=D.cx,y1=D.b+2,tipX=H.cx,tipY=H.b+1;
+    document.getElementById('pmp-e3').setAttribute('cx',x1);
+    document.getElementById('pmp-e3').setAttribute('cy',y1);
+    document.getElementById('pml-e3').setAttribute('d',
+      'M '+x1+' '+y1+' C '+x1+' '+lane+', '+tipX+' '+lane+', '+tipX+' '+(tipY+9));
+    document.getElementById('pma-e3').setAttribute('d',
+      'M '+tipX+' '+tipY+' L '+(tipX-5)+' '+(tipY+9)+' L '+(tipX+5)+' '+(tipY+9)+' Z');
+  }
+  function drawIn(path){
+    const L=path.getTotalLength();
+    path.style.transition='none';
+    path.style.strokeDasharray=L;
+    path.style.strokeDashoffset=L;
+    void path.getBoundingClientRect();
+    path.style.transition='';
+    path.style.strokeDashoffset='0';
+    clearTimeout(path._t);
+    path._t=setTimeout(()=>{path.style.strokeDasharray='';path.style.strokeDashoffset='';},560);
+  }
+  const stName={H:'<b class="sh">READ_HEADER</b>',B:'<b class="sb">READ_BODY</b>',D:'<b class="sd">组包 · 派发</b>'};
+  function paint(s){
+    const arrived=ARRIVED[s.frags];
+    // 分片 chips
+    for(let i=0;i<4;i++){
+      const el=document.getElementById('pmf-'+i);
+      el.className='pm-chip'+(i<s.frags?(i===s.arrive?' now':' used'):'');
+    }
+    // 缓冲区字节：到达追加（stagger），消费变淡
+    for(let i=0;i<15;i++){
+      const el=document.getElementById('pmb-'+i);
+      const inFrag=s.arrive>=0&&i>=FR[s.arrive][0]&&i<FR[s.arrive][1];
+      el.style.transitionDelay=inFrag?((i-FR[s.arrive][0])*70+'ms'):'0ms';
+      el.classList.toggle('in',i<arrived);
+      el.classList.toggle('used',i<s.consumed);
+    }
+    // 状态机节点
+    document.getElementById('pmNH').classList.toggle('on',s.st==='H');
+    document.getElementById('pmNB').classList.toggle('on',s.st==='B');
+    document.getElementById('pmND').classList.toggle('on',s.st==='D');
+    // 连接边：当前迁移边 draw-in，其余隐藏；无活动边时全部回到微弱提示态
+    ['e1','e2','e3'].forEach(e=>{
+      const ln=document.getElementById('pml-'+e),ar=document.getElementById('pma-'+e);
+      const on=s.edge===e,other=!!s.edge&&!on;
+      ln.classList.toggle('on',on);ln.classList.toggle('off',other);
+      ar.classList.toggle('on',on);ar.classList.toggle('off',other);
+      if(on&&!lit.has(e))drawIn(ln);
+      if(on)lit.add(e);else lit.delete(e);
+    });
+    // 状态读数
+    document.getElementById('pmStatus').innerHTML=
+      'state = '+stName[s.st]+' · 缓冲区未消费 <b>'+(arrived-s.consumed)+'</b> B · len = <b>'+(s.len===null?'—':s.len)+'</b>';
+    // 产出消息卡片
+    document.getElementById('pmM0').classList.toggle('show',s.msgs>=1);
+    document.getElementById('pmM1').classList.toggle('show',s.msgs>=2);
+  }
+  return {id:'parser',label:'解析状态机',sub:'读头→读体→组包',steps,mount,paint,code,onResize:layout};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[stickScene,schemeScene,parserScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();
+  codeBox.innerHTML=SCENES[si].code.map((l,idx)=>'<div class="cl" id="cl-'+idx+'">'+(l===''?'&nbsp;':l)+'</div>').join('');
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  const hl=s.hl||[];
+  SCENES[si].code.forEach((_,idx)=>{document.getElementById('cl-'+idx).classList.toggle('hl',hl.includes(idx));});
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ 本步动作：'+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2800;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>{if(SCENES[si].onResize)SCENES[si].onResize();});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

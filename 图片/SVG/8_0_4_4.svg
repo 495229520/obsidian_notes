@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 940" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>MSI-X 消息如何到达 CPU</title>
+  <desc>上半：MSI-X Table entry 到 CPU 的投递路径结构。中部：四种编号分层。下半：DMA remapping vs interrupt remapping，以及 IRQ 与 CQE 同步边界。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="940" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">MSI-X：设备写 Message Address/Data，平台解释为中断</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">软件语义是中断消息 · 线路上是 Memory Write Request TLP · 不是 PCIe Message Request</text>
+
+  <!-- ============ Panel A：投递路径结构 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 投递路径结构：Table entry → MemWr → 重映射 → 中断控制器 → CPU</text>
+
+  <rect x="48" y="124" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Table entry structure -->
+  <rect x="68" y="148" width="220" height="160" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="178" y="174" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">MSI-X Table entry</text>
+  <rect x="84" y="188" width="188" height="28" rx="4" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="178" y="207" font-size="11" fill="#4A473F" text-anchor="middle">Message Address</text>
+  <rect x="84" y="222" width="188" height="28" rx="4" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="178" y="241" font-size="11" fill="#4A473F" text-anchor="middle">Message Data</text>
+  <rect x="84" y="256" width="188" height="28" rx="4" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="178" y="275" font-size="11" fill="#4A473F" text-anchor="middle">Vector Control (mask)</text>
+  <text x="178" y="300" font-size="10.5" fill="#8A6A3A" text-anchor="middle">位于 BAR · BIR+offset</text>
+
+  <path d="M288,228 L320,228" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+
+  <rect x="324" y="188" width="180" height="80" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="414" y="220" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">PCIe MemWr TLP</text>
+  <text x="414" y="242" font-size="11" fill="#A64B3C" text-anchor="middle">Address + Data</text>
+  <text x="414" y="258" font-size="10.5" fill="#733428" text-anchor="middle">设备发起</text>
+
+  <path d="M504,228 L536,228" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="540" y="188" width="190" height="80" rx="7" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="635" y="216" font-size="12" font-weight="700" fill="#6B5B95" text-anchor="middle">Interrupt Remapping</text>
+  <text x="635" y="238" font-size="11" fill="#4A473F" text-anchor="middle">若启用（VT-d 等）</text>
+  <text x="635" y="256" font-size="10.5" fill="#6B675C" text-anchor="middle">验证并转换目标</text>
+
+  <path d="M730,228 L762,228" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="766" y="168" width="180" height="120" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="856" y="196" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">中断控制器</text>
+  <text x="856" y="220" font-size="11" fill="#3D5A80" text-anchor="middle">x86: APIC</text>
+  <text x="856" y="240" font-size="11" fill="#3D5A80" text-anchor="middle">Arm: GIC / ITS</text>
+  <text x="856" y="264" font-size="10.5" fill="#6B675C" text-anchor="middle">架构相关编码</text>
+
+  <path d="M946,228 L978,228" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+
+  <rect x="982" y="168" width="180" height="120" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1072" y="196" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Linux IRQ</text>
+  <text x="1072" y="220" font-size="11" fill="#2F6B5E" text-anchor="middle">+ affinity</text>
+  <text x="1072" y="244" font-size="11" fill="#2F6B5E" text-anchor="middle">→ 目标 CPU</text>
+  <text x="1072" y="268" font-size="10.5" fill="#6B675C" text-anchor="middle">handler / eventfd</text>
+
+  <text x="68" y="352" font-size="12" fill="#4A473F">PBA：mask 期间 pending bit 可置位 · 解 mask 后按规范投递并清 bit · 软件不可当可写寄存器清零</text>
+
+  <!-- ============ Panel B：四种编号 ============ -->
+  <text x="48" y="404" font-size="13" font-weight="700" fill="#4A473F">B · 四种“编号”必须分层：写日志时说清层次</text>
+
+  <rect x="48" y="418" width="274" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="418" width="274" height="32" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="48" y="438" width="274" height="12" fill="#EFE7DA"/>
+  <text x="68" y="440" font-size="12" font-weight="700" fill="#6B4E28">① MSI-X entry</text>
+  <text x="68" y="472" font-size="12" fill="#4A473F">所属：设备 / PCI 层</text>
+  <text x="68" y="494" font-size="12" fill="#4A473F">含义：Table 中一条消息源</text>
+  <text x="68" y="520" font-size="11" fill="#6B675C">例：MSI-X entry 3</text>
+  <text x="68" y="538" font-size="11" fill="#8A6A3A">≠ Linux IRQ 号</text>
+
+  <rect x="338" y="418" width="274" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="338" y="418" width="274" height="32" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="338" y="438" width="274" height="12" fill="#E3EAF4"/>
+  <text x="358" y="440" font-size="12" font-weight="700" fill="#2C4460">② Linux IRQ number</text>
+  <text x="358" y="472" font-size="12" fill="#4A473F">所属：内核抽象</text>
+  <text x="358" y="494" font-size="12" fill="#4A473F">含义：中断源标识</text>
+  <text x="358" y="520" font-size="11" fill="#6B675C">例：Linux IRQ 142</text>
+  <text x="358" y="538" font-size="11" fill="#3D5A80">/proc/interrupts 可见</text>
+
+  <rect x="628" y="418" width="274" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="628" y="418" width="274" height="32" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="628" y="438" width="274" height="12" fill="#DCE9E3"/>
+  <text x="648" y="440" font-size="12" font-weight="700" fill="#24473F">③ CPU vector / INTID</text>
+  <text x="648" y="472" font-size="12" fill="#4A473F">所属：架构中断控制器</text>
+  <text x="648" y="494" font-size="12" fill="#4A473F">含义：CPU 接收侧标识</text>
+  <text x="648" y="520" font-size="11" fill="#6B675C">APIC vector / GIC INTID</text>
+  <text x="648" y="538" font-size="11" fill="#2F6B5E">平台相关</text>
+
+  <rect x="918" y="418" width="274" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="918" y="418" width="274" height="32" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <rect x="918" y="438" width="274" height="12" fill="#F0E0DB"/>
+  <text x="938" y="440" font-size="12" font-weight="700" fill="#733428">④ CPU affinity</text>
+  <text x="938" y="472" font-size="12" fill="#4A473F">所属：Linux IRQ 管理</text>
+  <text x="938" y="494" font-size="12" fill="#4A473F">含义：允许/实际落点 CPU</text>
+  <text x="938" y="520" font-size="11" fill="#6B675C">smp / effective_affinity</text>
+  <text x="938" y="538" font-size="11" fill="#A64B3C">managed 可能不可改</text>
+
+  <!-- ============ Panel C：双 remapping + 边界 ============ -->
+  <text x="48" y="592" font-size="13" font-weight="700" fill="#4A473F">C · 两种 remapping 与 IRQ 同步边界</text>
+
+  <rect x="48" y="606" width="560" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="606" width="560" height="34" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="48" y="628" width="560" height="12" fill="#EFE7DA"/>
+  <text x="68" y="629" font-size="13" font-weight="700" fill="#6B4E28">DMA remapping vs Interrupt remapping</text>
+
+  <rect x="68" y="660" width="250" height="120" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="88" y="686" font-size="12" font-weight="700" fill="#2C4460">DMA remapping</text>
+  <text x="88" y="710" font-size="12" fill="#4A473F">约束：设备访问主机内存</text>
+  <text x="88" y="732" font-size="12" fill="#4A473F">对象：IOVA → PA</text>
+  <text x="88" y="754" font-size="11" fill="#3D5A80">解决：能读写哪些页面</text>
+
+  <rect x="334" y="660" width="250" height="120" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="354" y="686" font-size="12" font-weight="700" fill="#733428">Interrupt remapping</text>
+  <text x="354" y="710" font-size="12" fill="#4A473F">约束：MSI/MSI-X 投递目标</text>
+  <text x="354" y="732" font-size="12" fill="#4A473F">对象：消息 → 中断目标</text>
+  <text x="354" y="754" font-size="11" fill="#A64B3C">解决：能触发哪个中断</text>
+
+  <rect x="632" y="606" width="560" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="632" y="606" width="560" height="34" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="632" y="628" width="560" height="12" fill="#DCE9E3"/>
+  <text x="652" y="629" font-size="13" font-weight="700" fill="#24473F">IRQ 到达是通知，不是语言级 acquire</text>
+
+  <rect x="652" y="660" width="520" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="668" y="683" font-size="12" fill="#24473F">能说明：有事件值得处理 · 可进入 handler / 唤醒 eventfd</text>
+
+  <rect x="652" y="708" width="520" height="72" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="668" y="732" font-size="12" font-weight="700" fill="#733428">不能自动保证</text>
+  <text x="668" y="752" font-size="11.5" fill="#4A473F">· CQE 对其余字段已可见  · C++ happens-before</text>
+  <text x="668" y="770" font-size="11.5" fill="#4A473F">· 任意 DMA 写对 CPU 对象级原子  · 可跳过 phase/status</text>
+
+  <!-- bottom bar -->
+  <rect x="48" y="832" width="1144" height="68" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="860" font-size="13" font-weight="700" fill="#4A473F">边界提醒</text>
+  <text x="68" y="882" font-size="12" fill="#4A473F">多 CQ 可共享同一 MSI-X vector · 勿直接编辑活动设备 Table · VFIO eventfd 是用户态通知边界，不是 Table 本身</text>
+</svg>

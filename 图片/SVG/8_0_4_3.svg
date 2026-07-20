@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 940" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>NVMe：队列在 DRAM，Doorbell 在 BAR</title>
+  <desc>上半：主机 DRAM 与设备 BAR 的结构对照。中部：Doorbell stride 与 DSTRD 布局。下半：提交/完成路径与 batching 取舍。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="940" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">NVMe：大块状态在主机 DRAM，少量控制入口在 BAR</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">Doorbell 只传索引 · SQE/CQE 正文仍经 DMA · DSTRD 决定寄存器步长而非队列深度</text>
+
+  <!-- ============ Panel A：双内存结构 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 结构对照：主机内存里的队列 vs BAR 里的门铃</text>
+
+  <!-- Host DRAM -->
+  <rect x="48" y="124" width="560" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="124" width="560" height="36" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="48" y="148" width="560" height="12" fill="#DCE9E3"/>
+  <text x="68" y="148" font-size="13" font-weight="700" fill="#24473F">主机 DRAM · DMA-mapped</text>
+
+  <!-- SQ ring -->
+  <text x="72" y="190" font-size="12" font-weight="700" fill="#2F6B5E">SQ（提交队列）</text>
+  <rect x="72" y="200" width="56" height="40" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="100" y="225" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">0</text>
+  <rect x="132" y="200" width="56" height="40" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="160" y="225" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">1</text>
+  <rect x="192" y="200" width="56" height="40" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.8"/>
+  <text x="220" y="218" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">2</text>
+  <text x="220" y="232" font-size="9" fill="#3D5A80" text-anchor="middle">tail</text>
+  <rect x="252" y="200" width="56" height="40" rx="4" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="280" y="225" font-size="11" fill="#6B675C" text-anchor="middle">…</text>
+  <rect x="312" y="200" width="56" height="40" rx="4" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="340" y="225" font-size="11" fill="#6B675C" text-anchor="middle">n</text>
+  <text x="380" y="225" font-size="11" fill="#6B675C">CPU 写 SQE · 设备 DMA Read</text>
+
+  <!-- CQ ring -->
+  <text x="72" y="268" font-size="12" font-weight="700" fill="#2F6B5E">CQ（完成队列）</text>
+  <rect x="72" y="278" width="56" height="40" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="100" y="303" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">0</text>
+  <rect x="132" y="278" width="56" height="40" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="160" y="296" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">1</text>
+  <text x="160" y="310" font-size="9" fill="#2F6B5E" text-anchor="middle">head</text>
+  <rect x="192" y="278" width="56" height="40" rx="4" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="220" y="303" font-size="11" fill="#6B675C" text-anchor="middle">…</text>
+  <rect x="252" y="278" width="56" height="40" rx="4" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="280" y="303" font-size="11" fill="#6B675C" text-anchor="middle">n</text>
+  <text x="320" y="303" font-size="11" fill="#6B675C">设备 DMA Write · CPU 读 CQE</text>
+
+  <!-- data buffer -->
+  <rect x="72" y="340" width="500" height="56" rx="6" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="92" y="364" font-size="12" font-weight="700" fill="#6B5B95">数据 buffer（DMA-mapped）</text>
+  <text x="92" y="384" font-size="11" fill="#6B675C">应用/CPU 与控制器 DMA 共享 · ownership 见 0.3</text>
+
+  <!-- Device BAR -->
+  <rect x="632" y="124" width="560" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="632" y="124" width="560" height="36" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="632" y="148" width="560" height="12" fill="#EFE7DA"/>
+  <text x="652" y="148" font-size="13" font-weight="700" fill="#6B4E28">设备 BAR aperture · CPU MMIO</text>
+
+  <rect x="656" y="180" width="512" height="40" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="676" y="205" font-size="12" fill="#4A473F">控制 / 状态寄存器 · CAP 等</text>
+
+  <text x="656" y="246" font-size="11" fill="#8A6A3A">Doorbell 区（典型从 0x1000 起）</text>
+
+  <!-- doorbell strip visual -->
+  <rect x="656" y="256" width="100" height="52" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="706" y="278" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">SQ Tail</text>
+  <text x="706" y="294" font-size="10" fill="#8A6A3A" text-anchor="middle">qid=0</text>
+
+  <rect x="766" y="256" width="100" height="52" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="816" y="278" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">CQ Head</text>
+  <text x="816" y="294" font-size="10" fill="#3D5A80" text-anchor="middle">qid=0</text>
+
+  <rect x="876" y="256" width="100" height="52" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="926" y="278" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">SQ Tail</text>
+  <text x="926" y="294" font-size="10" fill="#8A6A3A" text-anchor="middle">qid=1</text>
+
+  <rect x="986" y="256" width="100" height="52" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1036" y="278" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">CQ Head</text>
+  <text x="1036" y="294" font-size="10" fill="#3D5A80" text-anchor="middle">qid=1</text>
+
+  <text x="1096" y="288" font-size="14" fill="#6B675C">…</text>
+
+  <!-- stride arrow -->
+  <path d="M656,320 L756,320" fill="none" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arra)"/>
+  <path d="M756,320 L656,320" fill="none" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arra)"/>
+  <text x="706" y="340" font-size="11" fill="#8A6A3A" text-anchor="middle">stride</text>
+
+  <text x="656" y="368" font-size="12" fill="#4A473F">Doorbell 不承载 SQE/CQE 正文 · 只推进 tail/head 索引</text>
+  <text x="656" y="390" font-size="11.5" fill="#6B675C">CMB 等可选能力可使部分队列位于控制器内存</text>
+
+  <!-- ============ Panel B：DSTRD 公式 ============ -->
+  <text x="48" y="458" font-size="13" font-weight="700" fill="#4A473F">B · CAP.DSTRD：Doorbell 寄存器 offset 步长</text>
+
+  <rect x="48" y="472" width="1144" height="120" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="68" y="492" width="420" height="80" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="88" y="518" font-size="13" font-weight="700" fill="#6B4E28">stride = 4 &lt;&lt; CAP.DSTRD</text>
+  <text x="88" y="542" font-size="12" fill="#4A473F">DSTRD=0 → 相邻间距 4 B</text>
+  <text x="88" y="560" font-size="11" fill="#6B675C">决定 offset 步长，不是队列深度</text>
+
+  <rect x="508" y="492" width="320" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="528" y="518" font-size="12" font-weight="700" fill="#2C4460">SQ Tail(qid)</text>
+  <text x="528" y="540" font-size="12" fill="#4A473F">= 0x1000 + (2×qid)×stride</text>
+  <text x="528" y="560" font-size="11" fill="#6B675C">偶数槽 · 提交推进</text>
+
+  <rect x="848" y="492" width="320" height="80" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="868" y="518" font-size="12" font-weight="700" fill="#24473F">CQ Head(qid)</text>
+  <text x="868" y="540" font-size="12" fill="#4A473F">= 0x1000 + (2×qid+1)×stride</text>
+  <text x="868" y="560" font-size="11" fill="#6B675C">奇数槽 · 消费推进</text>
+
+  <!-- ============ Panel C：路径 + batching ============ -->
+  <text x="48" y="626" font-size="13" font-weight="700" fill="#4A473F">C · 提交/完成路径与 Doorbell batching 取舍</text>
+
+  <rect x="48" y="640" width="720" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- submit path mini -->
+  <text x="68" y="668" font-size="12" font-weight="700" fill="#3D5A80">提交路径</text>
+  <rect x="68" y="680" width="100" height="40" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="118" y="705" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">填 SQE</text>
+  <path d="M168,700 L188,700" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <rect x="192" y="680" width="90" height="40" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="237" y="705" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">发布屏障</text>
+  <path d="M282,700 L302,700" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <rect x="306" y="680" width="110" height="40" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="361" y="705" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">SQ Tail DB</text>
+  <path d="M416,700 L436,700" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <rect x="440" y="680" width="120" height="40" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="500" y="705" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">DMA Read SQE</text>
+
+  <!-- complete path mini -->
+  <text x="68" y="750" font-size="12" font-weight="700" fill="#A64B3C">完成路径</text>
+  <rect x="68" y="762" width="130" height="40" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="133" y="787" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">DMA Write CQE</text>
+  <path d="M198,782 L218,782" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <rect x="222" y="762" width="120" height="40" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="282" y="787" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">观察 phase</text>
+  <path d="M342,782 L362,782" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <rect x="366" y="762" width="90" height="40" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="411" y="787" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">消费 CQE</text>
+  <path d="M456,782 L476,782" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <rect x="480" y="762" width="110" height="40" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="535" y="787" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">CQ Head DB</text>
+
+  <text x="68" y="840" font-size="12" fill="#4A473F">posted write 返回 ≠ 设备已执行 · 完成以 CQE / 协议状态为准</text>
+  <text x="68" y="862" font-size="11.5" fill="#6B675C">访问宽度、对齐、端序必须遵守 NVMe 规范 · offset 算错可能敲到别的队列</text>
+
+  <!-- batching panel -->
+  <rect x="792" y="640" width="400" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="792" y="640" width="400" height="34" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="792" y="662" width="400" height="12" fill="#EFE7DA"/>
+  <text x="812" y="663" font-size="13" font-weight="700" fill="#6B4E28">Doorbell batching</text>
+
+  <rect x="812" y="692" width="360" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="832" y="716" font-size="12" font-weight="700" fill="#24473F">高负载：合批摊薄 MMIO 固定成本</text>
+  <text x="832" y="734" font-size="11" fill="#2F6B5E">N 条命令 → 1 次 Tail 推进</text>
+
+  <rect x="812" y="760" width="360" height="56" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="832" y="784" font-size="12" font-weight="700" fill="#733428">低负载 / 延迟敏感：攒批增加等待</text>
+  <text x="832" y="802" font-size="11" fill="#A64B3C">首条命令可能等后续凑批</text>
+
+  <text x="812" y="844" font-size="12" fill="#4A473F">最优点取决于设备、QD、到达模式与 p99</text>
+  <text x="812" y="866" font-size="11.5" fill="#6B675C">shadow doorbell 是可选优化，非默认</text>
+</svg>

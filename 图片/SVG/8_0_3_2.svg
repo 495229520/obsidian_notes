@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 8_0_1 / 8_0_2 -->
+  <title>DMA 生命周期与缓冲区所有权</title>
+  <desc>上半：Descriptor → Doorbell → DMA → Completion 全链路。中部：CPU-owned / Device-owned 状态机。下半：NVMe 读时应用 read 对应设备 DMA Write。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">DMA 省的是 CPU 逐字节搬运，不是提交、总线与完成同步</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">在途期间 buffer 归设备 · 只有观察到匹配 completion 并完成同步，所有权才回到 CPU</text>
+
+  <!-- ============ Panel A：生命周期泳道 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 一次 DMA 请求：谁准备、谁发布、谁搬运、谁收割</text>
+
+  <!-- lanes -->
+  <rect x="48" y="128" width="1144" height="100" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="64" y="150" font-size="12" font-weight="700" fill="#3D5A80">应用 / CPU</text>
+
+  <rect x="48" y="238" width="1144" height="100" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="64" y="260" font-size="12" font-weight="700" fill="#2F6B5E">驱动 / 运行时</text>
+
+  <rect x="48" y="348" width="1144" height="100" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="64" y="370" font-size="12" font-weight="700" fill="#A64B3C">设备 · DMA engine</text>
+
+  <!-- CPU steps -->
+  <rect x="200" y="158" width="150" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="275" y="178" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① 准备业务数据</text>
+  <text x="275" y="196" font-size="10.5" fill="#3D5A80" text-anchor="middle">或从池借 buffer</text>
+
+  <rect x="900" y="158" width="170" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="985" y="178" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">⑧ 确认完成 + 同步</text>
+  <text x="985" y="196" font-size="10.5" fill="#3D5A80" text-anchor="middle">才能读/改/复用</text>
+
+  <!-- Driver steps -->
+  <rect x="200" y="268" width="150" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="275" y="288" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">② pin + DMA map</text>
+  <text x="275" y="306" font-size="10.5" fill="#2F6B5E" text-anchor="middle">固定页 · 得 IOVA</text>
+
+  <rect x="380" y="268" width="160" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="460" y="288" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">③ 构造描述符</text>
+  <text x="460" y="306" font-size="10.5" fill="#2F6B5E" text-anchor="middle">地址 · 长度 · 方向</text>
+
+  <rect x="570" y="268" width="170" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="655" y="288" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">④ 发布同步 + 屏障</text>
+  <text x="655" y="306" font-size="10.5" fill="#2F6B5E" text-anchor="middle">描述符先对设备可见</text>
+
+  <rect x="770" y="268" width="140" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="840" y="288" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">⑤ 写 Doorbell</text>
+  <text x="840" y="306" font-size="10.5" fill="#8A6A3A" text-anchor="middle">MMIO 通知设备</text>
+
+  <rect x="1040" y="268" width="130" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1105" y="288" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑨ unmap/unpin</text>
+  <text x="1105" y="306" font-size="10.5" fill="#2F6B5E" text-anchor="middle">或池内保留映射</text>
+
+  <!-- Device steps -->
+  <rect x="570" y="378" width="150" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="645" y="398" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">⑥ 读描述符</text>
+  <text x="645" y="416" font-size="10.5" fill="#A64B3C" text-anchor="middle">发起总线事务</text>
+
+  <rect x="750" y="378" width="170" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="2"/>
+  <text x="835" y="398" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">⑦ 执行 DMA</text>
+  <text x="835" y="416" font-size="10.5" fill="#A64B3C" text-anchor="middle">读写主机内存 · 非 CPU</text>
+
+  <rect x="950" y="378" width="150" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1025" y="398" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">写完成项</text>
+  <text x="1025" y="416" font-size="10.5" fill="#A64B3C" text-anchor="middle">MSI-X / polling</text>
+
+  <!-- arrows between lanes -->
+  <path d="M275,208 L275,264" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M354,292 L376,292" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M544,292 L566,292" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M744,292 L766,292" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M840,318 L840,374" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M724,402 L746,402" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M924,402 L946,402" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M1025,378 L1025,210 L1070,210" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M1070,208 L1070,264" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+
+  <!-- device-owned zone -->
+  <rect x="560" y="460" width="560" height="28" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="840" y="479" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">Device-owned 区间：CPU 不得提前复用、释放或撤销映射</text>
+
+  <!-- ============ Panel B：所有权状态机 ============ -->
+  <text x="48" y="528" font-size="13" font-weight="700" fill="#4A473F">B · 缓冲区所有权状态机：完成观察 + 完成同步，才算归还</text>
+
+  <rect x="48" y="544" width="700" height="160" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="80" y="580" width="180" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="170" y="606" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">CPU-owned</text>
+  <text x="170" y="626" font-size="11" fill="#3D5A80" text-anchor="middle">可准备 / 读 / 改 / 释放</text>
+
+  <path d="M268,612 L320,612" fill="none" stroke="#A64B3C" stroke-width="1.7" marker-end="url(#arrr)"/>
+  <text x="294" y="600" font-size="10.5" fill="#733428" text-anchor="middle">发布同步</text>
+
+  <rect x="328" y="580" width="200" height="64" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="428" y="606" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">Device-owned</text>
+  <text x="428" y="626" font-size="11" fill="#A64B3C" text-anchor="middle">DMA 可能仍在进行</text>
+
+  <path d="M536,612 L588,612" fill="none" stroke="#2F6B5E" stroke-width="1.7" marker-end="url(#arrg)"/>
+  <text x="562" y="600" font-size="10.5" fill="#24473F" text-anchor="middle">completion</text>
+
+  <rect x="596" y="580" width="120" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="656" y="606" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">完成同步</text>
+  <text x="656" y="626" font-size="10.5" fill="#2F6B5E" text-anchor="middle">→ CPU-owned</text>
+
+  <path d="M656,648 L656,680 L170,680 L170,648" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arrb)"/>
+  <text x="420" y="698" font-size="11" fill="#6B675C" text-anchor="middle">“设备可能已经做完了”不是合法依据 · 必须匹配请求—完成</text>
+
+  <!-- Panel C: DMA Read/Write -->
+  <rect x="768" y="544" width="424" height="160" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="788" y="572" font-size="13" font-weight="700" fill="#4A473F">C · 主语：设备视角</text>
+
+  <rect x="788" y="592" width="180" height="88" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="878" y="620" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">DMA Read</text>
+  <text x="878" y="642" font-size="11" fill="#8A6A3A" text-anchor="middle">设备读主机内存</text>
+  <text x="878" y="662" font-size="10.5" fill="#6B4E28" text-anchor="middle">例：应用写盘</text>
+
+  <rect x="988" y="592" width="180" height="88" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1078" y="620" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">DMA Write</text>
+  <text x="1078" y="642" font-size="11" fill="#2F6B5E" text-anchor="middle">设备写主机内存</text>
+  <text x="1078" y="662" font-size="10.5" fill="#24473F" text-anchor="middle">例：应用读盘</text>
+
+  <!-- bottom warning -->
+  <rect x="48" y="728" width="1144" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="756" font-size="13" font-weight="700" fill="#4A473F">D · 最易混淆的一对词</text>
+
+  <rect x="68" y="776" width="540" height="68" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="88" y="804" font-size="13" font-weight="700" fill="#2C4460">应用 NVMe Read</text>
+  <text x="88" y="826" font-size="12" fill="#3D5A80">语义：数据从介质进入应用 buffer</text>
+
+  <path d="M620,810 L680,810" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <text x="650" y="798" font-size="11" fill="#733428" text-anchor="middle">对应</text>
+
+  <rect x="688" y="776" width="480" height="68" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="708" y="804" font-size="13" font-weight="700" fill="#733428">控制器对主机执行 DMA Write</text>
+  <text x="708" y="826" font-size="12" fill="#A64B3C">总线操作：设备向主机内存写入</text>
+</svg>

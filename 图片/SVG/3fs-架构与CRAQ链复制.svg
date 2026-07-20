@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1020" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；框 #E3EAF4/#3D5A80/#2C4460；
+       专色 #EFE7D6/#8A6D3B；clean/收益 #E2EFE9/#2F6B5E；dirty/等待 #F4E3DE/#B0503F -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0503F"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6D3B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1020" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">3FS：为 AI 负载把每层「贵但对」的选项同时选满</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">O_DIRECT 绕缓存 ＋ USRBIO 共享环 ＋ RDMA 直达 ＋ 无状态元数据（FoundationDB）＋ CRAQ 链式复制 —— 前六章结论的集成样本</text>
+
+  <!-- ═══ 四组件 ═══ -->
+  <rect x="48" y="104" width="1144" height="150" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">四组件：职责刀切，控制面不进 IO 路径（10.1）</text>
+
+  <rect x="76" y="146" width="256" height="92" rx="7" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="204" y="170" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">cluster manager（控制面）</text>
+  <text x="204" y="192" font-size="10" fill="#6B675C" text-anchor="middle">成员管理、故障检测</text>
+  <text x="204" y="210" font-size="10" fill="#6B675C" text-anchor="middle">分发复制链表 —— 不在 IO 路径</text>
+
+  <rect x="356" y="146" width="256" height="92" rx="7" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="484" y="170" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">metadata service（无状态）</text>
+  <text x="484" y="192" font-size="10" fill="#2F6B5E" text-anchor="middle">文件语义 → FoundationDB 事务</text>
+  <text x="484" y="210" font-size="10" fill="#2F6B5E" text-anchor="middle">挂了随便换 —— 7.2 §4.3 的纯粹形态</text>
+
+  <rect x="636" y="146" width="256" height="92" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.4"/>
+  <text x="764" y="170" font-size="11.5" font-weight="700" fill="#5C4A28" text-anchor="middle">storage service ×N（数据面）</text>
+  <text x="764" y="192" font-size="10" fill="#5C4A28" text-anchor="middle">本机 NVMe 上的 chunk</text>
+  <text x="764" y="210" font-size="10" fill="#5C4A28" text-anchor="middle">O_DIRECT 直读，执行链式复制</text>
+
+  <rect x="916" y="146" width="256" height="92" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1044" y="170" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">client（两条路）</text>
+  <text x="1044" y="192" font-size="10" fill="#2C4460" text-anchor="middle">FUSE：兼容路径（付 7.3 §1 的税）</text>
+  <text x="1044" y="210" font-size="10" fill="#2C4460" text-anchor="middle">USRBIO：性能路径（下图）</text>
+
+  <!-- ═══ CRAQ ═══ -->
+  <rect x="48" y="278" width="1144" height="358" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="306" font-size="14" font-weight="700" fill="#4A473F">CRAQ 链式复制：强一致 ＋ 读吞吐随链长扩展</text>
+
+  <!-- 写入口 -->
+  <rect x="76" y="330" width="150" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="151" y="351" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">client 写</text>
+  <text x="151" y="370" font-size="10" fill="#2C4460" text-anchor="middle">RDMA 送数据到 head</text>
+  <path d="M226,356 L282,356" fill="none" stroke="#B0503F" stroke-width="2.2" marker-end="url(#arrr)"/>
+
+  <!-- 链 -->
+  <rect x="286" y="322" width="200" height="86" rx="8" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.5"/>
+  <text x="386" y="346" font-size="12" font-weight="700" fill="#B0503F" text-anchor="middle">head</text>
+  <text x="386" y="368" font-size="10" fill="#B0503F" text-anchor="middle">收到写 → 本地落 chunk</text>
+  <text x="386" y="388" font-size="10" font-weight="700" fill="#B0503F" text-anchor="middle">版本标记 dirty（未发布）</text>
+  <path d="M486,356 L546,356" fill="none" stroke="#B0503F" stroke-width="2.2" marker-end="url(#arrr)"/>
+  <text x="516" y="346" font-size="9.5" fill="#B0503F" text-anchor="middle">传播</text>
+
+  <rect x="550" y="322" width="200" height="86" rx="8" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.5"/>
+  <text x="650" y="346" font-size="12" font-weight="700" fill="#B0503F" text-anchor="middle">middle</text>
+  <text x="650" y="368" font-size="10" fill="#B0503F" text-anchor="middle">落 chunk，继续传</text>
+  <text x="650" y="388" font-size="10" font-weight="700" fill="#B0503F" text-anchor="middle">dirty</text>
+  <path d="M750,356 L810,356" fill="none" stroke="#B0503F" stroke-width="2.2" marker-end="url(#arrr)"/>
+
+  <rect x="814" y="322" width="200" height="86" rx="8" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="914" y="346" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle">tail ＝ 提交点</text>
+  <text x="914" y="368" font-size="10" fill="#2F6B5E" text-anchor="middle">落定即提交，确认沿链回传</text>
+  <text x="914" y="388" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">各节点改标 clean（已发布）</text>
+
+  <path d="M814,416 C700,446 500,446 386,416" fill="none" stroke="#2F6B5E" stroke-width="1.8" stroke-dasharray="6,4" marker-end="url(#arrg)"/>
+  <text x="600" y="456" font-size="10.5" fill="#2F6B5E" text-anchor="middle">提交确认逆链回传 ＝ release 发布逐级可见</text>
+
+  <!-- 读 -->
+  <rect x="1046" y="322" width="126" height="86" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1109" y="352" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">client 读</text>
+  <text x="1109" y="372" font-size="10" fill="#2C4460" text-anchor="middle">可打链上</text>
+  <text x="1109" y="390" font-size="10" fill="#2C4460" text-anchor="middle">任意节点</text>
+
+  <path d="M1046,392 C980,470 760,486 660,414" fill="none" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrg)"/>
+  <text x="880" y="492" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">clean → 该节点直接返回（最常见）</text>
+  <path d="M660,478 C740,510 860,500 906,414" fill="none" stroke="#B0503F" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrr)"/>
+  <text x="800" y="528" font-size="10.5" fill="#B0503F" text-anchor="middle">dirty → 向 tail 查已提交版本号（小消息，数据不搬）＝ 不确定时向发布点 acquire 确认</text>
+
+  <rect x="76" y="552" width="1090" height="64" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="96" y="576" font-size="10.5" font-weight="700" fill="#4A473F">账目：写延迟 ＝ 链长 × 单跳（RDMA 下 μs 级/跳）；读吞吐随链长线性扩展且始终强一致</text>
+  <text x="96" y="598" font-size="10.5" fill="#6B675C">为何选副本不选 EC：训练读要「任何副本直接读」；EC 的降级读与修复账与画像不符（7.1）—— 链长 ＝ 容错 × 写延迟 × 成本三方约束</text>
+
+  <!-- ═══ USRBIO 数据路径 ═══ -->
+  <rect x="48" y="660" width="1144" height="336" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="688" font-size="14" font-weight="700" fill="#4A473F">USRBIO 读路径：进程间的 SQ/CQ 环 ＋ RDMA 直达 —— 零 syscall、零内核拷贝、零 page cache</text>
+
+  <rect x="76" y="708" width="220" height="100" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="186" y="730" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">应用（训练进程）</text>
+  <text x="186" y="752" font-size="10" fill="#2C4460" text-anchor="middle">① Iov 填入提交环</text>
+  <text x="186" y="770" font-size="10" fill="#2C4460" text-anchor="middle">（release 发布，零 syscall）</text>
+  <text x="186" y="788" font-size="10" fill="#2C4460" text-anchor="middle">⑥ 轮询完成环收割</text>
+
+  <rect x="316" y="722" width="130" height="72" rx="16" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="381" y="748" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">共享内存环</text>
+  <text x="381" y="766" font-size="9.5" fill="#2F6B5E" text-anchor="middle">提交环 / 完成环</text>
+  <text x="381" y="784" font-size="9.5" fill="#2F6B5E" text-anchor="middle">＝ 进程间 io_uring（2.1）</text>
+  <path d="M296,744 L312,744" fill="none" stroke="#2F6B5E" stroke-width="1.7" marker-end="url(#arrg)"/>
+  <path d="M312,776 L296,776" fill="none" stroke="#2F6B5E" stroke-width="1.7" marker-end="url(#arrg)"/>
+
+  <rect x="466" y="708" width="220" height="100" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="576" y="730" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">3FS client 进程</text>
+  <text x="576" y="752" font-size="10" fill="#2C4460" text-anchor="middle">② 轮询取请求，查元数据缓存</text>
+  <text x="576" y="770" font-size="10" fill="#2C4460" text-anchor="middle">W1：未命中付一次 FDB 事务</text>
+  <text x="576" y="788" font-size="10" fill="#2C4460" text-anchor="middle">定位 chunk 所在链，挑副本</text>
+  <path d="M446,758 L462,758" fill="none" stroke="#2F6B5E" stroke-width="1.7" marker-end="url(#arrg)"/>
+
+  <rect x="746" y="708" width="200" height="100" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.5"/>
+  <text x="846" y="730" font-size="11.5" font-weight="700" fill="#5C4A28" text-anchor="middle">storage service</text>
+  <text x="846" y="752" font-size="10" fill="#5C4A28" text-anchor="middle">④ O_DIRECT 读 chunk</text>
+  <text x="846" y="770" font-size="10" fill="#5C4A28" text-anchor="middle">W3：盘几十 μs —— 最大头</text>
+  <text x="846" y="788" font-size="10" fill="#5C4A28" text-anchor="middle">T1：盘 DMA → 节点内存</text>
+  <path d="M686,742 L742,742" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="714" y="732" font-size="9.5" fill="#6B675C" text-anchor="middle">③ W2 去程</text>
+
+  <rect x="986" y="708" width="180" height="100" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.4"/>
+  <text x="1076" y="730" font-size="11.5" font-weight="700" fill="#5C4A28" text-anchor="middle">NVMe ×16/节点</text>
+  <text x="1076" y="752" font-size="10" fill="#5C4A28" text-anchor="middle">chunk 散在多条链</text>
+  <text x="1076" y="770" font-size="10" fill="#5C4A28" text-anchor="middle">深队列恒满窗（2.3）</text>
+  <text x="1076" y="788" font-size="10" fill="#5C4A28" text-anchor="middle">聚合带宽 ＝ 全集群并行</text>
+  <path d="M946,758 L982,758" fill="none" stroke="#8A6D3B" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <!-- RDMA 回程 -->
+  <path d="M746,830 C560,868 320,850 200,812" fill="none" stroke="#8A6D3B" stroke-width="2.4" marker-end="url(#arrb)"/>
+  <text x="480" y="878" font-size="11" font-weight="700" fill="#8A6D3B" text-anchor="middle">⑤ RDMA WRITE 直写应用注册缓冲（4.4/4.5）：W4 串行化 ＋ T2/H1 两次网卡 DMA —— CPU 一个字节没搬</text>
+
+  <rect x="76" y="900" width="1090" height="80" rx="8" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="620" y="928" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle">全程账：3 次 DMA（T1/T2/H1），零 syscall、零内核拷贝、零 page cache —— 盘（W3）仍是最大等待点，与 NVMe-oF 同形（5.1）</text>
+  <text x="620" y="952" font-size="10.5" fill="#2F6B5E" text-anchor="middle">前提：随机抽样 → 缓存无益（1.3「缓存无益则绕开」当真做到底）；聚合 6.6 TiB/s 来自 180 节点并行，不是单次 IO 快</text>
+  <text x="620" y="970" font-size="10.5" fill="#4A473F" text-anchor="middle">代价同 SPDK：client 轮询烧核、无缓存兜底 —— 负载画像不符时这些「贵但对」全变成「贵而错」</text>
+</svg>

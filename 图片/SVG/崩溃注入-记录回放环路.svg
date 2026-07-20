@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；步骤框 #E3EAF4/#3D5A80/#2C4460；等待/危险 #A64B3C；
+       安全/绿色 #2F6B5E；中性 #F1EFE8/#8A8574；与本库既有 lsm-/nvmeof-*.svg 同一套 -->
+  <title>崩溃注入测试：三层易失性与记录-回放环路</title>
+  <desc>顶部为三层易失存储各自的丢失条件与对应测试手段；主体为五步测试环路：带 oracle 记账的工作负载、dm-log-writes 记录、按 flush 边界生成崩溃状态、回放恢复、不变量校验，循环枚举所有崩溃点。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">崩溃注入：把「崩溃后可能的盘上状态」系统地生成出来</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">崩在哪一层决定丢什么、也决定用什么注入——kill -9 只测第一层</text>
+
+  <!-- 三层易失性 -->
+  <text x="48" y="122" font-size="13" font-weight="700" fill="#4A473F" dominant-baseline="central">三层易失性（1.3 / 1.4）</text>
+  <rect x="48" y="138" width="368" height="96" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="232" y="158" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">① 应用 buffer</text>
+  <text x="232" y="182" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">进程崩即丢（stdio、自攒的批）</text>
+  <text x="232" y="212" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">测法：循环 kill -9（6.1 §5）</text>
+
+  <rect x="436" y="138" width="368" height="96" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="620" y="158" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">② 页缓存（write 过未 fsync）</text>
+  <text x="620" y="182" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">kill -9 不丢——内核替你写回，掩盖漏 fsync！</text>
+  <text x="620" y="212" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">测法：块层记录-回放（本图主体）</text>
+
+  <rect x="824" y="138" width="368" height="96" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1008" y="158" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">③ 盘写缓存</text>
+  <text x="1008" y="182" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">FLUSH / FUA 之后才保证到介质</text>
+  <text x="1008" y="212" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">测法：回放尊重 FLUSH 标记 + dm-flakey 注错</text>
+
+  <!-- 环路 -->
+  <text x="48" y="282" font-size="13" font-weight="700" fill="#4A473F" dominant-baseline="central">记录-回放环路（device-mapper 在块层的必经之路上工作，1.7）</text>
+
+  <rect x="48" y="304" width="250" height="84" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="173" y="326" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">① 工作负载 + oracle 记账</text>
+  <text x="173" y="350" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">确认成功才写 oracle</text>
+  <text x="173" y="370" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">（O_DSYNC 单条追加 + 校验和）</text>
+  <path d="M298,346 L334,346" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="338" y="304" width="250" height="84" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="463" y="326" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">② dm-log-writes 记录 bio 流</text>
+  <text x="463" y="350" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">连同 FLUSH / FUA 标记</text>
+  <text x="463" y="370" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">= 崩溃状态空间的完整原始材料</text>
+  <path d="M588,346 L624,346" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="628" y="304" width="250" height="84" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="753" y="326" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">③ 生成崩溃状态</text>
+  <text x="753" y="350" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">截到第 N 个 flush 边界</text>
+  <text x="753" y="370" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">+ 边界后写的子集/乱序枚举</text>
+  <path d="M878,346 L914,346" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="918" y="304" width="274" height="84" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1055" y="326" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">④ 回放到干净设备 → 挂载 → 恢复</text>
+  <text x="1055" y="350" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">replay-log --end-mark N</text>
+  <text x="1055" y="370" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">跑被测系统自己的恢复流程</text>
+  <path d="M1055,388 L1055,428 L878,428" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="628" y="404" width="246" height="108" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="751" y="426" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">⑤ 校验器：三类 key 对账</text>
+  <text x="751" y="450" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">已确认：必须在且值正确</text>
+  <text x="751" y="470" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">在途：可在可不在（库须能打开）</text>
+  <text x="751" y="490" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">从未写过：必须不在</text>
+
+  <path d="M628,458 L590,458 L590,346" fill="none" stroke="#5A564B" stroke-width="1.8" stroke-dasharray="5 4"/>
+  <path d="M590,346 L624,346" fill="none" stroke="#5A564B" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrn)"/>
+  <text x="580" y="500" font-size="10.5" fill="#6B675C" text-anchor="end" dominant-baseline="central">循环：N = 1…全部 flush 边界</text>
+
+  <rect x="918" y="428" width="274" height="84" rx="8" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1055" y="450" font-size="12" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">FAIL → 固化复现物</text>
+  <text x="1055" y="474" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">「边界 N + 写子集 + 种子」可反复重放</text>
+  <text x="1055" y="494" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">崩溃 bug 从玄学变成普通 bug</text>
+  <path d="M874,478 L914,478" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+
+  <!-- 军规 -->
+  <rect x="48" y="560" width="1144" height="120" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="70" y="584" font-size="12.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">军规</text>
+  <text x="70" y="608" font-size="11" fill="#4A473F" dominant-baseline="central">· 只测 kill -9 = 只测第一层：漏 fsync 的 bug 被页缓存圆谎，上线后第一次掉电才暴露</text>
+  <text x="70" y="632" font-size="11" fill="#4A473F" dominant-baseline="central">· 回放必须尊重 FLUSH/FUA：无视它会生成物理上不可能的状态（假阳性）或漏掉合法乱序（假阴性）</text>
+  <text x="70" y="656" font-size="11" fill="#4A473F" dominant-baseline="central">· oracle 要比被测系统更保守（O_DSYNC + 校验和）；fsck 通过 ≠ 应用数据正确；每个 FAIL 必须留下可复现的最小案例</text>
+</svg>

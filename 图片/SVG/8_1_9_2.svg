@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>JBD2 事务 on-disk 布局与 revoke</title>
+  <desc>模拟已提交事务在日志中的块序列：descriptor、journaled blocks、revoke、commit；以及 revoke 防止过时重放。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">JBD2：一个已提交事务在日志里长什么样</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">descriptor 描述映射 · payload 是块映像 · revoke 作废旧副本 · commit 宣告完整</text>
+
+  <!-- ========== On-disk transaction strip ========== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">on-disk 事务序列（简化）</text>
+
+  <rect x="48" y="128" width="1144" height="210" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.4"/>
+
+  <!-- block sequence -->
+  <rect x="72" y="160" width="200" height="100" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="172" y="190" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">descriptor</text>
+  <text x="172" y="212" font-size="11" fill="#3D5A80" text-anchor="middle">正式块号标签</text>
+  <text x="172" y="232" font-size="11" fill="#3D5A80" text-anchor="middle">tid / 校验相关</text>
+  <text x="172" y="248" font-size="10" fill="#6B675C" text-anchor="middle">「后面这些块是谁」</text>
+
+  <path d="M280,210 L308,210" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="316" y="160" width="150" height="100" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="391" y="190" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">journaled</text>
+  <text x="391" y="212" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">block A</text>
+  <text x="391" y="232" font-size="11" fill="#2F6B5E" text-anchor="middle">元数据映像</text>
+  <text x="391" y="248" font-size="10" fill="#6B675C" text-anchor="middle">→ home #A</text>
+
+  <rect x="478" y="160" width="150" height="100" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="553" y="190" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">journaled</text>
+  <text x="553" y="212" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">block B</text>
+  <text x="553" y="232" font-size="11" fill="#2F6B5E" text-anchor="middle">元数据映像</text>
+  <text x="553" y="248" font-size="10" fill="#6B675C" text-anchor="middle">→ home #B</text>
+
+  <rect x="640" y="160" width="150" height="100" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="715" y="190" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">journaled</text>
+  <text x="715" y="212" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">data?</text>
+  <text x="715" y="232" font-size="11" fill="#8A6A3A" text-anchor="middle">仅 data=journal</text>
+  <text x="715" y="248" font-size="10" fill="#6B675C" text-anchor="middle">可选文件数据</text>
+
+  <path d="M798,210 L826,210" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="834" y="160" width="150" height="100" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="909" y="190" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">revoke</text>
+  <text x="909" y="212" font-size="11" fill="#A64B3C" text-anchor="middle">optional</text>
+  <text x="909" y="232" font-size="11" fill="#733428" text-anchor="middle">作废旧块映像</text>
+  <text x="909" y="248" font-size="10" fill="#6B675C" text-anchor="middle">勿再重放</text>
+
+  <path d="M992,210 L1020,210" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="1028" y="160" width="140" height="100" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="2"/>
+  <text x="1098" y="190" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">commit</text>
+  <text x="1098" y="212" font-size="11" fill="#3D5A80" text-anchor="middle">完整边界</text>
+  <text x="1098" y="232" font-size="11" fill="#2C4460" text-anchor="middle">序列 + 校验</text>
+  <text x="1098" y="248" font-size="10" fill="#6B675C" text-anchor="middle">恢复认此为准</text>
+
+  <!-- legend under strip -->
+  <text x="72" y="300" font-size="12" fill="#4A473F">日志方向 →</text>
+  <text x="180" y="300" font-size="12" fill="#6B675C">无有效 commit 的事务：恢复时不当完整事务重放</text>
+  <text x="72" y="322" font-size="12" fill="#6B675C">每个事务有递增序列标识；恢复靠序列 + 描述 + commit + 校验识别完整记录</text>
+
+  <!-- ========== Memory vs disk ========== -->
+  <text x="48" y="360" font-size="13" font-weight="700" fill="#4A473F">内存事务 → 日志落盘（结构对照）</text>
+
+  <rect x="48" y="376" width="560" height="200" rx="10" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="68" y="404" font-size="13" font-weight="700" fill="#2C4460">内存 · running / locked transaction</text>
+
+  <rect x="72" y="424" width="150" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="147" y="445" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">page cache</text>
+  <text x="147" y="462" font-size="10" fill="#3D5A80" text-anchor="middle">脏数据页</text>
+
+  <rect x="238" y="424" width="150" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="313" y="445" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">metadata buf</text>
+  <text x="313" y="462" font-size="10" fill="#2F6B5E" text-anchor="middle">inode / 位图…</text>
+
+  <rect x="404" y="424" width="180" height="48" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="494" y="445" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">JBD2 handles</text>
+  <text x="494" y="462" font-size="10" fill="#8A6A3A" text-anchor="middle">收集进 running Tx</text>
+
+  <path d="M313,476 L313,500" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="72" y="540" font-size="12" fill="#4A473F">关闭事务 → 写 descriptor / payload / revoke → flush 协议 → 写 commit</text>
+  <text x="72" y="560" font-size="11" fill="#6B675C">ordered 模式下：相关新数据须在元数据 commit 前先写出正式数据块</text>
+
+  <rect x="632" y="376" width="560" height="200" rx="10" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="652" y="404" font-size="13" font-weight="700" fill="#24473F">磁盘 · home location（正式位置）</text>
+
+  <rect x="656" y="424" width="160" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="736" y="448" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">block #A</text>
+  <text x="736" y="466" font-size="10" fill="#3D5A80" text-anchor="middle">checkpoint 后更新</text>
+
+  <rect x="832" y="424" width="160" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="912" y="448" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">block #B</text>
+  <text x="912" y="466" font-size="10" fill="#2F6B5E" text-anchor="middle">checkpoint 后更新</text>
+
+  <rect x="1008" y="424" width="160" height="56" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="1088" y="448" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">data blocks</text>
+  <text x="1088" y="466" font-size="10" fill="#8A6A3A" text-anchor="middle">多数模式直写</text>
+
+  <text x="656" y="520" font-size="12" fill="#4A473F">commit 后、checkpoint 前：home 可能仍旧，日志足够 redo</text>
+  <text x="656" y="544" font-size="12" fill="#4A473F">恢复：把已提交映像写回正式位置（幂等 redo）</text>
+  <text x="656" y="566" font-size="11" fill="#6B675C">重复恢复安全：同一结果可再写一次</text>
+
+  <!-- ========== Revoke story ========== -->
+  <text x="48" y="612" font-size="13" font-weight="700" fill="#4A473F">为什么需要 revoke：块用途已变，旧日志映像不能无条件重放</text>
+
+  <rect x="48" y="628" width="1144" height="240" rx="10" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.4"/>
+
+  <!-- timeline wrong -->
+  <text x="72" y="658" font-size="12" font-weight="700" fill="#733428">时间线</text>
+
+  <rect x="72" y="674" width="200" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="172" y="700" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">t1 · 块 #X 属文件 A</text>
+  <text x="172" y="720" font-size="10" fill="#3D5A80" text-anchor="middle">旧 Tx 记入 journal 映像</text>
+
+  <path d="M280,706 L308,706" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="316" y="674" width="200" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="416" y="700" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">t2 · 释放并重分配</text>
+  <text x="416" y="720" font-size="10" fill="#8A6A3A" text-anchor="middle">块 #X 改作别的对象</text>
+
+  <path d="M524,706 L552,706" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="560" y="674" width="220" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="670" y="700" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">t3 · 新 Tx + revoke #X</text>
+  <text x="670" y="720" font-size="10" fill="#2F6B5E" text-anchor="middle">声明旧副本失效</text>
+
+  <path d="M788,706 L816,706" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="824" y="674" width="340" height="64" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="994" y="700" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">崩溃恢复时：勿把 t1 映像盖回 #X</text>
+  <text x="994" y="720" font-size="10" fill="#A64B3C" text-anchor="middle">否则会污染已改变用途的块</text>
+
+  <!-- two outcomes -->
+  <rect x="72" y="764" width="540" height="80" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="92" y="792" font-size="13" font-weight="700" fill="#733428">无 revoke · 危险</text>
+  <text x="92" y="816" font-size="12" fill="#733428">无条件重放旧 journal 映像 → 覆盖新用途块 → 元数据/数据污染</text>
+
+  <rect x="632" y="764" width="536" height="80" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="652" y="792" font-size="13" font-weight="700" fill="#24473F">有 revoke · 安全</text>
+  <text x="652" y="816" font-size="12" fill="#24473F">恢复程序跳过被 revoke 的旧块副本，只重放仍有效的记录</text>
+</svg>

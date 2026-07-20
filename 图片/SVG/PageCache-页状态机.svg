@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 690" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1180" height="690" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Page Cache 页的状态机：变脏、写回与回收</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">write() 返回只代表“进了缓存”，不代表“落了盘”；回收永远先挑 Clean 页下手</text>
+
+  <!-- 状态框 -->
+  <rect x="70" y="330" width="190" height="70" rx="8" fill="#F5F4ED" stroke="#8A8574" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="165" y="360" font-size="14" font-weight="700" fill="#2B2A26" text-anchor="middle">不在缓存</text>
+  <text x="165" y="382" font-size="11" fill="#6B675C" text-anchor="middle">首次访问 / 已被回收</text>
+
+  <rect x="370" y="160" width="230" height="70" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="485" y="190" font-size="14" font-weight="700" fill="#7A5518" text-anchor="middle">Locked · !Uptodate</text>
+  <text x="485" y="212" font-size="11" fill="#7A5518" text-anchor="middle">读 IO 进行中，占位防重复读</text>
+
+  <rect x="760" y="160" width="220" height="70" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="870" y="190" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">Uptodate · Clean</text>
+  <text x="870" y="212" font-size="11" fill="#24473F" text-anchor="middle">与盘上一致，可直接丢弃</text>
+
+  <rect x="760" y="450" width="220" height="70" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="870" y="480" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">Dirty 脏页</text>
+  <text x="870" y="502" font-size="11" fill="#733428" text-anchor="middle">只有内存里是新的</text>
+
+  <rect x="370" y="450" width="230" height="70" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="485" y="480" font-size="14" font-weight="700" fill="#4A3F68" text-anchor="middle">Writeback 写回中</text>
+  <text x="485" y="502" font-size="11" fill="#4A3F68" text-anchor="middle">正在向设备提交</text>
+
+  <!-- e1: 不在缓存 -> Locked -->
+  <path d="M165,326 C165,195 250,195 364,195" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="196" y="252" font-size="11" fill="#4A473F">读未命中：分配 folio</text>
+  <text x="196" y="268" font-size="11" fill="#4A473F">提交读 IO（进程睡眠）</text>
+
+  <!-- e2: Locked -> Clean -->
+  <line x1="604" y1="195" x2="754" y2="195" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="680" y="176" font-size="11" fill="#4A473F" text-anchor="middle">IO 完成中断</text>
+  <text x="680" y="216" font-size="11" fill="#4A473F" text-anchor="middle">置 Uptodate · 解锁</text>
+
+  <!-- e3: Clean -> Dirty -->
+  <line x1="870" y1="234" x2="870" y2="444" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="884" y="330" font-size="11" fill="#4A473F">write()：改内存页并标 Dirty</text>
+  <text x="884" y="346" font-size="11" fill="#4A473F">系统调用立即返回</text>
+
+  <!-- e4: Dirty -> Writeback -->
+  <line x1="754" y1="485" x2="606" y2="485" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="680" y="470" font-size="10.8" fill="#4A473F" text-anchor="middle">flusher 周期 / 水位触发</text>
+  <text x="680" y="507" font-size="10.8" fill="#4A473F" text-anchor="middle">或 fsync 强制（→ 1.4）</text>
+
+  <!-- e5: Writeback -> Clean -->
+  <path d="M485,446 C485,330 690,300 758,236" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="530" y="360" font-size="11" fill="#4A473F">写回完成：变回 Clean</text>
+  <text x="530" y="376" font-size="11" fill="#4A473F">之后可再次被写脏</text>
+
+  <!-- e6: Clean -> 不在缓存（回收） -->
+  <path d="M870,156 C870,84 100,84 100,324" fill="none" stroke="#5A564B" stroke-width="1.6" stroke-dasharray="7 5" marker-end="url(#arr)"/>
+  <text x="500" y="104" font-size="11" fill="#4A473F" text-anchor="middle">内存压力回收：Clean 页直接释放（零 IO）</text>
+
+  <!-- 注释卡 -->
+  <rect x="70" y="570" width="520" height="86" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="92" y="600" font-size="12.5" fill="#4A473F">回收先挑 Clean 页：直接释放，零 IO；Dirty 页必须先写回再释放</text>
+  <text x="92" y="626" font-size="12.5" fill="#4A473F">—— 内存紧张时的“突发写风暴”与 p99 毛刺由此而来（→ 9.5）</text>
+
+  <rect x="620" y="570" width="490" height="86" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="642" y="600" font-size="12.5" fill="#733428">写未命中：分配新页直接写脏；整页覆盖可跳过“先读回”</text>
+  <text x="642" y="626" font-size="12.5" fill="#733428">掉电时 Dirty / Writeback 数据会丢：write 返回 ≠ 持久化（→ 1.4）</text>
+</svg>

@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 960" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       硬件专色 #EFE7D6/#8A6D3B；健康 #E2EFE9/#2F6B5E；故障 #F4E3DE/#B0503F；与本库既有 SVG 同一套 -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0503F"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="960" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Multipath：一个 namespace、两条路，故障时换路不换盘</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">host 内核把两个 controller 合并成一个块设备；切换发生在 bio 层 —— 尾延迟几乎全部来自「发现路死了」这一步</text>
+
+  <!-- ═══ 拓扑面板 ═══ -->
+  <rect x="48" y="104" width="1144" height="404" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">拓扑：两条路走独立故障域（网卡 / 交换机 / target 口全都分开）</text>
+
+  <!-- Host -->
+  <rect x="80" y="152" width="240" height="330" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="200" y="178" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">Host（GPU 节点）</text>
+
+  <rect x="100" y="192" width="200" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="200" y="212" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">应用：只见 /dev/nvme0n1</text>
+  <text x="200" y="230" font-size="10.5" fill="#2C4460" text-anchor="middle">切换无感，只见延迟毛刺</text>
+  <path d="M200,244 L200,266" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="100" y="270" width="200" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="200" y="290" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">native multipath：bio 层选路</text>
+  <text x="200" y="308" font-size="10.5" fill="#2C4460" text-anchor="middle">RCU 读路径表 + iopolicy</text>
+  <path d="M200,322 L200,344" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="100" y="348" width="200" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="200" y="368" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">blk-mq 每核队列</text>
+  <text x="200" y="386" font-size="10.5" fill="#2C4460" text-anchor="middle">路径 = controller = 独立队列组</text>
+
+  <text x="200" y="432" font-size="10.5" fill="#6B675C" text-anchor="middle">重发单位是 bio（意图），</text>
+  <text x="200" y="448" font-size="10.5" fill="#6B675C" text-anchor="middle">不是填好一半的 SQE</text>
+
+  <!-- 路径 A（上，正常承载 IO） -->
+  <text x="430" y="200" font-size="12" font-weight="700" fill="#2F6B5E">路径 A（正常时承载 IO）· 网卡 A 出发</text>
+  <path d="M320,240 L428,240" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <rect x="430" y="214" width="150" height="52" rx="7" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="505" y="235" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">交换机 A</text>
+  <text x="505" y="253" font-size="10.5" fill="#6B675C" text-anchor="middle">独立故障域</text>
+  <path d="M580,240 L763,240" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <!-- 断点标记 -->
+  <path d="M648,222 L676,258 M676,222 L648,258" fill="none" stroke="#B0503F" stroke-width="3.2"/>
+  <text x="662" y="290" font-size="11.5" font-weight="700" fill="#B0503F" text-anchor="middle">t₀ 此处断</text>
+
+  <!-- 路径 B（下，备用） -->
+  <text x="430" y="386" font-size="12" font-weight="700" fill="#8A8574">路径 B（切换后接管）· 网卡 B 出发</text>
+  <path d="M320,420 L428,420" fill="none" stroke="#8A8574" stroke-width="2" marker-end="url(#arrn)"/>
+  <rect x="430" y="394" width="150" height="52" rx="7" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="505" y="415" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">交换机 B</text>
+  <text x="505" y="433" font-size="10.5" fill="#6B675C" text-anchor="middle">独立故障域</text>
+  <path d="M580,420 L763,420" fill="none" stroke="#8A8574" stroke-width="2" marker-end="url(#arrn)"/>
+
+  <!-- Target -->
+  <rect x="765" y="152" width="405" height="330" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="967" y="178" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">Target · 同一个 subsystem NQN</text>
+
+  <rect x="785" y="200" width="170" height="60" rx="7" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="870" y="222" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle">controller 1</text>
+  <text x="870" y="240" font-size="10.5" fill="#2F6B5E" text-anchor="middle">fabric 口 A · connect ①</text>
+  <rect x="785" y="268" width="170" height="24" rx="12" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="870" y="284" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">ANA: optimized</text>
+
+  <rect x="785" y="380" width="170" height="60" rx="7" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="870" y="402" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">controller 2</text>
+  <text x="870" y="420" font-size="10.5" fill="#6B675C" text-anchor="middle">fabric 口 B · connect ②</text>
+  <rect x="785" y="448" width="170" height="24" rx="12" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="870" y="464" font-size="10.5" font-weight="700" fill="#6B675C" text-anchor="middle">ANA: non-optimized</text>
+
+  <rect x="990" y="270" width="158" height="96" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.6"/>
+  <text x="1069" y="298" font-size="12.5" font-weight="700" fill="#5C4A28" text-anchor="middle">namespace</text>
+  <text x="1069" y="318" font-size="10.5" fill="#5C4A28" text-anchor="middle">NGUID 相同</text>
+  <text x="1069" y="336" font-size="10.5" fill="#5C4A28" text-anchor="middle">= 判定为同一块盘</text>
+  <path d="M955,240 C980,240 985,290 988,296" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <path d="M955,414 C980,414 985,348 988,342" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="967" y="360" font-size="10" fill="#6B675C" text-anchor="middle">状态由 target 维护，</text>
+  <text x="967" y="374" font-size="10" fill="#6B675C" text-anchor="middle">变更发 AEN → host 拉 log</text>
+
+  <!-- ═══ 时间线面板 ═══ -->
+  <rect x="48" y="528" width="1144" height="402" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="556" font-size="14" font-weight="700" fill="#4A473F">故障切换时间线：检测窗口贡献了绝大部分切换延迟</text>
+
+  <!-- 相位块 -->
+  <rect x="110" y="584" width="170" height="44" rx="6" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="195" y="602" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">正常：IO 走 A</text>
+  <text x="195" y="619" font-size="10" fill="#2F6B5E" text-anchor="middle">B 空载待命</text>
+
+  <rect x="280" y="584" width="290" height="44" rx="6" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.5"/>
+  <text x="425" y="602" font-size="11.5" font-weight="700" fill="#B0503F" text-anchor="middle">① 检测窗口 —— 切换延迟的大头</text>
+  <text x="425" y="619" font-size="10" fill="#B0503F" text-anchor="middle">IO 在此期间 hang 住</text>
+
+  <rect x="570" y="584" width="180" height="44" rx="6" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.4"/>
+  <text x="660" y="602" font-size="11.5" font-weight="700" fill="#5C4A28" text-anchor="middle">② 摘除 ＋ ③ 重排</text>
+  <text x="660" y="619" font-size="10" fill="#5C4A28" text-anchor="middle">μs 级</text>
+
+  <rect x="750" y="584" width="400" height="44" rx="6" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="950" y="602" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">IO 全部走 B</text>
+  <text x="950" y="619" font-size="10" fill="#2F6B5E" text-anchor="middle">B 的在途窗口瞬间翻倍 → 延迟按排队论上抬</text>
+
+  <!-- 时间轴 -->
+  <path d="M110,644 L1156,644" fill="none" stroke="#5A564B" stroke-width="2" marker-end="url(#arrn)"/>
+  <path d="M280,572 L280,656" fill="none" stroke="#B0503F" stroke-width="2.4"/>
+  <text x="280" y="670" font-size="11" font-weight="700" fill="#B0503F" text-anchor="middle">t₀ 链路断</text>
+
+  <!-- 相位说明 -->
+  <text x="425" y="692" font-size="10.5" fill="#6B675C" text-anchor="middle">有信号（link down / QP error）：ms 级</text>
+  <text x="425" y="709" font-size="10.5" fill="#6B675C" text-anchor="middle">静默死：等 keep-alive（KATO，Linux 默认 5 s）兜底</text>
+  <text x="660" y="692" font-size="10.5" fill="#6B675C" text-anchor="middle">publish 新路径表（RCU 写端）</text>
+  <text x="660" y="709" font-size="10.5" fill="#6B675C" text-anchor="middle">在途 bio 收回 → 重投到 B</text>
+  <text x="950" y="692" font-size="10.5" fill="#6B675C" text-anchor="middle">切换「成功」≠ 回到从前：</text>
+  <text x="950" y="709" font-size="10.5" fill="#6B675C" text-anchor="middle">容量必须按 N−1 条路规划</text>
+
+  <!-- 后台重连带 -->
+  <rect x="280" y="732" width="870" height="50" rx="7" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3" stroke-dasharray="6,4"/>
+  <text x="715" y="753" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">④ 后台重连（不挡 IO）：每 reconnect_delay（默认 10 s）重试一次重建路径 A</text>
+  <text x="715" y="771" font-size="10.5" fill="#6B675C" text-anchor="middle">ctrl_loss_tmo（默认 600 s）内不放弃；连上即 publish 回路径表，A 重新参与选路</text>
+
+  <!-- 尾延迟标注 -->
+  <path d="M280,800 L280,810 L750,810 L750,800" fill="none" stroke="#B0503F" stroke-width="1.8"/>
+  <text x="515" y="834" font-size="12.5" font-weight="700" fill="#B0503F" text-anchor="middle">受害 IO 的额外延迟 ≈ 检测窗口（大头）＋ μs 级重排</text>
+  <text x="515" y="854" font-size="10.5" fill="#6B675C" text-anchor="middle">调多路径 ≈ 调检测：更灵敏 = 更快切换，也 = 更容易把网络抖动误判成死亡</text>
+
+  <rect x="110" y="872" width="1040" height="42" rx="8" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="630" y="898" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle">军规：冗余沿故障域画（网卡/交换机/target 口全分开）；冗余带宽不是容量，负载按 N−1 条路规划</text>
+</svg>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>epoll LT 与 ET 动画 · 水平触发反复通知 · 边缘触发一次 · 非阻塞读到 EAGAIN</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ===== LT / ET 共用舞台 ===== */
+.lt-stage{position:relative;width:578px;height:340px;margin:2px auto 0;}
+.lt-buf{position:absolute;left:40px;top:40px;width:200px;height:200px;border:1.5px solid var(--brown);border-radius:11px;background:var(--paper);overflow:hidden;}
+.lt-buf .t{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:11px;font-weight:700;color:var(--brown);}
+.lt-fill{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(24,95,165,.22);transition:height var(--dur) var(--ease);}
+.lt-byte{position:absolute;left:50%;transform:translateX(-50%);width:72px;height:22px;border-radius:5px;background:var(--blue);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:bottom var(--dur) var(--ease),opacity var(--dur) var(--ease),background var(--dur) var(--ease);}
+.lt-loop{position:absolute;left:280px;top:30px;width:260px;height:100px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);}
+.lt-loop .t{position:absolute;top:6px;left:10px;font-family:var(--mono);font-size:10px;color:var(--faint);font-weight:700;}
+.lt-ret{position:absolute;left:300px;top:55px;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--muted);padding:6px 14px;border-radius:8px;border:1.5px solid var(--line);background:var(--gray);transition:all var(--dur) var(--ease);}
+.lt-ret.fire{color:var(--green);border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 3px rgba(15,110,86,.2);}
+.lt-ret.silent{color:var(--faint);border-color:var(--line);background:var(--gray);opacity:.55;}
+.lt-read{position:absolute;left:280px;top:150px;width:260px;height:90px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);}
+.lt-read .t{position:absolute;top:6px;left:10px;font-family:var(--mono);font-size:10px;color:var(--faint);font-weight:700;}
+.lt-call{position:absolute;left:300px;top:178px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--blue);background:var(--bluebg);border:1.5px solid var(--blue);border-radius:7px;padding:4px 12px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.lt-call.on{opacity:1;}
+.lt-badge{position:absolute;font-size:10.5px;font-weight:700;border:1.5px solid;border-radius:999px;padding:2px 10px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;}
+.lt-badge.on{opacity:1;}
+.lt-badge.g{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.lt-badge.h{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.lt-badge.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.lt-badge.b{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.lt-timeline{position:absolute;left:40px;top:270px;right:40px;height:50px;border-top:1.5px dashed var(--line);}
+.lt-tick{position:absolute;top:8px;font-family:var(--mono);font-size:10px;color:var(--faint);transform:translateX(-50%);}
+.lt-dot{position:absolute;top:-5px;width:10px;height:10px;border-radius:50%;background:var(--line);transform:translateX(-50%);transition:background var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.lt-dot.on{background:var(--green);transform:translateX(-50%) scale(1.3);}
+.lt-dot.miss{background:var(--danger);}
+
+/* ===== 非阻塞读循环 ===== */
+.et-stage{position:relative;width:578px;height:340px;margin:2px auto 0;}
+.et-code-flow{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.et-step{border:1.5px solid var(--grid);border-radius:9px;padding:8px 12px;font-size:12px;color:var(--muted);background:var(--paper);opacity:.35;transition:all var(--dur) var(--ease);font-family:var(--mono);}
+.et-step.lit{opacity:1;border-color:var(--ink);color:var(--ink);box-shadow:0 2px 6px rgba(60,55,40,.08);}
+.et-step.ok{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.et-step.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+.et-step.warn{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.et-side{position:absolute;right:0;top:0;width:220px;height:320px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);padding:12px;}
+.et-side .t{font-family:var(--mono);font-size:10px;color:var(--faint);font-weight:700;margin-bottom:10px;}
+.et-bar{height:14px;border:1.5px solid var(--brown);border-radius:7px;overflow:hidden;background:var(--panel);margin:8px 0;}
+.et-bar-fill{height:100%;width:0;background:var(--blue);transition:width var(--dur) var(--ease);}
+.et-bar-fill.empty{background:var(--gray);}
+.et-stat{font-size:11px;color:var(--muted);margin:4px 0;font-family:var(--mono);}
+.et-stat b{color:var(--ink);}
+.et-warn{margin-top:12px;font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;border:1.5px solid var(--danger);background:var(--dangerbg);color:var(--danger);opacity:0;transition:opacity var(--dur) var(--ease);}
+.et-warn.on{opacity:1;}
+.et-ok{margin-top:12px;font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;border:1.5px solid var(--green);background:var(--greenbg);color:var(--green);opacity:0;transition:opacity var(--dur) var(--ease);}
+.et-ok.on{opacity:1;}
+
+/* ===== 对照 ===== */
+.cmp-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.cmp-card{border:1.5px solid var(--grid);border-radius:11px;padding:12px 14px;background:var(--paper);transition:all var(--dur) var(--ease);opacity:.4;}
+.cmp-card.lit{opacity:1;border-color:var(--ink);box-shadow:0 2px 8px rgba(60,55,40,.1);}
+.cmp-card h3{font-size:13px;font-weight:700;margin-bottom:8px;}
+.cmp-card.lt h3{color:var(--blue);}
+.cmp-card.et h3{color:var(--brown);}
+.cmp-item{font-size:11.5px;color:var(--muted);margin:5px 0;padding-left:2px;}
+.cmp-item.show{color:var(--ink);}
+.cmp-item b{color:var(--ink);}
+.cmp-verdict{margin-top:12px;border:1.5px solid var(--green);background:var(--greenbg);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--green);font-weight:600;opacity:0;transition:opacity var(--dur) var(--ease);}
+.cmp-verdict.on{opacity:1;}
+
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .hb{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>epoll LT 与 ET · 水平触发反复通知 / 边缘触发只提醒一次</h1>
+    <p>配套笔记《13.4 epoll模型》§8 · LT 只要有数据就一直提醒 · ET 必须非阻塞循环读到 EAGAIN　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+
+/* ========== 场景 1：LT 水平触发 ========== */
+const ltScene=(()=>{
+  const code=codeOf([
+    'ev.events = EPOLLIN;  <span class="cmt">// 默认 LT，无 EPOLLET</span>',
+    'epoll_ctl(epfd, ADD, fd, &ev);',
+    'n = epoll_wait(...);  <span class="cmt">// 缓冲区有数据 → 返回</span>',
+    'read(fd, buf, 10);    <span class="cmt">// 只读一部分也行</span>',
+    'n = epoll_wait(...);  <span class="cmt">// 还有剩余 → 再次返回</span>',
+    'read(fd, buf, 30);    <span class="cmt">// 读完 → 不再通知</span>'
+  ]);
+  // bytes: 4 blocks of 10B, bottom positions
+  const steps=[
+    {title:'步骤 0 · 接收缓冲空，无事件',chip:'空闲',chipC:'c0',lines:[0,1],
+     h:0,alive:4,read:0,ret:'silent',call:0,badge:'',ticks:[0,0,0,0],
+     desc:'LT 是 epoll 默认模式。此刻内核接收缓冲为空，<code>epoll_wait</code> 阻塞等待。记忆：<b>LT = 只要还有数据，就一直提醒你</b>。'},
+    {title:'步骤 1 · 40B 数据到达',chip:'有数据',chipC:'cb',lines:[2],
+     h:80,alive:4,read:0,ret:'fire',call:0,badge:'g',ticks:[1,0,0,0],
+     desc:'网络数据进入内核接收缓冲（40B）。状态从"空→非空"，<code>epoll_wait</code> <span class="gr">返回 EPOLLIN</span>。'},
+    {title:'步骤 2 · 应用只 read 10B',chip:'读一部分',chipC:'cb',lines:[3],
+     h:60,alive:3,read:1,ret:'silent',call:1,badge:'b',ticks:[1,0,0,0],
+     desc:'应用只读了 10B，缓冲还剩 30B。LT 允许这样——你<span class="bl">不必一次读完</span>。'},
+    {title:'步骤 3 · 下次 wait 再次返回',chip:'反复通知',chipC:'cg',lines:[4],
+     h:60,alive:3,read:1,ret:'fire',call:0,badge:'g',ticks:[1,1,0,0],
+     desc:'因为缓冲里<span class="gr">还有数据</span>，下一次 <code>epoll_wait</code> 会<span class="gr">再次返回</span>同一 fd。这就是"水平触发"：水平（有数据）持续为真就持续通知。'},
+    {title:'步骤 4 · 读完剩余 30B',chip:'读空',chipC:'cg',lines:[5],
+     h:0,alive:0,read:2,ret:'silent',call:1,badge:'b',ticks:[1,1,0,0],
+     desc:'应用把剩余 30B 读完，接收缓冲变空。'},
+    {title:'步骤 5 · 缓冲空 → 不再通知',chip:'停止提醒',chipC:'c0',lines:[5],
+     h:0,alive:0,read:2,ret:'silent',call:0,badge:'h',ticks:[1,1,1,0],
+     desc:'缓冲已空，后续 <code>epoll_wait</code> 不会再为这个 fd 返回，直到有<span class="hb">新数据</span>到达。LT 编程简单，不易丢事件。'},
+  ];
+  function mount(){
+    let h='<div class="lt-buf"><span class="t">内核接收缓冲</span><div class="lt-fill" id="ltFill"></div>';
+    for(let i=0;i<4;i++)h+='<div class="lt-byte" id="ltB'+i+'" style="bottom:'+(12+i*26)+'px">10B</div>';
+    h+='</div>';
+    h+='<div class="lt-loop"><span class="t">epoll_wait</span></div>';
+    h+='<div class="lt-ret" id="ltRet">等待中…</div>';
+    h+='<div class="lt-read"><span class="t">应用 read()</span></div>';
+    h+='<div class="lt-call" id="ltCall">read(fd, buf, …)</div>';
+    h+='<span class="lt-badge g" id="ltBadge" style="left:300px;top:120px"></span>';
+    h+='<div class="lt-timeline">';
+    [0,1,2,3].forEach(i=>{
+      const x=40+i*140;
+      h+='<div class="lt-dot" id="ltD'+i+'" style="left:'+x+'px"></div>';
+      h+='<span class="lt-tick" style="left:'+x+'px">round '+(i+1)+'</span>';
+    });
+    h+='</div>';
+    viz.innerHTML='<div class="vcap"><b>LT 水平触发</b>：缓冲有数据 → 反复通知，直到读空</div><div class="lt-stage">'+h+'</div>';
+  }
+  function paint(s){
+    el('ltFill').style.height=s.h+'%';
+    for(let i=0;i<4;i++){
+      const b=el('ltB'+i);
+      const alive=i<s.alive;
+      b.style.opacity=alive?1:0;
+      b.style.bottom=(12+i*26)+'px';
+      b.style.background=alive?'var(--blue)':'var(--green)';
+    }
+    const r=el('ltRet');
+    r.className='lt-ret '+s.ret;
+    r.textContent=s.ret==='fire'?'返回 EPOLLIN':'等待中…';
+    el('ltCall').classList.toggle('on',!!s.call);
+    el('ltCall').textContent=s.read===1?'read 10B（剩 30B）':s.read===2?'read 30B（读空）':'read(fd, buf, …)';
+    const badge=el('ltBadge');
+    const labels={g:s.ret==='fire'&&s.h===80?'数据到达 · 首次通知':'仍有数据 · 再次通知',b:s.read===1?'只读一部分也安全':'读空缓冲',h:'缓冲空 · 停止通知',d:''};
+    badge.className='lt-badge '+(s.badge||'g')+(s.badge?' on':'');
+    badge.textContent=labels[s.badge]||'';
+    s.ticks.forEach((v,i)=>{el('ltD'+i).className='lt-dot'+(v?' on':'');});
+  }
+  return {id:'lt',label:'LT 水平触发',sub:'有数据就反复通知',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：ET 边缘触发 ========== */
+const etScene=(()=>{
+  const code=codeOf([
+    'ev.events = EPOLLIN | EPOLLET;  <span class="cmt">// 边缘触发</span>',
+    'epoll_ctl(epfd, ADD, fd, &ev);',
+    'n = epoll_wait(...);  <span class="cmt">// 空→非空 边沿，通知一次</span>',
+    'read(fd, buf, 10);    <span class="cmt">// 只读一部分</span>',
+    'n = epoll_wait(...);  <span class="cmt">// 未读完也不再返回！</span>',
+    '<span class="cmt">// 必须循环 read 到 EAGAIN 才安全</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · ET 模式注册',chip:'EPOLLET',chipC:'c0',lines:[0,1],
+     h:0,alive:4,read:0,ret:'silent',call:0,badge:'',ticks:[0,0,0,0],
+     desc:'设置 <code>EPOLLET</code> 启用边缘触发。记忆：<b>ET = 只在状态变化的边沿提醒一次</b>。'},
+    {title:'步骤 1 · 40B 到达，边沿触发一次',chip:'通知一次',chipC:'cg',lines:[2],
+     h:80,alive:4,read:0,ret:'fire',call:0,badge:'g',ticks:[1,0,0,0],
+     desc:'缓冲从空变为非空——这是一个<span class="gr">上升沿</span>。<code>epoll_wait</code> 返回一次 EPOLLIN。'},
+    {title:'步骤 2 · 只 read 10B（危险示范）',chip:'未读完',chipC:'ch',lines:[3],
+     h:60,alive:3,read:1,ret:'silent',call:1,badge:'h',ticks:[1,0,0,0],
+     desc:'应用只读了 10B，剩 30B。在 LT 下下次还会通知；但在 ET 下……'},
+    {title:'步骤 3 · 下次 wait：沉默！',chip:'不再通知',chipC:'cd',lines:[4],
+     h:60,alive:3,read:1,ret:'silent',call:0,badge:'d',ticks:[1,0,1,0],
+     desc:'缓冲里还有 30B，但状态没有"新变化"（仍是非空），ET <span class="dg">不再返回</span>这个 fd。残留数据可能被饿死——这是 ET 最常见的坑。'},
+    {title:'步骤 4 · 正确做法：一次读到 EAGAIN',chip:'读尽',chipC:'cg',lines:[5],
+     h:0,alive:0,read:2,ret:'silent',call:1,badge:'g',ticks:[1,0,1,0],
+     desc:'正确姿势：在第一次通知后，<span class="gr">循环 read 直到 EAGAIN</span>，把缓冲读空。这样就不会依赖"再次通知"。'},
+    {title:'步骤 5 · 新数据再来才再通知',chip:'新边沿',chipC:'cb',lines:[2],
+     h:40,alive:2,read:0,ret:'fire',call:0,badge:'b',ticks:[1,0,1,1],
+     desc:'只有缓冲再次经历<span class="bl">空→非空</span>（或读空后新数据到达）才会再次触发。ET 减少 wait 返回次数，但编程要求严格。'},
+  ];
+  function mount(){
+    let h='<div class="lt-buf"><span class="t">内核接收缓冲</span><div class="lt-fill" id="etFill"></div>';
+    for(let i=0;i<4;i++)h+='<div class="lt-byte" id="etB'+i+'" style="bottom:'+(12+i*26)+'px">10B</div>';
+    h+='</div>';
+    h+='<div class="lt-loop"><span class="t">epoll_wait · ET</span></div>';
+    h+='<div class="lt-ret" id="etRet">等待中…</div>';
+    h+='<div class="lt-read"><span class="t">应用 read()</span></div>';
+    h+='<div class="lt-call" id="etCall">read(fd, buf, …)</div>';
+    h+='<span class="lt-badge g" id="etBadge" style="left:300px;top:120px"></span>';
+    h+='<div class="lt-timeline">';
+    [0,1,2,3].forEach(i=>{
+      const x=40+i*140;
+      h+='<div class="lt-dot" id="etD'+i+'" style="left:'+x+'px"></div>';
+      h+='<span class="lt-tick" style="left:'+x+'px">round '+(i+1)+'</span>';
+    });
+    h+='</div>';
+    viz.innerHTML='<div class="vcap"><b>ET 边缘触发</b>：只在状态变化时通知一次 · 未读完不再提醒</div><div class="lt-stage">'+h+'</div>';
+  }
+  function paint(s){
+    el('etFill').style.height=s.h+'%';
+    for(let i=0;i<4;i++){
+      const b=el('etB'+i);
+      const alive=i<s.alive;
+      b.style.opacity=alive?1:0;
+      b.style.bottom=(12+i*26)+'px';
+    }
+    const r=el('etRet');
+    r.className='lt-ret '+s.ret;
+    r.textContent=s.ret==='fire'?'返回 EPOLLIN（一次）':'不再返回此 fd';
+    if(s.badge==='d')r.textContent='沉默 · 残留数据饿死风险';
+    el('etCall').classList.toggle('on',!!s.call);
+    el('etCall').textContent=s.read===1?'read 10B（剩 30B）⚠':s.read===2?'循环 read 到 EAGAIN':'read(fd, buf, …)';
+    const badge=el('etBadge');
+    const labels={g:s.read===2?'循环读尽 · 安全':'边沿触发 · 仅一次',h:'只读一部分 · 危险',d:'未读完也不再通知！',b:'新数据 · 新边沿'};
+    badge.className='lt-badge '+(s.badge||'g')+(s.badge?' on':'');
+    badge.textContent=labels[s.badge]||'';
+    s.ticks.forEach((v,i)=>{
+      const d=el('etD'+i);
+      d.className='lt-dot'+(v?(i===2&&s.badge==='d'?' miss':' on'):'');
+    });
+  }
+  return {id:'et',label:'ET 边缘触发',sub:'只通知一次 · 必须读尽',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：非阻塞读循环 ========== */
+const loopScene=(()=>{
+  const code=codeOf([
+    'fcntl(fd, F_SETFL, O_NONBLOCK);  <span class="cmt">// 必须非阻塞</span>',
+    'while (true) {',
+    '  n = recv(fd, buf, sizeof(buf), 0);',
+    '  if (n > 0)  process(buf, n);',
+    '  else if (n == 0) { close(fd); break; }',
+    '  else if (errno == EAGAIN) break;  <span class="cmt">// 读空边界</span>',
+    '  else if (errno == EINTR) continue;',
+    '  else { close(fd); break; }',
+    '}'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 为何必须非阻塞？',chip:'阻塞陷阱',chipC:'cd',lines:[0],
+     lit:0,pct:60,stat:'缓冲 60%',warn:1,ok:0,
+     desc:'若 fd 是<span class="dg">阻塞</span>的：循环 read 把缓冲读空后，下一次 read 会<span class="dg">睡眠等待新数据</span>——整个 EventLoop 卡死，其他连接全部停摆。'},
+    {title:'步骤 1 · 设为 O_NONBLOCK',chip:'非阻塞',chipC:'cb',lines:[0],
+     lit:0,pct:60,stat:'fd 非阻塞',warn:0,ok:0,
+     desc:'<code>fcntl(O_NONBLOCK)</code> 后，缓冲为空时 read 立刻返回 <code>-1</code> 且 <code>errno=EAGAIN</code>，而不是挂起线程。EAGAIN 不是错误，是<span class="bl">"读空边界"</span>。'},
+    {title:'步骤 2 · while 循环开始 recv',chip:'循环读',chipC:'cb',lines:[1,2],
+     lit:1,pct:60,stat:'recv #1',warn:0,ok:0,
+     desc:'进入 <code>while(true)</code>，调用 <code>recv</code>。缓冲有数据时立即返回读到的字节数。'},
+    {title:'步骤 3 · n>0 处理数据，继续循环',chip:'n>0',chipC:'cg',lines:[3],
+     lit:2,pct:30,stat:'recv #2 · 处理中',warn:0,ok:0,
+     desc:'<code>n>0</code>：把数据交给协议解析 / 业务，然后<span class="gr">继续循环</span>——不要 return，缓冲里可能还有。'},
+    {title:'步骤 4 · 缓冲读空 → EAGAIN → break',chip:'EAGAIN',chipC:'cg',lines:[5],
+     lit:3,pct:0,stat:'errno = EAGAIN',warn:0,ok:1,
+     desc:'缓冲为空时非阻塞 recv 返回 -1 / EAGAIN。这就是<span class="gr">"这一轮可以停了"</span>的信号——<code>break</code> 回到 EventLoop，等待下一次边沿。'},
+    {title:'步骤 5 · 其他分支：对端关闭 / 真错误',chip:'n==0 / 错误',chipC:'ch',lines:[4,6,7],
+     lit:4,pct:0,stat:'完整分支',warn:0,ok:1,
+     desc:'<code>n==0</code>：对端关闭，走 close 路径。<code>EINTR</code>：被信号打断，continue。<code>其他 errno</code>：真错误，关闭连接。高频面试点：<b>ET + 非阻塞 + 循环到 EAGAIN</b>。'},
+  ];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>ET 正确读法</b>：非阻塞 + 循环到 EAGAIN</div>'+
+      '<div class="et-stage">'+
+        '<div class="et-code-flow" style="width:330px">'+
+          '<div class="et-step" id="es0">① fcntl → O_NONBLOCK</div>'+
+          '<div class="et-step" id="es1">② while(true) { recv(...) }</div>'+
+          '<div class="et-step" id="es2">③ n&gt;0 → process → 继续</div>'+
+          '<div class="et-step" id="es3">④ EAGAIN → break（读空）</div>'+
+          '<div class="et-step" id="es4">⑤ n==0 / 错误 → close</div>'+
+        '</div>'+
+        '<div class="et-side">'+
+          '<div class="t">接收缓冲水位</div>'+
+          '<div class="et-bar"><div class="et-bar-fill" id="esFill"></div></div>'+
+          '<div class="et-stat" id="esStat">缓冲 —</div>'+
+          '<div class="et-warn" id="esWarn">阻塞 fd 会把 EventLoop 卡死</div>'+
+          '<div class="et-ok" id="esOk">EAGAIN = 读空边界 · 安全退出</div>'+
+        '</div>'+
+      '</div>';
+  }
+  function paint(s){
+    for(let i=0;i<5;i++){
+      const e=el('es'+i);
+      let c='et-step';
+      if(s.lit===i)c+=' lit'+(i===0&&s.warn?' bad':i===3||i===4?' ok':i===2?' ok':'');
+      else if(s.lit>i)c+=' lit ok';
+      e.className=c;
+    }
+    const f=el('esFill');
+    f.style.width=s.pct+'%';
+    f.classList.toggle('empty',s.pct===0);
+    el('esStat').innerHTML='<b>'+s.stat+'</b>';
+    el('esWarn').classList.toggle('on',!!s.warn);
+    el('esOk').classList.toggle('on',!!s.ok);
+  }
+  return {id:'loop',label:'非阻塞读循环',sub:'读到 EAGAIN 才停',steps,mount,paint,code};
+})();
+
+/* ========== 场景 4：对照 ========== */
+const cmpScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// LT：默认，编程简单</span>',
+    'ev.events = EPOLLIN;',
+    '<span class="cmt">// ET：高性能，必须非阻塞+读尽</span>',
+    'ev.events = EPOLLIN | EPOLLET;',
+    'fcntl(fd, F_SETFL, O_NONBLOCK);',
+    '<span class="cmt">// while(recv) until EAGAIN</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 并排对比 LT / ET',chip:'对照',chipC:'c0',lines:[],
+     lit:'both',rows:0,verdict:0,
+     desc:'两种触发模式解决同一问题："何时告诉应用 fd 就绪"，策略不同。'},
+    {title:'步骤 1 · 触发条件',chip:'何时通知',chipC:'cb',lines:[1,3],
+     lit:'both',rows:1,verdict:0,
+     desc:'LT：只要 fd 仍可读/可写就<span class="bl">反复通知</span>。ET：仅在状态<span class="hb">发生变化</span>（边沿）时通知一次。'},
+    {title:'步骤 2 · 编程要求',chip:'怎么写',chipC:'ch',lines:[4,5],
+     lit:'both',rows:2,verdict:0,
+     desc:'LT：可以一次只处理一部分，编程简单。ET：<span class="hb">必须非阻塞</span>，并循环处理到 EAGAIN，否则丢事件或卡死。'},
+    {title:'步骤 3 · 性能与风险',chip:'取舍',chipC:'cd',lines:[0,2],
+     lit:'both',rows:3,verdict:0,
+     desc:'LT：wait 返回次数可能更多，但不易出错。ET：减少返回次数，适合海量连接，但<span class="dg">写错就静默丢数据或卡 EventLoop</span>。'},
+    {title:'步骤 4 · 选型建议',chip:'怎么选',chipC:'cg',lines:[5],
+     lit:'both',rows:3,verdict:1,
+     desc:'学习/稳健优先用 LT；追求极致吞吐且团队熟悉非阻塞 IO 时用 ET。无论哪种，真正的 read/write 仍由应用完成——这就是 Reactor 要组织的下一层。'},
+  ];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>LT vs ET</b>：触发条件 · 编程要求 · 取舍</div>'+
+      '<div class="cmp-row2">'+
+        '<div class="cmp-card lt" id="cLT"><h3>LT 水平触发</h3>'+
+          '<div class="cmp-item" id="ci0l">有数据就反复 epoll_wait 返回</div>'+
+          '<div class="cmp-item" id="ci1l">可只读一部分，编程简单</div>'+
+          '<div class="cmp-item" id="ci2l">返回次数可能更多，不易丢事件</div>'+
+        '</div>'+
+        '<div class="cmp-card et" id="cET"><h3>ET 边缘触发</h3>'+
+          '<div class="cmp-item" id="ci0e">状态变化时只通知一次</div>'+
+          '<div class="cmp-item" id="ci1e">必须非阻塞 + 循环到 EAGAIN</div>'+
+          '<div class="cmp-item" id="ci2e">返回少、吞吐高，写错代价大</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="cmp-verdict" id="cV">面试点：ET + 非阻塞 + while(recv) until EAGAIN</div>';
+  }
+  function paint(s){
+    el('cLT').classList.toggle('lit',s.lit==='both'||s.lit==='lt');
+    el('cET').classList.toggle('lit',s.lit==='both'||s.lit==='et');
+    for(let i=0;i<3;i++){
+      const on=s.rows>i;
+      el('ci'+i+'l').classList.toggle('show',on);
+      el('ci'+i+'e').classList.toggle('show',on);
+    }
+    el('cV').classList.toggle('on',!!s.verdict);
+  }
+  return {id:'compare',label:'对照总结',sub:'LT vs ET 选型',steps,mount,paint,code};
+})();
+
+const SCENES=[ltScene,etScene,loopScene,cmpScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

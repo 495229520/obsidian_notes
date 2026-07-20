@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 980" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；框 #E3EAF4/#3D5A80/#2C4460；
+       专色 #EFE7D6/#8A6D3B；数据面/收益 #E2EFE9/#2F6B5E；瓶颈 #F4E3DE/#B0503F -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0503F"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="980" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">元数据路径：每次 IO 都要过的那把「分布式的锁」</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">一次 IO ＝ M 段（问路：小消息，RTT 与排队主导）＋ D 段（搬数据：大块，带宽主导）—— 两段性质不同，扩展手段不同</text>
+
+  <!-- ═══ 流转面板 ═══ -->
+  <rect x="48" y="104" width="1144" height="420" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">一次 open ＋ read 的流转：数据不过 MDS，「问路」却谁也绕不开</text>
+
+  <!-- client -->
+  <rect x="80" y="200" width="200" height="200" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="180" y="226" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">client</text>
+  <rect x="100" y="242" width="160" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="180" y="261" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">open("/data/train/…")</text>
+  <text x="180" y="279" font-size="10" fill="#2C4460" text-anchor="middle">先问路，后搬数据</text>
+  <rect x="100" y="308" width="160" height="46" rx="6" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="180" y="327" font-size="11" font-weight="700" fill="#2F6B5E" text-anchor="middle">read 4 KiB</text>
+  <text x="180" y="345" font-size="10" fill="#2F6B5E" text-anchor="middle">拿到位置后直连存储</text>
+
+  <!-- MDS -->
+  <rect x="470" y="152" width="330" height="230" rx="8" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.6"/>
+  <text x="635" y="178" font-size="13" font-weight="700" fill="#B0503F" text-anchor="middle">MDS（元数据服务）—— 瓶颈本体</text>
+  <rect x="490" y="192" width="290" height="50" rx="6" fill="#FAF9F2" stroke="#B0503F" stroke-width="1.2"/>
+  <text x="635" y="212" font-size="10.5" font-weight="700" fill="#B0503F" text-anchor="middle">M2：路径解析＋权限＋目录树并发控制</text>
+  <text x="635" y="230" font-size="10" fill="#B0503F" text-anchor="middle">单机 VFS 的 dcache 走查（1.1）搬到服务端＋排队</text>
+  <rect x="490" y="252" width="290" height="50" rx="6" fill="#FAF9F2" stroke="#B0503F" stroke-width="1.2"/>
+  <text x="635" y="272" font-size="10.5" font-weight="700" fill="#B0503F" text-anchor="middle">M3：写操作先记 WAL ＋ fdatasync（6.1）</text>
+  <text x="635" y="290" font-size="10" fill="#B0503F" text-anchor="middle">元数据写延迟的硬地板</text>
+  <rect x="490" y="312" width="290" height="50" rx="6" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="635" y="332" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">四张表：命名空间 / 布局 / 位置 / 租约</text>
+  <text x="635" y="350" font-size="10" fill="#6B675C" text-anchor="middle">KB 级记录 —— 问题不在容量，在 QPS 与一致性</text>
+
+  <!-- M 段箭头 -->
+  <path d="M280,258 C360,240 400,220 466,212" fill="none" stroke="#B0503F" stroke-width="2" marker-end="url(#arrr)"/>
+  <path d="M466,236 C400,250 360,262 284,270" fill="none" stroke="#B0503F" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrr)"/>
+  <text x="330" y="200" font-size="11" font-weight="700" fill="#B0503F">M1：问路 RTT（逐级解析则多次往返）</text>
+  <text x="330" y="292" font-size="10.5" fill="#B0503F">④ 返回 inode＋分片位置（小消息）</text>
+
+  <!-- 存储节点 -->
+  <rect x="900" y="152" width="270" height="330" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="1035" y="178" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">存储节点 ×N（可水平扩展）</text>
+  <rect x="920" y="196" width="230" height="44" rx="6" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1035" y="222" font-size="10.5" fill="#2F6B5E" text-anchor="middle">节点 1：本地引擎（第 1~3 章路径）</text>
+  <rect x="920" y="252" width="230" height="44" rx="6" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1035" y="278" font-size="10.5" fill="#2F6B5E" text-anchor="middle">节点 2：D2 盘服务时间＋一次 DMA</text>
+  <rect x="920" y="308" width="230" height="44" rx="6" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1035" y="334" font-size="10.5" fill="#2F6B5E" text-anchor="middle">节点 3：…（加盘加网卡即扩容）</text>
+  <text x="1035" y="386" font-size="10" fill="#6B675C" text-anchor="middle">位置来自 7.1 的摆放结果</text>
+  <text x="1035" y="404" font-size="10" fill="#6B675C" text-anchor="middle">数据路径按带宽扩展</text>
+
+  <!-- D 段箭头 -->
+  <path d="M280,331 C560,380 760,300 896,240" fill="none" stroke="#2F6B5E" stroke-width="3" marker-end="url(#arrg)"/>
+  <text x="560" y="412" font-size="11.5" font-weight="700" fill="#2F6B5E">⑤~⑦ D 段：数据直连搬运（大块、带宽主导）—— 数据不过 MDS</text>
+
+  <!-- 对比条 -->
+  <rect x="80" y="440" width="1088" height="64" rx="8" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.4"/>
+  <text x="624" y="466" font-size="12" font-weight="700" fill="#5C4A28" text-anchor="middle">小文件负载专杀元数据：一万个 10 KiB 文件 ＝ 一万组 M 段 —— 集群 IOPS 上限 ＝ MDS 的 QPS 上限</text>
+  <text x="624" y="490" font-size="10.5" fill="#5C4A28" text-anchor="middle">加万兆网卡对 M 段毫无帮助；负载侧解法 ＝ 小文件打包成大文件（7.6），存储侧解法 ＝ 下面三代扩展</text>
+
+  <!-- ═══ 三代方案 ═══ -->
+  <rect x="48" y="528" width="1144" height="430" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="556" font-size="14" font-weight="700" fill="#4A473F">三代扩展 ＝ 共享 map 并发优化的三步：一把锁 → 分段锁 → 快照读＋失效协议</text>
+
+  <!-- 第一代 -->
+  <rect x="76" y="576" width="350" height="300" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="251" y="602" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">① 单点全内存（GFS / HDFS NameNode）</text>
+  <rect x="126" y="620" width="250" height="66" rx="7" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.4"/>
+  <text x="251" y="646" font-size="11.5" font-weight="700" fill="#B0503F" text-anchor="middle">整棵树在一台机器内存里</text>
+  <text x="251" y="668" font-size="10.5" fill="#B0503F" text-anchor="middle">≈ 一把大锁保护整个 map</text>
+  <text x="96" y="716" font-size="10.5" fill="#4A473F">＋ 实现简单，单点即全序，一致性天然</text>
+  <text x="96" y="740" font-size="10.5" fill="#B0503F">− 内存装不下十亿 inode</text>
+  <text x="96" y="762" font-size="10.5" fill="#B0503F">− 单机 QPS 上限 ＝ 集群上限</text>
+  <text x="96" y="784" font-size="10.5" fill="#B0503F">− 重启加载全量要几十分钟</text>
+  <text x="96" y="828" font-size="10" fill="#6B675C">瓶颈位置：那一台机器本身</text>
+
+  <!-- 第二代 -->
+  <rect x="446" y="576" width="350" height="300" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="621" y="602" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">② 分片（≈ 分段锁）</text>
+  <rect x="472" y="620" width="140" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="542" y="644" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">按子树切</text>
+  <text x="542" y="662" font-size="9.5" fill="#2C4460" text-anchor="middle">局部性好，热点仍单机</text>
+  <rect x="630" y="620" width="140" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="700" y="644" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">按哈希切</text>
+  <text x="700" y="662" font-size="9.5" fill="#2C4460" text-anchor="middle">天然均匀，局部性没了</text>
+  <rect x="472" y="700" width="298" height="64" rx="7" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.4"/>
+  <text x="621" y="724" font-size="10.5" font-weight="700" fill="#B0503F" text-anchor="middle">跨分片 rename ＝ 分布式事务</text>
+  <text x="621" y="746" font-size="9.5" fill="#B0503F" text-anchor="middle">单机 scoped_lock 一行的事，换了复杂度档次</text>
+  <text x="466" y="796" font-size="10.5" fill="#4A473F">＋ QPS 随分片数扩展</text>
+  <text x="466" y="820" font-size="10.5" fill="#B0503F">− readdir 扇出 / 热点子树 / 迁移</text>
+  <text x="466" y="852" font-size="10" fill="#6B675C">瓶颈位置：跨分片操作与热点段</text>
+
+  <!-- 第三代 -->
+  <rect x="816" y="576" width="350" height="300" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="991" y="602" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">③ 事务 KV ＋ 客户端租约缓存</text>
+  <rect x="842" y="620" width="298" height="56" rx="7" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="991" y="642" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">MDS 无状态化：mkdir → 几条 KV 事务</text>
+  <text x="991" y="660" font-size="9.5" fill="#2F6B5E" text-anchor="middle">扩展/事务/容灾复用 TiKV / FoundationDB</text>
+  <rect x="842" y="690" width="298" height="74" rx="7" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="991" y="712" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">租约 ＝ 分布式 MESI</text>
+  <text x="991" y="732" font-size="9.5" fill="#2F6B5E" text-anchor="middle">租约内免 RTT（≈ Shared）；要改则回收/等过期</text>
+  <text x="991" y="750" font-size="9.5" fill="#2F6B5E" text-anchor="middle">用时间换消息可靠性 —— 回收最慢等满租期</text>
+  <text x="836" y="796" font-size="10.5" fill="#4A473F">＋ 命中缓存的 M 段 ≈ 0 RTT</text>
+  <text x="836" y="820" font-size="10.5" fill="#B0503F">− 每个元数据操作 ＝ 一次 KV 事务延迟</text>
+  <text x="836" y="852" font-size="10" fill="#6B675C">瓶颈位置：KV 事务与租约回收尾延迟（JuiceFS / 3FS 在此）</text>
+</svg>

@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1120" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       成本/等待 #A64B3C；零成本 #2F6B5E；数据流箭头绿色；与本库既有 SVG 同一套 -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1120" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">一次 4 KiB 远程读：等待点与拷贝逐步对账（RDMA transport · 内核态两端）</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">六个等待点里盘仍是最大头；网络加约一个 RTT；host 保留中断 + 唤醒——最后这两项正是 5.7 用户态路径要删的</text>
+
+  <!-- 泳道 -->
+  <rect x="48" y="104" width="300" height="720" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="198" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">Host：应用 + 内核</text>
+  <rect x="364" y="104" width="180" height="720" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="454" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">Host 网卡</text>
+  <rect x="560" y="104" width="320" height="720" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="720" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">Target：CPU + 内存</text>
+  <rect x="896" y="104" width="296" height="720" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="1044" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">Target SSD</text>
+
+  <!-- ① -->
+  <rect x="62" y="152" width="272" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="198" y="175" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① read() / io_uring → 块层 blk-mq</text>
+  <text x="198" y="197" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点 A：块层排队（与本地盘同款）</text>
+
+  <path d="M198,212 L198,244" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ② -->
+  <rect x="62" y="248" width="272" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="198" y="271" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② nvme-fabrics：bio → 读 SQE(capsule)</text>
+  <text x="198" y="293" font-size="10.5" fill="#2C4460" text-anchor="middle">数据页快速注册（FRWR），rkey 装进 keyed SGL</text>
+
+  <path d="M334,278 L374,278" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ③ -->
+  <rect x="378" y="248" width="152" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="454" y="271" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ SEND capsule</text>
+  <text x="454" y="293" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点 B：网络去程</text>
+
+  <path d="M530,278 L570,368" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ④ -->
+  <rect x="574" y="344" width="292" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="720" y="367" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">④ nvmet：解 capsule → 转本地读命令</text>
+  <text x="720" y="389" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点 C：target 侧队列排队</text>
+
+  <path d="M866,374 L906,464" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑤ -->
+  <rect x="910" y="440" width="268" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1044" y="463" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑤ SSD 执行，DMA 写 target 内存</text>
+  <text x="1044" y="485" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点 D：盘服务时间（最大头）· T①</text>
+
+  <path d="M910,492 L870,556" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑥ -->
+  <rect x="574" y="536" width="292" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="720" y="559" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑥ RDMA WRITE：数据直写 host bio 页</text>
+  <text x="720" y="581" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">host CPU 不参与；T② 读出 → H① 写入</text>
+
+  <path d="M574,566 L534,566" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+
+  <!-- H① 落地 -->
+  <rect x="378" y="536" width="152" height="60" rx="7" fill="#E3EAF4" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="454" y="559" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">H①：DMA 直入</text>
+  <text x="454" y="581" font-size="10.5" fill="#2C4460" text-anchor="middle">数据落 bio 页，0 拷贝</text>
+
+  <path d="M720,596 L720,628" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑦ -->
+  <rect x="574" y="632" width="292" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="720" y="655" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑦ SEND response capsule（CQE 回家）</text>
+  <text x="720" y="677" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点 E：网络回程</text>
+
+  <path d="M574,668 L338,752" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="470" y="700" font-size="10.5" fill="#6B675C" text-anchor="middle">CQE 经 host 网卡 DMA 入内存</text>
+
+  <!-- ⑧ -->
+  <rect x="62" y="728" width="272" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="198" y="751" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑧ 中断 → 完成 bio → 唤醒应用</text>
+  <text x="198" y="773" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点 F：中断 + 调度唤醒（内核路径保留）</text>
+
+  <!-- 底部左：写路径 -->
+  <rect x="48" y="844" width="556" height="250" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="872" font-size="13.5" font-weight="700" fill="#4A473F">写路径的两条形状（方向反转，仍由 target 主导）</text>
+  <text x="72" y="906" font-size="12" fill="#4A473F">小写：数据装进 capsule 随命令同行（in-capsule data），省一次往返</text>
+  <text x="72" y="938" font-size="12" fill="#4A473F">大写：target 就绪后发 RDMA READ，从 host 内存把数据拉过来</text>
+  <text x="72" y="970" font-size="12" fill="#4A473F">读（上图）：target 用 RDMA WRITE 把数据推进 host 内存</text>
+  <text x="72" y="1002" font-size="12" font-weight="700" fill="#2F6B5E">共同点：搬运由 target 主导——按自己缓冲节奏拉推，天然背压</text>
+
+  <!-- 底部右：对账 -->
+  <rect x="636" y="844" width="556" height="250" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="660" y="872" font-size="13.5" font-weight="700" fill="#4A473F">对账（RDMA transport · 内核态两端）</text>
+  <text x="660" y="906" font-size="12" fill="#4A473F">CPU 拷贝：host 0 次（O_DIRECT）· target 0 次——零拷贝指 CPU</text>
+  <text x="660" y="938" font-size="12" fill="#4A473F">内存总线：target 2 次 DMA（T① 盘写入、T② 网卡读出）· host 1 次</text>
+  <text x="660" y="970" font-size="12" fill="#4A473F">等待点 A–F：排队 ×2 + 网络 ×2 + 盘 ×1 + 中断唤醒 ×1</text>
+  <text x="660" y="1002" font-size="12" font-weight="700" fill="#A64B3C">相对本地盘的增量设计目标：约 +10 μs 以内【量级】</text>
+</svg>

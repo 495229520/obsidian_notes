@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">就绪通知 vs 完成通知：同一次网络读，两条时间线</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">epoll 说“可以来拿了”，数据还要自己拷；io_uring 通知到达时，数据已经躺在你的 buffer 里</text>
+
+  <!-- 左泳道标题：epoll -->
+  <rect x="80" y="108" width="520" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="340" y="136" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">epoll + 非阻塞 read（就绪模型 / Reactor）</text>
+
+  <!-- 右泳道标题：io_uring -->
+  <rect x="640" y="108" width="520" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="900" y="136" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">io_uring recv（完成模型 / Proactor）</text>
+
+  <!-- 左泳道步骤 -->
+  <rect x="80" y="172" width="520" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="104" y="196" font-size="12" font-weight="700" fill="#2C4460">① epoll_wait() 陷入并睡眠 —— syscall #1</text>
+  <text x="104" y="218" font-size="11" fill="#2C4460">兴趣集在内核：红黑树；此刻就绪链表为空，线程让出 CPU</text>
+
+  <line x1="340" y1="230" x2="340" y2="252" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="256" width="520" height="58" rx="7" fill="#ECEAE0" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="104" y="280" font-size="12" font-weight="700" fill="#4A473F">② 网卡收包 → 协议栈把数据放进 socket 接收缓冲</text>
+  <text x="104" y="302" font-size="11" fill="#4A473F">数据此刻在内核内存里；应用还在睡</text>
+
+  <line x1="340" y1="314" x2="340" y2="336" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="340" width="520" height="58" rx="7" fill="#ECEAE0" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="104" y="364" font-size="12" font-weight="700" fill="#4A473F">③ ep_poll_callback：fd 挂进就绪链表 → 唤醒等待者</text>
+  <text x="104" y="386" font-size="11" fill="#4A473F">回调挂在 socket 等待队列上 —— 事件驱动，不是内核轮询</text>
+
+  <line x1="340" y1="398" x2="340" y2="420" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="424" width="520" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="104" y="448" font-size="12" font-weight="700" fill="#2C4460">④ epoll_wait 返回：“fd 可读”</text>
+  <text x="104" y="470" font-size="11" fill="#2C4460">只带消息，不带数据 —— 数据仍在内核缓冲里</text>
+
+  <line x1="340" y1="482" x2="340" y2="504" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="508" width="520" height="58" rx="7" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="104" y="532" font-size="12" font-weight="700" fill="#733428">⑤ 应用自己调 recv() —— syscall #2　★ 拷贝点</text>
+  <text x="104" y="554" font-size="11" fill="#733428">此刻才拷贝：socket 接收缓冲 → 用户 buffer（CPU 拷贝 ×1）</text>
+
+  <line x1="340" y1="566" x2="340" y2="588" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="592" width="520" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="104" y="620" font-size="12" font-weight="700" fill="#2C4460">⑥ 处理数据</text>
+
+  <rect x="80" y="656" width="520" height="76" rx="7" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.4"/>
+  <text x="104" y="682" font-size="11.5" font-weight="700" fill="#2B2A26">账单：每笔 IO ≥ 2 次陷入（wait + read）</text>
+  <text x="104" y="704" font-size="11" fill="#4A473F">buffer 只在 recv 调用期间被占用 ——</text>
+  <text x="104" y="722" font-size="11" fill="#4A473F">十万连接可以共享一小池 buffer【就绪模型的省内存优势】</text>
+
+  <!-- 右泳道步骤 -->
+  <rect x="640" y="172" width="520" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="664" y="196" font-size="12" font-weight="700" fill="#24473F">① 提交 recv SQE（buffer 地址随单据一起交给内核）</text>
+  <text x="664" y="218" font-size="11" fill="#24473F">io_uring_enter 一次陷入可提交一批 —— 陷入成本摊薄</text>
+
+  <line x1="900" y1="230" x2="900" y2="252" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="640" y="256" width="520" height="58" rx="7" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="664" y="280" font-size="12" font-weight="700" fill="#733428">② buffer 所有权移交【纪律】</text>
+  <text x="664" y="302" font-size="11" fill="#733428">从提交到 CQE 出现，应用不得读写或释放这块 buffer</text>
+
+  <line x1="900" y1="314" x2="900" y2="336" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="640" y="340" width="520" height="58" rx="7" fill="#ECEAE0" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="664" y="364" font-size="12" font-weight="700" fill="#4A473F">③ 内核在等：内部 poll 挂在 socket 上，应用线程自由</text>
+  <text x="664" y="386" font-size="11" fill="#4A473F">应用可以继续提交别的 IO、做计算 —— 没有线程被占住</text>
+
+  <line x1="900" y1="398" x2="900" y2="420" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="640" y="424" width="520" height="58" rx="7" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="664" y="448" font-size="12" font-weight="700" fill="#733428">④ 数据到达：内核代你执行 recv　★ 拷贝点</text>
+  <text x="664" y="470" font-size="11" fill="#733428">同一次拷贝，换了人做：socket 缓冲 → 你提交的 buffer</text>
+
+  <line x1="900" y1="482" x2="900" y2="504" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="640" y="508" width="520" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="664" y="532" font-size="12" font-weight="700" fill="#24473F">⑤ 填 CQE（user_data + res=字节数）→ 推 CQ tail</text>
+  <text x="664" y="554" font-size="11" fill="#24473F">完成通知与数据同时就位</text>
+
+  <line x1="900" y1="566" x2="900" y2="588" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="640" y="592" width="520" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="664" y="620" font-size="12" font-weight="700" fill="#24473F">⑥ 应用收割 CQE：数据已就位，直接处理 —— 收割可零陷入</text>
+
+  <rect x="640" y="656" width="520" height="76" rx="7" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.4"/>
+  <text x="664" y="682" font-size="11.5" font-weight="700" fill="#2B2A26">账单：syscall 数与 IO 数解耦（一批一次，甚至零次）</text>
+  <text x="664" y="704" font-size="11" fill="#4A473F">代价：每个在途 recv 都占一块 buffer —— 内存随连接数放大</text>
+  <text x="664" y="722" font-size="11" fill="#4A473F">缓解：provided buffers 共享池 + multishot（2.4）</text>
+
+  <!-- 拷贝点连线 -->
+  <path d="M600,537 L640,453" fill="none" stroke="#A64B3C" stroke-width="1.3" stroke-dasharray="5 4"/>
+  <text x="620" y="500" font-size="10.5" fill="#A64B3C" transform="rotate(-60 620 500)">同一次拷贝</text>
+
+  <!-- 底部横带：普通文件 -->
+  <rect x="80" y="760" width="1080" height="104" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="104" y="790" font-size="13" font-weight="700" fill="#4A3F68">为什么普通文件进不了 epoll【事实】</text>
+  <text x="104" y="816" font-size="11.5" fill="#4A3F68">“就绪”只对流式 fd 有意义（数据到没到）；普通文件永远“可读”——不在页缓存就去介质取，不存在“等它变可读”这件事。</text>
+  <text x="104" y="840" font-size="11.5" fill="#4A3F68">epoll_ctl(ADD) 普通文件直接返回 EPERM。这是 epoll 生态的文件 IO 只能靠线程池、而 io_uring 文件与网络通吃（完成语义两者皆适用）的根源。</text>
+</svg>

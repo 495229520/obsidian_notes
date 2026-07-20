@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1080" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       成本/等待 #A64B3C；零成本 #2F6B5E；与本库既有 nvmeof-*.svg 同一套 -->
+  <title>NVMe/TCP 与 NVMe/RDMA 读路径对比</title>
+  <desc>同一笔 4 KiB 远程读在两种 transport 下的六阶段对照：提交、命令去程、target 收命令、盘执行、数据回程、完成通知；标注每一步的等待点与数据拷贝差异。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1080" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">同一笔 4 KiB 远程读：NVMe/TCP 与 NVMe/RDMA 逐阶段对账</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">协议与队列映射完全相同；差异全在「谁搬字节」——盘（阶段④）两边一样且仍是最大头</text>
+
+  <!-- 泳道 -->
+  <rect x="48" y="104" width="480" height="788" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="288" y="134" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">NVMe/TCP（任意网卡 · 任意以太网）</text>
+  <rect x="712" y="104" width="480" height="788" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="952" y="134" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">NVMe/RDMA（RDMA 网卡 · 近无损网络）</text>
+
+  <!-- 中缝阶段标签 -->
+  <rect x="548" y="182" width="144" height="44" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="620" y="204" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">① 提交</text>
+  <rect x="548" y="306" width="144" height="44" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="620" y="328" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">② 命令去程</text>
+  <rect x="548" y="430" width="144" height="44" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="620" y="452" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">③ target 收命令</text>
+  <rect x="548" y="554" width="144" height="44" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="620" y="570" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">④ 盘执行</text>
+  <text x="620" y="587" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">两边完全相同</text>
+  <rect x="548" y="678" width="144" height="44" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="620" y="700" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">⑤ 数据回程 4 KiB</text>
+  <rect x="548" y="802" width="144" height="44" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="620" y="824" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">⑥ 完成通知</text>
+
+  <!-- ===== TCP 列 ===== -->
+  <!-- ① -->
+  <rect x="68" y="160" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="288" y="182" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">nvme-tcp：bio → CapsuleCmd PDU 组帧</text>
+  <text x="288" y="204" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">无需内存注册 · PDU 头带长度在字节流上自分帧</text>
+  <text x="288" y="226" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点：每队列 io_work 工作队列被调度</text>
+  <path d="M288,248 L288,280" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ② -->
+  <rect x="68" y="284" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="288" y="306" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">内核 TCP 栈发送：分段 / 拥塞控制 / 重传</text>
+  <text x="288" y="328" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">协议处理按包计费（CPU）· TSO 只能摊薄不能消除</text>
+  <text x="288" y="350" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">socket 发送缓冲 = 网络背压的落点</text>
+  <path d="M288,372 L288,404" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ③ -->
+  <rect x="68" y="408" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="288" y="430" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">中断 → softirq → nvmet-tcp 读 socket 解 PDU</text>
+  <text x="288" y="452" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点：中断 + target 侧 io_work 调度</text>
+  <text x="288" y="474" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">命令字节经 CPU 拷贝（64B 级，小）</text>
+  <path d="M288,496 L288,528" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ④ -->
+  <rect x="68" y="532" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="288" y="554" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">本地 NVMe：SQ → 盘 → DMA 写 target 内存</text>
+  <text x="288" y="576" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 D：盘服务时间 几十 μs——最大头</text>
+  <text x="288" y="598" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">盘不关心 transport 是谁</text>
+  <path d="M288,620 L288,652" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑤ -->
+  <rect x="68" y="656" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="288" y="676" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">target sendpage 零拷贝发出 C2HData</text>
+  <text x="288" y="696" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">host 收侧：中断 → softirq → CPU 把字节 skb → bio 页</text>
+  <text x="288" y="716" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">每字节 1 次 CPU 拷贝——最大结构性差异</text>
+  <text x="288" y="734" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">（DDP 类网卡卸载可删掉这次拷贝）</text>
+  <path d="M288,744 L288,776" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑥ -->
+  <rect x="68" y="780" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="288" y="802" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">CapsuleResp PDU → softirq → 完成 bio</text>
+  <text x="288" y="824" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点：中断 + 调度唤醒（无法轮询归零）</text>
+  <text x="288" y="846" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">NAPI + 中断合并只能摊薄</text>
+
+  <!-- ===== RDMA 列 ===== -->
+  <!-- ① -->
+  <rect x="732" y="160" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="952" y="182" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">nvme-rdma：bio → SQE + FRWR 快速注册</text>
+  <text x="952" y="204" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">rkey 装进 keyed SGL · 一次 MMIO 门铃</text>
+  <text x="952" y="226" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">注册是 RDMA 独有成本（μs 内，预注册可摊）</text>
+  <path d="M952,248 L952,280" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ② -->
+  <rect x="732" y="284" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="952" y="306" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">网卡硬件 SEND capsule</text>
+  <text x="952" y="328" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">传输层（分段/确认/重传）在网卡 · CPU 0 参与</text>
+  <text x="952" y="350" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">前提：PFC/ECN 调好的近无损网络</text>
+  <path d="M952,372 L952,404" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ③ -->
+  <rect x="732" y="408" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="952" y="430" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">网卡直写 target 内存 + CQE</text>
+  <text x="952" y="452" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">可轮询 · 0 中断 · 0 拷贝</text>
+  <text x="952" y="474" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">nvmet-rdma 从 CQ 取到完整 capsule</text>
+  <path d="M952,496 L952,528" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ④ -->
+  <rect x="732" y="532" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="952" y="554" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">本地 NVMe：SQ → 盘 → DMA 写 target 内存</text>
+  <text x="952" y="576" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 D：盘服务时间 几十 μs——最大头</text>
+  <text x="952" y="598" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">与左侧一字不差</text>
+  <path d="M952,620 L952,652" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑤ -->
+  <rect x="732" y="656" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="952" y="678" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">target 发 RDMA WRITE：直写 host 的 bio 页</text>
+  <text x="952" y="700" font-size="11" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">两端 CPU 0 拷贝——纯网卡 DMA</text>
+  <text x="952" y="722" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">用 ① 给的 rkey，host CPU 全程不知情</text>
+  <path d="M952,744 L952,776" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑥ -->
+  <rect x="732" y="780" width="440" height="88" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="952" y="802" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">response capsule → CQE → 中断或轮询</text>
+  <text x="952" y="824" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">内核态路径仍保留中断 + 唤醒（5.7 的删除对象）</text>
+  <text x="952" y="846" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">用户态（SPDK）可轮询 CQ 把这项归零</text>
+
+  <!-- ===== 总账 ===== -->
+  <rect x="68" y="916" width="440" height="84" rx="8" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="288" y="938" font-size="13" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">NVMe/TCP 总账</text>
+  <text x="288" y="960" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">增量延迟 几十 μs 起 · 尾部受 softirq/调度影响更抖</text>
+  <text x="288" y="982" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">CPU 税随带宽线性增长（收侧拷贝 + 协议处理）</text>
+
+  <rect x="732" y="916" width="440" height="84" rx="8" fill="#FAF9F2" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="952" y="938" font-size="13" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">NVMe/RDMA 总账</text>
+  <text x="952" y="960" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">增量 ~10 μs 内 · 轮询时 p99 贴 p50</text>
+  <text x="952" y="982" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">CPU 不碰数据字节 · 代价在网卡与无损网络前提</text>
+
+  <text x="620" y="1040" font-size="13" font-weight="700" fill="#2B2A26" text-anchor="middle" dominant-baseline="central">差距 = 谁搬字节：CPU（TCP）vs 网卡（RDMA）——协议、capsule、队列映射两边完全相同</text>
+</svg>

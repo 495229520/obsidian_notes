@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 8_0_1 / 9.x：
+       底色 rgb(245,244,237)
+       蓝 #E3EAF4 / #3D5A80 / #2C4460
+       绿 #DCE9E3 / #2F6B5E / #24473F
+       琥珀 #EFE7DA / #8A6A3A / #6B4E28
+       红 #F0E0DB / #A64B3C / #733428
+       中性 #F1EFE8 / #D8D5C8 / #4A473F / #6B675C / #2B2A26
+       面板底 #FBFBF6 · 实心三角箭头 #5A564B -->
+  <title>虚拟地址翻译：VA/PA、多级页表与 TLB</title>
+  <desc>上半：四种地址角色与 VA=VPN+offset → PA=PFN+offset。中部：x86-64 四级页表示意与页表项权限位。下半：TLB 缓存翻译结果，避免每次从根遍历。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">访问 Cache / 内存之前，CPU 必须先完成 VA → PA 翻译</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">页表保存映射与权限 · 页内偏移不变 · TLB 缓存近期翻译，避免每次从根遍历</text>
+
+  <!-- ============ Panel A：四种地址 ============ -->
+  <text x="48" y="108" font-size="13" font-weight="700" fill="#4A473F">A · 同块缓冲，不同参与者看到的地址不同 —— 不能把指针当 DMA 地址</text>
+
+  <rect x="48" y="120" width="276" height="96" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="186" y="150" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">虚拟地址 VA</text>
+  <text x="186" y="172" font-size="11" fill="#2C4460" text-anchor="middle">用户进程 · CPU 指令</text>
+  <text x="186" y="194" font-size="10.5" fill="#3D5A80" text-anchor="middle">进程间可重复</text>
+
+  <rect x="340" y="120" width="276" height="96" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="478" y="150" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">物理地址 PA</text>
+  <text x="478" y="172" font-size="11" fill="#24473F" text-anchor="middle">内存控制器 · Cache 一致性域</text>
+  <text x="478" y="194" font-size="10.5" fill="#2F6B5E" text-anchor="middle">DRAM 真实位置</text>
+
+  <rect x="632" y="120" width="276" height="96" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="770" y="150" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">DMA / IOVA</text>
+  <text x="770" y="172" font-size="11" fill="#6B4E28" text-anchor="middle">PCIe 设备侧地址</text>
+  <text x="770" y="194" font-size="10.5" fill="#8A6A3A" text-anchor="middle">可能经 IOMMU 重映射</text>
+
+  <rect x="924" y="120" width="268" height="96" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="1058" y="150" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">文件偏移</text>
+  <text x="1058" y="172" font-size="11" fill="#4A473F" text-anchor="middle">文件系统 · 块设备</text>
+  <text x="1058" y="194" font-size="10.5" fill="#6B675C" text-anchor="middle">持久化介质逻辑位置</text>
+
+  <!-- ============ Panel B：VA/PA 拆分 ============ -->
+  <text x="48" y="250" font-size="13" font-weight="700" fill="#4A473F">B · 页号被映射，页内偏移原样保留（常见 4 KiB → 偏移 12 bit）</text>
+
+  <rect x="48" y="262" width="1144" height="148" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- VA bar -->
+  <text x="68" y="290" font-size="12" font-weight="700" fill="#2C4460">虚拟地址 VA</text>
+  <rect x="68" y="302" width="560" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <rect x="68" y="302" width="400" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <line x1="468" y1="302" x2="468" y2="342" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="268" y="327" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">虚拟页号 VPN</text>
+  <text x="548" y="327" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">页内偏移</text>
+  <text x="548" y="360" font-size="10.5" fill="#6B675C" text-anchor="middle">12 bit · 不变</text>
+
+  <!-- arrow VPN -> PFN -->
+  <path d="M268,344 L268,372" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <text x="288" y="366" font-size="11" fill="#4A473F">页表映射</text>
+
+  <!-- offset vertical -->
+  <path d="M548,344 L548,372" fill="none" stroke="#2F6B5E" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrg)"/>
+
+  <!-- PA bar -->
+  <text x="68" y="400" font-size="12" font-weight="700" fill="#24473F">物理地址 PA</text>
+  <rect x="188" y="380" width="560" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <line x1="588" y1="380" x2="588" y2="420" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="388" y="405" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">物理页框号 PFN</text>
+  <text x="668" y="405" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">页内偏移</text>
+
+  <!-- right callout -->
+  <rect x="800" y="286" width="368" height="100" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="820" y="314" font-size="12" font-weight="700" fill="#6B4E28">关键推论</text>
+  <text x="820" y="338" font-size="11.5" fill="#6B4E28">VA 连续 ≠ PA 连续</text>
+  <text x="820" y="360" font-size="11.5" fill="#6B4E28">page 是映射粒度 · frame 是物理单位</text>
+  <text x="820" y="382" font-size="11" fill="#8A6A3A">大页只是更大的映射粒度</text>
+
+  <!-- ============ Panel C：多级页表 ============ -->
+  <text x="48" y="444" font-size="13" font-weight="700" fill="#4A473F">C · 多级页表：只为实际使用的地址范围分配下级表（x86-64 四级 · 4 KiB 示意）</text>
+
+  <rect x="48" y="456" width="740" height="280" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- bit split -->
+  <text x="68" y="484" font-size="11.5" font-weight="700" fill="#4A473F">虚拟地址位域拆分（常见配置，非所有 CPU 固定格式）</text>
+  <rect x="68" y="496" width="88" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="112" y="512" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L4</text>
+  <text x="112" y="526" font-size="9.5" fill="#3D5A80" text-anchor="middle">9 bit</text>
+  <rect x="164" y="496" width="88" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="208" y="512" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L3</text>
+  <text x="208" y="526" font-size="9.5" fill="#3D5A80" text-anchor="middle">9 bit</text>
+  <rect x="260" y="496" width="88" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="304" y="512" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L2</text>
+  <text x="304" y="526" font-size="9.5" fill="#3D5A80" text-anchor="middle">9 bit</text>
+  <rect x="356" y="496" width="88" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="400" y="512" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L1</text>
+  <text x="400" y="526" font-size="9.5" fill="#3D5A80" text-anchor="middle">9 bit</text>
+  <rect x="452" y="496" width="100" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="502" y="512" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">offset</text>
+  <text x="502" y="526" font-size="9.5" fill="#2F6B5E" text-anchor="middle">12 bit</text>
+  <text x="568" y="518" font-size="11" fill="#6B675C">每级 512 项</text>
+
+  <!-- walk chain -->
+  <rect x="68" y="556" width="100" height="48" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="118" y="576" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">CR3 / 根</text>
+  <text x="118" y="594" font-size="10" fill="#8A6A3A" text-anchor="middle">页表基址</text>
+  <path d="M172,580 L196,580" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="200" y="556" width="88" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="244" y="576" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L4</text>
+  <text x="244" y="594" font-size="10" fill="#3D5A80" text-anchor="middle">目录</text>
+  <path d="M292,580 L316,580" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="320" y="556" width="88" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="364" y="576" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L3</text>
+  <text x="364" y="594" font-size="10" fill="#3D5A80" text-anchor="middle">目录</text>
+  <path d="M412,580 L436,580" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="440" y="556" width="88" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="484" y="576" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L2</text>
+  <text x="484" y="594" font-size="10" fill="#3D5A80" text-anchor="middle">目录</text>
+  <path d="M532,580 L556,580" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="560" y="556" width="88" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="604" y="576" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">L1</text>
+  <text x="604" y="594" font-size="10" fill="#3D5A80" text-anchor="middle">目录</text>
+  <path d="M652,580 L676,580" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="680" y="556" width="88" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="724" y="576" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">PTE</text>
+  <text x="724" y="594" font-size="10" fill="#2F6B5E" text-anchor="middle">PFN+权限</text>
+
+  <path d="M724,608 L724,636" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <rect x="640" y="640" width="128" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="704" y="665" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">物理页框 + offset</text>
+
+  <text x="68" y="640" font-size="11" fill="#4A473F">完整 walk：多级表项内存访问 + 目标数据访问</text>
+  <text x="68" y="662" font-size="11" fill="#4A473F">未使用区域不分配下级表 → 稀疏地址空间更省</text>
+  <text x="68" y="684" font-size="10.5" fill="#6B675C">还存在 5 级页表；AArch64 级数/页大小也可不同</text>
+  <text x="68" y="712" font-size="10.5" fill="#6B675C">页表项 ≠ 物理内存本身：只存映射关系与权限</text>
+
+  <!-- PTE flags panel -->
+  <rect x="812" y="456" width="380" height="280" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="832" y="486" font-size="13" font-weight="700" fill="#2C4460">PTE 至少携带这些语义</text>
+  <text x="832" y="516" font-size="12" fill="#2C4460">· 物理页框号 PFN</text>
+  <text x="832" y="540" font-size="12" fill="#2C4460">· Present / Valid</text>
+  <text x="832" y="564" font-size="12" fill="#2C4460">· Read / Write</text>
+  <text x="832" y="588" font-size="12" fill="#2C4460">· Execute Disable</text>
+  <text x="832" y="612" font-size="12" fill="#2C4460">· User / Supervisor</text>
+  <text x="832" y="636" font-size="12" fill="#2C4460">· Accessed / Dirty</text>
+  <line x1="832" y1="654" x2="1172" y2="654" stroke="#A8BFD4" stroke-width="1"/>
+  <text x="832" y="680" font-size="11.5" fill="#2C4460">软件经 OS 接口使用这些能力</text>
+  <text x="832" y="704" font-size="11.5" fill="#2C4460">不要直接解析硬件页表项位布局</text>
+  <text x="832" y="728" font-size="10.5" fill="#3D5A80">字段名与位序随架构变化</text>
+
+  <!-- ============ Panel D：TLB 为什么存在 ============ -->
+  <text x="48" y="768" font-size="13" font-weight="700" fill="#4A473F">D · 为什么需要 TLB：walk 太贵，把近期 VPN→PFN 结果放进片上缓存</text>
+
+  <rect x="48" y="780" width="1144" height="96" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="68" y="800" width="200" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="168" y="824" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">load / store 得 VA</text>
+  <text x="168" y="844" font-size="10.5" fill="#3D5A80" text-anchor="middle">执行单元侧</text>
+  <path d="M272,828 L300,828" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="304" y="800" width="200" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="404" y="824" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">查 TLB</text>
+  <text x="404" y="844" font-size="10.5" fill="#8A6A3A" text-anchor="middle">缓存翻译结果</text>
+  <path d="M508,828 L536,828" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="540" y="800" width="220" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="650" y="824" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">命中 → 得 PA</text>
+  <text x="650" y="844" font-size="10.5" fill="#2F6B5E" text-anchor="middle">继续访问 Cache</text>
+  <path d="M764,828 L792,828" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="796" y="800" width="372" height="56" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="982" y="824" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">未命中 → Page Table Walk</text>
+  <text x="982" y="844" font-size="10.5" fill="#6B675C" text-anchor="middle">填 TLB 后重试；无效则 Page Fault</text>
+</svg>

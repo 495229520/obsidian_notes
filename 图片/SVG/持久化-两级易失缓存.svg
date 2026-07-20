@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 620" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="620" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">write 之后，数据在哪：两级易失缓存与三道闸门</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">数据只有走完最后一道闸门，掉电才不丢；fsync 的职责是打穿后两道</text>
+
+  <!-- fsync 覆盖范围 -->
+  <line x1="365" y1="150" x2="1180" y2="150" stroke="#2F6B5E" stroke-width="1.5"/>
+  <line x1="365" y1="150" x2="365" y2="162" stroke="#2F6B5E" stroke-width="1.5"/>
+  <line x1="1180" y1="150" x2="1180" y2="162" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="772" y="140" font-size="12.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">fsync() / fdatasync() 负责打穿闸门二 + 闸门三，并等待完成</text>
+
+  <!-- 闸门标签 -->
+  <text x="330" y="214" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">闸门一 · fflush()</text>
+  <text x="330" y="231" font-size="10.5" fill="#6B675C" text-anchor="middle">库缓冲 → 内核</text>
+  <text x="625" y="214" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">闸门二 · fsync 第①步</text>
+  <text x="625" y="231" font-size="10.5" fill="#6B675C" text-anchor="middle">写回脏页并等待完成</text>
+  <text x="920" y="214" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">闸门三 · fsync 第②步</text>
+  <text x="920" y="231" font-size="10.5" fill="#6B675C" text-anchor="middle">FLUSH / FUA，清空盘上缓存</text>
+
+  <!-- 四个站点 -->
+  <rect x="70" y="250" width="225" height="100" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="182" y="278" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">应用缓冲区</text>
+  <text x="182" y="300" font-size="11" fill="#2C4460" text-anchor="middle">fwrite / ofstream 写到这</text>
+  <text x="182" y="326" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">进程崩溃：丢</text>
+
+  <rect x="365" y="250" width="225" height="100" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="477" y="278" font-size="14" font-weight="700" fill="#7A5518" text-anchor="middle">Page Cache</text>
+  <text x="477" y="300" font-size="11" fill="#7A5518" text-anchor="middle">write() 写到这就返回</text>
+  <text x="477" y="326" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">系统掉电：丢</text>
+
+  <rect x="660" y="250" width="225" height="100" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="772" y="278" font-size="14" font-weight="700" fill="#4A3F68" text-anchor="middle">设备写缓存</text>
+  <text x="772" y="300" font-size="11" fill="#4A3F68" text-anchor="middle">盘上 DRAM，写回 bio 到这</text>
+  <text x="772" y="326" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">掉电：丢（带电容企业盘除外）</text>
+
+  <rect x="955" y="250" width="225" height="100" rx="8" fill="#E9EFDA" stroke="#6A7F3F" stroke-width="1.5"/>
+  <text x="1067" y="278" font-size="14" font-weight="700" fill="#48562B" text-anchor="middle">非易失介质（NAND）</text>
+  <text x="1067" y="300" font-size="11" fill="#48562B" text-anchor="middle">FLUSH 确认后到这</text>
+  <text x="1067" y="326" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">掉电：安全</text>
+
+  <line x1="299" y1="300" x2="359" y2="300" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <line x1="594" y1="300" x2="654" y2="300" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <line x1="889" y1="300" x2="949" y2="300" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+
+  <!-- 底部说明卡 -->
+  <rect x="70" y="430" width="360" height="120" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="92" y="460" font-size="13" font-weight="700" fill="#2B2A26">fdatasync 快在哪【事实】</text>
+  <text x="92" y="486" font-size="11.5" fill="#4A473F">只保证数据 + 读取所需元数据（如文件大小）</text>
+  <text x="92" y="510" font-size="11.5" fill="#4A473F">跳过 mtime 等 → 常省一次日志提交</text>
+
+  <rect x="450" y="430" width="360" height="120" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="472" y="460" font-size="13" font-weight="700" fill="#2B2A26">O_DIRECT 与闸门【事实】</text>
+  <text x="472" y="486" font-size="11.5" fill="#4A473F">O_DIRECT 只是跳过 Page Cache（闸门二的活）</text>
+  <text x="472" y="510" font-size="11.5" fill="#4A473F">闸门三照旧需要：设备写缓存还在路上</text>
+
+  <rect x="830" y="430" width="380" height="120" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="852" y="460" font-size="13" font-weight="700" fill="#2B2A26">网络存储上【前提】</text>
+  <text x="852" y="486" font-size="11.5" fill="#4A473F">NFS / 分布式FS：fsync 变成 COMMIT 类 RPC</text>
+  <text x="852" y="510" font-size="11.5" fill="#4A473F">延迟 = 网络 RTT + 远端整套闸门（→ 第5 · 7章）</text>
+</svg>

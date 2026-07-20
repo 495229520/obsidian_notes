@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 850" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="850" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Operator：一个永不退出的收敛循环</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">观察（list-watch）→ 排队（去重/退避）→ 收敛（幂等 reconcile）→ 写回 —— 与 epoll 水平触发同一哲学</text>
+
+  <!-- N1: API Server -->
+  <rect x="460" y="122" width="340" height="76" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="630" y="150" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">API Server + etcd</text>
+  <text x="630" y="172" font-size="11" fill="#24473F" text-anchor="middle">spec：期望态（用户写）· status：现状（控制器写）</text>
+
+  <!-- N2: list-watch -->
+  <rect x="880" y="270" width="312" height="104" rx="8" fill="#E2E9ED" stroke="#4E6E81" stroke-width="1.5"/>
+  <text x="900" y="298" font-size="13.5" font-weight="700" fill="#33505F">list-watch（网络层）</text>
+  <text x="900" y="322" font-size="11" fill="#33505F">HTTP 长连接持续推送增量事件</text>
+  <text x="900" y="342" font-size="11" fill="#33505F">断线：按 resourceVersion 续传</text>
+  <text x="900" y="362" font-size="11" fill="#33505F">太旧 410 Gone → 重新 LIST 全量对账</text>
+
+  <!-- N3: Informer -->
+  <rect x="880" y="430" width="312" height="76" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="900" y="458" font-size="13.5" font-weight="700" fill="#7A5518">Informer 本地缓存</text>
+  <text x="900" y="482" font-size="11" fill="#7A5518">控制器读本地只读副本，不打 API Server</text>
+
+  <!-- N4: WorkQueue -->
+  <rect x="460" y="560" width="340" height="96" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="630" y="588" font-size="13.5" font-weight="700" fill="#4A3F68" text-anchor="middle">WorkQueue</text>
+  <text x="630" y="610" font-size="11" fill="#4A3F68" text-anchor="middle">同 key 合并（去重）· 限速 · 指数退避重试</text>
+  <text x="630" y="630" font-size="11" fill="#4A3F68" text-anchor="middle">类比：带 coalescing 的有界任务队列</text>
+
+  <!-- N5: Reconciler -->
+  <rect x="60" y="420" width="320" height="104" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="80" y="448" font-size="13.5" font-weight="700" fill="#733428">Reconciler workers</text>
+  <text x="80" y="472" font-size="11" fill="#733428">输入只有 key：读缓存 → 比对期望与现状 → 收敛</text>
+  <text x="80" y="492" font-size="11" fill="#733428">幂等：被重复调用是常态，不是异常</text>
+  <text x="80" y="512" font-size="11" fill="#733428">要等待就 requeueAfter，绝不阻塞 worker</text>
+
+  <!-- 环形箭头 -->
+  <path d="M804,176 C900,190 1010,220 1032,266" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <text x="960" y="230" font-size="10.5" fill="#6B675C">事件推送（增量）</text>
+
+  <line x1="1036" y1="378" x2="1036" y2="426" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <text x="1050" y="406" font-size="10.5" fill="#6B675C">更新缓存 + 分发</text>
+
+  <path d="M876,486 C760,510 700,530 664,556" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <text x="742" y="512" font-size="10.5" fill="#6B675C">key 入队（不带事件内容）</text>
+
+  <path d="M456,610 C330,600 250,560 218,528" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <text x="290" y="588" font-size="10.5" fill="#6B675C">worker 取 key</text>
+
+  <path d="M180,416 C220,290 340,210 456,176" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+  <text x="212" y="280" font-size="10.5" fill="#2F6B5E">写回：创建子资源 / 更新 status</text>
+  <text x="212" y="298" font-size="10.5" fill="#2F6B5E">（带 resourceVersion，→ 10.3）</text>
+  <text x="212" y="322" font-size="10.5" fill="#6B675C">写回又产生新事件 → 循环</text>
+
+  <!-- LT/ET 卡 -->
+  <rect x="60" y="122" width="330" height="180" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="80" y="150" font-size="13.5" font-weight="700" fill="#2B2A26">水平触发 vs 边缘触发（epoll 同款）</text>
+  <text x="80" y="178" font-size="11.5" fill="#4A473F">ET：只报"变化那一刻"，错过 = 永久丢失</text>
+  <text x="80" y="200" font-size="11.5" fill="#4A473F">LT：状态不符就一直报，错过一次无所谓</text>
+  <text x="80" y="228" font-size="11.5" fill="#4A473F">K8s 选 LT：事件只是提示，定期 resync</text>
+  <text x="80" y="248" font-size="11.5" fill="#4A473F">全量对账兜底 —— 不信任何单个通知</text>
+  <text x="80" y="278" font-size="11.5" font-weight="700" fill="#A64B3C">推论：reconcile 必须幂等（13.4 epoll）</text>
+
+  <!-- Leader election 卡 -->
+  <rect x="60" y="700" width="1130" height="108" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="84" y="730" font-size="13.5" font-weight="700" fill="#2B2A26">Leader Election：分布式 mutex</text>
+  <text x="84" y="758" font-size="12" fill="#4A473F">operator 跑多副本求高可用，但同一时刻只有一个实例干活：抢 Lease 租约者为主，靠周期心跳续约 —— 进程内 mutex + 看门狗的集群版</text>
+  <text x="84" y="784" font-size="12" fill="#4A473F">续约超时（主挂了 / 网络分区）→ 其他副本接管；切换期间循环暂停几秒【取舍：可用性换单写者】—— 排障时先查谁是 leader</text>
+</svg>

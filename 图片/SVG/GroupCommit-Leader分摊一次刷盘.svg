@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="660" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">Group Commit：用一次刷盘运走一车事务</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">刷盘（fdatasync）是固定成本 T_flush；每事务付一次 = TPS 封顶 1/T_flush，拼车 = 上限乘以批大小 N</text>
+
+  <!-- ======== 上：每事务一刷 ======== -->
+  <text x="70" y="128" font-size="14" font-weight="700" fill="#A64B3C">每事务一刷（串行付全价）</text>
+  <line x1="70" y1="196" x2="1180" y2="196" stroke="#5A564B" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- T1 -->
+  <rect x="90" y="150" width="50" height="34" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="115" y="172" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">写 T1</text>
+  <rect x="140" y="150" width="240" height="34" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="260" y="172" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">fdatasync（T_flush，等设备 FLUSH）</text>
+  <!-- T2 -->
+  <rect x="380" y="150" width="50" height="34" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="405" y="172" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">写 T2</text>
+  <rect x="430" y="150" width="240" height="34" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="550" y="172" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">fdatasync</text>
+  <!-- T3 -->
+  <rect x="670" y="150" width="50" height="34" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="695" y="172" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">写 T3</text>
+  <rect x="720" y="150" width="240" height="34" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="840" y="172" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">fdatasync</text>
+
+  <text x="985" y="140" font-size="12" font-weight="700" fill="#A64B3C">3 个事务 = 3 次 T_flush</text>
+  <text x="985" y="158" font-size="11.5" fill="#A64B3C">TPS ≤ 1 / T_flush</text>
+  <text x="985" y="176" font-size="11" fill="#6B675C">写 log 本身（μs 级）几乎不占时间，</text>
+  <text x="985" y="192" font-size="11" fill="#6B675C">时间全花在等 FLUSH 上</text>
+
+  <!-- ======== 下：group commit ======== -->
+  <text x="70" y="252" font-size="14" font-weight="700" fill="#2F6B5E">Group Commit（Leader 代刷，Follower 搭车）</text>
+
+  <!-- 事务到达轴 -->
+  <text x="70" y="286" font-size="11.5" fill="#6B675C">事务到达：</text>
+  <g font-size="11" font-weight="700">
+    <circle cx="175" cy="282" r="11" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="175" y="286" fill="#2C4460" text-anchor="middle">T1</text>
+    <circle cx="255" cy="282" r="11" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="255" y="286" fill="#2C4460" text-anchor="middle">T2</text>
+    <circle cx="310" cy="282" r="11" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="310" y="286" fill="#2C4460" text-anchor="middle">T3</text>
+    <circle cx="365" cy="282" r="11" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="365" y="286" fill="#2C4460" text-anchor="middle">T4</text>
+    <circle cx="600" cy="282" r="11" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="600" y="286" fill="#2C4460" text-anchor="middle">T5</text>
+  </g>
+
+  <!-- 批次一 -->
+  <rect x="160" y="316" width="60" height="36" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="190" y="338" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">写 T1</text>
+  <rect x="220" y="316" width="240" height="36" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="340" y="332" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">fdatasync ①（T1 是 Leader）</text>
+  <text x="340" y="347" font-size="10.5" fill="#7A5518" text-anchor="middle">刷盘期间 T2 T3 T4 到达 → 排队攒批</text>
+
+  <!-- T2-T4 等待指示 -->
+  <path d="M 255 295 L 255 306 L 500 306 L 500 316" fill="none" stroke="#6B5B95" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="392" y="304" font-size="10" fill="#4A3F68" text-anchor="middle" >T2–T4 入队等待</text>
+
+  <!-- 批次二 -->
+  <rect x="460" y="316" width="105" height="36" rx="4" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="512" y="338" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">写 T2+T3+T4</text>
+  <rect x="565" y="316" width="240" height="36" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="685" y="332" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">fdatasync ②（T2 当新 Leader）</text>
+  <text x="685" y="347" font-size="10.5" fill="#7A5518" text-anchor="middle">一次刷盘运走 3 个事务</text>
+
+  <!-- 批次三 -->
+  <rect x="805" y="316" width="60" height="36" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="835" y="338" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">写 T5</text>
+  <rect x="865" y="316" width="240" height="36" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="985" y="338" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">fdatasync ③</text>
+
+  <line x1="70" y1="368" x2="1180" y2="368" stroke="#5A564B" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- 完成通知 -->
+  <text x="685" y="392" font-size="11" fill="#2F6B5E">fdatasync ② 返回 → Leader 通知（notify_all）T2 T3 T4 同时完成提交</text>
+
+  <!-- ======== 底部要点 ======== -->
+  <rect x="70" y="420" width="1110" height="210" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="96" y="452" font-size="13.5" font-weight="700" fill="#2B2A26">三条读图要点</text>
+
+  <text x="96" y="484" font-size="12.5" font-weight="700" fill="#2F6B5E">① 上限公式</text>
+  <text x="230" y="484" font-size="12.5" fill="#4A473F">TPS ≤ N / T_flush。T_flush = 1 ms、批大小 N = 50 时：2 万 TPS——盘没变快，是账变了</text>
+
+  <text x="96" y="518" font-size="12.5" font-weight="700" fill="#2F6B5E">② 自然成批</text>
+  <text x="230" y="518" font-size="12.5" fill="#4A473F">不需要定时器：上一批刷盘期间到达的事务自动成为下一批。负载越高 → 批越大 → 摊得越薄，自适应</text>
+
+  <text x="96" y="552" font-size="12.5" font-weight="700" fill="#2F6B5E">③ 延迟的代价</text>
+  <text x="230" y="552" font-size="12.5" fill="#4A473F">单个事务多等了「别人的刷盘 + 排队」：低负载下 p50 略涨（最多约一个 T_flush）；</text>
+  <text x="230" y="574" font-size="12.5" fill="#4A473F">高负载下反而更低——不拼车时排队队列更长（Little 定律，见 00. 总纲）</text>
+
+  <text x="96" y="608" font-size="11.5" fill="#6B675C">同一模式的工业实现：MySQL binlog group commit、PostgreSQL commit_delay、RocksDB WriteGroup（Leader 合并写 WAL）</text>
+</svg>

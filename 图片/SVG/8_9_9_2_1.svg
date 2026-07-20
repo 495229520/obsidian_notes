@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 9.7 SLO 图：
+       底色 rgb(245,244,237)
+       蓝 #E3EAF4 / #3D5A80 / #2C4460
+       绿 #DCE9E3 / #2F6B5E / #24473F
+       琥珀 #EFE7DA / #8A6A3A / #6B4E28
+       红 #F0E0DB / #A64B3C / #733428
+       中性 #F1EFE8 / #D8D5C8 / #4A473F / #6B675C / #2B2A26
+       面板底 #FBFBF6 · 实心三角箭头 #5A564B -->
+  <title>iostat：四类指标必须组合读取</title>
+  <desc>上半：/proc/diskstats 累计计数经采样差分得到完成速率、平均队列、await、%util 四类指标，并用利特尔法则做量级自检。下半：QD 扫描曲线区分有效扩展与进入饱和，并列三种组合签名与观测边界。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">iostat：四类指标必须组合读取</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">完成速率回答「做了多少」，队列与 await 回答「等了多少」，%util 只回答「是否持续有请求」——单列没有结论</text>
+
+  <!-- ============ Panel A ============ -->
+  <text x="48" y="108" font-size="13" font-weight="700" fill="#4A473F">A · 数据源：内核累计计数器 → 相邻采样差分 → iostat -x 周期报告</text>
+
+  <rect x="48" y="120" width="340" height="78" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="218" y="144" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">/proc/diskstats</text>
+  <text x="218" y="165" font-size="10.5" fill="#2C4460" text-anchor="middle">块设备累计计数器（按 MAJ:MIN）</text>
+  <text x="218" y="183" font-size="10.5" fill="#2C4460" text-anchor="middle">读/写完成数 · 时间 · 扇区 · io_ticks</text>
+  <path d="M388,159 L414,159" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="416" y="120" width="340" height="78" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="586" y="144" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">相邻采样差分</text>
+  <text x="586" y="165" font-size="10.5" fill="#2C4460" text-anchor="middle">Δcounter / Δtime</text>
+  <text x="586" y="183" font-size="10.5" fill="#2C4460" text-anchor="middle">-y 跳过开机累计首报 · 建议 1s</text>
+  <path d="M756,159 L782,159" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="784" y="120" width="408" height="78" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="988" y="144" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">iostat -x 周期报告</text>
+  <text x="988" y="165" font-size="10.5" fill="#24473F" text-anchor="middle">速率 · 队列 · 等待 · 忙碌</text>
+  <text x="988" y="183" font-size="10.5" fill="#24473F" text-anchor="middle">同窗口组合读，不要单列下结论</text>
+
+  <text x="48" y="230" font-size="12.5" font-weight="700" fill="#4A473F">四类指标 · 各回答一个问题（必须同窗口并读）</text>
+
+  <rect x="48" y="242" width="278" height="112" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="187" y="266" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① 完成速率</text>
+  <text x="187" y="288" font-size="11" fill="#2C4460" text-anchor="middle">r/s · w/s · rkB/s · wkB/s</text>
+  <text x="187" y="308" font-size="10.5" fill="#2C4460" text-anchor="middle">合并后的设备请求，≠ 应用 QPS</text>
+  <text x="187" y="332" font-size="11" font-weight="700" fill="#3D5A80" text-anchor="middle">问：做了多少？</text>
+
+  <rect x="342" y="242" width="278" height="112" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="481" y="266" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">② 平均队列</text>
+  <text x="481" y="288" font-size="11" fill="#24473F" text-anchor="middle">aqu-sz（旧 avgqu-sz）</text>
+  <text x="481" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">请求×时间面积 ÷ 采样时间</text>
+  <text x="481" y="332" font-size="11" font-weight="700" fill="#2F6B5E" text-anchor="middle">问：积压多深？</text>
+
+  <rect x="636" y="242" width="278" height="112" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="775" y="266" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 平均等待</text>
+  <text x="775" y="288" font-size="11" fill="#6B4E28" text-anchor="middle">r_await · w_await（ms）</text>
+  <text x="775" y="308" font-size="10.5" fill="#6B4E28" text-anchor="middle">入队 → 完成；不含 FS/应用排队</text>
+  <text x="775" y="332" font-size="11" font-weight="700" fill="#8A6A3A" text-anchor="middle">问：等了多久？</text>
+
+  <rect x="930" y="242" width="262" height="112" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="1061" y="266" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">④ 忙碌时间</text>
+  <text x="1061" y="288" font-size="11" fill="#4A473F" text-anchor="middle">%util ≈ Δio_ticks / Δtime</text>
+  <text x="1061" y="308" font-size="10.5" fill="#4A473F" text-anchor="middle">队列非空占比，≠ 通道全满</text>
+  <text x="1061" y="332" font-size="11" font-weight="700" fill="#5A564B" text-anchor="middle">问：是否持续有请求？</text>
+
+  <rect x="48" y="370" width="1144" height="52" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="392" font-size="11.5" font-weight="700" fill="#4A473F">量级自检 · 利特尔法则</text>
+  <text x="68" y="410" font-size="11" fill="#4A473F">aqu-sz ≈ (r/s + w/s + d/s) × await_weighted(ms) / 1000</text>
+  <text x="720" y="410" font-size="10.5" fill="#6B675C">用途：查单位 / 聚合错误 · 非逐项恒等 · flush 与分层设备会偏</text>
+
+  <!-- ============ Panel B ============ -->
+  <text x="48" y="456" font-size="13" font-weight="700" fill="#4A473F">B · 组合判读：在受控 QD 扫描里读签名——吞吐是否还涨、队列与 await 是否同步抬</text>
+
+  <!-- 左图：QD 扫描 -->
+  <rect x="48" y="468" width="620" height="392" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="492" font-size="11.5" font-weight="700" fill="#4A473F">QD 扫描示意（4 KiB 随机读 · 同盘同负载）</text>
+  <text x="68" y="510" font-size="10" fill="#6B675C">横轴 = 队列深度 · 左纵轴 = IOPS · 右纵轴 = await</text>
+
+  <!-- 分区：有效扩展 / 饱和（plot: x 100..500, y 540..760） -->
+  <rect x="100" y="540" width="190" height="220" fill="#DCE9E3" opacity="0.40"/>
+  <rect x="290" y="540" width="210" height="220" fill="#F0E0DB" opacity="0.40"/>
+  <text x="195" y="558" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">① 有效扩展区</text>
+  <text x="395" y="558" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">② 进入饱和区</text>
+
+  <!-- 轴 -->
+  <line x1="100" y1="540" x2="100" y2="760" stroke="#8A8574" stroke-width="1.3"/>
+  <line x1="100" y1="760" x2="500" y2="760" stroke="#8A8574" stroke-width="1.3"/>
+  <line x1="500" y1="540" x2="500" y2="760" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="94" y="548" font-size="9.5" fill="#3D5A80" text-anchor="end">IOPS</text>
+  <text x="506" y="548" font-size="9.5" fill="#A64B3C" text-anchor="start">await</text>
+  <text x="110" y="778" font-size="9.5" fill="#6B675C">QD 1</text>
+  <text x="280" y="778" font-size="9.5" fill="#6B675C" text-anchor="middle">32</text>
+  <text x="500" y="778" font-size="9.5" fill="#6B675C" text-anchor="end">128 →</text>
+
+  <!-- IOPS：低→升→平台（y 越小越高） -->
+  <path d="M100,730 C160,700 220,640 290,590 C340,560 400,552 500,548" fill="none" stroke="#3D5A80" stroke-width="2.4"/>
+  <text x="185" y="650" font-size="10.5" font-weight="700" fill="#3D5A80">IOPS ↑</text>
+  <text x="420" y="575" font-size="10.5" font-weight="700" fill="#3D5A80">IOPS 平台</text>
+
+  <!-- await：先稳后升 -->
+  <path d="M100,700 C160,698 220,694 290,688 C350,650 420,600 500,560" fill="none" stroke="#A64B3C" stroke-width="2.4"/>
+  <text x="165" y="720" font-size="10.5" font-weight="700" fill="#A64B3C">await 稳</text>
+  <text x="430" y="620" font-size="10.5" font-weight="700" fill="#A64B3C">await ↑</text>
+
+  <!-- 拐点 -->
+  <circle cx="290" cy="590" r="4" fill="#2F6B5E"/>
+  <line x1="290" y1="590" x2="290" y2="760" stroke="#2F6B5E" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="290" y="798" font-size="10" fill="#2F6B5E" text-anchor="middle">拐点：吞吐停涨 + 延迟抬头</text>
+
+  <!-- 图例 / 读法 -->
+  <line x1="520" y1="600" x2="548" y2="600" stroke="#3D5A80" stroke-width="2.4"/>
+  <text x="556" y="604" font-size="10.5" fill="#2C4460">IOPS / 带宽</text>
+  <line x1="520" y1="624" x2="548" y2="624" stroke="#A64B3C" stroke-width="2.4"/>
+  <text x="556" y="628" font-size="10.5" fill="#733428">r_await / w_await</text>
+  <line x1="520" y1="652" x2="628" y2="652" stroke="#C9C5B6" stroke-width="1"/>
+  <text x="520" y="672" font-size="10.5" fill="#4A473F">同步看 aqu-sz：</text>
+  <text x="520" y="692" font-size="10.5" fill="#24473F">扩展区 · 与 IOPS 同比例升</text>
+  <text x="520" y="712" font-size="10.5" fill="#733428">饱和区 · 与 await 同步抬</text>
+  <line x1="520" y1="728" x2="628" y2="728" stroke="#C9C5B6" stroke-width="1"/>
+  <text x="520" y="750" font-size="10" fill="#6B675C">%util=100% 可出现在两区：</text>
+  <text x="520" y="768" font-size="10" fill="#6B675C">多队列 NVMe 只说明持续有 IO</text>
+  <text x="520" y="786" font-size="10" fill="#6B675C">是否封顶看曲线拐点，不看 util</text>
+
+  <!-- 右栏：三种签名 + 边界 -->
+  <rect x="688" y="468" width="504" height="392" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="708" y="492" font-size="11.5" font-weight="700" fill="#2B2A26">三种组合签名（候选机制，非自动诊断）</text>
+
+  <rect x="708" y="508" width="464" height="76" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="724" y="530" font-size="11.5" font-weight="700" fill="#24473F">① 有效扩展</text>
+  <text x="724" y="550" font-size="10.5" fill="#24473F">签名：QD ↑ · IOPS ↑ · await 稳 · aqu-sz 同比例升</text>
+  <text x="724" y="570" font-size="10.5" fill="#2F6B5E">→ 并行度仍在被填充；继续小步提 QD 找拐点</text>
+
+  <rect x="708" y="596" width="464" height="76" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="724" y="618" font-size="11.5" font-weight="700" fill="#6B4E28">② 进入饱和</text>
+  <text x="724" y="638" font-size="10.5" fill="#6B4E28">签名：QD ↑ · IOPS 平台 · await ↑ · aqu-sz 同步抬</text>
+  <text x="724" y="658" font-size="10.5" fill="#8A6A3A">→ 新增并发主要变成排队；降 QD + blktrace 拆阶段</text>
+
+  <rect x="708" y="684" width="464" height="76" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="724" y="706" font-size="11.5" font-weight="700" fill="#2C4460">③ 观测边界错位</text>
+  <text x="724" y="726" font-size="10.5" fill="#2C4460">签名：应用 / fio clat 高 · 叶子盘 await 低 · r/s≈0</text>
+  <text x="724" y="746" font-size="10.5" fill="#3D5A80">→ 延迟在块层前 / 虚拟层 / 网络 / 远端；换观测点</text>
+
+  <rect x="708" y="772" width="464" height="68" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="724" y="794" font-size="11" font-weight="700" fill="#733428">边界 · 别给 %util 设通用阈值</text>
+  <text x="724" y="814" font-size="10" fill="#733428">Page Cache / 应用排队 / NFS·SMB RPC 可不进本地块统计；</text>
+  <text x="724" y="830" font-size="10" fill="#733428">%util=100% 只说明持续有 IO 在途——封顶看 IOPS / aqu-sz / await。</text>
+</svg>

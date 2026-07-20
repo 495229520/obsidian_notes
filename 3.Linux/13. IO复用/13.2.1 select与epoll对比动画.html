@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>select 与 epoll 对比动画 · 全量扫描 vs 红黑树+就绪链表 · O(n) vs 就绪数相关</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:560ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px 24px 20px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;letter-spacing:.2px;text-align:center;}
+.viz .vcap b{color:var(--ink);}
+
+/* 通用：区框标题居中 */
+.zone{
+  border:1.5px solid var(--line);border-radius:12px;background:var(--paper);
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+}
+.zone.lit{border-color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.16);}
+.zone.lit-b{border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.14);}
+.zone.lit-h{border-color:var(--brown);box-shadow:0 0 0 3px rgba(154,91,14,.16);}
+.zt{
+  flex:none;height:28px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);
+  letter-spacing:.4px;border-bottom:1px solid var(--grid);background:rgba(241,239,232,.55);
+}
+.zbody{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;min-height:0;overflow:hidden;}
+
+/* fd 芯片：文字绝对居中 */
+.fd{
+  width:40px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--gray);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted);
+  transition:all var(--dur) var(--ease);flex:none;
+}
+.fd.mon{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.fd.scan{border-color:var(--brown);background:var(--brownbg);color:var(--brown);box-shadow:0 0 0 3px rgba(154,91,14,.22);transform:scale(1.08);}
+.fd.ready{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.fd.dim{opacity:.28;}
+.fd.hid{opacity:0;transform:scale(.85);pointer-events:none;}
+
+/* ===== select ===== */
+.sel-stage{width:578px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+.sel-top{display:grid;grid-template-columns:1fr 64px 1fr;gap:0;align-items:stretch;height:200px;}
+.sel-zone .zbody{padding:14px 16px;}
+.fd-grid{display:grid;grid-template-columns:repeat(4,40px);grid-template-rows:repeat(2,32px);gap:14px 16px;justify-content:center;align-content:center;}
+.sel-bridge{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  position:relative;
+}
+.sel-bridge svg{width:56px;height:28px;overflow:visible;}
+.sel-bridge .arr-label{
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brown);
+  opacity:0;transform:translateY(4px);transition:all var(--dur) var(--ease);
+  white-space:nowrap;text-align:center;
+}
+.sel-bridge .arr-label.on{opacity:1;transform:translateY(0);}
+.sel-bridge .arr-line{stroke:var(--brown);stroke-width:2.5;fill:none;
+  stroke-dasharray:48;stroke-dashoffset:48;transition:stroke-dashoffset var(--dur) var(--ease);}
+.sel-bridge.on .arr-line{stroke-dashoffset:0;}
+.sel-bridge .arr-head{fill:var(--brown);opacity:0;transition:opacity var(--dur) var(--ease);}
+.sel-bridge.on .arr-head{opacity:1;}
+
+.sel-bot{height:88px;}
+.sel-bot .zbody{padding:10px 12px;}
+.fd-row{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:nowrap;}
+.fd-row .fd{transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+
+.sel-meta{
+  height:36px;display:flex;align-items:center;justify-content:center;gap:12px;
+}
+.pill{
+  height:28px;padding:0 14px;border-radius:999px;border:1.5px solid var(--line);
+  background:var(--gray);color:var(--muted);
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;
+  opacity:0;transform:translateY(4px);transition:all var(--dur) var(--ease);
+  white-space:nowrap;max-width:100%;
+}
+.pill.on{opacity:1;transform:translateY(0);}
+.pill.b{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.pill.g{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.pill.h{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.pill.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.cost{
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);
+  opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;
+}
+.cost.on{opacity:1;}
+.cost b{color:var(--danger);}
+
+/* ===== epoll ===== */
+.ep-stage{width:578px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+.ep-top{display:grid;grid-template-columns:1fr 56px 168px;gap:0;align-items:stretch;height:220px;}
+.ep-tree-box .zbody{padding:8px 10px 10px;position:relative;}
+.tree-wrap{position:relative;width:100%;height:100%;max-width:340px;max-height:170px;margin:0 auto;}
+.tree-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
+.tree-svg line{stroke:var(--line);stroke-width:1.8;transition:stroke var(--dur) var(--ease);}
+.zone.lit .tree-svg line{stroke:rgba(15,110,86,.4);}
+.ep-node{
+  position:absolute;width:36px;height:36px;margin-left:-18px;margin-top:-18px;
+  border-radius:50%;border:1.5px solid var(--blue);background:var(--bluebg);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;font-weight:700;color:var(--blue);
+  transition:all var(--dur) var(--ease);z-index:2;
+  opacity:0;transform:scale(.7);
+}
+.ep-node.on{opacity:1;transform:scale(1);}
+.ep-node.add{box-shadow:0 0 0 4px rgba(24,95,165,.22);transform:scale(1.12);}
+.ep-node.ready{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+
+.ep-bridge{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+}
+.ep-bridge svg{width:48px;height:24px;overflow:visible;}
+.ep-bridge .arr-line{stroke:var(--green);stroke-width:2.5;fill:none;
+  stroke-dasharray:40;stroke-dashoffset:40;transition:stroke-dashoffset var(--dur) var(--ease);}
+.ep-bridge.on .arr-line{stroke-dashoffset:0;}
+.ep-bridge .arr-head{fill:var(--green);opacity:0;transition:opacity var(--dur) var(--ease);}
+.ep-bridge.on .arr-head{opacity:1;}
+
+.rdy-col{display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;width:100%;}
+.rdy-item{
+  width:100%;max-width:120px;height:34px;border-radius:8px;
+  border:1.5px solid var(--green);background:var(--greenbg);color:var(--green);
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:translateX(12px);transition:all var(--dur) var(--ease);
+}
+.rdy-item.on{opacity:1;transform:translateX(0);}
+
+.ep-bot{height:86px;}
+.ep-bot .zbody{padding:10px 16px;}
+.ev-row{display:flex;gap:16px;align-items:center;justify-content:center;}
+.ev-chip{
+  min-width:140px;height:36px;padding:0 16px;border-radius:9px;
+  border:1.5px solid var(--green);background:var(--greenbg);color:var(--green);
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:translateY(8px);transition:all var(--dur) var(--ease);
+  white-space:nowrap;
+}
+.ev-chip.on{opacity:1;transform:translateY(0);}
+
+.ep-meta{height:36px;display:flex;align-items:center;justify-content:center;gap:10px;}
+.ep-chip{
+  height:28px;padding:0 14px;border-radius:999px;border:1.5px solid var(--line);
+  background:var(--gray);color:var(--muted);
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all var(--dur) var(--ease);white-space:nowrap;
+}
+.ep-chip.on{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.ep-chip.g{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+
+/* ===== 对比表 ===== */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
+.cmp-card{border:1.5px solid var(--grid);border-radius:11px;padding:14px 16px;background:var(--paper);transition:all var(--dur) var(--ease);opacity:.4;}
+.cmp-card.lit{opacity:1;border-color:var(--ink);box-shadow:0 2px 8px rgba(60,55,40,.1);}
+.cmp-card h3{font-size:14px;font-weight:700;margin-bottom:10px;text-align:center;}
+.cmp-card.sel h3{color:var(--brown);}
+.cmp-card.ep h3{color:var(--green);}
+.cmp-row{display:flex;gap:8px;margin:7px 0;font-size:12px;color:var(--muted);align-items:center;}
+.cmp-row .k{font-family:var(--mono);font-size:10.5px;color:var(--faint);width:40px;flex:none;text-align:right;}
+.cmp-row .v{flex:1;text-align:left;}
+.cmp-row.show{color:var(--ink);}
+.cmp-verdict{margin-top:14px;border:1.5px solid var(--green);background:var(--greenbg);border-radius:10px;padding:12px 16px;font-size:12.5px;color:var(--green);font-weight:600;opacity:0;transition:opacity var(--dur) var(--ease);text-align:center;}
+.cmp-verdict.on{opacity:1;}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .hb{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>select 与 epoll 对比 · 全量扫描 vs 红黑树 + 就绪链表</h1>
+    <p>配套笔记《13.2 select模型》《13.4 epoll模型》 · 每次拷贝 fd 集合 / 内核线性扫描 / 用户再遍历 · 对照 epoll_ctl 常驻内核　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+const FDS=[3,5,7,9,11,13,15,17];
+const READY=[5,13];
+
+/* 大箭头 SVG：实心三角头 + 描边绘制 */
+const ARROW_R=(color)=>`
+<svg viewBox="0 0 56 28" aria-hidden="true">
+  <path class="arr-line" d="M4 14 H42" stroke="${color}"/>
+  <polygon class="arr-head" points="42,7 54,14 42,21"/>
+</svg>`;
+const ARROW_G=`
+<svg viewBox="0 0 48 24" aria-hidden="true">
+  <path class="arr-line" d="M2 12 H34" stroke="var(--green)"/>
+  <polygon class="arr-head" points="34,5 46,12 34,19"/>
+</svg>`;
+
+/* ========== 场景 1：select ========== */
+const selectScene=(()=>{
+  const code=codeOf([
+    'FD_ZERO(&rfds);',
+    'FD_SET(3,&rfds); FD_SET(5,&rfds); ...',
+    'n = select(maxfd+1, &rfds, NULL, NULL, &tv);',
+    '<span class="cmt">// 内核线性扫描全部被监控 fd</span>',
+    'for (fd=0; fd<=maxfd; ++fd)',
+    '  if (FD_ISSET(fd,&rfds)) handle(fd);',
+    '<span class="cmt">// 下次调用前必须重新 FD_SET 整份集合</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 用户态持有 8 个连接 fd',chip:'监控集',chipC:'c0',lines:[],
+     mon:0,scan:-1,ready:0,copy:0,user:0,cost:'',badge:'',
+     desc:'服务器同时挂着 8 个 fd（示意；真实场景可达上千）。其中只有 <b>fd=5</b> 和 <b>fd=13</b> 真正有数据可读。问题：如何高效地找到它们？'},
+    {title:'步骤 1 · FD_ZERO + FD_SET 组装位图',chip:'fd_set 位图',chipC:'cb',lines:[0,1],
+     mon:1,scan:-1,ready:0,copy:0,user:0,cost:'',badge:'b',
+     desc:'用户态用 <code>FD_ZERO</code> 清空位图，再对每个关心的 fd 调 <code>FD_SET</code>。位图大小受 <b>FD_SETSIZE≈1024</b> 限制——这是 select 的硬上限。'},
+    {title:'步骤 2 · 整份 fd_set 拷入内核',chip:'每次拷贝',chipC:'ch',lines:[2],
+     mon:1,scan:-1,ready:0,copy:1,user:0,cost:'拷贝 O(监控数)',badge:'h',
+     desc:'调用 <code>select()</code> 时，整份 <code>fd_set</code> 从用户态<span class="hb">拷贝进内核</span>。连接越多，每次系统调用拷贝越重——这是 select 的第一道成本。'},
+    {title:'步骤 3 · 内核线性扫描全部 fd',chip:'O(n) 扫描',chipC:'ch',lines:[3],
+     mon:1,scan:0,ready:0,copy:1,user:0,cost:'扫描 0/8',badge:'h',
+     desc:'内核从 0 扫到 maxfd，逐个检查每个被监控 fd 是否就绪。无论有多少真正就绪，都要<span class="hb">按总监控数</span>走一遍。'},
+    {title:'步骤 4 · 继续扫描… 命中就绪 fd',chip:'命中 5、13',chipC:'cg',lines:[3],
+     mon:1,scan:7,ready:1,copy:1,user:0,cost:'扫描 8/8 · 就绪 2',badge:'g',
+     desc:'扫完全部 8 个后，内核把就绪位写回 <code>fd_set</code>（非就绪位被清掉）。返回值 <code>n=2</code> 只是就绪个数，并不告诉你"是哪几个"。'},
+    {title:'步骤 5 · 用户态再遍历找就绪',chip:'二次遍历',chipC:'cd',lines:[4,5],
+     mon:1,scan:-1,ready:1,copy:0,user:1,cost:'用户再扫 maxfd',badge:'d',
+     desc:'返回用户态后，还要用 <code>FD_ISSET</code> 从 0 扫到 maxfd，才能找到真正就绪的 fd。这是<span class="dg">第三次</span>与"总连接数"相关的线性成本。'},
+    {title:'步骤 6 · 下次调用前必须重建集合',chip:'集合被破坏',chipC:'ch',lines:[6],
+     mon:0,scan:-1,ready:0,copy:0,user:0,cost:'每次重新 FD_SET',badge:'h',
+     desc:'<code>select</code> 返回后 <code>fd_set</code> 只剩就绪位——原监控集被<span class="hb">破坏</span>。下一轮循环必须重新 <code>FD_ZERO + FD_SET</code> 整份集合。三道线性成本叠加，高并发下成为瓶颈。'},
+  ];
+  function fdGrid(prefix){
+    return '<div class="fd-grid">'+FDS.map((fd,i)=>'<div class="fd" id="'+prefix+i+'">'+fd+'</div>').join('')+'</div>';
+  }
+  function mount(){
+    viz.innerHTML=
+      '<div class="vcap"><b>select 工作流</b>：组装 → 拷贝进内核 → 线性扫描 → 用户再找就绪</div>'+
+      '<div class="sel-stage">'+
+        '<div class="sel-top">'+
+          '<div class="zone" id="szUser"><div class="zt">用户态 · fd 集合</div><div class="zbody">'+fdGrid('sf-u')+'</div></div>'+
+          '<div class="sel-bridge" id="sfBridge">'+ARROW_R('var(--brown)')+'<span class="arr-label" id="sfCopy">拷贝</span></div>'+
+          '<div class="zone" id="szKern"><div class="zt">内核态 · select 扫描</div><div class="zbody">'+fdGrid('sf-k')+'</div></div>'+
+        '</div>'+
+        '<div class="zone sel-bot" id="szUser2"><div class="zt">用户态二次遍历 · FD_ISSET</div><div class="zbody"><div class="fd-row">'+
+          FDS.map((fd,i)=>'<div class="fd hid" id="sf-r'+i+'">'+fd+'</div>').join('')+
+        '</div></div></div>'+
+        '<div class="sel-meta"><span class="pill" id="sfBadge"></span><span class="cost" id="sfCost"></span></div>'+
+      '</div>';
+  }
+  function paint(s){
+    FDS.forEach((fd,i)=>{
+      const u=el('sf-u'+i),k=el('sf-k'+i),r=el('sf-r'+i);
+      let uc='fd',kc='fd';
+      if(s.mon){uc+=' mon';kc+=' mon';}
+      if(s.scan===i)kc+=' scan';
+      if(s.ready&&READY.includes(fd)){
+        if(s.mon||s.user)uc+=' ready';
+        kc+=' ready';
+      }
+      if(s.scan>=0&&s.scan!==i&&!(s.ready&&READY.includes(fd)))kc+=' dim';
+      u.className=uc;k.className=kc;
+      if(s.user){
+        r.className='fd'+(READY.includes(fd)?' ready':' dim');
+      }else{
+        r.className='fd hid';
+      }
+    });
+    el('sfBridge').classList.toggle('on',!!s.copy);
+    el('sfCopy').classList.toggle('on',!!s.copy);
+
+    const labels={b:'FD_SET 组装完成',h:s.copy?'整份 fd_set 拷入内核':s.scan>=0?'内核线性扫描中…':'集合被破坏 · 须重建',g:'就绪 fd=5,13 · n=2',d:'用户态再扫 maxfd 找就绪'};
+    const b=el('sfBadge');
+    b.className='pill '+(s.badge||'b')+(s.badge?' on':'');
+    b.textContent=labels[s.badge]||'';
+
+    const c=el('sfCost');
+    c.innerHTML=s.cost?('<b>'+s.cost+'</b>'):'';
+    c.classList.toggle('on',!!s.cost);
+
+    el('szUser').classList.toggle('lit-b',!!s.mon&&!s.user&&!s.copy);
+    el('szKern').classList.toggle('lit-h',s.scan>=0||!!s.copy);
+    el('szUser2').classList.toggle('lit',!!s.user);
+  }
+  return {id:'select',label:'select 工作流',sub:'拷贝 · 扫描 · 再遍历',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：epoll ========== */
+const epollScene=(()=>{
+  const code=codeOf([
+    'epfd = epoll_create1(EPOLL_CLOEXEC);',
+    'epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);',
+    '<span class="cmt">// 监控集常驻内核红黑树，无需每轮拷贝</span>',
+    'n = epoll_wait(epfd, events, MAX, -1);',
+    '<span class="cmt">// 只返回就绪链表上的事件</span>',
+    'for (i=0; i<n; ++i) handle(events[i]);'
+  ]);
+  /* 百分比布局：节点中心相对 tree-wrap，保证框内居中不溢出 */
+  const nodes=[
+    {id:0,fd:17,x:50,y:18},
+    {id:1,fd:9,x:28,y:48},
+    {id:2,fd:13,x:72,y:48},
+    {id:3,fd:5,x:16,y:80},
+    {id:4,fd:11,x:40,y:80},
+    {id:5,fd:7,x:60,y:80},
+    {id:6,fd:15,x:84,y:80}
+  ];
+  const edges=[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]];
+  const steps=[
+    {title:'步骤 0 · 创建 epoll 实例',chip:'epfd',chipC:'c0',lines:[0],
+     show:0,add:-1,rdy:0,wait:0,anno:'',boxLit:0,
+     desc:'<code>epoll_create1()</code> 在内核创建一个 epoll 实例，返回 <b>epfd</b>。之后所有增删改与等待都挂在这个实例上。'},
+    {title:'步骤 1 · epoll_ctl 把 fd 挂进红黑树',chip:'红黑树',chipC:'cb',lines:[1,2],
+     show:7,add:3,rdy:0,wait:0,anno:'h',boxLit:1,
+     desc:'每个关心的 fd 用 <code>epoll_ctl(ADD)</code> 注册一次，挂入内核<span class="bl">红黑树</span>（监控集）。集合<span class="gr">常驻内核</span>——下一轮 <code>epoll_wait</code> 不必再拷贝整份 fd 列表。'},
+    {title:'步骤 2 · 数据到达 → 回调挂入就绪链表',chip:'就绪链表',chipC:'cg',lines:[2],
+     show:7,add:-1,rdy:1,wait:0,anno:'g',boxLit:2,
+     desc:'网卡收包后协议栈把数据放入 socket 接收缓冲，并触发该 fd 等待队列上的回调：把 fd 挂到 epoll 的<span class="gr">就绪链表</span>。代价与<span class="gr">活跃 fd 数</span>相关，不是总连接数。'},
+    {title:'步骤 3 · epoll_wait 直接返回就绪列表',chip:'O(就绪数)',chipC:'cg',lines:[3,4],
+     show:7,add:-1,rdy:1,wait:1,anno:'g',boxLit:3,
+     desc:'<code>epoll_wait</code> 从就绪链表取出事件，填入用户传入的 <code>events[]</code>。返回的 <code>n</code> 个条目<span class="gr">每一个都是就绪的</span>——用户态无需再扫全部 fd。'},
+    {title:'步骤 4 · 只处理 n 个就绪事件',chip:'无二次扫描',chipC:'cg',lines:[5],
+     show:7,add:-1,rdy:1,wait:1,anno:'g',boxLit:3,
+     desc:'循环 <code>for (i=0; i&lt;n; ++i)</code> 即可处理。对比 select：没有"拷贝全量集合"、没有"内核扫全量"、没有"用户再扫 maxfd"。'},
+    {title:'步骤 5 · 监控集仍在，下轮直接 wait',chip:'零重建',chipC:'cb',lines:[2,3],
+     show:7,add:-1,rdy:0,wait:0,anno:'h',boxLit:1,
+     desc:'处理完后红黑树里的监控集<span class="bl">原封不动</span>。除非要增删改 fd，否则下一轮只需再调 <code>epoll_wait</code>——这是 epoll 高并发的关键。'},
+  ];
+  function mount(){
+    let lines='';
+    edges.forEach(([a,b])=>{
+      const A=nodes[a],B=nodes[b];
+      lines+='<line x1="'+A.x+'%" y1="'+A.y+'%" x2="'+B.x+'%" y2="'+B.y+'%"/>';
+    });
+    const nodeHtml=nodes.map(n=>
+      '<div class="ep-node" id="en'+n.id+'" style="left:'+n.x+'%;top:'+n.y+'%">'+n.fd+'</div>'
+    ).join('');
+    viz.innerHTML=
+      '<div class="vcap"><b>epoll 工作流</b>：ctl 注册一次 · 就绪链表驱动 · wait 只拿活跃</div>'+
+      '<div class="ep-stage">'+
+        '<div class="ep-top">'+
+          '<div class="zone ep-tree-box" id="epTree"><div class="zt">内核 · 红黑树（监控集）</div><div class="zbody"><div class="tree-wrap">'+
+            '<svg class="tree-svg" viewBox="0 0 100 100" preserveAspectRatio="none">'+lines+'</svg>'+nodeHtml+
+          '</div></div></div>'+
+          '<div class="ep-bridge" id="epBridge">'+ARROW_G+'</div>'+
+          '<div class="zone" id="epList"><div class="zt">就绪链表</div><div class="zbody"><div class="rdy-col">'+
+            '<div class="rdy-item" id="er0">fd 5</div><div class="rdy-item" id="er1">fd 13</div>'+
+          '</div></div></div>'+
+        '</div>'+
+        '<div class="zone ep-bot" id="epUser"><div class="zt">用户态 · events[] 就绪数组</div><div class="zbody"><div class="ev-row">'+
+          '<div class="ev-chip" id="eu0">events[0] = 5</div><div class="ev-chip" id="eu1">events[1] = 13</div>'+
+        '</div></div></div>'+
+        '<div class="ep-meta"><span class="ep-chip" id="epChip">epfd</span><span class="pill" id="epAnno"></span></div>'+
+      '</div>';
+  }
+  function paint(s){
+    nodes.forEach((n,i)=>{
+      const e=el('en'+i);
+      let c='ep-node';
+      if(i<s.show)c+=' on';
+      if(s.add===i)c+=' add';
+      if(s.rdy&&READY.includes(n.fd))c+=' ready';
+      e.className=c;
+    });
+    el('er0').classList.toggle('on',!!s.rdy);
+    el('er1').classList.toggle('on',!!s.rdy);
+    el('eu0').classList.toggle('on',!!s.wait);
+    el('eu1').classList.toggle('on',!!s.wait);
+    el('epBridge').classList.toggle('on',!!s.rdy);
+
+    const chip=el('epChip');
+    chip.className='ep-chip'+(s.show>0?' on':'')+(s.rdy?' g':'');
+    chip.textContent=s.wait?'n = 2 就绪':s.rdy?'回调挂链':'epfd';
+
+    const a=el('epAnno');
+    const txt=s.anno==='g'?(s.wait?'直接返回就绪数组 · 无二次扫描':'数据到达 → 挂入就绪链表'):(s.anno==='h'?'监控集常驻内核 · 无需每轮拷贝':'');
+    a.className='pill '+(s.anno||'h')+(s.anno?' on':'');
+    a.textContent=txt;
+
+    el('epTree').classList.toggle('lit',s.boxLit===1);
+    el('epList').classList.toggle('lit',s.boxLit===2);
+    el('epUser').classList.toggle('lit',s.boxLit===3);
+  }
+  return {id:'epoll',label:'epoll 工作流',sub:'红黑树 · 就绪链表',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：对照总结 ========== */
+const cmpScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// select：代价 ∝ 总监控 fd 数</span>',
+    'select(...)  <span class="cmt">// 拷贝 + 扫全量 + 用户再扫</span>',
+    '',
+    '<span class="cmt">// epoll：代价主要 ∝ 就绪事件数</span>',
+    'epoll_ctl(...)  <span class="cmt">// 增删改一次即可</span>',
+    'epoll_wait(...) <span class="cmt">// 只返回就绪列表</span>',
+    '<span class="cmt">// 注意：不要机械背 "epoll 永远 O(1)"</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 并排对比两套模型',chip:'对照',chipC:'c0',lines:[],
+     lit:'both',rows:0,verdict:0,
+     desc:'左侧 select、右侧 epoll。逐步点亮四条关键差异：集合传递、事件检测、返回方式、数量上限。'},
+    {title:'步骤 1 · 监控集合如何传递',chip:'集合传递',chipC:'ch',lines:[1,4],
+     lit:'both',rows:1,verdict:0,
+     desc:'select<span class="hb">每次调用都传入完整 fd 集合</span>并被内核改写；epoll 用 <code>epoll_ctl</code> 增删改，<span class="gr">监控集长期保存在内核</span>。'},
+    {title:'步骤 2 · 事件如何被发现',chip:'事件检测',chipC:'ch',lines:[1,5],
+     lit:'both',rows:2,verdict:0,
+     desc:'select/poll 通常需要<span class="hb">遍历所有被监控 fd</span>；epoll 在数据到达时把 fd 挂进<span class="gr">就绪链表</span>，wait 时直接取链。'},
+    {title:'步骤 3 · 返回给用户什么',chip:'返回形态',chipC:'cb',lines:[1,5],
+     lit:'both',rows:3,verdict:0,
+     desc:'select 返回后用户还要用 <code>FD_ISSET</code> 再扫一遍；epoll 直接给出<span class="gr">就绪事件数组</span>，循环 n 次即可。'},
+    {title:'步骤 4 · 数量上限与复杂度',chip:'上限与成本',chipC:'cd',lines:[0,3,6],
+     lit:'both',rows:4,verdict:0,
+     desc:'select 受 <b>FD_SETSIZE≈1024</b> 编译期限制；epoll 无此硬上限（受系统资源限制）。更准确的说法：epoll 避免了按<span class="dg">总连接数</span>线性扫描的主成本，处理成本主要与<span class="gr">就绪事件数</span>相关——不要机械背"永远 O(1)"。'},
+    {title:'步骤 5 · 选型结论',chip:'何时用谁',chipC:'cg',lines:[6],
+     lit:'ep',rows:4,verdict:1,
+     desc:'<b>跨平台 / 连接很少</b>：select 仍可用。<b>Linux 高并发</b>：epoll 是首选。epoll 解决的是"少量线程高效等待大量 fd"，它通知的是<span class="gr">可以读写</span>，真正的 read/write 仍由应用完成——这正是后面 Reactor 要组织的事。'},
+  ];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>select vs epoll</b>：四条差异 + 选型</div>'+
+      '<div class="cmp-grid">'+
+        '<div class="cmp-card sel" id="cmpSel"><h3>select</h3>'+
+          '<div class="cmp-row" id="cr0s"><span class="k">传递</span><span class="v">每次拷贝完整 fd_set</span></div>'+
+          '<div class="cmp-row" id="cr1s"><span class="k">检测</span><span class="v">内核线性扫全部 fd</span></div>'+
+          '<div class="cmp-row" id="cr2s"><span class="k">返回</span><span class="v">用户再 FD_ISSET 找就绪</span></div>'+
+          '<div class="cmp-row" id="cr3s"><span class="k">上限</span><span class="v">FD_SETSIZE ≈ 1024</span></div>'+
+        '</div>'+
+        '<div class="cmp-card ep" id="cmpEp"><h3>epoll</h3>'+
+          '<div class="cmp-row" id="cr0e"><span class="k">传递</span><span class="v">epoll_ctl 注册，常驻内核</span></div>'+
+          '<div class="cmp-row" id="cr1e"><span class="k">检测</span><span class="v">就绪链表，事件驱动</span></div>'+
+          '<div class="cmp-row" id="cr2e"><span class="k">返回</span><span class="v">直接给就绪事件数组</span></div>'+
+          '<div class="cmp-row" id="cr3e"><span class="k">上限</span><span class="v">无 FD_SETSIZE，受资源限</span></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="cmp-verdict" id="cmpV">Linux 高并发首选 epoll · 它发现"谁就绪"，Reactor 负责"分发给谁"</div>';
+  }
+  function paint(s){
+    el('cmpSel').classList.toggle('lit',s.lit==='both'||s.lit==='sel');
+    el('cmpEp').classList.toggle('lit',s.lit==='both'||s.lit==='ep');
+    for(let i=0;i<4;i++){
+      const on=s.rows>i;
+      el('cr'+i+'s').classList.toggle('show',on);
+      el('cr'+i+'e').classList.toggle('show',on);
+    }
+    el('cmpV').classList.toggle('on',!!s.verdict);
+  }
+  return {id:'compare',label:'对照总结',sub:'四条差异 · 选型',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[selectScene,epollScene,cmpScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

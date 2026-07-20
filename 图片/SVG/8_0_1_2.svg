@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 940" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 9.7 / 9.2：
+       底色 rgb(245,244,237)
+       蓝 #E3EAF4 / #3D5A80 / #2C4460
+       绿 #DCE9E3 / #2F6B5E / #24473F
+       琥珀 #EFE7DA / #8A6A3A / #6B4E28
+       红 #F0E0DB / #A64B3C / #733428
+       中性 #F1EFE8 / #D8D5C8 / #4A473F / #6B675C / #2B2A26
+       面板底 #FBFBF6 · 实心三角箭头 #5A564B -->
+  <title>伪共享、发布协议与三层屏障域</title>
+  <desc>上半：同一 Cache Line 上的伪共享与按 destructive interference 隔开的对照，以及处理优先级。中部：release/acquire 发布协议与 happens-before，明确屏障不是刷回 DRAM。下半：编译器 / CPU 线程 / 设备与总线 三层一致性域，以及无锁队列、轮询、NVMe Doorbell 的同形不同原语。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="940" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">伪共享拖慢性能 · 错误内存序破坏正确性 · 两者不能混为一谈</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">布局决定搬多少行 · release/acquire 决定发布与观察的先后 · 设备通信还要换一套原语</text>
+
+  <!-- ============ Panel A：伪共享 ============ -->
+  <text x="48" y="108" font-size="13" font-weight="700" fill="#4A473F">A · False Sharing：C++ 对象没共享，Cache Line 共享了 → 所有权仍在两核间乒乓</text>
+
+  <!-- 坏：同一行 -->
+  <rect x="48" y="120" width="560" height="200" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="68" y="146" font-size="12.5" font-weight="700" fill="#733428">坏 · 两个热写字段挤在同一行</text>
+  <rect x="80" y="164" width="496" height="64" rx="6" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="100" y="184" font-size="10.5" fill="#6B675C">同一条 Cache Line</text>
+  <rect x="100" y="196" width="180" height="24" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="190" y="212" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">producer_count</text>
+  <rect x="290" y="196" width="180" height="24" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="380" y="212" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">consumer_count</text>
+  <text x="480" y="212" font-size="10" fill="#6B675C">…</text>
+
+  <rect x="100" y="248" width="140" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="170" y="268" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 0 写</text>
+  <text x="170" y="286" font-size="10" fill="#2C4460" text-anchor="middle">producer</text>
+  <path d="M250,272 L290,272" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <path d="M290,288 L250,288" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <rect x="300" y="248" width="140" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="370" y="268" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 1 写</text>
+  <text x="370" y="286" font-size="10" fill="#2C4460" text-anchor="middle">consumer</text>
+  <text x="460" y="268" font-size="11" font-weight="700" fill="#733428">逻辑无共享</text>
+  <text x="460" y="288" font-size="11" font-weight="700" fill="#733428">硬件互相拖</text>
+
+  <!-- 好：隔开 -->
+  <rect x="632" y="120" width="560" height="200" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="652" y="146" font-size="12.5" font-weight="700" fill="#24473F">好 · 按 destructive interference 隔开</text>
+  <rect x="664" y="164" width="220" height="64" rx="6" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="774" y="188" font-size="10.5" fill="#6B675C" text-anchor="middle">Line A</text>
+  <text x="774" y="210" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">producer_count</text>
+  <rect x="920" y="164" width="220" height="64" rx="6" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1030" y="188" font-size="10.5" fill="#6B675C" text-anchor="middle">Line B</text>
+  <text x="1030" y="210" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">consumer_count</text>
+
+  <rect x="664" y="248" width="140" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="734" y="268" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 0 写</text>
+  <text x="734" y="286" font-size="10" fill="#2C4460" text-anchor="middle">只动 Line A</text>
+  <rect x="1000" y="248" width="140" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="1070" y="268" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 1 写</text>
+  <text x="1070" y="286" font-size="10" fill="#2C4460" text-anchor="middle">只动 Line B</text>
+  <text x="830" y="272" font-size="12" font-weight="700" fill="#2F6B5E">各持各行 · 无乒乓</text>
+
+  <!-- 处理优先级 -->
+  <rect x="48" y="336" width="1144" height="72" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="360" font-size="12" font-weight="700" fill="#2B2A26">处理优先级（先所有权，后填充）</text>
+  <text x="68" y="386" font-size="11.5" fill="#4A473F">① 单写者 / 消息传递　② 批量更新本地计数　③ 读写分离　④ 确认热点同行后再 alignas / 填充　·　填充增对象、伤缓存与 TLB，不是默认写法</text>
+
+  <!-- ============ Panel B：发布协议 ============ -->
+  <text x="48" y="440" font-size="13" font-weight="700" fill="#4A473F">B · 发布协议：屏障约束的是观察顺序，不是「把缓存刷回 DRAM」</text>
+
+  <rect x="48" y="452" width="720" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="478" font-size="12" font-weight="700" fill="#2B2A26">release / acquire 建立 synchronizes-with → happens-before</text>
+
+  <rect x="80" y="496" width="160" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="160" y="516" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">填写 request</text>
+  <text x="160" y="534" font-size="10" fill="#2C4460" text-anchor="middle">opcode · buffer · …</text>
+  <path d="M240,522 L272,522" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="274" y="496" width="200" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="374" y="516" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">release store</text>
+  <text x="374" y="534" font-size="10" fill="#24473F" text-anchor="middle">ready = true</text>
+  <path d="M474,522 L506,522" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <rect x="508" y="496" width="200" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="608" y="516" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">acquire load</text>
+  <text x="608" y="534" font-size="10" fill="#24473F" text-anchor="middle">读到 true</text>
+  <path d="M608,548 L608,568" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <rect x="508" y="570" width="200" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="608" y="590" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">读取 request</text>
+  <text x="608" y="608" font-size="10" fill="#2C4460" text-anchor="middle">保证看到完整写入</text>
+
+  <text x="80" y="590" font-size="11" fill="#4A473F">之前的写不能越过 release 向后</text>
+  <text x="80" y="612" font-size="11" fill="#4A473F">之后的读不能越过 acquire 向前</text>
+  <text x="80" y="634" font-size="11" font-weight="700" fill="#2F6B5E">消费端读到 true 后，才能读完整请求</text>
+
+  <!-- 内存序表 -->
+  <rect x="792" y="452" width="400" height="200" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="812" y="478" font-size="12" font-weight="700" fill="#2C4460">常用 memory_order（先语义，后架构）</text>
+  <text x="812" y="504" font-size="11" fill="#2C4460">relaxed · 原子性与修改序，不发布其他内存</text>
+  <text x="812" y="526" font-size="11" fill="#2C4460">acquire · 消费已发布数据</text>
+  <text x="812" y="548" font-size="11" fill="#2C4460">release · 发布已写好的数据</text>
+  <text x="812" y="570" font-size="11" fill="#2C4460">acq_rel · 读改写上的双向约束</text>
+  <text x="812" y="592" font-size="11" fill="#2C4460">seq_cst · 全局单一顺序 · 默认先正确</text>
+  <text x="812" y="620" font-size="10.5" fill="#3D5A80">x86 强序可能掩盖错误 · 正确性从 C++ 模型证明</text>
+  <text x="812" y="638" font-size="10.5" fill="#3D5A80">volatile ≠ 线程同步 · 无原子 / 无 HB</text>
+
+  <!-- ============ Panel C：三层域 ============ -->
+  <text x="48" y="684" font-size="13" font-weight="700" fill="#4A473F">C · 三层一致性域：形状相似，原语不同——「插一条 fence 全解决」通常是错的</text>
+
+  <rect x="48" y="696" width="370" height="120" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="68" y="722" font-size="12.5" font-weight="700" fill="#2C4460">① 编译器</text>
+  <text x="68" y="746" font-size="11" fill="#2C4460">是否移动 / 合并 / 删除内存访问</text>
+  <text x="68" y="768" font-size="11" fill="#2C4460">手段：原子语义 · 编译器屏障</text>
+  <text x="68" y="796" font-size="10.5" fill="#3D5A80">源码顺序 ≠ 生成代码顺序</text>
+
+  <rect x="434" y="696" width="370" height="120" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="454" y="722" font-size="12.5" font-weight="700" fill="#24473F">② CPU 线程之间</text>
+  <text x="454" y="746" font-size="11" fill="#24473F">他核按什么顺序观察普通内存</text>
+  <text x="454" y="768" font-size="11" fill="#24473F">手段：acquire/release · 硬件 fence</text>
+  <text x="454" y="796" font-size="10.5" fill="#2F6B5E">靠缓存一致性传播 · 不必经 DRAM</text>
+
+  <rect x="820" y="696" width="372" height="120" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="840" y="722" font-size="12.5" font-weight="700" fill="#6B4E28">③ 设备与总线</text>
+  <text x="840" y="746" font-size="11" fill="#6B4E28">CPU · DMA · MMIO · PCIe 可见与顺序</text>
+  <text x="840" y="768" font-size="11" fill="#6B4E28">手段：DMA API · I/O 屏障 · 设备协议</text>
+  <text x="840" y="796" font-size="10.5" fill="#8A6A3A">atomic_thread_fence ≠ DMA 发布</text>
+
+  <!-- 同形三例 -->
+  <rect x="48" y="832" width="1144" height="80" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="68" y="856" font-size="12" font-weight="700" fill="#2B2A26">同形三例：先写数据 → 再发布通知</text>
+  <text x="68" y="880" font-size="11.5" fill="#4A473F">无锁队列：写槽位 → release tail　·　Busy poll：更新完成标志所在行（勿混入无关热写）　·　NVMe：填 SQE → dma_wmb/wmb → 写 Doorbell</text>
+  <text x="68" y="900" font-size="11" fill="#6B675C">形状相同 · 保证来源不同 · 驱动用平台 DMA/MMIO API，不能用 C++ 线程 fence 替代</text>
+</svg>

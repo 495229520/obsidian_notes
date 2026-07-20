@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>三个位置：线程、物理页、设备</title>
+  <desc>上半：线程/内存/设备三角关系与独立约束。中部：对齐闭环 vs 错位。下半：双路分片而非全集中。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">一次访问由三个位置共同决定</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">线程所在节点 = 内存页所在节点 = 高频设备所在节点 · 三者彼此独立，绑一个不会自动修好另两个</text>
+
+  <!-- ============ Panel A：三角 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 必须同时追踪的三个位置</text>
+
+  <rect x="48" y="124" width="1144" height="280" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- three nodes of triangle -->
+  <rect x="160" y="160" width="220" height="90" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.6"/>
+  <text x="270" y="196" font-size="15" font-weight="700" fill="#2C4460" text-anchor="middle">① 线程在哪执行</text>
+  <text x="270" y="220" font-size="12" fill="#3D5A80" text-anchor="middle">逻辑 CPU / NUMA node</text>
+  <text x="270" y="238" font-size="11" fill="#6B675C" text-anchor="middle">CPU affinity 控制</text>
+
+  <rect x="510" y="160" width="220" height="90" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="620" y="196" font-size="15" font-weight="700" fill="#24473F" text-anchor="middle">② 物理页在哪</text>
+  <text x="620" y="220" font-size="12" fill="#2F6B5E" text-anchor="middle">页实际分配的 NUMA node</text>
+  <text x="620" y="238" font-size="11" fill="#6B675C" text-anchor="middle">first-touch / membind</text>
+
+  <rect x="860" y="160" width="220" height="90" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.6"/>
+  <text x="970" y="196" font-size="15" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 设备在哪</text>
+  <text x="970" y="220" font-size="12" fill="#8A6A3A" text-anchor="middle">PCIe 最近 NUMA node</text>
+  <text x="970" y="238" font-size="11" fill="#6B675C" text-anchor="middle">sysfs numa_node</text>
+
+  <!-- independence notes -->
+  <rect x="100" y="280" width="320" height="96" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="120" y="308" font-size="12" font-weight="700" fill="#733428">钉线程 ≠ 搬内存</text>
+  <text x="120" y="332" font-size="12" fill="#4A473F">线程钉到 node 0，不会自动</text>
+  <text x="120" y="352" font-size="12" fill="#4A473F">把已在 node 1 的物理页搬来</text>
+
+  <rect x="460" y="280" width="320" height="96" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="480" y="308" font-size="12" font-weight="700" fill="#733428">绑内存 ≠ 限线程</text>
+  <text x="480" y="332" font-size="12" fill="#4A473F">内存 bind 到 node 0，不会自动</text>
+  <text x="480" y="352" font-size="12" fill="#4A473F">限制线程只能在 node 0 运行</text>
+
+  <rect x="820" y="280" width="320" height="96" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="840" y="308" font-size="12" font-weight="700" fill="#733428">线程+内存同节点 ≠ 设备本地</text>
+  <text x="840" y="332" font-size="12" fill="#4A473F">若 NVMe 在 node 1，DMA 仍可能</text>
+  <text x="840" y="352" font-size="12" fill="#4A473F">跨节点到 node 0 的 buffer</text>
+
+  <!-- ============ Panel B：对齐 vs 错位 ============ -->
+  <text x="48" y="440" font-size="13" font-weight="700" fill="#4A473F">B · 对齐闭环 vs 典型错位</text>
+
+  <rect x="48" y="454" width="560" height="220" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.6"/>
+  <rect x="48" y="454" width="560" height="34" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <rect x="48" y="476" width="560" height="12" fill="#DCE9E3"/>
+  <text x="68" y="477" font-size="13" font-weight="700" fill="#24473F">对齐 · 数据路径在同一节点闭环</text>
+
+  <rect x="80" y="510" width="120" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="140" y="540" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">worker N0</text>
+  <path d="M200,534 L230,534" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <rect x="234" y="510" width="120" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="294" y="540" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">buffer N0</text>
+  <path d="M354,534 L384,534" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <rect x="388" y="510" width="120" height="48" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="448" y="540" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">NVMe N0</text>
+
+  <text x="80" y="590" font-size="12" fill="#4A473F">本地访存 + 本地 DMA + 同节点 IRQ/poller</text>
+  <text x="80" y="614" font-size="12" fill="#2F6B5E">目标公式：线程节点 = 页节点 = 设备节点</text>
+  <text x="80" y="642" font-size="12" fill="#6B675C">不是整机挤到一侧，而是每条路径各自闭环</text>
+
+  <rect x="632" y="454" width="560" height="220" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.6"/>
+  <rect x="632" y="454" width="560" height="34" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <rect x="632" y="476" width="560" height="12" fill="#F0E0DB"/>
+  <text x="652" y="477" font-size="13" font-weight="700" fill="#733428">错位 · 功能正确，稳定交远端税</text>
+
+  <rect x="664" y="510" width="120" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="724" y="540" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">worker N1</text>
+  <path d="M784,534 L814,534" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrr)"/>
+  <rect x="818" y="510" width="120" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="878" y="540" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">buffer N0</text>
+  <path d="M938,534 L968,534" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrr)"/>
+  <rect x="972" y="510" width="120" height="48" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="1032" y="540" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">NVMe N0</text>
+
+  <text x="664" y="590" font-size="12" fill="#4A473F">worker 远端读页 · 设备 DMA 可能跨节点</text>
+  <text x="664" y="614" font-size="12" fill="#A64B3C">均值可能尚可 · p99 / CPU 成本先恶化</text>
+  <text x="664" y="642" font-size="12" fill="#6B675C">校验通过也不能证明布局正确</text>
+
+  <!-- ============ Panel C：分片 ============ -->
+  <rect x="48" y="700" width="1144" height="140" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="732" font-size="13" font-weight="700" fill="#4A473F">C · 双路存储机的正确直觉：每节点一套闭环，而不是全集中</text>
+  <text x="68" y="760" font-size="12" fill="#4A473F">Node0：worker0 + pool0 + NIC0/NVMe0 · Node1：worker1 + pool1 + NIC1/NVMe1</text>
+  <text x="68" y="784" font-size="12" fill="#4A473F">跨节点只传控制消息 / 元数据 / 调度意图，大块 payload 尽量不搬家</text>
+  <text x="68" y="812" font-size="12" fill="#6B675C">代价：资源池分片 · 一侧忙时另一侧空闲资源不能无成本借用 · 可预测延迟 vs 全局利用率</text>
+</svg>

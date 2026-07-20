@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1060" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       成本/等待 #A64B3C；零成本 #2F6B5E；中性箭头 #5A564B；与本库既有 rdma-*.svg 同一套 -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1060" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">ibv_rc_pingpong：控制路径搭台，数据路径打乒乓</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">上半场（毫秒级，内核参与）：建资源、带外交换、推状态机；下半场（微秒级，内核缺席）：预投 Recv、SEND 乒乓、自旋收割</text>
+
+  <!-- 第一幕：控制路径 -->
+  <rect x="48" y="104" width="1144" height="400" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">第一幕 · 控制路径：每连接一次，慢一点无妨</text>
+  <text x="328" y="132" font-size="12" font-weight="700" fill="#6B675C" text-anchor="middle" dy="26">Client</text>
+  <text x="912" y="132" font-size="12" font-weight="700" fill="#6B675C" text-anchor="middle" dy="26">Server</text>
+
+  <!-- Row1 建资源（双方） -->
+  <rect x="88" y="172" width="480" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="195" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">建资源：open → PD → reg_mr(buf) → CQ → QP</text>
+  <text x="328" y="216" font-size="10.5" fill="#2C4460" text-anchor="middle">全部是系统调用；QP 生在 RESET 态</text>
+  <rect x="672" y="172" width="480" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="195" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">建资源：open → PD → reg_mr(buf) → CQ → QP</text>
+  <text x="912" y="216" font-size="10.5" fill="#2C4460" text-anchor="middle">全部是系统调用；QP 生在 RESET 态</text>
+
+  <path d="M328,230 L328,256" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <path d="M912,230 L912,256" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- Row2 post_recv -->
+  <rect x="88" y="260" width="480" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="283" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">post_recv 预投满 RQ（rx_depth 条）</text>
+  <text x="328" y="304" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">必须先于对端 send——RNR 约束</text>
+  <rect x="672" y="260" width="480" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="283" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">post_recv 预投满 RQ（rx_depth 条）</text>
+  <text x="912" y="304" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">必须先于对端 send——RNR 约束</text>
+
+  <path d="M328,318 L328,344" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <path d="M912,318 L912,344" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- Row3 TCP 交换（横跨） -->
+  <rect x="88" y="348" width="1064" height="58" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.4"/>
+  <text x="620" y="371" font-size="12.5" font-weight="700" fill="#5C4A28" text-anchor="middle">TCP 带外交换：LID : QPN : PSN : GID（两边互发一行文本）</text>
+  <text x="620" y="392" font-size="10.5" fill="#5C4A28" text-anchor="middle">Verbs 没有 connect()——连接参数用普通 socket 自己换（4.2 §4）</text>
+
+  <path d="M328,406 L328,432" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <path d="M912,406 L912,432" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- Row4 状态机 -->
+  <rect x="88" y="436" width="480" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="459" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">modify_qp：INIT → RTR → RTS</text>
+  <text x="328" y="480" font-size="10.5" fill="#2C4460" text-anchor="middle">RTR 填对端（QPN/PSN/GID/MTU）；RTS 填重传参数</text>
+  <rect x="672" y="436" width="480" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="459" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">modify_qp：INIT → RTR → RTS</text>
+  <text x="912" y="480" font-size="10.5" fill="#2C4460" text-anchor="middle">RTR 填对端（QPN/PSN/GID/MTU）；RTS 填重传参数</text>
+
+  <!-- 第二幕：数据路径 -->
+  <rect x="48" y="524" width="1144" height="330" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="552" font-size="14" font-weight="700" fill="#4A473F">第二幕 · 数据路径：一次乒乓迭代（usec/iter ≈ 一个完整往返 RTT）</text>
+
+  <!-- c1 -->
+  <rect x="88" y="576" width="420" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="298" y="598" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">Client：post_send（整块 buf）+ doorbell</text>
+  <text x="298" y="618" font-size="10.5" fill="#2C4460" text-anchor="middle">SQ 深度 = 1：串行乒乓，天生不是带宽工具</text>
+
+  <path d="M508,603 L728,647" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+  <text x="618" y="612" font-size="10.5" fill="#2F6B5E" text-anchor="middle">网卡 DMA 读 buf → 上线（0 拷贝）</text>
+
+  <!-- s1 -->
+  <rect x="732" y="620" width="420" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="942" y="642" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">Server 网卡：DMA 写进预投的 recv buf → CQE</text>
+  <text x="942" y="662" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">数据落地不经过任何一次 CPU 拷贝</text>
+
+  <path d="M942,674 L942,700" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- s2 -->
+  <rect x="732" y="704" width="420" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="942" y="726" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">Server：poll 看到 RECV 完成 → 立刻 post_send 回球</text>
+  <text x="942" y="746" font-size="10.5" fill="#2C4460" text-anchor="middle">顺手补投 recv，让 RQ 永不见底</text>
+
+  <path d="M732,731 L512,775" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+  <text x="622" y="742" font-size="10.5" fill="#2F6B5E" text-anchor="middle">回程同样 0 拷贝</text>
+
+  <!-- c2 -->
+  <rect x="88" y="748" width="420" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="298" y="770" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">Client：poll 收到 RECV 完成——一次迭代结束</text>
+  <text x="298" y="790" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">唯一等待点：自旋 poll_cq（或 -e 睡在 fd 上）</text>
+
+  <text x="620" y="830" font-size="11" fill="#6B675C" text-anchor="middle">对比口径：pingpong 的 usec/iter 是完整往返；ib_send_lat 报的是往返一半——比较时差 2 倍</text>
+
+  <!-- 两种等待方式 -->
+  <rect x="48" y="874" width="560" height="160" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="902" font-size="13.5" font-weight="700" fill="#2F6B5E">默认等法：自旋 poll_cq</text>
+  <text x="72" y="932" font-size="12" fill="#4A473F">0 系统调用、0 中断、0 唤醒——完成延迟最低最稳</text>
+  <text x="72" y="962" font-size="12" fill="#4A473F">代价：这个核被烧满，没消息也 100% 占用</text>
+  <text x="72" y="992" font-size="12" fill="#4A473F">尾延迟不经过调度器——与 2.4 polling 同一笔交易</text>
+
+  <rect x="632" y="874" width="560" height="160" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="656" y="902" font-size="13.5" font-weight="700" fill="#A64B3C">-e 事件等法：completion channel</text>
+  <text x="656" y="932" font-size="12" fill="#4A473F">req_notify_cq 武装通知 → 阻塞读 channel 的 fd（睡进内核）</text>
+  <text x="656" y="962" font-size="12" fill="#4A473F">每批完成付：1 次中断 + 1 次调度唤醒 + 2 次系统调用</text>
+  <text x="656" y="992" font-size="12" fill="#4A473F">省下整颗核，换来 μs 级延迟加项与尾抖动【取舍】</text>
+</svg>

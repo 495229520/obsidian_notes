@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编译全过程 · 预处理 → 编译（词法·语法·语义）→ 汇编 → 链接</title>
+<style>
+/* ============ 设计系统：与《编译四阶段流水线》同一套暖纸色 token ============ */
+:root {
+  --paper:#F5F4ED; --panel:#FBFAF6; --ink:#444441; --muted:#5F5E5A; --faint:#8a887f;
+  --line:#c9c7bf; --grid:#e2e0d7;
+  --c1:#854F0B; --c1bg:#FAEEDA;      /* 预处理·棕 */
+  --c2:#185FA5; --c2bg:#E6F1FB;      /* 编译·蓝 */
+  --c3:#0F6E56; --c3bg:#E1F5EE;      /* 汇编·绿 */
+  --c4:#8A3A52; --c4bg:#F7E9EE;      /* 链接·酒红 */
+  --gray:#F1EFE8;
+  --kw:#A05A0E;  --kwbg:#FAEEDA;     /* Token: 关键字 */
+  --id:#185FA5;  --idbg:#E6F1FB;     /* Token: 标识符 */
+  --num:#0F6E56; --numbg:#E1F5EE;    /* Token: 数字   */
+  --op:#8A3A52;  --opbg:#F7E9EE;     /* Token: 运算符 */
+  --pt:#5F5E5A;  --ptbg:#F1EFE8;     /* Token: 分隔符 */
+  --err:#B3543F; --errbg:#F9E9E4;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1); --dur:420ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1220px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+
+/* ---------- 主流水线 ---------- */
+.pipe{display:flex;align-items:stretch;gap:0;margin-top:22px;}
+.node{flex:0 0 auto;min-width:92px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:11px 13px;text-align:center;transition:all var(--dur) var(--ease);}
+.node .ext{font-family:var(--mono);font-size:15px;font-weight:700;}
+.node .cn{font-size:11px;color:var(--muted);margin-top:2px;}
+.node.on{transform:translateY(-3px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
+.node.done{opacity:.9;}
+.arrow{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;padding:0 6px;min-width:84px;}
+.arrow .tool{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--faint);padding:2px 8px;border-radius:999px;border:1px solid transparent;transition:all var(--dur) var(--ease);white-space:nowrap;}
+.arrow .cmd{font-size:10px;color:var(--faint);margin-top:3px;font-family:var(--mono);opacity:.7;}
+.arrow .track{width:100%;height:2px;background:var(--grid);margin-top:6px;position:relative;border-radius:2px;}
+.arrow .track::after{content:"";position:absolute;right:-1px;top:-3px;border:4px solid transparent;border-left-color:var(--grid);transition:border-left-color var(--dur) var(--ease);}
+.arrow .fill{position:absolute;left:0;top:0;height:100%;width:0;background:var(--line);border-radius:2px;transition:width var(--dur) var(--ease);}
+.node.n1.lit{border-color:var(--c1);background:var(--c1bg);} .node.n1.lit .ext{color:var(--c1);}
+.node.n2.lit{border-color:var(--c2);background:var(--c2bg);} .node.n2.lit .ext{color:var(--c2);}
+.node.n3.lit{border-color:var(--c3);background:var(--c3bg);} .node.n3.lit .ext{color:var(--c3);}
+.node.n4.lit{border-color:var(--c4);background:var(--c4bg);} .node.n4.lit .ext{color:var(--c4);}
+.node.n5.lit{border-color:var(--ink);background:var(--gray);} .node.n5.lit .ext{color:var(--ink);}
+.arrow.a1.on .tool{color:var(--c1);border-color:var(--c1);background:var(--c1bg);}
+.arrow.a2.on .tool{color:var(--c2);border-color:var(--c2);background:var(--c2bg);}
+.arrow.a3.on .tool{color:var(--c3);border-color:var(--c3);background:var(--c3bg);}
+.arrow.a4.on .tool{color:var(--c4);border-color:var(--c4);background:var(--c4bg);}
+.arrow.a1.on .fill{background:var(--c1);} .arrow.a1.on .track::after{border-left-color:var(--c1);}
+.arrow.a2.on .fill{background:var(--c2);} .arrow.a2.on .track::after{border-left-color:var(--c2);}
+.arrow.a3.on .fill{background:var(--c3);} .arrow.a3.on .track::after{border-left-color:var(--c3);}
+.arrow.a4.on .fill{background:var(--c4);} .arrow.a4.on .track::after{border-left-color:var(--c4);}
+
+/* ---------- 编译器内部子流水线 ---------- */
+.subwrap{margin-top:12px;display:flex;align-items:center;gap:12px;transition:opacity var(--dur) var(--ease);}
+.subwrap.dim{opacity:.4;}
+.subtag{font-size:11px;color:var(--faint);white-space:nowrap;font-family:var(--mono);border-left:3px solid var(--c2);padding-left:8px;line-height:1.4;}
+.subpipe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.sub{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:5px 12px;text-align:center;transition:all var(--dur) var(--ease);}
+.sub b{display:block;font-size:12.5px;font-weight:600;color:var(--muted);}
+.sub i{display:block;font-style:normal;font-size:10px;color:var(--faint);font-family:var(--mono);}
+.sub.lit{border-color:var(--c2);background:var(--c2bg);transform:translateY(-2px);box-shadow:0 4px 10px rgba(24,95,165,.12);}
+.sub.lit b{color:var(--c2);}
+.sub.past{opacity:.75;}
+.sarr{color:var(--faint);font-size:13px;}
+
+/* ---------- 主体两栏 ---------- */
+.main{display:grid;grid-template-columns:1fr 1.35fr;gap:20px;margin-top:20px;align-items:start;}
+@media(max-width:960px){.main{grid-template-columns:1fr;}}
+.card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 20px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.p0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.p1{color:var(--c1);border-color:var(--c1);background:var(--c1bg);}
+.chip.p2{color:var(--c2);border-color:var(--c2);background:var(--c2bg);}
+.chip.p3{color:var(--c3);border-color:var(--c3);background:var(--c3bg);}
+.chip.p4{color:var(--c4);border-color:var(--c4);background:var(--c4bg);}
+.gcc{font-family:var(--mono);font-size:12.5px;background:#2E2C27;color:#E3D9C6;border-radius:8px;padding:8px 14px;margin-top:12px;white-space:pre-wrap;}
+.gcc .flag{color:#E3A44C;}
+.act{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--gray);border-left:3px solid var(--ink);border-radius:0 8px 8px 0;padding:7px 12px;margin-top:12px;transition:border-color var(--dur) var(--ease);}
+.act.p1{border-color:var(--c1);} .act.p2{border-color:var(--c2);}
+.act.p3{border-color:var(--c3);} .act.p4{border-color:var(--c4);}
+.desc-body{margin-top:12px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);font-weight:600;}
+.desc-body code{font-family:var(--mono);font-size:12.5px;background:var(--gray);border-radius:4px;padding:0 4px;}
+.desc-body ul{margin:8px 0 0 18px;}
+.desc-body li{margin:3px 0;}
+.desc-body .bad{color:var(--err);font-weight:600;}
+
+/* ---------- 可视化舞台（三个持久场景，淡入淡出切换） ---------- */
+.vis .code-title{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;}
+.vis .code-title .tag{font-family:var(--mono);font-weight:600;}
+.stage{position:relative;height:472px;}
+@media(max-width:960px){.stage{height:500px;}}
+.scene{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .45s var(--ease),visibility .45s;}
+.scene.on{opacity:1;visibility:visible;}
+
+/* 场景 A：代码面板 */
+.codebox{background:#2E2C27;border-radius:10px;padding:14px 4px;font-family:var(--mono);font-size:12.5px;line-height:1.55;height:100%;overflow:auto;}
+.cl{padding:1px 18px;white-space:pre;color:#D8D5CC;}
+.cl .cmt{color:#8F8B80;}
+.cl .kw{color:#E3A44C;}
+.cl .str{color:#9BBF8A;}
+.cl .add{color:#9BBF8A;}
+.cl .und{color:#D98A7B;}
+.cl.fade{animation:fadein .5s var(--ease);}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+/* 场景 B：词法分析 */
+.lex-line{font-size:12px;color:var(--muted);font-family:var(--mono);margin:4px 0 10px;}
+.chars{position:relative;display:flex;gap:3px;flex-wrap:wrap;padding-bottom:46px;}
+.ch{width:30px;height:38px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-family:var(--mono);font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .4s var(--ease);}
+.ch.ws{color:var(--faint);border-style:dashed;font-size:12px;}
+.ch.eof{color:var(--faint);border-style:dashed;font-size:11px;}
+.ch.kw{background:var(--kwbg);border-color:var(--kw);color:var(--kw);font-weight:700;}
+.ch.id{background:var(--idbg);border-color:var(--id);color:var(--id);font-weight:700;}
+.ch.num{background:var(--numbg);border-color:var(--num);color:var(--num);font-weight:700;}
+.ch.op{background:var(--opbg);border-color:var(--op);color:var(--op);font-weight:700;}
+.ch.pt{background:var(--ptbg);border-color:var(--pt);color:var(--pt);font-weight:700;}
+.scanptr{position:absolute;bottom:0;left:0;width:80px;margin-left:-40px;text-align:center;transition:left .6s var(--ease);}
+.scanptr .tri{font-size:13px;color:var(--c2);line-height:1;}
+.scanptr .lbl{font-family:var(--mono);font-size:10.5px;color:var(--c2);font-weight:600;white-space:nowrap;}
+.lex-mid{display:flex;align-items:center;gap:10px;margin:14px 0 10px;font-size:12px;color:var(--faint);}
+.lex-mid .rule{flex:1;height:1px;background:var(--grid);}
+.tokens{display:flex;gap:8px;flex-wrap:wrap;min-height:64px;}
+.tok{border:1.5px solid;border-radius:8px;padding:4px 10px;text-align:center;opacity:0;transform:translateY(10px) scale(.85);transition:opacity .45s var(--ease),transform .45s var(--ease);}
+.tok.show{opacity:1;transform:none;}
+.tok em{display:block;font-style:normal;font-size:9px;font-family:var(--mono);letter-spacing:.5px;opacity:.75;}
+.tok b{display:block;font-family:var(--mono);font-size:14px;font-weight:700;}
+.tok.kw{color:var(--kw);border-color:var(--kw);background:var(--kwbg);}
+.tok.id{color:var(--id);border-color:var(--id);background:var(--idbg);}
+.tok.num{color:var(--num);border-color:var(--num);background:var(--numbg);}
+.tok.op{color:var(--op);border-color:var(--op);background:var(--opbg);}
+.tok.pt{color:var(--pt);border-color:var(--pt);background:var(--ptbg);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px dashed var(--grid);}
+.lg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+.lg i{width:12px;height:12px;border-radius:3px;border:1.5px solid;}
+.lg.kw i{background:var(--kwbg);border-color:var(--kw);} .lg.id i{background:var(--idbg);border-color:var(--id);}
+.lg.num i{background:var(--numbg);border-color:var(--num);} .lg.op i{background:var(--opbg);border-color:var(--op);}
+.lg.pt i{background:var(--ptbg);border-color:var(--pt);}
+
+/* 场景 C：语法树 + 语义 */
+.ast-flex{display:flex;gap:14px;height:100%;}
+.ast-left{flex:1.15;display:flex;flex-direction:column;min-width:0;}
+.ast-right{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0;}
+.tokstrip{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;}
+.mt{font-family:var(--mono);font-size:12px;font-weight:600;border:1.5px solid;border-radius:6px;padding:1px 8px;transition:all .45s var(--ease);}
+.mt.kw{color:var(--kw);border-color:var(--kw);background:var(--kwbg);}
+.mt.id{color:var(--id);border-color:var(--id);background:var(--idbg);}
+.mt.num{color:var(--num);border-color:var(--num);background:var(--numbg);}
+.mt.op{color:var(--op);border-color:var(--op);background:var(--opbg);}
+.mt.pt{color:var(--pt);border-color:var(--pt);background:var(--ptbg);}
+.mt.used{opacity:.32;border-style:dashed;transform:scale(.92);}
+#astsvg{flex:1;width:100%;min-height:0;}
+.nd rect{transition:all .4s var(--ease);}
+.nd{opacity:0;transform:translateY(10px);transition:opacity .5s var(--ease),transform .5s var(--ease);transform-box:fill-box;}
+.nd.show{opacity:1;transform:none;}
+.nd text{font-family:var(--mono);font-size:14px;font-weight:700;}
+.ed{stroke:#9a978c;stroke-width:1.8;fill:none;transition:stroke-dashoffset .7s var(--ease);}
+.tb{opacity:0;transition:opacity .55s var(--ease);}
+.tb text{font-family:var(--mono);font-size:11px;font-weight:700;fill:var(--num);}
+.tb.show{opacity:1;}
+.sidecard{border:1px solid var(--grid);border-radius:10px;background:var(--paper);padding:10px 14px;transition:opacity .45s var(--ease),transform .45s var(--ease);}
+.sidecard h4{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.sidecard h4::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c2);}
+.sidecard.hide{display:none;}
+.gr{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:3px 8px;border-radius:6px;border-left:3px solid transparent;transition:all .4s var(--ease);white-space:nowrap;}
+.gr.hot{color:var(--c2);background:var(--c2bg);border-left-color:var(--c2);font-weight:700;}
+.symtb{width:100%;border-collapse:collapse;font-size:12px;}
+.symtb th{font-weight:600;color:var(--faint);font-size:10.5px;text-align:left;padding:2px 8px;border-bottom:1px solid var(--grid);}
+.symtb td{font-family:var(--mono);font-size:11.5px;padding:3px 8px;color:var(--muted);border-bottom:1px dashed var(--grid);}
+.symtb td:first-child{color:var(--id);font-weight:700;}
+.symtb tr.srow{opacity:0;transform:translateX(8px);transition:opacity .5s var(--ease),transform .5s var(--ease);}
+.symtb tr.srow.show{opacity:1;transform:none;}
+.errcard{border:1px solid var(--err);background:var(--errbg);border-radius:10px;padding:10px 14px;opacity:0;transform:translateY(8px);transition:opacity .5s var(--ease),transform .5s var(--ease);}
+.errcard.show{opacity:1;transform:none;}
+.errcard h4{font-size:12px;font-weight:600;color:var(--err);margin-bottom:6px;}
+.errcard .ex{font-family:var(--mono);font-size:11.5px;margin:4px 0;color:var(--ink);}
+.errcard .ex b{color:var(--err);}
+.errcard .why{font-size:11px;color:var(--muted);margin:0 0 6px 16px;}
+
+/* ---------- 控制条 ---------- */
+.controls{margin-top:20px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:6px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:52px;text-align:center;}
+.speed{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+.speed button{font:inherit;font-size:12px;color:var(--muted);background:transparent;border:none;padding:6px 12px;cursor:pointer;}
+.speed button+button{border-left:1px solid var(--line);}
+.speed button.on{background:var(--ink);color:var(--paper);}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>编译全过程 · 预处理 → 编译（<span style="color:var(--c2)">词法 · 语法 · 语义</span>）→ 汇编 → 链接</h1>
+    <p>《编译四阶段流水线》的放大镜版：钻进编译器 cc1 内部，看字符流如何变成 Token、AST、再到可执行文件　·　<kbd>←</kbd> <kbd>→</kbd> 切换，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <!-- 主流水线 -->
+  <div class="pipe">
+    <div class="node n1"><div class="ext">.c</div><div class="cn">源代码</div></div>
+    <div class="arrow a1" data-arrow="1"><div class="tool">预处理器 cpp</div><div class="cmd">gcc -E</div><div class="track"><div class="fill"></div></div></div>
+    <div class="node n2"><div class="ext">.i</div><div class="cn">预处理文件</div></div>
+    <div class="arrow a2" data-arrow="2"><div class="tool">编译器 cc1</div><div class="cmd">gcc -S</div><div class="track"><div class="fill"></div></div></div>
+    <div class="node n3"><div class="ext">.s</div><div class="cn">汇编代码</div></div>
+    <div class="arrow a3" data-arrow="3"><div class="tool">汇编器 as</div><div class="cmd">gcc -c</div><div class="track"><div class="fill"></div></div></div>
+    <div class="node n4"><div class="ext">.o</div><div class="cn">目标文件</div></div>
+    <div class="arrow a4" data-arrow="4"><div class="tool">链接器 ld</div><div class="cmd">gcc</div><div class="track"><div class="fill"></div></div></div>
+    <div class="node n5"><div class="ext">a.out</div><div class="cn">可执行文件</div></div>
+  </div>
+
+  <!-- 编译器内部子流水线 -->
+  <div class="subwrap dim" id="subwrap">
+    <div class="subtag">编译器 cc1 内部<br>前端 → 后端</div>
+    <div class="subpipe">
+      <div class="sub" id="sub0"><b>① 词法分析</b><i>字符流 → Token 流</i></div>
+      <span class="sarr">→</span>
+      <div class="sub" id="sub1"><b>② 语法分析</b><i>Token 流 → AST</i></div>
+      <span class="sarr">→</span>
+      <div class="sub" id="sub2"><b>③ 语义分析</b><i>符号表 · 类型检查</i></div>
+      <span class="sarr">→</span>
+      <div class="sub" id="sub3"><b>④ 优化 · 代码生成</b><i>IR → 汇编 .s</i></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- 左：讲解 -->
+    <section class="card">
+      <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+      <div class="gcc" id="stCmd"></div>
+      <div class="act" id="stAct"></div>
+      <div class="desc-body" id="stDesc"></div>
+    </section>
+
+    <!-- 右：可视化舞台 -->
+    <section class="card vis">
+      <div class="code-title"><span id="visName"></span><span class="tag" id="visTag"></span></div>
+      <div class="stage">
+
+        <!-- 场景 A：代码面板（预处理 / 汇编 / 链接） -->
+        <div class="scene" id="sc-code"><div class="codebox" id="codebox"></div></div>
+
+        <!-- 场景 B：词法分析 -->
+        <div class="scene" id="sc-lex">
+          <div class="lex-line" id="lexLine">main.i · sum() 函数体内的一行 —— 编译器眼中它只是一串字符</div>
+          <div class="chars" id="chars"></div>
+          <div class="lex-mid"><span>▼ 切分结果 · Token 流（类型, 词素）</span><div class="rule"></div></div>
+          <div class="tokens" id="tokens"></div>
+          <div class="legend">
+            <div class="lg kw"><i></i>关键字 KEYWORD</div>
+            <div class="lg id"><i></i>标识符 IDENTIFIER</div>
+            <div class="lg num"><i></i>数字 NUMBER</div>
+            <div class="lg op"><i></i>运算符 OPERATOR</div>
+            <div class="lg pt"><i></i>分隔符 PUNCTUATOR</div>
+          </div>
+        </div>
+
+        <!-- 场景 C：语法分析 + 语义分析 -->
+        <div class="scene" id="sc-ast">
+          <div class="ast-flex">
+            <div class="ast-left">
+              <div class="tokstrip" id="tokstrip"></div>
+              <svg id="astsvg" viewBox="0 0 352 330" preserveAspectRatio="xMidYMid meet">
+                <!-- 边 -->
+                <path class="ed" id="eRP" d="M170 53 L170 97"/>
+                <path class="ed" id="ePA" d="M160 127 L108 177"/>
+                <path class="ed" id="ePM" d="M180 127 L232 177"/>
+                <path class="ed" id="eMB" d="M231 207 L192 257"/>
+                <path class="ed" id="eM2" d="M249 207 L288 257"/>
+                <!-- 节点 -->
+                <g class="nd" id="nR"><rect x="132" y="23" width="76" height="30" rx="7" fill="var(--kwbg)" stroke="var(--kw)" stroke-width="1.5"/><text x="170" y="43" text-anchor="middle" fill="var(--kw)">return</text></g>
+                <g class="nd" id="nP"><rect x="151" y="97" width="38" height="30" rx="7" fill="var(--opbg)" stroke="var(--op)" stroke-width="1.5"/><text x="170" y="117" text-anchor="middle" fill="var(--op)">+</text></g>
+                <g class="nd" id="nA"><rect x="80" y="177" width="40" height="30" rx="7" fill="var(--idbg)" stroke="var(--id)" stroke-width="1.5"/><text x="100" y="197" text-anchor="middle" fill="var(--id)">a</text></g>
+                <g class="nd" id="nM"><rect x="221" y="177" width="38" height="30" rx="7" fill="var(--opbg)" stroke="var(--op)" stroke-width="1.5"/><text x="240" y="197" text-anchor="middle" fill="var(--op)">*</text></g>
+                <g class="nd" id="nB"><rect x="165" y="257" width="40" height="30" rx="7" fill="var(--idbg)" stroke="var(--id)" stroke-width="1.5"/><text x="185" y="277" text-anchor="middle" fill="var(--id)">b</text></g>
+                <g class="nd" id="n2"><rect x="275" y="257" width="40" height="30" rx="7" fill="var(--numbg)" stroke="var(--num)" stroke-width="1.5"/><text x="295" y="277" text-anchor="middle" fill="var(--num)">2</text></g>
+                <!-- 语义分析：类型标注（自底向上） -->
+                <g class="tb" id="bB" style="transition-delay:.05s"><text x="211" y="279">int</text></g>
+                <g class="tb" id="b2" style="transition-delay:.2s"><text x="320" y="279">int</text></g>
+                <g class="tb" id="bA" style="transition-delay:.35s"><text x="126" y="199">int</text></g>
+                <g class="tb" id="bM" style="transition-delay:.55s"><text x="265" y="199">int</text></g>
+                <g class="tb" id="bP" style="transition-delay:.8s"><text x="195" y="119">int</text></g>
+                <g class="tb" id="bR" style="transition-delay:1.05s"><text x="214" y="43">int ✓ 匹配返回类型</text></g>
+              </svg>
+            </div>
+            <div class="ast-right">
+              <div class="sidecard" id="gramCard">
+                <h4>C 表达式文法（简化）· 高亮 = 本步用到的规则</h4>
+                <div class="gr" id="gr0">语句&nbsp;&nbsp;&nbsp;→ return 表达式 ;</div>
+                <div class="gr" id="gr1">表达式 → 项 { + 项 }</div>
+                <div class="gr" id="gr2">项&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ 因子 { * 因子 }</div>
+                <div class="gr" id="gr3">因子&nbsp;&nbsp;&nbsp;→ 标识符 | 数字 | ( 表达式 )</div>
+              </div>
+              <div class="sidecard hide" id="symCard">
+                <h4>符号表 · 作用域 sum()</h4>
+                <table class="symtb">
+                  <tr><th>名字</th><th>类型</th><th>来源</th></tr>
+                  <tr class="srow"><td>a</td><td>int</td><td>形参</td></tr>
+                  <tr class="srow"><td>b</td><td>int</td><td>形参</td></tr>
+                  <tr class="srow"><td>sum</td><td>int (int,int)</td><td>函数定义</td></tr>
+                  <tr class="srow"><td>printf</td><td>int (const char*,…)</td><td>stdio.h 声明</td></tr>
+                </table>
+              </div>
+              <div class="errcard" id="errCard">
+                <h4>✗ 语义分析报错示范（换两行错误代码）</h4>
+                <div class="ex"><b>return c + 1;</b></div>
+                <div class="why">error: 'c' undeclared —— 符号表查无此名</div>
+                <div class="ex"><b>return a + "hi";</b></div>
+                <div class="why">error: invalid operands (int + char*) —— 语法合法，类型无意义</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+    <div class="speed" id="speed">
+      <button data-ms="4200">慢</button>
+      <button data-ms="3000" class="on">中</button>
+      <button data-ms="1600">快</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+
+/* 词法场景：字符条 `return a + b * 2;` + EOF */
+const CHARS = ['r','e','t','u','r','n',' ','a',' ','+',' ','b',' ','*',' ','2',';','EOF'];
+/* 每个 Token：类型、词素、覆盖的字符下标 */
+const TOKS = [
+  {t:'kw', l:'return', cs:[0,1,2,3,4,5], tag:'KEYWORD'},
+  {t:'id', l:'a',      cs:[7],           tag:'IDENT'},
+  {t:'op', l:'+',      cs:[9],           tag:'OP'},
+  {t:'id', l:'b',      cs:[11],          tag:'IDENT'},
+  {t:'op', l:'*',      cs:[13],          tag:'OP'},
+  {t:'num',l:'2',      cs:[15],          tag:'NUMBER'},
+  {t:'pt', l:';',      cs:[16],          tag:'PUNCT'},
+];
+
+/* AST 场景：每步累计显示的元素 / 已消费 Token / 文法高亮 */
+const AST_STATES = {
+  leaves:{show:['nA','nB','n2'],                          used:[],            gram:3},
+  mul:   {show:['nA','nB','n2','nM','eMB','eM2'],         used:[3,4,5],       gram:2},
+  add:   {show:['nA','nB','n2','nM','eMB','eM2','nP','ePA','ePM'], used:[1,2,3,4,5], gram:1},
+  full:  {show:['nA','nB','n2','nM','eMB','eM2','nP','ePA','ePM','nR','eRP'], used:[0,1,2,3,4,5,6], gram:0},
+};
+
+const STEPS = [
+/* 0 */ { title:'步骤 0 · 源代码', chip:'起点', chipC:'p0', node:0, arrow:0, sub:-1,
+  cmd:'$ cat main.c        # 我们手写的源码',
+  act:'▸ 认识起点：一份 .c 源文件，主角是 sum 里的 a + b * 2',
+  panel:'code', visName:'main.c', visTag:'源代码 · 纯文本',
+  desc:'我们带这份小程序走完全程。留意三样东西：预处理指令（<code>#include</code>、<code>#define</code>）、一处注释、以及 <b>sum 里的 <code>a + b * 2</code></b> —— 稍后用它观察运算符优先级如何进入语法树。',
+  code:[
+    ['cmt','// main.c'],
+    ['kw','#include','<stdio.h>'],
+    ['kw','#define',' MAX 100'],
+    ['',''],
+    ['cmt','// 加权求和'],
+    ['','int sum(int a, int b) {'],
+    ['','    return a + b * 2;'],
+    ['','}'],
+    ['',''],
+    ['','int main() {'],
+    ['','    int x = 1;'],
+    ['','    printf("%d\\n", sum(x, MAX));'],
+    ['','    return 0;'],
+    ['','}'],
+  ]},
+/* 1 */ { title:'步骤 1 · 预处理 ① 头文件展开', chip:'预处理 (Preprocessing)', chipC:'p1', node:1, arrow:1, sub:-1,
+  cmd:'$ gcc -E main.c -o main.i     # 预处理进行中…',
+  act:'▸ #include <stdio.h> 被替换成头文件全文，main.i 体积暴涨',
+  panel:'code', visName:'main.i（生成中）', visTag:'头文件已展开',
+  desc:'预处理器 <code>cpp</code> 是个<b>文本搬运工</b>：见到 <code>#include &lt;stdio.h&gt;</code> 就把整个头文件<b>原文粘贴</b>进来（上千行声明），所以 main.i 比 main.c 大几十倍。它完全<b>不懂 C 语法</b>，只认识以 <code>#</code> 开头的指令。',
+  code:[
+    ['cmt','# 1 "main.c"'],
+    ['cmt','# 1 "/usr/include/stdio.h" 1'],
+    ['add','extern int printf(const char *, ...);'],
+    ['add','extern int scanf(const char *, ...);'],
+    ['add','typedef struct _IO_FILE FILE;'],
+    ['cmt','// ……上千行声明被原样插入……'],
+    ['cmt','# 4 "main.c" 2'],
+    ['',''],
+    ['cmt','// 加权求和          ← 注释还在'],
+    ['','int sum(int a, int b) {'],
+    ['','    return a + b * 2;'],
+    ['','}'],
+    ['cmt','// …… (main 部分暂未变化)'],
+  ]},
+/* 2 */ { title:'步骤 2 · 预处理 ② 宏替换 · 删注释', chip:'预处理 (Preprocessing)', chipC:'p1', node:1, arrow:1, sub:-1,
+  cmd:'$ gcc -E main.c -o main.i     # 完成，得到 main.i',
+  act:'▸ MAX → 100（纯文本替换），注释被删除，main.i 定稿',
+  panel:'code', visName:'main.i（完成）', visTag:'纯文本 · 仍是 C 代码',
+  desc:'预处理还做两件事：<b>宏替换</b>（<code>MAX</code> → <code>100</code>，逐字替换、不查类型）和<b>删注释</b>（换成一个空格）。要是手滑写了 <code>#define MAX 100;</code>，多出来的分号也会被<b>照样替换</b>进去 —— 错误留给下一阶段的编译器去报。',
+  code:[
+    ['add','extern int printf(const char *, ...);'],
+    ['cmt','// ……头文件声明（略）……'],
+    ['',''],
+    ['','int sum(int a, int b) {'],
+    ['','    return a + b * 2;'],
+    ['','}'],
+    ['',''],
+    ['','int main() {'],
+    ['','    int x = 1;'],
+    ['add','    printf("%d\\n", sum(x, 100));'],
+    ['cmt','                          //  ↑ MAX 已变成 100'],
+    ['','    return 0;'],
+    ['','}'],
+  ]},
+/* 3 */ { title:'步骤 3 · 词法分析 · 面对字符流', chip:'编译 · 词法分析', chipC:'p2', node:1, arrow:2, sub:0,
+  cmd:'cc1 前端 ① 词法分析 (Lexical Analysis)：字符流 → Token 流',
+  act:'▸ 锁定 sum 里的一行，扫描指针停在第一个字符上',
+  panel:'lex', visName:'词法分析器 (lexer / scanner)', visTag:'cc1 前端 ①',
+  lex:{ptr:0, n:0},
+  desc:'编译阶段正式开始。cc1 拿到的 main.i 在它眼里只是<b>一长串字符</b>：<code>\'r\' \'e\' \'t\' \'u\' \'r\' \'n\' \' \' \'a\' …</code>。词法分析器的任务：把字符流切成有意义的最小单位 —— <b>Token（记号）</b>，每个 Token = <b>(类型, 词素)</b>。',
+  },
+/* 4 */ { title:'步骤 4 · 词法分析 · 最长匹配出 "return"', chip:'编译 · 词法分析', chipC:'p2', node:1, arrow:2, sub:0,
+  cmd:'cc1 前端 ① 词法分析：识别单词 → 查关键字表',
+  act:'▸ 指针右移 6 格吞下 return，查关键字表命中 → KEYWORD',
+  panel:'lex', visName:'词法分析器 (lexer / scanner)', visTag:'cc1 前端 ①',
+  lex:{ptr:7, n:1},
+  desc:'指针逐字符右移：<code>r e t u r n</code> 都是字母就继续吞，遇到空格停下 —— 这叫<b>最长匹配</b>。拿到单词 "return" 后<b>查关键字表</b>：命中 → 生成 KEYWORD Token；查不到（比如 <code>returns</code>）就当普通标识符。这就是为什么关键字不能做变量名。',
+  },
+/* 5 */ { title:'步骤 5 · 词法分析 · 标识符与运算符', chip:'编译 · 词法分析', chipC:'p2', node:1, arrow:2, sub:0,
+  cmd:'cc1 前端 ① 词法分析：跳过空白，逐个切词',
+  act:'▸ 跳过空格，切出标识符 a 与运算符 +，指针滑到 b',
+  panel:'lex', visName:'词法分析器 (lexer / scanner)', visTag:'cc1 前端 ①',
+  lex:{ptr:11, n:3},
+  desc:'空白字符只当<b>分隔符</b>，跳过、不生成 Token。<code>a</code> 查关键字表不命中 → IDENTIFIER；<code>+</code> 是运算符字符 → OPERATOR。注意：<b>词法分析只认"这是个什么单词"，不管单词排列是否合法</b> —— 写 <code>a + + b</code> 在这一步照样畅通无阻。',
+  },
+/* 6 */ { title:'步骤 6 · 词法分析 · Token 流完成', chip:'编译 · 词法分析', chipC:'p2', node:1, arrow:2, sub:0,
+  cmd:'cc1 前端 ① 词法分析：输出 7 个 Token，交给 parser',
+  act:'▸ 扫描到行尾：字符流 → 7 个 Token 的序列',
+  panel:'lex', visName:'词法分析器 (lexer / scanner)', visTag:'cc1 前端 ① · 完成',
+  lex:{ptr:17, n:7},
+  desc:'整行切分完毕，输出 Token 序列。<b>词法错误</b>也在这一步报出：源码混进非法字符 <code>@</code>、写了没闭合的字符串 <code>"abc</code>，lexer 当场拒绝。切好的 Token 流像"单词卡片"，接下来交给语法分析器去"连词成句"。',
+  },
+/* 7 */ { title:'步骤 7 · 语法分析 · 叶子先落位', chip:'编译 · 语法分析', chipC:'p2', node:1, arrow:2, sub:1,
+  cmd:'cc1 前端 ② 语法分析 (Syntax Analysis / Parsing)：Token 流 → AST',
+  act:'▸ 按文法"因子"规则，a、b、2 先成为叶子节点',
+  panel:'ast', visName:'语法分析器 (parser) · 构建 AST', visTag:'cc1 前端 ②',
+  ast:'leaves',
+  desc:'语法分析器按 <b>C 的文法规则</b>消费 Token 流，搭出<b>抽象语法树 AST</b>。右侧是本行用到的简化文法：<b>因子</b>是最小成分 —— 标识符 <code>a</code>、<code>b</code> 和数字 <code>2</code> 先各自成为叶子节点。',
+  },
+/* 8 */ { title:'步骤 8 · 语法分析 · 优先级进树：b * 2', chip:'编译 · 语法分析', chipC:'p2', node:1, arrow:2, sub:1,
+  cmd:'cc1 前端 ② 语法分析：按"项 → 因子 * 因子"归约',
+  act:'▸ * 优先级高：b 和 2 先归约成一棵子树',
+  panel:'ast', visName:'语法分析器 (parser) · 构建 AST', visTag:'cc1 前端 ②',
+  ast:'mul',
+  desc:'关键一步：<code>*</code> 的优先级比 <code>+</code> 高，对应文法里更深的"项"层。parser 先把 <code>b * 2</code> 归约成子树。<b>运算符优先级不是运行时的规则，而是在建树时就固化进了树的形状</b> —— 越深的节点越先求值。',
+  },
+/* 9 */ { title:'步骤 9 · 语法分析 · a + (b*2)', chip:'编译 · 语法分析', chipC:'p2', node:1, arrow:2, sub:1,
+  cmd:'cc1 前端 ② 语法分析：按"表达式 → 项 + 项"归约',
+  act:'▸ + 把 a 与 (b*2) 子树接为左右孩子',
+  panel:'ast', visName:'语法分析器 (parser) · 构建 AST', visTag:'cc1 前端 ②',
+  ast:'add',
+  desc:'回到浅一层的"表达式"规则，<code>+</code> 把 <code>a</code> 和刚才的 <code>(b*2)</code> 子树接为左右孩子。看树形已能读出"先乘后加"：<code>*</code> 在更深处，求值自然先发生。',
+  },
+/* 10 */ { title:'步骤 10 · 语法分析 · AST 完成', chip:'编译 · 语法分析', chipC:'p2', node:1, arrow:2, sub:1,
+  cmd:'cc1 前端 ② 语法分析：return 语句归约完成',
+  act:'▸ return 挂到根上，7 个 Token 全部消费完毕',
+  panel:'ast', visName:'语法分析器 (parser) · AST 完成', visTag:'cc1 前端 ② · 完成',
+  ast:'full',
+  desc:'<code>return</code> 作为语句节点挂到根，AST 完成，上方 Token 全部消费。<b>语法错误</b>在这一步报出：写 <code>return a + ;</code>，parser 按文法期待一个"因子"却读到分号 → <span class="bad">expected expression before \';\'</span>。但注意 —— <code>return a + "hi";</code> 在语法上<b>完全合法</b>，parser 不管类型！',
+  },
+/* 11 */ { title:'步骤 11 · 语义分析 · 符号表', chip:'编译 · 语义分析', chipC:'p2', node:1, arrow:2, sub:2,
+  cmd:'cc1 前端 ③ 语义分析 (Semantic Analysis)：这句话有意义吗？',
+  act:'▸ 建符号表：逐个查 a、b "声明过没有、什么类型"',
+  panel:'ast', visName:'语义分析 · 符号表检查', visTag:'cc1 前端 ③',
+  ast:'full', sym:true,
+  desc:'语法通了，还得回答"<b>这句话有没有意义</b>"。第一件事：查<b>符号表</b> —— 每个名字声明过没有、在哪个作用域、什么类型。<code>a</code>、<code>b</code> 都是 sum 的形参，在表里 → 通过。用了没声明的名字，就在这一步报 <span class="bad">undeclared</span>。',
+  },
+/* 12 */ { title:'步骤 12 · 语义分析 · 类型检查', chip:'编译 · 语义分析', chipC:'p2', node:1, arrow:2, sub:2,
+  cmd:'cc1 前端 ③ 语义分析：自底向上推导每个节点的类型',
+  act:'▸ 自底向上标注：int * int → int，int + int → int，与返回类型匹配 ✓',
+  panel:'ast', visName:'语义分析 · 类型检查', visTag:'cc1 前端 ③',
+  ast:'full', sym:true, badges:true,
+  desc:'第二件事：<b>类型检查</b>，沿树自底向上标注 —— <code>b:int</code>、<code>2:int</code> → <code>b*2:int</code>；再和 <code>a:int</code> 相加 → <code>int</code>；最后与函数签名 <code>int sum(...)</code> 比对 ✓。需要<b>隐式转换</b>（如 int + double）时，也是在这里往树上插入转换节点。',
+  },
+/* 13 */ { title:'步骤 13 · 语义分析 · 报错示范', chip:'编译 · 语义分析', chipC:'p2', node:1, arrow:2, sub:2,
+  cmd:'cc1 前端 ③ 语义分析：语义错误在这一步拦截',
+  act:'▸ 换两行错误代码：未声明 / 类型不匹配，当场报错',
+  panel:'ast', visName:'语义分析 · 错误拦截', visTag:'cc1 前端 ③ · 完成',
+  ast:'full', sym:true, badges:true, err:true,
+  desc:'三兄弟的分工到此清楚了：<ul><li><b>词法</b>管"单词认不认识"（非法字符 <code>@</code>）</li><li><b>语法</b>管"句子通不通顺"（<code>return a + ;</code>）</li><li><b>语义</b>管"话有没有道理"（未声明、类型不匹配）</li></ul>右下两例语法完全合法，却全被语义分析拦下。',
+  },
+/* 14 */ { title:'步骤 14 · 优化与代码生成 → main.s', chip:'编译 · 优化与代码生成', chipC:'p2', node:2, arrow:2, sub:3,
+  cmd:'$ gcc -S main.i -o main.s     # 前端通过，后端出汇编',
+  act:'▸ AST → 中间代码 IR → 优化（b*2 → b+b）→ 生成汇编',
+  panel:'code', visName:'main.s', visTag:'汇编 · 与 CPU 架构相关',
+  desc:'前端三关全过，AST 先翻成<b>中间代码 IR</b>，做与机器无关的优化 —— 比如把 <code>b * 2</code> <b>强度削弱</b>成一次加法；再由后端按目标架构生成汇编。同一个 IR，x86 和 ARM 产出的 .s 完全不同。',
+  code:[
+    ['','sum:'],
+    ['','    push   %rbp'],
+    ['','    mov    %rsp, %rbp'],
+    ['','    mov    %edi, -4(%rbp)    # 形参 a'],
+    ['','    mov    %esi, -8(%rbp)    # 形参 b'],
+    ['','    mov    -8(%rbp), %eax'],
+    ['add','    add    %eax, %eax        # b*2 优化成 b+b'],
+    ['add','    add    -4(%rbp), %eax    # 再 + a'],
+    ['','    pop    %rbp'],
+    ['','    ret'],
+    ['','main:'],
+    ['','    ...'],
+    ['','    call   sum'],
+    ['und','    call   printf            # 地址仍未知'],
+  ]},
+/* 15 */ { title:'步骤 15 · 汇编 → main.o', chip:'汇编 (Assembly)', chipC:'p3', node:3, arrow:3, sub:-1,
+  cmd:'$ gcc -c main.s -o main.o',
+  act:'▸ as 逐条把助记符翻成机器码，printf 在符号表记为 U',
+  panel:'code', visName:'main.o', visTag:'二进制 · 可重定位目标文件',
+  desc:'汇编器 <code>as</code> 做<b>一对一翻译</b>：每条助记符对应一条机器指令，产出<b>可重定位目标文件 .o</b>。此时还<b>不能运行</b>：<code>printf</code> 的地址不知道，符号表里标为 <span class="bad">U（未定义）</span>，留给链接器。',
+  code:[
+    ['cmt','// 机器码（十六进制）'],
+    ['','0000: 55 48 89 e5 89 7d fc 89'],
+    ['','0008: 75 f8 8b 45 f8 01 c0 03'],
+    ['','0010: 45 fc 5d c3 ...'],
+    ['',''],
+    ['cmt','// 符号表 (nm main.o)'],
+    ['add','0000000000000000 T sum'],
+    ['add','0000000000000016 T main'],
+    ['und','                 U printf   ← 未定义！'],
+    ['cmt','// U = 引用了但本文件没定义'],
+    ['cmt','//     等链接时去 libc 找'],
+  ]},
+/* 16 */ { title:'步骤 16 · 链接 → a.out', chip:'链接 (Linking)', chipC:'p4', node:4, arrow:4, sub:-1,
+  cmd:'$ gcc main.o -o a.out && ./a.out     # 背后调用 ld',
+  act:'▸ ld 合并段 + 符号解析（填上 printf）+ 重定位，运行输出 201',
+  panel:'code', visName:'a.out', visTag:'可执行文件',
+  desc:'链接器 <code>ld</code> 三件事：<b>合并段</b>（各 .o 的 .text/.data 拼起来）、<b>符号解析</b>（去 libc 找到 <code>printf</code>，填上 U）、<b>重定位</b>（占位地址改成最终地址）。运行验证：<code>sum(1, 100) = 1 + 100*2 = 201</code>。全程完工。',
+  code:[
+    ['cmt','// 符号表 (nm a.out)'],
+    ['add','0000000000401126 T sum'],
+    ['add','0000000000401142 T main'],
+    ['add','0000000000401030 T printf   ← 已解析！'],
+    ['',''],
+    ['cmt','// call 指令被重定位'],
+    ['und','旧:  call   ????????'],
+    ['add','新:  call   0x401030   # printf'],
+    ['',''],
+    ['add','$ ./a.out'],
+    ['add','201'],
+  ]},
+];
+
+/* ================= 持久 DOM 构建（只跑一次） ================= */
+const $ = id => document.getElementById(id);
+const nodes  = [...document.querySelectorAll('.pipe .node')];
+const arrows = [...document.querySelectorAll('.pipe .arrow')];
+const subs   = [0,1,2,3].map(i=>$('sub'+i));
+
+/* 词法：字符格子 + 扫描指针 */
+const charsBox = $('chars');
+CHARS.forEach((c,i)=>{
+  const d=document.createElement('div');
+  d.className='ch'+(c===' '?' ws':'')+(c==='EOF'?' eof':'');
+  d.id='ch'+i; d.textContent=(c===' '?'·':c);
+  charsBox.appendChild(d);
+});
+const ptr=document.createElement('div');
+ptr.className='scanptr'; ptr.id='scanptr';
+ptr.innerHTML='<div class="tri">▲</div><div class="lbl">扫描指针</div>';
+charsBox.appendChild(ptr);
+
+/* 词法：Token 卡片（先建好，逐个 .show） */
+const toksBox = $('tokens');
+TOKS.forEach((t,i)=>{
+  const d=document.createElement('div');
+  d.className='tok '+t.t; d.id='tok'+i;
+  d.style.transitionDelay=(i*0.06)+'s';
+  d.innerHTML='<em>'+t.tag+'</em><b>'+t.l+'</b>';
+  toksBox.appendChild(d);
+});
+
+/* AST：Token 消费条 */
+const stripBox = $('tokstrip');
+TOKS.forEach((t,i)=>{
+  const s=document.createElement('span');
+  s.className='mt '+t.t; s.id='mt'+i; s.textContent=t.l;
+  stripBox.appendChild(s);
+});
+
+/* AST：边的描边动画准备 */
+const EDGES = ['eRP','ePA','ePM','eMB','eM2'].map(id=>{
+  const p=$(id), len=p.getTotalLength();
+  p.style.strokeDasharray=len; p.style.strokeDashoffset=len;
+  return {p, len};
+});
+const AST_NODES = ['nR','nP','nA','nM','nB','n2'];
+const BADGES = ['bA','bB','b2','bM','bP','bR'];
+
+/* 圆点 */
+const dotsBox=$('dots'); const dotEls=[];
+STEPS.forEach((s,i)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(i);};dotsBox.appendChild(d);dotEls.push(d);});
+
+/* ================= 渲染（每步只做突变） ================= */
+function hl(cls,txt){
+  txt=txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return cls?'<span class="'+cls+'">'+txt+'</span>':txt;
+}
+function fmtCmd(s){return s.replace(/(-[ESco]\b|--?\w+)/g,'<span class="flag">$1</span>');}
+
+function renderLex(st){
+  /* 已消费 Token 的字符上色 */
+  const colored={};
+  for(let k=0;k<st.n;k++) TOKS[k].cs.forEach(ci=>colored[ci]=TOKS[k].t);
+  CHARS.forEach((c,i)=>{
+    const el=$('ch'+i);
+    el.className='ch'+(c===' '?' ws':'')+(c==='EOF'?' eof':'')+(colored[i]?' '+colored[i]:'');
+  });
+  /* 指针滑动到"下一个待读字符" */
+  const target=$('ch'+Math.min(st.ptr,CHARS.length-1));
+  ptr.style.left=(target.offsetLeft+target.offsetWidth/2)+'px';
+  /* Token 卡片逐个亮起 */
+  TOKS.forEach((t,i)=>$('tok'+i).classList.toggle('show',i<st.n));
+}
+
+function renderAst(step){
+  const st=AST_STATES[step.ast];
+  AST_NODES.forEach(id=>$(id).classList.toggle('show',st.show.includes(id)));
+  EDGES.forEach(({p,len})=>{p.style.strokeDashoffset=st.show.includes(p.id)?0:len;});
+  TOKS.forEach((t,i)=>$('mt'+i).classList.toggle('used',st.used.includes(i)));
+  /* 文法卡 vs 符号表卡 */
+  const symOn=!!step.sym;
+  $('gramCard').classList.toggle('hide',symOn);
+  $('symCard').classList.toggle('hide',!symOn);
+  [0,1,2,3].forEach(i=>$('gr'+i).classList.toggle('hot',!symOn&&st.gram===i));
+  const srows=[...document.querySelectorAll('.srow')];
+  srows.forEach((r,i)=>{r.style.transitionDelay=(i*0.12)+'s';r.classList.toggle('show',symOn);});
+  /* 类型标注 & 报错卡 */
+  BADGES.forEach(id=>$(id).classList.toggle('show',!!step.badges));
+  $('errCard').classList.toggle('show',!!step.err);
+}
+
+let cur=0;
+function go(i){
+  cur=Math.max(0,Math.min(STEPS.length-1,i));
+  const s=STEPS[cur];
+  /* 主流水线 */
+  nodes.forEach((n,idx)=>{
+    n.classList.toggle('lit',idx===s.node);
+    n.classList.toggle('on',idx===s.node);
+    n.classList.toggle('done',idx<s.node);
+  });
+  arrows.forEach(a=>{
+    const ai=+a.dataset.arrow;
+    a.classList.toggle('on',ai===s.arrow);
+    a.querySelector('.fill').style.width=(ai<=s.arrow?100:0)+'%';
+  });
+  /* 子流水线 */
+  $('subwrap').classList.toggle('dim',s.sub<0);
+  subs.forEach((el,idx)=>{
+    el.classList.toggle('lit',idx===s.sub);
+    el.classList.toggle('past',s.sub>=0&&idx<s.sub||s.node>=2&&s.sub<0);
+  });
+  /* 左栏 */
+  $('stTitle').textContent=s.title;
+  const chip=$('stChip'); chip.textContent=s.chip; chip.className='chip '+s.chipC;
+  $('stCmd').innerHTML=fmtCmd(s.cmd);
+  const act=$('stAct'); act.textContent=s.act; act.className='act '+s.chipC;
+  $('stDesc').innerHTML=s.desc;
+  /* 右栏舞台 */
+  $('visName').textContent=s.visName; $('visTag').textContent=s.visTag;
+  $('sc-code').classList.toggle('on',s.panel==='code');
+  $('sc-lex').classList.toggle('on',s.panel==='lex');
+  $('sc-ast').classList.toggle('on',s.panel==='ast');
+  if(s.panel==='code'){
+    $('codebox').innerHTML=s.code.map(([c,...rest])=>'<div class="cl fade">'+hl(c,rest.join(''))+'</div>').join('');
+  }else if(s.panel==='lex'){
+    renderLex(s.lex);
+  }else{
+    renderAst(s);
+  }
+  /* 控制条 */
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  $('readout').textContent=cur+' / '+(STEPS.length-1);
+  $('btnPrev').disabled=cur===0; $('btnNext').disabled=cur===STEPS.length-1;
+  if(cur===STEPS.length-1) stop();
+}
+
+let timer=null, ms=3000;
+function play(){ if(cur===STEPS.length-1) go(0); $('btnPlay').textContent='⏸ 暂停'; timer=setInterval(()=>{cur<STEPS.length-1?go(cur+1):stop();},ms); }
+function stop(){ if(timer){clearInterval(timer);timer=null;} $('btnPlay').textContent='▶ 播放'; }
+$('btnPlay').onclick=()=>timer?stop():play();
+$('btnPrev').onclick=()=>{stop();go(cur-1);};
+$('btnNext').onclick=()=>{stop();go(cur+1);};
+$('speed').onclick=e=>{const b=e.target.closest('button[data-ms]');if(!b)return;ms=+b.dataset.ms;document.querySelectorAll('.speed button').forEach(x=>x.classList.toggle('on',x===b));if(timer){stop();play();}};
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){stop();go(cur+1);}
+  else if(e.key==='ArrowLeft'){stop();go(cur-1);}
+  else if(e.key===' '){e.preventDefault();timer?stop():play();}
+});
+window.addEventListener('resize',()=>{const s=STEPS[cur];if(s.panel==='lex')renderLex(s.lex);});
+const m=location.hash.match(/step=(\d+)/); go(m?+m[1]:0);
+</script>
+</body>
+</html>

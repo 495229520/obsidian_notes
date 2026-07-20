@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 812" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="812" fill="#F5F4ED"/>
+
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">MLPerf Storage：把「GPU 为什么空」变成一个可比较的数</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">拿掉真 GPU，用 sleep 模拟算力（DLIO）；AU = busy ÷ (busy + wait)，ResNet-50 / 3D-Unet 门槛 90%，CosmoFlow 70%</text>
+
+  <line x1="616" y1="90" x2="616" y2="312" stroke="#9B968A" stroke-width="1" stroke-dasharray="5 4"/>
+
+  <!-- ① 模拟加速器回路 -->
+  <text x="48" y="102" font-size="13" font-weight="700" fill="#2B2A26">① 模拟加速器回路：读 batch（真 IO）→ sleep（算力）→ 循环；wait 就是空泡</text>
+
+  <text x="60" y="140" font-size="11" font-weight="700" fill="#2F6B5E">存储跟得上：wait≈0，compute 背靠背</text>
+  <text x="52" y="167" font-size="10" fill="#6B675C">算力</text>
+  <rect x="116" y="150" width="98" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+  <text x="165" y="166" font-size="9.5" fill="#48562B" text-anchor="middle">compute</text>
+  <rect x="218" y="150" width="98" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+  <text x="267" y="166" font-size="9.5" fill="#48562B" text-anchor="middle">compute</text>
+  <rect x="320" y="150" width="98" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+  <text x="369" y="166" font-size="9.5" fill="#48562B" text-anchor="middle">compute</text>
+  <rect x="422" y="150" width="98" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+  <text x="471" y="166" font-size="9.5" fill="#48562B" text-anchor="middle">compute</text>
+  <text x="528" y="167" font-size="10.5" font-weight="700" fill="#2F6B5E">AU≈99%</text>
+
+  <text x="60" y="205" font-size="11" font-weight="700" fill="#A64B3C">存储跟不上：每轮先等 batch 再算，wait 累积</text>
+  <text x="52" y="231" font-size="10" fill="#6B675C">算力</text>
+  <rect x="116" y="214" width="52" height="24" rx="3" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="142" y="230" font-size="9" fill="#A64B3C" text-anchor="middle">wait</text>
+  <rect x="172" y="214" width="90" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+  <text x="217" y="230" font-size="9.5" fill="#48562B" text-anchor="middle">compute</text>
+  <rect x="266" y="214" width="52" height="24" rx="3" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="292" y="230" font-size="9" fill="#A64B3C" text-anchor="middle">wait</text>
+  <rect x="322" y="214" width="90" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+  <text x="367" y="230" font-size="9.5" fill="#48562B" text-anchor="middle">compute</text>
+  <rect x="416" y="214" width="52" height="24" rx="3" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="442" y="230" font-size="9" fill="#A64B3C" text-anchor="middle">wait</text>
+  <rect x="472" y="214" width="68" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+  <text x="506" y="230" font-size="9.5" fill="#48562B" text-anchor="middle">compute</text>
+  <text x="546" y="231" font-size="10.5" font-weight="700" fill="#A64B3C">AU&lt;90%</text>
+
+  <rect x="56" y="252" width="500" height="28" rx="4" fill="#EFEDE3" stroke="#5A564B" stroke-width="1"/>
+  <text x="68" y="270" font-size="11" fill="#4A473F">AU = busy ÷ (busy + wait) = compute 时间 ÷ (compute + 等 batch)</text>
+  <text x="60" y="300" font-size="10" fill="#6B675C">DLIO 用 sleep 代替真 GPU kernel → 测的纯是「把数据喂到位」的能力，与型号解耦</text>
+
+  <!-- ② 三类负载画像 -->
+  <text x="628" y="102" font-size="13" font-weight="700" fill="#2B2A26">② 三类负载 = 三种存储画像（门槛依负载而定）</text>
+
+  <rect x="628" y="118" width="564" height="58" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="644" y="140" font-size="12" font-weight="700" fill="#2C4460">3D-Unet｜大样本（~140 MB 级）</text>
+  <text x="644" y="161" font-size="10.5" fill="#2C4460">顺序读、带宽墙；门槛 90%　例：8 卡 ~23 GiB/s @ 99%</text>
+
+  <rect x="628" y="184" width="564" height="58" rx="6" fill="#F0E3D3" stroke="#B07A3E" stroke-width="1.4"/>
+  <text x="644" y="206" font-size="12" font-weight="700" fill="#7A5426">ResNet-50｜小样本（~110 KB 级 JPEG）</text>
+  <text x="644" y="227" font-size="10.5" fill="#7A5426">海量小文件、元数据 + 随机 IOPS 墙；门槛 90%　例：128 卡 ~24 GiB/s</text>
+
+  <rect x="628" y="250" width="564" height="58" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="644" y="272" font-size="12" font-weight="700" fill="#24473F">CosmoFlow｜中样本（~2 MB 级）</text>
+  <text x="644" y="293" font-size="10.5" fill="#24473F">算力相对更快、更难喂 → 门槛 70%　例：8 卡 ~4.3 GiB/s @ ~75%</text>
+
+  <line x1="616" y1="345" x2="616" y2="610" stroke="#9B968A" stroke-width="1" stroke-dasharray="5 4"/>
+
+  <!-- ③ 扩展曲线 -->
+  <text x="48" y="356" font-size="13" font-weight="700" fill="#2B2A26">③ 扩展曲线：加卡直到 AU 跌破门槛</text>
+
+  <text x="80" y="382" font-size="10" fill="#6B675C">AU %</text>
+  <line x1="92" y1="386" x2="92" y2="560" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="92" y1="560" x2="566" y2="560" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="470" y="580" font-size="10.5" fill="#6B675C">加速器数 →</text>
+
+  <line x1="92" y1="433" x2="560" y2="433" stroke="#A64B3C" stroke-width="1.3" stroke-dasharray="6 4"/>
+  <text x="500" y="428" font-size="10" font-weight="700" fill="#A64B3C">90% 门槛</text>
+
+  <path d="M100,396 L280,398 L338,402 C378,408 404,420 424,433 L462,474 L520,520 L548,540" fill="none" stroke="#2F6B5E" stroke-width="2.2"/>
+  <line x1="424" y1="433" x2="424" y2="560" stroke="#5A564B" stroke-width="1.1" stroke-dasharray="4 3"/>
+  <text x="424" y="576" font-size="10" font-weight="700" fill="#4A473F" text-anchor="middle">N*（支持卡数）</text>
+  <text x="48" y="600" font-size="10.5" fill="#6B675C">加卡 → 聚合需求↑ → 存储/主机饱和 → 每轮 wait↑ → AU↓</text>
+
+  <!-- ④ checkpoint 负载 -->
+  <text x="628" y="356" font-size="13" font-weight="700" fill="#2B2A26">④ checkpoint 负载（v2.0）：测突发，不测持续喂</text>
+
+  <rect x="628" y="368" width="272" height="70" rx="6" fill="#F0E3D3" stroke="#B07A3E" stroke-width="1.3"/>
+  <text x="642" y="390" font-size="12" font-weight="700" fill="#7A5426">写路径</text>
+  <text x="642" y="410" font-size="10.5" fill="#7A5426">B/W（GiB/s）+ 写时长（s）</text>
+  <text x="642" y="428" font-size="10" fill="#7A5426">N-rank 齐射 = incast 突发（8.6 §4）</text>
+
+  <rect x="916" y="368" width="276" height="70" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="930" y="390" font-size="12" font-weight="700" fill="#24473F">读路径（恢复）</text>
+  <text x="930" y="410" font-size="10.5" fill="#24473F">B/W + 读时长</text>
+  <text x="930" y="428" font-size="10" fill="#24473F">决定故障后要停多久</text>
+
+  <rect x="628" y="450" width="564" height="92" rx="6" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="644" y="472" font-size="11" font-weight="700" fill="#2B2A26">读一份提交，四个字段对齐口径：</text>
+  <text x="644" y="494" font-size="10.5" fill="#4A473F">① 支持的加速器数 @ 目标 AU　② 聚合 GiB/s</text>
+  <text x="644" y="514" font-size="10.5" fill="#4A473F">③ 主机数 / 客户端 RAM / 网络　④ 数据集是否 &gt; 内存</text>
+  <text x="644" y="533" font-size="10" fill="#6B675C">缺任一项，数字不可比</text>
+
+  <!-- ⑤ 测量陷阱 -->
+  <rect x="48" y="632" width="1144" height="158" rx="8" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="68" y="660" font-size="13" font-weight="700" fill="#2B2A26">测量陷阱：AU 高 ≠ 你的存储强</text>
+  <text x="68" y="688" font-size="11" fill="#4A473F">① 数据集必须 &gt; 主机内存：否则第二 epoch 命中页缓存，测的是 DRAM 不是存储（1.2 §3、8.7 §4）——第二 epoch 突然变快就是信号</text>
+  <text x="68" y="714" font-size="11" fill="#4A473F">② 主机是隐藏变量：AU 同时受 CPU 解码 / 客户端 RAM / 网卡数影响，胖主机会美化存储——比较提交先对齐主机口径</text>
+  <text x="68" y="740" font-size="11" fill="#4A473F">③ AU 是某配置下的一个点：换数据集 / 加速器型号 / 主机数都会变，不能跨配置直接搬（与「口径不同不能相减」同理）</text>
+  <text x="68" y="766" font-size="11" fill="#4A473F">④ 门槛因负载而异：ResNet-50 / 3D-Unet 90%，CosmoFlow 70%——报结论要连门槛一起报</text>
+</svg>

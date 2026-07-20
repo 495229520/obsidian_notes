@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 8_0_1 / 8_0_2 -->
+  <title>IOMMU 工作形态与安全边界</title>
+  <desc>上半：Translated / Identity / Disabled 三种形态取舍。中部：domain 隔离与最小权限。下半：IOMMU 能阻止什么、不能保证什么。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="780" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">IOMMU 不只是性能选项，更是设备 DMA 的隔离边界</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">地址重映射 · 访问权限 · domain 隔离 · 错误拦截 —— 关 IOMMU 不等于一定更快</text>
+
+  <!-- ============ Panel A：三种形态 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 三种常见工作形态：隔离强度与翻译成本的取舍</text>
+
+  <rect x="48" y="128" width="360" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="128" width="360" height="40" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="48" y="156" width="360" height="12" fill="#DCE9E3"/>
+  <text x="228" y="154" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">Translated</text>
+  <text x="68" y="196" font-size="12.5" fill="#2B2A26">IOVA 经 IOMMU 页表 → PA</text>
+  <text x="68" y="222" font-size="12" fill="#24473F">隔离能力：强</text>
+  <text x="68" y="248" font-size="12" fill="#4A473F">需管理页表 · IOTLB · 失效</text>
+  <text x="68" y="274" font-size="12" fill="#4A473F">稳态命中 IOTLB 时成本可摊薄</text>
+  <text x="68" y="300" font-size="11.5" fill="#2F6B5E">VFIO / 安全默认路径常见形态</text>
+
+  <rect x="440" y="128" width="360" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="440" y="128" width="360" height="40" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="440" y="156" width="360" height="12" fill="#EFE7DA"/>
+  <text x="620" y="154" font-size="14" font-weight="700" fill="#6B4E28" text-anchor="middle">Identity / Passthrough</text>
+  <text x="460" y="196" font-size="12.5" fill="#2B2A26">IOVA 常与 PA 同值关系</text>
+  <text x="460" y="222" font-size="12" fill="#6B4E28">隔离能力：依配置而定</text>
+  <text x="460" y="248" font-size="12" fill="#4A473F">可减少部分翻译压力</text>
+  <text x="460" y="274" font-size="12" fill="#4A473F">不等于所有隔离都存在</text>
+  <text x="460" y="300" font-size="11.5" fill="#8A6A3A">仍受平台策略与 DMA API 约束</text>
+
+  <rect x="832" y="128" width="360" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="832" y="128" width="360" height="40" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <rect x="832" y="156" width="360" height="12" fill="#F0E0DB"/>
+  <text x="1012" y="154" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">Disabled</text>
+  <text x="852" y="196" font-size="12.5" fill="#2B2A26">事务直接进物理地址空间</text>
+  <text x="852" y="222" font-size="12" fill="#733428">隔离能力：弱</text>
+  <text x="852" y="248" font-size="12" fill="#4A473F">配置简单 · 调试有时更直</text>
+  <text x="852" y="274" font-size="12" fill="#4A473F">失控设备可访问任意内存</text>
+  <text x="852" y="300" font-size="11.5" fill="#A64B3C">不是“免费性能开关”</text>
+
+  <!-- ============ Panel B：domain ============ -->
+  <text x="48" y="368" font-size="13" font-weight="700" fill="#4A473F">B · Domain 与 IOMMU group：隔离单元由拓扑决定，不是“一个设备一个安全域”</text>
+
+  <rect x="48" y="384" width="1144" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- domain boxes -->
+  <rect x="80" y="408" width="300" height="92" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="230" y="436" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">Domain A</text>
+  <text x="230" y="458" font-size="11.5" fill="#3D5A80" text-anchor="middle">设备 1 · 设备 2（同 group）</text>
+  <text x="230" y="480" font-size="11" fill="#2C4460" text-anchor="middle">共享 IOVA 空间 · 彼此未必隔离</text>
+
+  <rect x="420" y="408" width="280" height="92" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="560" y="436" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">Domain B</text>
+  <text x="560" y="458" font-size="11.5" fill="#2F6B5E" text-anchor="middle">设备 3（独立 group）</text>
+  <text x="560" y="480" font-size="11" fill="#24473F" text-anchor="middle">独立 IOVA · 与 A 隔离</text>
+
+  <rect x="740" y="408" width="420" height="92" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="950" y="436" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">IOMMU group 为何可能多设备</text>
+  <text x="950" y="458" font-size="11.5" fill="#8A6A3A" text-anchor="middle">PCIe bridge · 多功能 · ACS 能力</text>
+  <text x="950" y="480" font-size="11" fill="#6B4E28" text-anchor="middle">硬件无法可靠隔离时，内核不能假装独立</text>
+
+  <!-- ============ Panel C：能/不能 ============ -->
+  <text x="48" y="560" font-size="13" font-weight="700" fill="#4A473F">C · 能阻止什么 / 不能保证什么</text>
+
+  <rect x="48" y="576" width="560" height="140" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="68" y="604" font-size="13" font-weight="700" fill="#24473F">能阻止</text>
+  <text x="68" y="632" font-size="12" fill="#24473F">· 访问 domain 中未映射页面</text>
+  <text x="68" y="654" font-size="12" fill="#24473F">· 用户态驱动只暴露已授权内存</text>
+  <text x="68" y="676" font-size="12" fill="#24473F">· 越界 DMA → 可观测 IOMMU fault</text>
+  <text x="68" y="698" font-size="12" fill="#24473F">· 不同 VM / 租户 / domain 地址空间隔离</text>
+
+  <rect x="632" y="576" width="560" height="140" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="652" y="604" font-size="13" font-weight="700" fill="#733428">不能保证</text>
+  <text x="652" y="632" font-size="12" fill="#733428">· 合法映射区域内仍可被设备写坏</text>
+  <text x="652" y="654" font-size="12" fill="#733428">· 映射过大 = 过度授权</text>
+  <text x="652" y="676" font-size="12" fill="#733428">· stale mapping / 提前复用仍会损坏合法页</text>
+  <text x="652" y="698" font-size="12" fill="#733428">· 不懂对象边界 · 协议长度 · 应用语义</text>
+
+  <!-- bottom -->
+  <rect x="48" y="736" width="1144" height="28" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="620" y="755" font-size="12" fill="#4A473F" text-anchor="middle">最小权限：只映射需要的页 · 收窄方向 · 完成后及时撤销 · 长期池按设备/租户拆分</text>
+</svg>

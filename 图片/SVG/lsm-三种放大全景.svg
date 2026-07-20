@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1000" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；结构框 #E3EAF4/#3D5A80/#2C4460；
+       WAL/硬件专色 #EFE7D6/#8A6D3B；收益/减免 #E2EFE9/#2F6B5E；代价/放大 #F4E3DE/#B0503F -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0503F"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1000" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">LSM-tree：排好序的日志分层归并，成本改名叫「三种放大」</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">更新即追加、删除即墓碑、新层压旧层 —— 写路径快得没道理，账单拆成写放大 / 读放大 / 空间放大分期偿还</text>
+
+  <!-- ═══ 结构面板 ═══ -->
+  <rect x="48" y="104" width="1144" height="596" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">结构与三种放大的现场</text>
+
+  <!-- 写入口 -->
+  <rect x="480" y="148" width="280" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="620" y="174" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">用户写 put(k, v) / delete(k)</text>
+  <path d="M545,190 L500,220" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <path d="M695,190 L740,220" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="380" y="224" width="220" height="52" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.5"/>
+  <text x="490" y="244" font-size="12" font-weight="700" fill="#5C4A28" text-anchor="middle">① WAL 顺序追加</text>
+  <text x="490" y="262" font-size="10.5" fill="#5C4A28" text-anchor="middle">fdatasync = 提交点（6.1）</text>
+
+  <rect x="640" y="224" width="220" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="750" y="244" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">② memtable（并发跳表）</text>
+  <text x="750" y="262" font-size="10.5" fill="#2C4460" text-anchor="middle">写到这里即确认 —— 无盘上随机写</text>
+
+  <path d="M750,276 L750,314" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="762" y="300" font-size="10.5" fill="#6B675C">写满冻结 → 顺序 flush</text>
+
+  <!-- L0 -->
+  <rect x="560" y="318" width="120" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <rect x="650" y="326" width="120" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <rect x="740" y="318" width="120" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="712" y="345" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">L0：SSTable ×N</text>
+  <text x="890" y="332" font-size="10.5" fill="#6B675C">文件 key 范围互相重叠</text>
+  <text x="890" y="348" font-size="10.5" fill="#6B675C">（memtable 直接倾倒区）</text>
+
+  <path d="M712,368 L712,406" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- L1 -->
+  <rect x="500" y="410" width="420" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <path d="M605,410 L605,452 M710,410 L710,452 M815,410 L815,452" stroke="#3D5A80" stroke-width="0.8" stroke-dasharray="3,3"/>
+  <text x="710" y="436" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">L1：全局有序，文件不重叠</text>
+
+  <path d="M710,452 L710,490" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- L2 -->
+  <rect x="420" y="494" width="580" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <path d="M517,494 L517,536 M614,494 L614,536 M711,494 L711,536 M808,494 L808,536 M905,494 L905,536" stroke="#3D5A80" stroke-width="0.8" stroke-dasharray="3,3"/>
+  <text x="710" y="520" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">L2：容量 ≈ T × L1（默认 T≈10），大头数据在最底层</text>
+
+  <!-- 写放大标注（右侧写路径） -->
+  <text x="1040" y="252" font-size="10.5" font-weight="700" fill="#B0503F">WA 记账：</text>
+  <text x="1040" y="270" font-size="10.5" fill="#B0503F">WAL ＋1 遍</text>
+  <text x="1040" y="288" font-size="10.5" fill="#B0503F">flush ＋1 遍</text>
+  <text x="1040" y="306" font-size="10.5" fill="#B0503F">每下沉一层 ×T 遍</text>
+  <path d="M925,410 C965,410 985,430 985,436" fill="none" stroke="#B0503F" stroke-width="1.6" marker-end="url(#arrr)"/>
+  <text x="1000" y="420" font-size="10.5" font-weight="700" fill="#B0503F">compaction：与目标层</text>
+  <text x="1000" y="438" font-size="10.5" font-weight="700" fill="#B0503F">重叠数据一起归并重写</text>
+  <text x="1000" y="462" font-size="10.5" fill="#B0503F">WA ≈ 2 ＋ T×(L−1)</text>
+  <text x="1000" y="480" font-size="10.5" fill="#B0503F">量级 10～30</text>
+  <text x="1000" y="504" font-size="10" fill="#6B675C">× 设备 FTL 的 WAF（3.5）</text>
+  <text x="1000" y="520" font-size="10" fill="#6B675C">＝ 闪存真实磨损</text>
+
+  <!-- 读路径（左侧） -->
+  <rect x="80" y="196" width="180" height="40" rx="7" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="170" y="221" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle">点查 get(k)：按新 → 旧</text>
+  <path d="M170,236 L170,556" fill="none" stroke="#2F6B5E" stroke-width="1.6" stroke-dasharray="5,4"/>
+
+  <path d="M180,250 L636,250" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <text x="196" y="244" font-size="10.5" fill="#2F6B5E">探测① memtable</text>
+  <path d="M180,340 L556,340" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <text x="196" y="334" font-size="10.5" fill="#2F6B5E">探测②③④ L0 逐个文件（重叠，跳不过）</text>
+  <path d="M180,431 L496,431" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <text x="196" y="425" font-size="10.5" fill="#2F6B5E">探测⑤ L1 定位 1 个文件</text>
+  <path d="M180,515 L416,515" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <text x="196" y="509" font-size="10.5" fill="#2F6B5E">探测⑥ L2 定位 1 个文件</text>
+
+  <text x="80" y="580" font-size="10.5" font-weight="700" fill="#2F6B5E">RA ＝ 探测结构数。两道减免：</text>
+  <text x="80" y="598" font-size="10" fill="#6B675C">bloom filter：「不在此文件」降为内存判断（只救点查，救不了 scan）</text>
+  <text x="80" y="614" font-size="10" fill="#6B675C">block cache：探测 ≠ 盘 IO —— RA 的单价由缓存命中率决定（1.2）</text>
+
+  <!-- 空间放大（右下角版本堆） -->
+  <rect x="620" y="560" width="500" height="120" rx="8" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.4"/>
+  <text x="640" y="584" font-size="11.5" font-weight="700" fill="#B0503F">SA：同一个 key 的多个版本与墓碑并存，等 compaction 回收</text>
+  <rect x="640" y="598" width="130" height="30" rx="5" fill="#FAF9F2" stroke="#B0503F" stroke-width="1.1"/>
+  <text x="705" y="617" font-size="10" fill="#B0503F" text-anchor="middle">k=v3 @ memtable（活）</text>
+  <rect x="784" y="598" width="110" height="30" rx="5" fill="#FAF9F2" stroke="#B0503F" stroke-width="1.1"/>
+  <text x="839" y="617" font-size="10" fill="#B0503F" text-anchor="middle">k=v2 @ L1（死）</text>
+  <rect x="908" y="598" width="110" height="30" rx="5" fill="#FAF9F2" stroke="#B0503F" stroke-width="1.1"/>
+  <text x="963" y="617" font-size="10" fill="#B0503F" text-anchor="middle">k=v1 @ L2（死）</text>
+  <rect x="1032" y="598" width="72" height="30" rx="5" fill="#FAF9F2" stroke="#B0503F" stroke-width="1.1" stroke-dasharray="4,3"/>
+  <text x="1068" y="617" font-size="10" fill="#B0503F" text-anchor="middle">墓碑@L0</text>
+  <text x="640" y="652" font-size="10" fill="#6B675C">墓碑要沉到最底层才能消失；compaction 进行中输入输出并存 —— 磁盘要按峰值预留</text>
+  <text x="640" y="668" font-size="10" fill="#6B675C">leveled SA ~1.1x，tiered 可达 ~2x（6.7）</text>
+
+  <!-- ═══ 三角面板 ═══ -->
+  <rect x="48" y="724" width="1144" height="236" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="752" font-size="14" font-weight="700" fill="#4A473F">放大三角：不可同时最优 —— compaction 策略是挑位置的旋钮（6.7）</text>
+
+  <path d="M300,782 L180,900 L420,900 Z" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="300" y="776" font-size="11.5" font-weight="700" fill="#B0503F" text-anchor="middle">写放大 WA</text>
+  <text x="150" y="922" font-size="11.5" font-weight="700" fill="#2C4460">读放大 RA</text>
+  <text x="400" y="922" font-size="11.5" font-weight="700" fill="#5C4A28">空间放大 SA</text>
+  <text x="300" y="866" font-size="10.5" fill="#6B675C" text-anchor="middle">压一个角，</text>
+  <text x="300" y="882" font-size="10.5" fill="#6B675C" text-anchor="middle">另两个角翘起</text>
+
+  <text x="520" y="800" font-size="11" fill="#4A473F">压 WA（少归并）→ run 变多 → RA、SA 上升（tiered 的位置）</text>
+  <text x="520" y="828" font-size="11" fill="#4A473F">压 RA（勤归并成每层一份有序）→ 重写变多 → WA 上升（leveled 的位置）</text>
+  <text x="520" y="856" font-size="11" fill="#4A473F">压 SA（激进回收旧版本）→ 同样以更多归并写为代价</text>
+  <rect x="520" y="880" width="640" height="56" rx="8" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="840" y="903" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排障先分账：写带宽异常查 WA · 读延迟异常查 RA · 容量异常查 SA</text>
+  <text x="840" y="923" font-size="10.5" fill="#2F6B5E" text-anchor="middle">三块仪表盘独立 —— 混在一起只能得出「引擎变慢了」</text>
+</svg>

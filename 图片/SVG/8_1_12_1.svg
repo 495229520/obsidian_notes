@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>一笔同步写的状态机：从脏页到 fsync 返回</title>
+  <desc>主路径 DirtyInMemory→WriteQueued→DeviceAccepted→Stable→SyncReturned；失败从中途汇入 Failed→Unknown。下方模拟 page cache / 设备易失缓存 / 非易失域中数据位置。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">一笔同步写的状态机：普通写完成 ≠ 持久</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">只有 Stable 之后 fsync 才能返回 0 · 任一中途失败进入 Unknown，应用不得报告提交成功</text>
+
+  <!-- 主路径背景带 -->
+  <rect x="36" y="100" width="1168" height="268" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="52" y="126" font-size="13" font-weight="700" fill="#4A473F">主路径 · 成功提交</text>
+
+  <!-- 状态节点 1 DirtyInMemory -->
+  <rect x="56" y="150" width="188" height="88" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="150" y="178" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">① DirtyInMemory</text>
+  <text x="150" y="200" font-size="11" fill="#6B4E28" text-anchor="middle">write 改 page cache</text>
+  <text x="150" y="220" font-size="10.5" fill="#8A6A3A" text-anchor="middle">设备完全看不到</text>
+
+  <!-- arrow -->
+  <line x1="244" y1="194" x2="278" y2="194" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="261" y="182" font-size="10" fill="#6B675C" text-anchor="middle">bio</text>
+
+  <!-- 2 WriteQueued -->
+  <rect x="288" y="150" width="188" height="88" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="382" y="178" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">② WriteQueued</text>
+  <text x="382" y="200" font-size="11" fill="#2C4460" text-anchor="middle">FS 生成 bio / request</text>
+  <text x="382" y="220" font-size="10.5" fill="#3D5A80" text-anchor="middle">在途 · 崩溃结果未定</text>
+
+  <line x1="476" y1="194" x2="510" y2="194" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="493" y="182" font-size="10" fill="#6B675C" text-anchor="middle">完成</text>
+
+  <!-- 3 DeviceAccepted -->
+  <rect x="520" y="150" width="188" height="88" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="614" y="174" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">③ DeviceAccepted</text>
+  <text x="614" y="196" font-size="11" fill="#6B4E28" text-anchor="middle">普通写完成</text>
+  <text x="614" y="216" font-size="10.5" fill="#A64B3C" text-anchor="middle">write-back 仍可能易失</text>
+  <text x="614" y="230" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle">≠ 持久</text>
+
+  <line x1="708" y1="194" x2="742" y2="194" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="725" y="178" font-size="9.5" fill="#2F6B5E" text-anchor="middle">Flush/FUA</text>
+
+  <!-- 4 Stable -->
+  <rect x="752" y="150" width="188" height="88" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="846" y="178" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">④ Stable</text>
+  <text x="846" y="200" font-size="11" fill="#24473F" text-anchor="middle">非易失条件满足</text>
+  <text x="846" y="220" font-size="10.5" fill="#2F6B5E" text-anchor="middle">协议要求的落盘点</text>
+
+  <line x1="940" y1="194" x2="974" y2="194" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arr-green)"/>
+
+  <!-- 5 SyncReturned -->
+  <rect x="984" y="150" width="188" height="88" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="1078" y="178" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">⑤ SyncReturned</text>
+  <text x="1078" y="200" font-size="11" fill="#24473F" text-anchor="middle">fsync 返回 0</text>
+  <text x="1078" y="220" font-size="10.5" fill="#2F6B5E" text-anchor="middle">可报告提交成功</text>
+
+  <!-- 层位置标签条 -->
+  <text x="52" y="268" font-size="12" font-weight="700" fill="#4A473F">数据此刻所在层（模拟）</text>
+
+  <!-- 小层栈 1 -->
+  <g transform="translate(72,278)">
+    <rect x="0" y="0" width="156" height="22" rx="3" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+    <text x="78" y="15" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">page cache 脏</text>
+    <rect x="0" y="26" width="156" height="18" rx="3" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+    <text x="78" y="38" font-size="9.5" fill="#9B968A" text-anchor="middle">设备缓存 —</text>
+    <rect x="0" y="48" width="156" height="18" rx="3" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+    <text x="78" y="60" font-size="9.5" fill="#9B968A" text-anchor="middle">非易失域 —</text>
+  </g>
+
+  <!-- 小层栈 2 -->
+  <g transform="translate(304,278)">
+    <rect x="0" y="0" width="156" height="22" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+    <text x="78" y="15" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">page cache + bio</text>
+    <rect x="0" y="26" width="156" height="18" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1" stroke-dasharray="4 3"/>
+    <text x="78" y="38" font-size="9.5" fill="#3D5A80" text-anchor="middle">队列 / 驱动 在途</text>
+    <rect x="0" y="48" width="156" height="18" rx="3" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+    <text x="78" y="60" font-size="9.5" fill="#9B968A" text-anchor="middle">非易失域 —</text>
+  </g>
+
+  <!-- 小层栈 3 -->
+  <g transform="translate(536,278)">
+    <rect x="0" y="0" width="156" height="18" rx="3" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+    <text x="78" y="12" font-size="9.5" fill="#9B968A" text-anchor="middle">page cache 可清脏</text>
+    <rect x="0" y="22" width="156" height="24" rx="3" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+    <text x="78" y="38" font-size="10" font-weight="700" fill="#733428" text-anchor="middle">设备易失缓存 ✓</text>
+    <rect x="0" y="50" width="156" height="16" rx="3" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+    <text x="78" y="61" font-size="9.5" fill="#9B968A" text-anchor="middle">非易失域 ？</text>
+  </g>
+
+  <!-- 小层栈 4 -->
+  <g transform="translate(768,278)">
+    <rect x="0" y="0" width="156" height="18" rx="3" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+    <text x="78" y="12" font-size="9.5" fill="#9B968A" text-anchor="middle">page cache</text>
+    <rect x="0" y="22" width="156" height="18" rx="3" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+    <text x="78" y="34" font-size="9.5" fill="#9B968A" text-anchor="middle">易失缓存 已排空</text>
+    <rect x="0" y="44" width="156" height="22" rx="3" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+    <text x="78" y="59" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">非易失域 ✓</text>
+  </g>
+
+  <!-- 小层栈 5 -->
+  <g transform="translate(1000,278)">
+    <rect x="0" y="0" width="156" height="66" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+    <text x="78" y="28" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">用户态可见成功</text>
+    <text x="78" y="48" font-size="10" fill="#2F6B5E" text-anchor="middle">完成状态已回传</text>
+  </g>
+
+  <!-- 失败路径面板 -->
+  <rect x="36" y="392" width="1168" height="248" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="52" y="418" font-size="13" font-weight="700" fill="#733428">失败路径 · 任意中途出错</text>
+  <text x="52" y="438" font-size="12" fill="#6B675C">writeback / 请求超时 / Flush·FUA 失败 → 统一进入 Failed，再落到 Unknown</text>
+
+  <!-- 三个失败源 -->
+  <rect x="80" y="460" width="200" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="180" y="482" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">① 脏页 writeback 错</text>
+  <text x="180" y="500" font-size="10.5" fill="#A64B3C" text-anchor="middle">DirtyInMemory → Failed</text>
+
+  <rect x="320" y="460" width="200" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="420" y="482" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">② 请求错误 / 超时</text>
+  <text x="420" y="500" font-size="10.5" fill="#A64B3C" text-anchor="middle">WriteQueued → Failed</text>
+
+  <rect x="560" y="460" width="200" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="660" y="482" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">③ Flush / FUA 失败</text>
+  <text x="660" y="500" font-size="10.5" fill="#A64B3C" text-anchor="middle">DeviceAccepted → Failed</text>
+
+  <!-- 汇合箭头到 Failed -->
+  <line x1="180" y1="516" x2="180" y2="548" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="420" y1="516" x2="420" y2="548" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="660" y1="516" x2="660" y2="548" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="180" y1="548" x2="660" y2="548" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="420" y1="548" x2="420" y2="568" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr-red)"/>
+
+  <!-- Failed -->
+  <rect x="300" y="572" width="240" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="420" y="592" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">Failed</text>
+  <text x="420" y="610" font-size="11" fill="#A64B3C" text-anchor="middle">同步路径错误已返回</text>
+
+  <line x1="540" y1="596" x2="620" y2="596" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arr-red)"/>
+
+  <!-- Unknown -->
+  <rect x="630" y="568" width="280" height="56" rx="7" fill="#EDEBE3" stroke="#4A473F" stroke-width="1.6"/>
+  <text x="770" y="592" font-size="13" font-weight="700" fill="#2B2A26" text-anchor="middle">Unknown</text>
+  <text x="770" y="612" font-size="11" fill="#733428" text-anchor="middle">不得报告提交成功 · 按失败协议处理</text>
+
+  <!-- 从主路径虚线示意失败分支来源 -->
+  <text x="960" y="488" font-size="11" fill="#6B675C">主路径上 ①②③ 均可分叉</text>
+  <text x="960" y="508" font-size="11" fill="#6B675C">④ Stable 之后失败少见</text>
+  <text x="960" y="528" font-size="11" fill="#6B675C">但返回前仍可能 EIO</text>
+
+  <!-- 底栏：判断准则 -->
+  <rect x="36" y="664" width="1168" height="200" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="52" y="692" font-size="13" font-weight="700" fill="#4A473F">状态含义速查 · 与 §9.2 正文一一对应</text>
+
+  <rect x="56" y="712" width="180" height="72" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="146" y="736" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">DirtyInMemory</text>
+  <text x="146" y="756" font-size="10" fill="#6B4E28" text-anchor="middle">仅在内核 DRAM</text>
+  <text x="146" y="772" font-size="10" fill="#8A6A3A" text-anchor="middle">Flush 管不到这里</text>
+
+  <rect x="252" y="712" width="180" height="72" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="342" y="736" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">WriteQueued</text>
+  <text x="342" y="756" font-size="10" fill="#2C4460" text-anchor="middle">bio/request 已发出</text>
+  <text x="342" y="772" font-size="10" fill="#3D5A80" text-anchor="middle">崩溃后结果未定</text>
+
+  <rect x="448" y="712" width="180" height="72" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="538" y="736" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">DeviceAccepted</text>
+  <text x="538" y="756" font-size="10" fill="#733428" text-anchor="middle">普通写完成</text>
+  <text x="538" y="772" font-size="10" fill="#A64B3C" text-anchor="middle">易失缓存仍可能有</text>
+
+  <rect x="644" y="712" width="180" height="72" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="734" y="736" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">Stable</text>
+  <text x="734" y="756" font-size="10" fill="#24473F" text-anchor="middle">Flush/FUA 条件满</text>
+  <text x="734" y="772" font-size="10" fill="#2F6B5E" text-anchor="middle">进入非易失域</text>
+
+  <rect x="840" y="712" width="170" height="72" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="925" y="736" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">SyncReturned</text>
+  <text x="925" y="756" font-size="10" fill="#24473F" text-anchor="middle">fsync 返回 0</text>
+  <text x="925" y="772" font-size="10" fill="#2F6B5E" text-anchor="middle">唯一可发布成功点</text>
+
+  <rect x="1026" y="712" width="160" height="72" rx="6" fill="#EDEBE3" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="1106" y="736" font-size="11" font-weight="700" fill="#2B2A26" text-anchor="middle">Unknown</text>
+  <text x="1106" y="756" font-size="10" fill="#733428" text-anchor="middle">失败后不可推断</text>
+  <text x="1106" y="772" font-size="10" fill="#4A473F" text-anchor="middle">哪些字节已持久</text>
+
+  <text x="56" y="820" font-size="12" fill="#2B2A26">判断准则：DeviceAccepted 只证明设备接收了请求；Stable 才证明协议要求的非易失条件；SyncReturned 才允许应用对外说「提交成功」。</text>
+  <text x="56" y="844" font-size="11.5" fill="#6B675C">若返回 EIO / ENOSPC 等错误，按失败协议处理，详见 fsyncgate 与 EIO 处理；重试不能假设上次已写稳。</text>
+</svg>

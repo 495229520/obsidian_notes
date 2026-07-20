@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">QP 状态机与 WQE 生命周期：先能收（RTR），再能发（RTS），一错全冲（ERR）</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">参数分三步喂进状态机，每一步都是一次 modify_qp 系统调用（控制路径）；错误是连接级的：整个 QP 作废，只能重建</text>
+
+  <!-- 状态机 -->
+  <rect x="60" y="150" width="130" height="54" rx="8" fill="#FBFAF5" stroke="#B9B4A4" stroke-width="1.4"/>
+  <text x="125" y="173" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">RESET</text>
+  <text x="125" y="192" font-size="10" fill="#6B675C" text-anchor="middle">初始态 / 重建落点</text>
+
+  <rect x="270" y="150" width="130" height="54" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="335" y="173" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">INIT</text>
+  <text x="335" y="192" font-size="10" fill="#2C4460" text-anchor="middle">端口 / 权限已定</text>
+
+  <rect x="480" y="150" width="130" height="54" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="545" y="173" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">RTR</text>
+  <text x="545" y="192" font-size="10" fill="#24473F" text-anchor="middle">能收（此前先灌 RQ）</text>
+
+  <rect x="690" y="150" width="130" height="54" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="755" y="173" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">RTS</text>
+  <text x="755" y="192" font-size="10" fill="#24473F" text-anchor="middle">能发：连接就绪</text>
+
+  <rect x="480" y="300" width="130" height="54" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="545" y="323" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">ERR</text>
+  <text x="545" y="342" font-size="10" fill="#733428" text-anchor="middle">在途＋后续全部冲刷</text>
+
+  <line x1="190" y1="177" x2="266" y2="177" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="228" y="144" font-size="10" font-weight="700" fill="#4A473F" text-anchor="middle">modify ①</text>
+  <text x="228" y="222" font-size="9.5" fill="#6B675C" text-anchor="middle">port · pkey</text>
+  <text x="228" y="236" font-size="9.5" fill="#6B675C" text-anchor="middle">access flags</text>
+
+  <line x1="400" y1="177" x2="476" y2="177" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="438" y="144" font-size="10" font-weight="700" fill="#4A473F" text-anchor="middle">modify ②</text>
+  <text x="438" y="222" font-size="9.5" fill="#6B675C" text-anchor="middle">对端 QPN·GID·PSN·MTU</text>
+  <text x="438" y="236" font-size="9.5" fill="#6B675C" text-anchor="middle">——需带外交换（4.2）</text>
+
+  <line x1="610" y1="177" x2="686" y2="177" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="648" y="144" font-size="10" font-weight="700" fill="#4A473F" text-anchor="middle">modify ③</text>
+  <text x="648" y="222" font-size="9.5" fill="#6B675C" text-anchor="middle">本地 PSN · timeout</text>
+  <text x="648" y="236" font-size="9.5" fill="#6B675C" text-anchor="middle">retry_cnt · rnr_retry</text>
+
+  <line x1="365" y1="204" x2="512" y2="298" stroke="#A64B3C" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arrR)"/>
+  <line x1="545" y1="204" x2="545" y2="296" stroke="#A64B3C" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arrR)"/>
+  <line x1="735" y1="204" x2="588" y2="298" stroke="#A64B3C" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arrR)"/>
+  <text x="700" y="266" font-size="10" fill="#733428">任一 WQE 出错 → 整个 QP 进 ERR</text>
+
+  <polyline points="480,340 125,340 125,208" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="170" y="332" font-size="10" fill="#4A473F">唯一出路：排水后 RESET 重建</text>
+
+  <!-- 右侧卡片 -->
+  <rect x="880" y="130" width="312" height="224" rx="10" fill="#EFEDE3" stroke="#C7C2B2" stroke-width="1.2"/>
+  <text x="900" y="158" font-size="12.5" font-weight="700" fill="#4A473F">为什么先 RTR 再 RTS</text>
+  <text x="900" y="186" font-size="10.5" fill="#4A473F">两端参数交叉依赖：我的 RTR 需要对端</text>
+  <text x="900" y="206" font-size="10.5" fill="#4A473F">的 QPN / PSN / GID——先带外交换；</text>
+  <text x="900" y="234" font-size="10.5" fill="#4A473F">先具备接收能力、再获得发送能力，</text>
+  <text x="900" y="254" font-size="10.5" fill="#4A473F">保证消息到达时对端一定准备好了。</text>
+  <text x="900" y="282" font-size="10.5" fill="#4A473F">双边还要求 RQ 里已有 Recv WQE，</text>
+  <text x="900" y="302" font-size="10.5" fill="#4A473F">否则对端收到 RNR NAK 进入重试</text>
+  <text x="900" y="322" font-size="10.5" fill="#4A473F">——纪律：灌满 RQ 之后再放对端发。</text>
+
+  <!-- WQE 生命周期 -->
+  <text x="48" y="416" font-size="13" font-weight="700" fill="#2B2A26">一个 WQE 的一生（发送侧）</text>
+
+  <rect x="48" y="430" width="150" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="123" y="451" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">post_send 填 WQE</text>
+  <text x="123" y="469" font-size="9.5" fill="#2C4460" text-anchor="middle">wr_id：对号票据</text>
+  <rect x="228" y="430" width="110" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="283" y="451" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">SQ 环</text>
+  <text x="283" y="469" font-size="9.5" fill="#24473F" text-anchor="middle">深度有限：满即背压</text>
+  <rect x="368" y="430" width="130" height="52" rx="7" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="433" y="451" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">doorbell（MMIO）</text>
+  <text x="433" y="469" font-size="9.5" fill="#733428" text-anchor="middle">≈ release 发布</text>
+  <rect x="528" y="430" width="170" height="52" rx="7" fill="#E7E2EF" stroke="#4A3F68" stroke-width="1.3"/>
+  <text x="613" y="451" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">RNIC 执行</text>
+  <text x="613" y="469" font-size="9.5" fill="#4A3F68" text-anchor="middle">分段·确认·重传（硬件）</text>
+  <rect x="728" y="430" width="150" height="52" rx="7" fill="#E7E2EF" stroke="#4A3F68" stroke-width="1.3"/>
+  <text x="803" y="451" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">生成 CQE</text>
+  <text x="803" y="469" font-size="9.5" fill="#4A3F68" text-anchor="middle">仅 signaled 的 WQE</text>
+  <rect x="908" y="430" width="110" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="963" y="451" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">CQ 环</text>
+  <text x="963" y="469" font-size="9.5" fill="#24473F" text-anchor="middle">容量必须够（溢出即错）</text>
+  <rect x="1048" y="430" width="144" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="1120" y="451" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">poll_cq 收割</text>
+  <text x="1120" y="469" font-size="9.5" fill="#2C4460" text-anchor="middle">查 status ＋ wr_id 对号</text>
+
+  <line x1="198" y1="456" x2="224" y2="456" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="338" y1="456" x2="364" y2="456" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="498" y1="456" x2="524" y2="456" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="698" y1="456" x2="724" y2="456" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="878" y1="456" x2="904" y2="456" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="1018" y1="456" x2="1044" y2="456" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <text x="48" y="516" font-size="10.5" fill="#733428">双边时序约束【事实】：对端 Send 到达前，本端 RQ 必须已 post 好 Recv WQE——否则 RNR NAK，重试耗尽后两端 QP 进 ERR。</text>
+  <text x="48" y="534" font-size="10.5" fill="#6B675C">收割后 SQ 槽位才可复用；unsignaled WQE 的槽位要等它之后第一个 signaled 完成一起释放。</text>
+
+  <!-- 底部三卡 -->
+  <rect x="48" y="560" width="368" height="150" rx="10" fill="#EFEDE3" stroke="#C7C2B2" stroke-width="1.2"/>
+  <text x="68" y="586" font-size="12" font-weight="700" fill="#4A473F">ERR 的冲刷语义</text>
+  <text x="68" y="610" font-size="10.5" fill="#4A473F">出错后：在途＋后续 WQE 全部以</text>
+  <text x="68" y="628" font-size="10.5" fill="#4A473F">WR_FLUSH_ERR 完成（排水）；只有</text>
+  <text x="68" y="646" font-size="10.5" fill="#4A473F">第一个非 FLUSH 的错误才是根因。</text>
+  <text x="68" y="664" font-size="10.5" fill="#4A473F">流程：停提交 → 收完冲刷 → 记根因</text>
+  <text x="68" y="682" font-size="10.5" fill="#4A473F">→ RESET → 重走 ①②③ → 重灌 RQ。</text>
+
+  <rect x="436" y="560" width="368" height="150" rx="10" fill="#EFEDE3" stroke="#C7C2B2" stroke-width="1.2"/>
+  <text x="456" y="586" font-size="12" font-weight="700" fill="#4A473F">signaled / unsignaled【取舍】</text>
+  <text x="456" y="610" font-size="10.5" fill="#4A473F">默认每个 WQE 一个 CQE；unsignaled</text>
+  <text x="456" y="628" font-size="10.5" fill="#4A473F">省 CQE 与收割成本，但槽位要等下一个</text>
+  <text x="456" y="646" font-size="10.5" fill="#4A473F">signaled 完成才批量释放——</text>
+  <text x="456" y="664" font-size="10.5" fill="#4A473F">全部 unsignaled = SQ 慢性泄漏，</text>
+  <text x="456" y="682" font-size="10.5" fill="#4A473F">最终 post_send 永远 ENOMEM。</text>
+
+  <rect x="824" y="560" width="368" height="150" rx="10" fill="#EFEDE3" stroke="#C7C2B2" stroke-width="1.2"/>
+  <text x="844" y="586" font-size="12" font-weight="700" fill="#4A473F">深度与背压</text>
+  <text x="844" y="610" font-size="10.5" fill="#4A473F">post 返回 ENOMEM = 队满背压；</text>
+  <text x="844" y="628" font-size="10.5" fill="#4A473F">在途账由应用自己记（wr_id 家族）。</text>
+  <text x="844" y="646" font-size="10.5" fill="#4A473F">需要的在途数 ≈ 带宽 × RTT ÷ 消息大小</text>
+  <text x="844" y="664" font-size="10.5" fill="#4A473F">——利特尔法则的网络版（2.3），</text>
+  <text x="844" y="682" font-size="10.5" fill="#4A473F">拐点用 4.9 的 perftest 亲手扫出来。</text>
+</svg>

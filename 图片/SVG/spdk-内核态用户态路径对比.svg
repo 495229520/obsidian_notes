@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1050" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       硬件专色（两边相同的部分）#EFE7D6/#8A6D3B；确定性/收益 #E2EFE9/#2F6B5E；抖动/删除 #F4E3DE/#B0503F -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1050" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">内核态 vs 用户态：同一块盘，两种软件包装</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">硬件协议（SQE / doorbell / CQE / phase bit）两边一字不差；差异 ＝ 通知、边界、队列、背压四次选边</text>
+
+  <!-- ═══ 左：内核路径 ═══ -->
+  <rect x="48" y="104" width="520" height="626" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">内核路径（io_uring ＋ O_DIRECT）</text>
+
+  <rect x="88" y="148" width="440" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="308" y="170" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① io_uring_enter 提交</text>
+  <text x="308" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle">syscall 陷入：百 ns 级，每批一次</text>
+  <path d="M308,204 L308,222" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="226" width="440" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="308" y="248" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② VFS → bio → blk-mq 每核队列 → 取 tag</text>
+  <text x="308" y="268" font-size="10.5" fill="#2C4460" text-anchor="middle">～μs；共享结构；tag 耗尽 ＝ 隐式背压（睡给你看）</text>
+  <path d="M308,282 L308,300" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="304" width="440" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="308" y="326" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ nvme 驱动：填 SQE → 敲 doorbell</text>
+  <text x="308" y="346" font-size="10.5" fill="#2C4460" text-anchor="middle">百 ns；与右侧用的是同一份硬件协议</text>
+  <path d="M308,360 L308,378" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="382" width="440" height="56" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.6"/>
+  <text x="308" y="404" font-size="12.5" font-weight="700" fill="#5C4A28" text-anchor="middle">④ 盘执行:DMA 数据 → 写 CQE → 翻 phase bit</text>
+  <text x="308" y="424" font-size="10.5" fill="#5C4A28" text-anchor="middle">几十 μs（NAND）—— 两条路径完全相同的部分</text>
+  <path d="M308,438 L308,456" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="460" width="440" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="308" y="482" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑤ MSI-X 中断 → ISR → softirq 收 CQE</text>
+  <text x="308" y="502" font-size="10.5" fill="#2C4460" text-anchor="middle">μs 级；中断 ＝ 系统级 notify_one</text>
+  <path d="M308,516 L308,534" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="538" width="440" height="56" rx="7" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.5"/>
+  <text x="308" y="560" font-size="12.5" font-weight="700" fill="#B0503F" text-anchor="middle">⑥ 唤醒等待任务 → 调度器排队 → 上核</text>
+  <text x="308" y="580" font-size="10.5" fill="#B0503F" text-anchor="middle">μs 级 ＋ 抖动：抢占 / C-state 惊跳 / NUMA —— p999 元凶</text>
+  <path d="M308,594 L308,612" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="616" width="440" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="308" y="638" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑦ 陷出，返回用户态</text>
+  <text x="308" y="658" font-size="10.5" fill="#2C4460" text-anchor="middle">百 ns 级</text>
+
+  <text x="308" y="704" font-size="11" fill="#6B675C" text-anchor="middle">软件合计：约 5～10 μs ＋ 调度抖动（对 NAND 盘 ≈ 一成）</text>
+
+  <!-- ═══ 右：SPDK 路径 ═══ -->
+  <rect x="620" y="104" width="572" height="626" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="644" y="132" font-size="14" font-weight="700" fill="#4A473F">SPDK 用户态路径</text>
+
+  <rect x="672" y="148" width="468" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="906" y="170" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① 应用调用 spdk_nvme_ns_cmd_read()</text>
+  <text x="906" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle">普通函数调用：ns 级，零陷入；-ENOMEM ＝ 显式背压</text>
+  <path d="M906,204 L906,222" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="672" y="226" width="468" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="906" y="248" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 本核独占 qpair：直接填 SQE</text>
+  <text x="906" y="268" font-size="10.5" fill="#2C4460" text-anchor="middle">百 ns；无共享结构、无 tag 仲裁、无锁</text>
+  <path d="M906,282 L906,300" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="672" y="304" width="468" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="906" y="326" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ 写屏障 → doorbell（mmap 进程的 MMIO）</text>
+  <text x="906" y="346" font-size="10.5" fill="#2C4460" text-anchor="middle">百 ns；数据先写全、发布殿后（release 语义）</text>
+  <path d="M906,360 L906,378" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="672" y="382" width="468" height="56" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.6"/>
+  <text x="906" y="404" font-size="12.5" font-weight="700" fill="#5C4A28" text-anchor="middle">④ 盘执行:DMA 数据 → 写 CQE → 翻 phase bit</text>
+  <text x="906" y="424" font-size="10.5" fill="#5C4A28" text-anchor="middle">几十 μs —— 与左侧一字不差</text>
+  <path d="M906,438 L906,456" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="672" y="460" width="468" height="56" rx="7" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="906" y="482" font-size="12.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">⑤ reactor 轮询 phase bit 命中 → 原地回调</text>
+  <text x="906" y="502" font-size="10.5" fill="#2F6B5E" text-anchor="middle">百 ns 内反应；acquire 读；完成路径上没有调度器</text>
+
+  <text x="906" y="536" font-size="11" fill="#6B675C" text-anchor="middle">软件合计：1 μs 以内，且无抖动 —— 代价是这个核 100% 在烧</text>
+
+  <!-- 被删除清单 -->
+  <rect x="672" y="556" width="468" height="116" rx="8" fill="none" stroke="#B0503F" stroke-width="1.6" stroke-dasharray="6,4"/>
+  <text x="906" y="580" font-size="11.5" font-weight="700" fill="#B0503F" text-anchor="middle">被删除的等待点（对应左列步骤）</text>
+  <text x="700" y="608" font-size="11" fill="#B0503F">✕ syscall 陷入 / 陷出（①⑦）</text>
+  <text x="930" y="608" font-size="11" fill="#B0503F">✕ 共享队列与 tag 仲裁（②）</text>
+  <text x="700" y="636" font-size="11" fill="#B0503F">✕ 中断 / softirq（⑤）</text>
+  <text x="930" y="636" font-size="11" fill="#B0503F">✕ 唤醒与调度（⑥）</text>
+  <text x="906" y="662" font-size="10" fill="#6B675C" text-anchor="middle">删掉的全是「软件强加」的开销；acquire/release 与缓存一致性一分没省</text>
+
+  <!-- ═══ 底部：三笔账与四次选边 ═══ -->
+  <rect x="48" y="754" width="1144" height="264" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="782" font-size="14" font-weight="700" fill="#4A473F">按三笔账算，不按平均延迟算</text>
+
+  <text x="76" y="814" font-size="11.5" font-weight="700" fill="#2C4460">平均延迟：只赢约一成</text>
+  <text x="76" y="834" font-size="10.5" fill="#6B675C">NAND 盘几十 μs 面前，软件 μs 是零头</text>
+  <text x="76" y="852" font-size="10.5" fill="#6B675C">—— 别拿这一项立项</text>
+
+  <text x="452" y="814" font-size="11.5" font-weight="700" fill="#2C4460">IOPS / 核：乘法效应</text>
+  <text x="452" y="834" font-size="10.5" fill="#6B675C">每笔省下的 μs × 百万 IOPS</text>
+  <text x="452" y="852" font-size="10.5" fill="#6B675C">＝ 省出整数个核（target 的命根）</text>
+
+  <text x="828" y="814" font-size="11.5" font-weight="700" fill="#2C4460">p999：删掉随机变量</text>
+  <text x="828" y="834" font-size="10.5" fill="#6B675C">完成路径上不再有调度器</text>
+  <text x="828" y="852" font-size="10.5" fill="#6B675C">—— 轮询买到的是确定性</text>
+
+  <rect x="76" y="876" width="1088" height="118" rx="8" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="620" y="904" font-size="12.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">四次选边：通知（睡眠 vs 自旋）· 边界（陷入 vs 零陷入）· 队列（共享仲裁 vs 按核分片）· 背压（隐式 vs 显式）</text>
+  <text x="620" y="932" font-size="11.5" fill="#4A473F" text-anchor="middle">省得掉的是特权级切换与调度；省不掉的是 acquire/release 与缓存一致性 —— 内核态/用户态是权限边界，不是内存模型边界</text>
+  <text x="620" y="960" font-size="11" fill="#6B675C" text-anchor="middle">选贵的一边要有资格：独占得起设备、烧得起核、接得住显式背压；否则 io_uring（SQPOLL / IOPOLL）是谱系的中点</text>
+  <text x="620" y="982" font-size="10.5" fill="#6B675C" text-anchor="middle">SPDK 的代价清单：失去文件系统与 page cache、设备离开内核（iostat/blktrace 失明）、每核常烧 100%</text>
+</svg>

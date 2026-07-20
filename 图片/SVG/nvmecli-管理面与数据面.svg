@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">nvme-cli 走的是哪条路：管理面 ioctl，与数据面并行</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">nvme-cli 的每个子命令 ≈ 一条 Admin 命令：经字符设备 ioctl 进 Admin 队列，与搬数据的 IO 队列互不排队</text>
+
+  <!-- 管理面 -->
+  <rect x="70" y="112" width="500" height="412" rx="10" fill="#F6EFDD" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="90" y="142" font-size="14" font-weight="700" fill="#7A5518">管理面（控制命令）</text>
+  <text x="90" y="163" font-size="10.5" fill="#6B675C">低频：问身份、查健康、改配置——一条队列足够</text>
+
+  <rect x="130" y="176" width="380" height="64" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="320" y="198" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">nvme-cli（用户态工具）</text>
+  <text x="320" y="220" font-size="10.5" fill="#7A5518" text-anchor="middle" font-family="'SF Mono',Menlo,Consolas,monospace">nvme smart-log /dev/nvme0</text>
+
+  <path d="M320,240 L320,258" fill="none" stroke="#B07D2B" stroke-width="1.8" marker-end="url(#arra)"/>
+
+  <rect x="130" y="262" width="380" height="64" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="320" y="284" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">/dev/nvme0：控制器字符设备</text>
+  <text x="320" y="306" font-size="10.5" fill="#7A5518" text-anchor="middle" font-family="'SF Mono',Menlo,Consolas,monospace">ioctl(NVME_IOCTL_ADMIN_CMD)</text>
+
+  <path d="M320,326 L320,344" fill="none" stroke="#B07D2B" stroke-width="1.8" marker-end="url(#arra)"/>
+
+  <rect x="130" y="348" width="380" height="64" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="320" y="370" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">内核 nvme 驱动</text>
+  <text x="320" y="392" font-size="10.5" fill="#7A5518" text-anchor="middle">校验参数 → 原样构造一条 Admin SQE</text>
+
+  <path d="M320,412 L320,430" fill="none" stroke="#B07D2B" stroke-width="1.8" marker-end="url(#arra)"/>
+
+  <rect x="130" y="434" width="380" height="64" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="320" y="456" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">Admin SQ/CQ（每控制器仅一对）</text>
+  <text x="320" y="478" font-size="10.5" fill="#7A5518" text-anchor="middle">填 SQE → 写 doorbell（3.2 同款协议）</text>
+
+  <!-- 数据面 -->
+  <rect x="640" y="112" width="530" height="412" rx="10" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="660" y="142" font-size="14" font-weight="700" fill="#2C4460">数据面（搬数据）</text>
+  <text x="660" y="163" font-size="10.5" fill="#6B675C">高频：读写数据——每核一对队列，百万 IOPS 级</text>
+
+  <rect x="705" y="176" width="400" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="905" y="198" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">应用 / fio</text>
+  <text x="905" y="220" font-size="10.5" fill="#2C4460" text-anchor="middle">read · write · io_uring 提交</text>
+
+  <path d="M905,240 L905,258" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <rect x="705" y="262" width="400" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="905" y="284" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">/dev/nvme0n1：namespace 块设备</text>
+  <text x="905" y="306" font-size="10.5" fill="#2C4460" text-anchor="middle">VFS → 页缓存 / O_DIRECT（1.3）</text>
+
+  <path d="M905,326 L905,344" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <rect x="705" y="348" width="400" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="905" y="370" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">块层 blk-mq</text>
+  <text x="905" y="392" font-size="10.5" fill="#2C4460" text-anchor="middle">每核软件队列 + tag 限流（1.7）</text>
+
+  <path d="M905,412 L905,430" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <rect x="705" y="434" width="400" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="905" y="456" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">IO SQ/CQ × N（每核一对）</text>
+  <text x="905" y="478" font-size="10.5" fill="#2C4460" text-anchor="middle">并行提交、互不加锁（3.3）</text>
+
+  <!-- 控制器 -->
+  <path d="M320,524 L320,552" fill="none" stroke="#B07D2B" stroke-width="1.8" marker-end="url(#arra)"/>
+  <path d="M905,524 L905,552" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <rect x="70" y="556" width="1100" height="88" rx="8" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="620" y="586" font-size="13.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">NVMe 控制器</text>
+  <text x="620" y="612" font-size="11" fill="#1F4A3E" text-anchor="middle">固件取 SQE → 解析执行 → NAND 通道并行搬运 → 写 CQE + 中断（3.1 命令模型）</text>
+
+  <!-- 底部要点 -->
+  <rect x="70" y="672" width="1100" height="104" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="702" font-size="13.5" font-weight="700" fill="#2B2A26">两个面互不排队，但管理命令会改变数据面脚下的世界</text>
+  <text x="94" y="728" font-size="11.5" fill="#4A473F">format / sanitize 重写 LBA 格式（数据全毁）、set-feature 改队列配置——都是验收期动作，不要对在线盘做</text>
+  <text x="94" y="752" font-size="11.5" font-weight="700" fill="#A64B3C">nvme-cli 没有魔法：每个子命令 ≈ 一次填好 Admin SQE 的 ioctl——正文 §6 用约 50 行 Modern C++ 复刻 smart-log</text>
+</svg>

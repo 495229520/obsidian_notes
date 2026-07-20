@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">一个 CR 的一生：从 apply 到 finalizer</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">reconcile 不问"发生了什么"，只问"现在差什么"—— 每次调用都从头对账</text>
+
+  <!-- 创建与收敛 -->
+  <text x="64" y="126" font-size="14" font-weight="700" fill="#2B2A26">创建与收敛</text>
+
+  <rect x="70" y="142" width="260" height="64" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="200" y="168" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">用户：kubectl apply CR</text>
+  <text x="200" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle">spec: tool=fio · bs=4k · iodepth=4</text>
+
+  <rect x="400" y="142" width="260" height="64" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="530" y="168" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">watch 事件 → key 入队</text>
+  <text x="530" y="190" font-size="10.5" fill="#24473F" text-anchor="middle">队列里只有 "default/demo"（去重）</text>
+
+  <rect x="730" y="142" width="260" height="64" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="860" y="168" font-size="13" font-weight="700" fill="#7A5518" text-anchor="middle">Reconcile(key)</text>
+  <text x="860" y="190" font-size="10.5" fill="#7A5518" text-anchor="middle">读 spec 与现状，算差距，三种走向</text>
+
+  <line x1="334" y1="174" x2="396" y2="174" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="664" y1="174" x2="726" y2="174" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <line x1="240" y1="210" x2="212" y2="266" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="800" y1="210" x2="620" y2="266" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="920" y1="210" x2="984" y2="266" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="70" y="270" width="340" height="84" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="90" y="296" font-size="12.5" font-weight="700" fill="#24473F">差：子资源还不存在</text>
+  <text x="90" y="318" font-size="11" fill="#24473F">创建 fio Job（挂 ownerReference）</text>
+  <text x="90" y="338" font-size="11" fill="#24473F">更新 status.phase = Running</text>
+
+  <rect x="450" y="270" width="340" height="84" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="470" y="296" font-size="12.5" font-weight="700" fill="#4A3F68">等：Job 还在跑</text>
+  <text x="470" y="318" font-size="11" fill="#4A3F68">requeueAfter(30s) 后再来对账</text>
+  <text x="470" y="338" font-size="11" fill="#4A3F68">绝不 sleep 占住 worker（事件循环纪律）</text>
+
+  <rect x="830" y="270" width="360" height="84" rx="8" fill="#E9EFDA" stroke="#6A7F3F" stroke-width="1.5"/>
+  <text x="850" y="296" font-size="12.5" font-weight="700" fill="#48562B">齐：Job 已完成</text>
+  <text x="850" y="318" font-size="11" fill="#48562B">解析结果写 status.iops（带 resourceVersion）</text>
+  <text x="850" y="338" font-size="11" fill="#48562B">409 Conflict → 重读重试（CAS 循环）</text>
+
+  <path d="M390,266 C400,238 412,228 430,214" fill="none" stroke="#2F6B5E" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrt)"/>
+  <text x="70" y="392" font-size="10.5" fill="#2F6B5E">任何写回都会产生新的 watch 事件 → key 再次入队，循环直到"无差可收"（图中示意一条回环，三种走向同理）</text>
+
+  <!-- 删除 -->
+  <line x1="64" y1="450" x2="1190" y2="450" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="64" y="484" font-size="14" font-weight="700" fill="#2B2A26">删除：finalizer 的两阶段</text>
+
+  <rect x="70" y="500" width="260" height="64" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="200" y="526" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">kubectl delete CR</text>
+  <text x="200" y="548" font-size="10.5" fill="#2C4460" text-anchor="middle">只是打上 deletionTimestamp</text>
+
+  <rect x="400" y="500" width="260" height="64" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="530" y="526" font-size="13" font-weight="700" fill="#7A5518" text-anchor="middle">对象并未消失</text>
+  <text x="530" y="548" font-size="10.5" fill="#7A5518" text-anchor="middle">finalizer 在 = 自定义 deleter 还没跑</text>
+
+  <rect x="730" y="500" width="260" height="64" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="860" y="526" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">Reconcile：清理外部资源</text>
+  <text x="860" y="548" font-size="10.5" fill="#24473F" text-anchor="middle">清理完成后移除 finalizer</text>
+
+  <rect x="730" y="608" width="260" height="64" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="860" y="634" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">GC 级联删除</text>
+  <text x="860" y="656" font-size="10.5" fill="#4A3F68" text-anchor="middle">ownerReference 连坐子 Job —— 集群版 RAII</text>
+
+  <line x1="334" y1="532" x2="396" y2="532" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="664" y1="532" x2="726" y2="532" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="860" y1="568" x2="860" y2="604" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="70" y="600" width="560" height="72" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="92" y="628" font-size="12.5" font-weight="700" fill="#733428">经典卡死：对象永远 Terminating</text>
+  <text x="92" y="652" font-size="11.5" fill="#733428">控制器挂了没人移除 finalizer → 删除永不完成（定位方法见正文）</text>
+
+  <!-- 底部两卡 -->
+  <rect x="70" y="712" width="540" height="116" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="92" y="742" font-size="13" font-weight="700" fill="#2B2A26">spec / status 所有权【事实】</text>
+  <text x="92" y="768" font-size="11.5" fill="#4A473F">spec 只归用户写，status 只归控制器写；status 是子资源，</text>
+  <text x="92" y="790" font-size="11.5" fill="#4A473F">分开鉴权、分开更新 —— 缩小 409 冲突面</text>
+
+  <rect x="650" y="712" width="540" height="116" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="672" y="742" font-size="13" font-weight="700" fill="#2B2A26">乐观并发 = compare_exchange</text>
+  <text x="672" y="768" font-size="11.5" fill="#4A473F">每次 update 带上读到的 resourceVersion；不匹配 → 409 →</text>
+  <text x="672" y="790" font-size="11.5" fill="#4A473F">重读重试 —— 与 CAS 自旋循环同构（正文有代码对照）</text>
+</svg>

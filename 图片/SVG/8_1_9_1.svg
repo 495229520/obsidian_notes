@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>循环日志：head、tail、commit 与 checkpoint</title>
+  <desc>上半模拟磁盘上的循环日志区域与 home location；下半展示 commit / checkpoint / tail 推进三阶段。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">循环日志：先写可重放记录，再异步写回 home location</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">head 推进写入 · tail 之后仍有效 · commit 后可恢复 · checkpoint 后才能安全回收</text>
+
+  <!-- ========== 磁盘布局模拟 ========== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">磁盘布局示意 · Journal 区域 vs Home location</text>
+
+  <rect x="48" y="128" width="1144" height="300" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.4"/>
+
+  <!-- Journal ring as linear strip with wrap annotation -->
+  <text x="72" y="160" font-size="13" font-weight="700" fill="#2C4460">Journal / Log 区（循环）</text>
+  <text x="280" y="160" font-size="11" fill="#6B675C">有限空间 · head 不能越过仍有效的 tail</text>
+
+  <!-- log strip background -->
+  <rect x="72" y="180" width="1096" height="72" rx="8" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+
+  <!-- reclaimed / free -->
+  <rect x="80" y="188" width="140" height="56" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="150" y="214" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">可复用</text>
+  <text x="150" y="232" font-size="10" fill="#6B675C" text-anchor="middle">tail 已越过</text>
+
+  <!-- active log records -->
+  <rect x="228" y="188" width="110" height="56" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="283" y="214" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Tx N-2</text>
+  <text x="283" y="232" font-size="10" fill="#2F6B5E" text-anchor="middle">committed</text>
+
+  <rect x="346" y="188" width="110" height="56" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="401" y="214" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Tx N-1</text>
+  <text x="401" y="232" font-size="10" fill="#2F6B5E" text-anchor="middle">committed</text>
+
+  <rect x="464" y="188" width="130" height="56" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="529" y="214" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Tx N</text>
+  <text x="529" y="232" font-size="10" fill="#3D5A80" text-anchor="middle">writing…</text>
+
+  <rect x="602" y="188" width="220" height="56" rx="5" fill="#FBFBF6" stroke="#9B968A" stroke-width="1.1" stroke-dasharray="5 4"/>
+  <text x="712" y="222" font-size="12" fill="#6B675C" text-anchor="middle">空闲槽位（尚未写入）</text>
+
+  <rect x="830" y="188" width="160" height="56" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="910" y="214" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">钉住 tail 的项</text>
+  <text x="910" y="232" font-size="10" fill="#8A6A3A" text-anchor="middle">未 checkpoint</text>
+
+  <rect x="998" y="188" width="160" height="56" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="1078" y="222" font-size="12" fill="#6B675C" text-anchor="middle">wrap → 接回左侧</text>
+
+  <!-- tail / head markers -->
+  <path d="M228,268 L228,252" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrg)"/>
+  <text x="228" y="288" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">tail</text>
+  <text x="228" y="304" font-size="10" fill="#2F6B5E" text-anchor="middle">仍可能被恢复依赖</text>
+
+  <path d="M594,268 L594,252" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrb)"/>
+  <text x="594" y="288" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">head</text>
+  <text x="594" y="304" font-size="10" fill="#3D5A80" text-anchor="middle">下一批写入位置</text>
+
+  <path d="M830,268 L830,252" stroke="#8A6A3A" stroke-width="2" marker-end="url(#arra)"/>
+  <text x="910" y="288" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">最老未写回 → 钉住 tail</text>
+
+  <!-- Home location -->
+  <text x="72" y="340" font-size="13" font-weight="700" fill="#4A473F">Home location（正式位置）</text>
+  <rect x="72" y="354" width="200" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="172" y="376" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">inode / 目录</text>
+  <text x="172" y="394" font-size="10" fill="#3D5A80" text-anchor="middle">元数据正式块</text>
+
+  <rect x="292" y="354" width="200" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="392" y="376" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">位图 / extent</text>
+  <text x="392" y="394" font-size="10" fill="#2F6B5E" text-anchor="middle">分配结构</text>
+
+  <rect x="512" y="354" width="200" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="612" y="376" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">文件数据块</text>
+  <text x="612" y="394" font-size="10" fill="#8A6A3A" text-anchor="middle">通常不进元数据日志</text>
+
+  <rect x="732" y="354" width="388" height="52" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="926" y="376" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">写前顺序：日志可重放信息 → commit 标记 → 才可依赖异步 checkpoint</text>
+  <text x="926" y="394" font-size="10" fill="#A64B3C" text-anchor="middle">覆盖正式位置之前，恢复线索必须先在 journal 里</text>
+
+  <!-- ========== 三阶段 ========== -->
+  <text x="48" y="468" font-size="13" font-weight="700" fill="#4A473F">三阶段：commit ≠ checkpoint ≠ tail 推进</text>
+
+  <!-- stage 1 -->
+  <rect x="48" y="486" width="360" height="200" rx="10" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.5"/>
+  <rect x="48" y="486" width="360" height="36" rx="10" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <rect x="48" y="510" width="360" height="12" fill="#E3EAF4"/>
+  <text x="68" y="510" font-size="13" font-weight="700" fill="#2C4460">① Commit · 写到日志区</text>
+
+  <rect x="72" y="540" width="312" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="228" y="563" font-size="12" fill="#2C4460" text-anchor="middle">descriptor + payload + commit block</text>
+
+  <text x="72" y="602" font-size="12" fill="#4A473F">· 宣告事务完整，崩溃后可重放</text>
+  <text x="72" y="624" font-size="12" fill="#4A473F">· 未见有效 commit → 不当完整事务</text>
+  <text x="72" y="646" font-size="12" fill="#4A473F">· home location 可能仍是旧状态</text>
+  <text x="72" y="668" font-size="11" font-weight="700" fill="#3D5A80">fsync 常推动到此持久化点</text>
+
+  <!-- stage 2 -->
+  <rect x="440" y="486" width="360" height="200" rx="10" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+  <rect x="440" y="486" width="360" height="36" rx="10" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <rect x="440" y="510" width="360" height="12" fill="#DCE9E3"/>
+  <text x="460" y="510" font-size="13" font-weight="700" fill="#24473F">② Checkpoint · 写回正式位置</text>
+
+  <rect x="464" y="540" width="312" height="36" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="620" y="563" font-size="12" fill="#24473F" text-anchor="middle">元数据 → inode / 位图 / 目录块…</text>
+
+  <text x="464" y="602" font-size="12" fill="#4A473F">· 正常路径不再依赖旧日志副本</text>
+  <text x="464" y="624" font-size="12" fill="#4A473F">· 可与 commit 异步、可分批进行</text>
+  <text x="464" y="646" font-size="12" fill="#4A473F">· 进行到一半崩溃 → 仍靠日志 redo</text>
+  <text x="464" y="668" font-size="11" font-weight="700" fill="#2F6B5E">不必等全部 checkpoint 才返回 fsync</text>
+
+  <!-- stage 3 -->
+  <rect x="832" y="486" width="360" height="200" rx="10" fill="#FBFBF6" stroke="#8A6A3A" stroke-width="1.5"/>
+  <rect x="832" y="486" width="360" height="36" rx="10" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <rect x="832" y="510" width="360" height="12" fill="#EFE7DA"/>
+  <text x="852" y="510" font-size="13" font-weight="700" fill="#6B4E28">③ Tail 推进 · 回收循环空间</text>
+
+  <rect x="856" y="540" width="312" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="1012" y="563" font-size="12" fill="#6B4E28" text-anchor="middle">最老依赖解除后推进 tail</text>
+
+  <text x="856" y="602" font-size="12" fill="#4A473F">· 只有不再被恢复依赖才可复用</text>
+  <text x="856" y="624" font-size="12" fill="#4A473F">· 某个长期未写回对象可钉住 tail</text>
+  <text x="856" y="646" font-size="12" fill="#4A473F">· 日志满 → 前台可能被迫等待</text>
+  <text x="856" y="668" font-size="11" font-weight="700" fill="#8A6A3A">压力 = 写入量 + 最老写回延迟</text>
+
+  <!-- arrows between stages -->
+  <path d="M408,586 L436,586" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <path d="M800,586 L828,586" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- bottom bar -->
+  <rect x="48" y="710" width="1144" height="118" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="72" y="742" font-size="13" font-weight="700" fill="#4A473F">判断准则</text>
+  <text x="72" y="770" font-size="12.5" fill="#2B2A26">commit 前：不能把事务当作可恢复的完整更新</text>
+  <text x="72" y="794" font-size="12.5" fill="#2B2A26">commit 后、checkpoint 前：正式位置可能仍旧，但日志足以恢复（redo）</text>
+  <text x="72" y="818" font-size="12.5" fill="#2B2A26">checkpoint 后：正式位置已含修改；tail 推进后，旧日志空间才可安全复用</text>
+</svg>

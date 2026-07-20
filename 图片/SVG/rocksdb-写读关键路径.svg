@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       等待/成本 #A64B3C；零成本/内存 #2F6B5E；与本库既有 lsm-/nvmeof-*.svg 同一套 -->
+  <title>RocksDB 写读关键路径</title>
+  <desc>左列写路径六步（唯一盘上等待点在 WAL fdatasync，含 write stall 背压回环），右列读路径六步（探测序列与 bloom、两级缓存），底部为 Version/MANIFEST 的文件集 MVCC。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">RocksDB 关键路径：一笔 Put 与一笔 Get 的完整旅程</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">前台路径跑在你的业务线程里；写路径只有 WAL 一步碰盘，读路径的单价由 bloom 与两级缓存决定</text>
+
+  <!-- 写路径泳道 -->
+  <rect x="48" y="104" width="560" height="612" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="328" y="132" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">写路径：六步只有一步碰盘</text>
+
+  <rect x="84" y="156" width="488" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="172" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">① 构造 WriteBatch（原子性单位）</text>
+  <text x="328" y="192" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">纯内存序列化</text>
+  <path d="M328,204 L328,218" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="84" y="220" width="488" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="238" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">② write group：leader 合并 N 个线程的 batch</text>
+  <text x="328" y="262" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">6.2 组提交的工业实现 · follower 原地等待</text>
+  <path d="M328,280 L328,294" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="84" y="296" width="488" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="314" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">③ WAL 顺序追加 + 可选 fdatasync</text>
+  <text x="328" y="336" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">唯一盘上等待点 · sync 三档 = 三种崩溃丢失窗口</text>
+  <path d="M328,360 L328,374" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="84" y="376" width="488" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="392" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">④ memtable 并发跳表插入（key + seq）</text>
+  <text x="328" y="412" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">纯内存 · 组内可并行</text>
+  <path d="M328,424 L328,438" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="84" y="440" width="488" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="458" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">⑤ leader 唤醒 followers → 各自返回</text>
+  <text x="328" y="480" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">此刻数据在 WAL（可能仅页缓存）+ memtable</text>
+
+  <path d="M84,520 L572,520" stroke="#8A8574" stroke-width="1" stroke-dasharray="6 4"/>
+  <text x="328" y="534" font-size="10.5" fill="#6B675C" text-anchor="middle" dominant-baseline="central">—— 前台到此为止，以下是后台线程 ——</text>
+
+  <rect x="84" y="552" width="488" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="328" y="570" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">⑥ 满 64 MiB → 冻结 immutable → flush 成 L0 SST</text>
+  <text x="328" y="592" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">提交新 Version · 作废旧 WAL</text>
+  <text x="328" y="612" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">compaction 线程池逐层下沉（6.6 的账本）</text>
+
+  <path d="M84,588 L64,588 L64,250 L80,250" fill="none" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrr)"/>
+  <rect x="90" y="640" width="476" height="56" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="328" y="658" font-size="11.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">write stall 背压（红色回环）：L0 达 20 减速 / 36 停写</text>
+  <text x="328" y="680" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">immutable 攒多 / 欠账字节超限同理 · 指纹：写延迟突跳且与数据量无关</text>
+
+  <!-- 读路径泳道 -->
+  <rect x="632" y="104" width="560" height="612" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="912" y="132" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">读路径：新 → 旧探测序列</text>
+
+  <rect x="668" y="156" width="488" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="172" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">① 取 current Version（引用计数 +1）</text>
+  <text x="912" y="194" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">无锁拿到一致文件集 · 与 flush/compaction 互不干扰</text>
+  <path d="M912,208 L912,222" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="668" y="224" width="488" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="240" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">② memtable → immutable memtable</text>
+  <text x="912" y="260" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">纯内存跳表查找</text>
+  <path d="M912,272 L912,286" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="668" y="288" width="488" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="306" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">③ L0 逐文件探测（key 范围重叠，跳不过）</text>
+  <text x="912" y="328" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">L0 文件数直接加进读放大——最值得盯的指标</text>
+  <path d="M912,344 L912,358" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="668" y="360" width="488" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="376" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">④ L1 及以下：每层二分定位至多一个文件</text>
+  <text x="912" y="396" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">层内有序不重叠</text>
+  <path d="M912,408 L912,422" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="668" y="424" width="488" height="84" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="442" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">⑤ 文件内三道闸</text>
+  <text x="912" y="464" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">bloom filter（内存，~1% 假阳）→ block cache（解压块）</text>
+  <text x="912" y="484" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">miss → pread：先页缓存（压缩块）再到盘</text>
+  <text x="912" y="500" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">两级缓存内存要合并核算</text>
+  <path d="M912,508 L912,522" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="668" y="524" width="488" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="912" y="540" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">⑥ 按 seq 与快照判可见性 · 墓碑 = NotFound</text>
+  <text x="912" y="560" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">扫描则是每层一个游标的多路归并 + 逐 key 跳墓碑</text>
+
+  <rect x="668" y="600" width="488" height="96" rx="7" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="912" y="620" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">读的单价公式</text>
+  <text x="912" y="644" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">探测次数（②③④ 决定）× 未命中率（⑤ 决定）</text>
+  <text x="912" y="666" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">同一个读放大，缓存冷热能差两个数量级</text>
+  <text x="912" y="684" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">（1.2 页缓存 · 6.6 读放大）</text>
+
+  <!-- Version / MANIFEST -->
+  <rect x="48" y="744" width="1144" height="96" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="70" y="768" font-size="12.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">Version / MANIFEST：文件集的 MVCC——两条路径能无锁并存的原因</text>
+  <text x="70" y="792" font-size="11" fill="#4A473F" dominant-baseline="central">· SST 不可变 → 「数据库当前状态」= 不可变文件清单（Version）；flush/compaction 完成 = 构造新清单 + 原子替换 current 指针 + 引用计数（≈ shared_ptr 快照交换）</text>
+  <text x="70" y="816" font-size="11" fill="#4A473F" dominant-baseline="central">· 快照 / 迭代器钉住旧 Version：持有多久，旧文件就多久删不掉 · MANIFEST 记录清单变更，本身就是一份元数据 WAL</text>
+</svg>

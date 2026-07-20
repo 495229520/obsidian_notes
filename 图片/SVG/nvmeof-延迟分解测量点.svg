@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 940" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；分段框 #E3EAF4/#3D5A80；观测点分色（紫/琥珀/蓝/绿）；
+       军规警示 #A64B3C；与本库既有 nvmeof-*.svg 同一套 -->
+  <title>NVMe-oF 延迟分解：五个观测点与差分链</title>
+  <desc>端到端六段路径 T1–T6，五层观测点各自覆盖的区间，差分链公式，以及示例量级的分段瀑布与两条统计军规。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="940" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">延迟分解：段的边界跟着可测量的工具走</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">每个工具天然定义一个测量区间；跨机的段不直接测，用同一时钟域内的差分夹逼出来</text>
+
+  <!-- 六段路径 -->
+  <rect x="48" y="120" width="174" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="135" y="142" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">T1 host 排队</text>
+  <text x="135" y="166" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">块层 + fabrics 提交</text>
+  <path d="M222,152 L238,152" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="242" y="120" width="174" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="329" y="142" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">T2 host 发送</text>
+  <text x="329" y="166" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">组帧 / 协议栈 / 注册</text>
+  <path d="M416,152 L432,152" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="436" y="120" width="174" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="523" y="142" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">T3 网络去程</text>
+  <text x="523" y="166" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">~半个 RTT</text>
+  <path d="M610,152 L626,152" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="630" y="120" width="174" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="717" y="142" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">T4 target 软件</text>
+  <text x="717" y="166" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">softirq · io_work · 查表</text>
+  <path d="M804,152 L820,152" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="824" y="120" width="174" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="911" y="142" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">T5 盘服务</text>
+  <text x="911" y="166" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">最大头：几十 μs</text>
+  <path d="M998,152 L1014,152" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="1018" y="120" width="174" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1105" y="142" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">T6 回程 + 完成</text>
+  <text x="1105" y="166" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">网络回程 · 中断 · 唤醒</text>
+
+  <!-- V1 fio -->
+  <text x="52" y="234" font-size="11" font-weight="700" fill="#0F6E56" dominant-baseline="central">V1 fio --lat_percentiles：全程（应用的真实感受）</text>
+  <path d="M48,246 L48,258 M48,252 L1192,252 M1192,246 L1192,258" fill="none" stroke="#0F6E56" stroke-width="2"/>
+
+  <!-- V2 blktrace -->
+  <text x="52" y="296" font-size="11" font-weight="700" fill="#534AB7" dominant-baseline="central">V2 host 侧 blktrace / biolatency：Q→D = T1</text>
+  <text x="436" y="296" font-size="11" font-weight="700" fill="#534AB7" dominant-baseline="central">D→C = T2…T6 —— 远端设备的 D→C 里装着整条 fabric</text>
+  <path d="M48,308 L48,320 M48,314 L222,314 M222,308 L222,320" fill="none" stroke="#534AB7" stroke-width="2"/>
+  <path d="M242,308 L242,320 M242,314 L1192,314 M1192,308 L1192,320" fill="none" stroke="#534AB7" stroke-width="2"/>
+
+  <!-- V3 网络 -->
+  <text x="52" y="358" font-size="11" font-weight="700" fill="#854F0B" dominant-baseline="central">V3 网络：空载 ping RTT 基线 + 带载重传计数（两段合计 ≈ 一个 RTT）</text>
+  <path d="M436,370 L436,382 M436,376 L610,376 M610,370 L610,382" fill="none" stroke="#854F0B" stroke-width="2"/>
+  <path d="M610,376 L1018,376" fill="none" stroke="#854F0B" stroke-width="1" stroke-dasharray="2 5" opacity="0.6"/>
+  <path d="M1018,370 L1018,382 M1018,376 L1192,376 M1192,370 L1192,382" fill="none" stroke="#854F0B" stroke-width="2"/>
+
+  <!-- V4 target biolatency -->
+  <text x="52" y="420" font-size="11" font-weight="700" fill="#3D5A80" dominant-baseline="central">V4 target 侧 biolatency：后端盘 + target 本地块层（T4 下半 + T5）</text>
+  <path d="M716,432 L716,444 M716,438 L998,438 M998,432 L998,444" fill="none" stroke="#3D5A80" stroke-width="2"/>
+
+  <!-- V5 本地基线 -->
+  <text x="52" y="482" font-size="11" font-weight="700" fill="#2F6B5E" dominant-baseline="central">V5 target 本地 fio 基线：盘的独立参照（稳态口径）</text>
+  <path d="M824,494 L824,506 M824,500 L998,500 M998,494 L998,506" fill="none" stroke="#2F6B5E" stroke-width="2"/>
+
+  <!-- 差分链 -->
+  <rect x="48" y="530" width="1144" height="92" rx="8" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="70" y="552" font-size="12.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">差分链（均值口径 · 每一步都在单机时钟域内完成）：</text>
+  <text x="70" y="578" font-size="11.5" fill="#4A473F" dominant-baseline="central">host D→C（V2）−  target 盘延迟（V4）−  空载 RTT（V3）  ≈  两端 fabrics 软件开销（余项）</text>
+  <text x="70" y="602" font-size="11.5" fill="#4A473F" dominant-baseline="central">fio 全程（V1）−  host D→C（V2）  ≈  host 块层排队 + 系统调用与唤醒</text>
+
+  <!-- 示例瀑布 -->
+  <text x="48" y="652" font-size="13" font-weight="700" fill="#2B2A26" dominant-baseline="central">示例量级对账（4K randread QD1，p50）：远端全程 102 μs = 84 + 6 + 9 + 3</text>
+  <rect x="48" y="668" width="824" height="36" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="460" y="686" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">盘 + target 块层 84 μs（V4/V5 吻合 → 盘没被冤枉）</text>
+  <rect x="872" y="668" width="59" height="36" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+  <rect x="931" y="668" width="88" height="36" fill="#EEEDFE" stroke="#534AB7" stroke-width="1"/>
+  <rect x="1019" y="668" width="29" height="36" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
+
+  <path d="M901,704 L901,720" fill="none" stroke="#854F0B" stroke-width="1"/>
+  <text x="901" y="732" font-size="10.5" font-weight="700" fill="#854F0B" text-anchor="middle" dominant-baseline="central">RTT 6</text>
+  <path d="M975,704 L975,746" fill="none" stroke="#534AB7" stroke-width="1"/>
+  <text x="975" y="758" font-size="10.5" font-weight="700" fill="#534AB7" text-anchor="middle" dominant-baseline="central">fabrics 软件 9（≈ 设计目标 ~10 μs 内 → 对账闭合）</text>
+  <path d="M1033,704 L1033,770" fill="none" stroke="#0F6E56" stroke-width="1"/>
+  <text x="1033" y="782" font-size="10.5" font-weight="700" fill="#0F6E56" text-anchor="middle" dominant-baseline="central">host 排队 + 系统调用 3</text>
+
+  <!-- 军规 -->
+  <rect x="48" y="810" width="1144" height="84" rx="8" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="70" y="832" font-size="12" font-weight="700" fill="#A64B3C" dominant-baseline="central">两条统计军规</text>
+  <text x="70" y="856" font-size="11.5" fill="#4A473F" dominant-baseline="central">· 均值可加减，分位数不可以：p99(总) ≠ Σ p99(段)——长尾不同源；尾延迟归因要按同一请求打点，或逐段比较分布</text>
+  <text x="70" y="878" font-size="11.5" fill="#4A473F" dominant-baseline="central">· 跨机时间戳不可直接相减（时钟偏移即误差）——差分只在单机时钟域内做，跨机的段用同域夹逼</text>
+</svg>

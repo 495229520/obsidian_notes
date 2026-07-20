@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP 连接建立与释放动画 · 三次握手 / 四次挥手 / 状态转换图</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ---------- 生命线场景（握手 / 挥手） ---------- */
+.stage{position:relative;flex:1;}
+.actor{position:absolute;top:0;transform:translateX(-50%);font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:4px 14px;background:var(--gray);white-space:nowrap;z-index:2;}
+.actor.ca{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.actor.sa{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.lane{position:absolute;top:38px;bottom:46px;width:2px;background:var(--grid);transform:translateX(-50%);}
+.badge{position:absolute;bottom:6px;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--gray);color:var(--muted);transition:all var(--dur) var(--ease);white-space:nowrap;z-index:2;}
+.badge.stb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.badge.sts{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.badge.stg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.badge.std{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.msg{position:absolute;transform:translate(-50%,-50%);font-family:var(--mono);font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:8px;border:1.5px solid;opacity:0;white-space:nowrap;z-index:3;
+  transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity .38s var(--ease),box-shadow .38s var(--ease);}
+.msg.mc{color:var(--blue);background:var(--bluebg);border-color:var(--blue);}
+.msg.ms{color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.msg.md{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.msg.fly{opacity:1;box-shadow:0 5px 14px rgba(62,61,57,.18);}
+.msg.hist{opacity:.35;}
+.msl{position:absolute;left:22%;bottom:38px;width:172px;transform:translateX(-50%);opacity:0;transition:opacity .4s var(--ease);z-index:2;text-align:center;}
+.msl.show{opacity:1;}
+.msl .mlbl{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--danger);margin-bottom:4px;white-space:nowrap;}
+.msl .track{height:8px;border:1px solid var(--danger);border-radius:999px;background:var(--dangerbg);overflow:hidden;}
+.msl .fill{height:100%;width:0;background:var(--danger);border-radius:999px;transition:width 1.4s var(--ease);}
+
+/* ---------- 状态转换图场景 ---------- */
+.sg{position:relative;flex:1;min-height:470px;}
+.sg svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:1;}
+.node{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:11.5px;font-weight:700;padding:6px 11px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--muted);white-space:nowrap;z-index:2;transition:all var(--dur) var(--ease);}
+.node.done{opacity:.78;}
+.node.done.b{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.node.done.s{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.node.done.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.node.cur{transform:translateX(-50%) scale(1.08);z-index:3;}
+.node.cur.b{color:var(--blue);border-color:var(--blue);background:var(--bluebg);box-shadow:0 0 0 3px rgba(24,95,165,.2);}
+.node.cur.s{color:var(--brown);border-color:var(--brown);background:var(--brownbg);box-shadow:0 0 0 3px rgba(154,91,14,.2);}
+.node.cur.g{color:var(--green);border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 3px rgba(15,110,86,.2);}
+.node.cur.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);box-shadow:0 0 0 3px rgba(179,64,47,.2);}
+.sg svg path.edge{fill:none;stroke-width:2;opacity:.1;transition:opacity .35s var(--ease),stroke-width .35s var(--ease);}
+.sg svg path.edge.dim{opacity:.05;}
+.sg svg path.edge.done{opacity:.35;}
+.sg svg path.edge.on{opacity:1;stroke-width:3;}
+.sg svg .ah{stroke:none;opacity:.1;transition:opacity .3s var(--ease);}
+.sg svg .ah.dim{opacity:.05;}
+.sg svg .ah.done{opacity:.35;}
+.sg svg .ah.on{opacity:1;transition-delay:200ms;}
+.sg svg .elbl{font-family:var(--mono);font-size:10px;font-weight:700;opacity:0;transition:opacity .3s var(--ease);paint-order:stroke;stroke:var(--panel);stroke-width:3.5px;}
+.sg svg .elbl.on{opacity:1;transition-delay:150ms;}
+
+/* ---------- 右侧 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12.5px;line-height:1.55;color:#D8D5CC;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.codebox .cl{white-space:pre;padding:2px 16px;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.cl.hl-c{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.cl.hl-s{background:rgba(196,134,44,.5);box-shadow:inset 4px 0 0 #E8C088;color:#F7F4EA;}
+.cl.hl-g{background:rgba(26,142,110,.5);box-shadow:inset 4px 0 0 #7FD8BC;color:#F7F4EA;}
+.cl.hl-c .cmt,.cl.hl-s .cmt,.cl.hl-g .cmt{color:#CCC8BA;}
+.cl.hl-c .kw,.cl.hl-s .kw,.cl.hl-g .kw{color:#F2D9A6;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TCP 连接建立与释放动画 · 三次握手 / 四次挥手 / 状态转换图</h1>
+    <p>对应笔记《7.5 TCP协议基础》　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+function byId(id){return document.getElementById(id);}
+function hlCode(map){
+  const lines=document.querySelectorAll('#codeBox .cl');
+  lines.forEach((ln,i)=>{ln.className='cl'+(map&&map[i]?' hl-'+map[i]:'');});
+}
+function setBadge(id,txt,cls){const b=byId(id);b.textContent=txt;b.className='badge'+(cls?' '+cls:'');}
+/* 生命线布局：chips 只在 mount 建一次，paint 只改 left/top/className */
+function lifelineMount(cfg){
+  const chipsHtml=cfg.chips.map(c=>'<div class="msg '+c.cls+'" id="'+c.id+'">'+c.text+'</div>').join('');
+  viz.innerHTML='<div class="vcap">'+cfg.cap+'</div>'+
+    '<div class="stage" style="min-height:'+cfg.h+'px">'+
+      '<div class="actor ca" style="left:22%">'+cfg.la+'</div>'+
+      '<div class="actor sa" style="left:78%">'+cfg.ra+'</div>'+
+      '<div class="lane" style="left:22%"></div><div class="lane" style="left:78%"></div>'+
+      chipsHtml+(cfg.extra||'')+
+      '<div class="badge" id="'+cfg.pfx+'-bc" style="left:22%"></div>'+
+      '<div class="badge" id="'+cfg.pfx+'-bs" style="left:78%"></div>'+
+    '</div>';
+}
+function paintChips(chips,states){
+  chips.forEach((c,i)=>{
+    const st=states[i]||'src';
+    const e=byId(c.id);
+    e.style.left=(st==='src'?c.sx:c.dx)+'%';
+    e.style.top=(st==='src'?c.sy:c.dy)+'px';
+    e.className='msg '+c.cls+(st==='fly'?' fly':(st==='hist'?' hist':''));
+  });
+}
+
+/* ========== 场景 1：三次握手 ========== */
+const hsScene=(()=>{
+  const chips=[
+    {id:'hs-m1',cls:'mc',text:'SYN seq=x ▸',sx:22,dx:78,sy:96,dy:132},
+    {id:'hs-m2',cls:'ms',text:'◂ SYN+ACK seq=y, ack=x+1',sx:78,dx:22,sy:170,dy:206},
+    {id:'hs-m3',cls:'mc',text:'ACK ack=y+1 ▸',sx:22,dx:78,sy:244,dy:280}
+  ];
+  const codeLines=[
+    '<span class="cmt">/* 服务器（被动打开） */</span>',
+    '<span class="kw">socket</span>();               <span class="cmt">// 创建监听套接字</span>',
+    '<span class="kw">bind</span>();                 <span class="cmt">// 绑定 IP:端口</span>',
+    '<span class="kw">listen</span>();               <span class="cmt">// 进入 LISTEN</span>',
+    '<span class="kw">accept</span>();               <span class="cmt">// 握手完成后返回连接</span>',
+    ' ',
+    '<span class="cmt">/* 客户端（主动打开） */</span>',
+    '<span class="kw">socket</span>();               <span class="cmt">// 创建套接字</span>',
+    '<span class="kw">connect</span>();              <span class="cmt">// 发起三次握手</span>'
+  ];
+  const steps=[
+    {title:'步骤 0 · 初始:服务器 bind+listen 进入 LISTEN',chip:'被动打开',chipC:'c0',
+     msgs:['src','src','src'],bc:['CLOSED',''],bs:['LISTEN','sts'],hl:{3:'s'},
+     desc:'服务器依次调用 <code>socket() → bind() → listen()</code>，<b>被动打开</b>进入 <span class="br">LISTEN</span>，等待连接请求；客户端此时还是 CLOSED。三次握手的目标：<b>双方各自确认"我能发、我能收"</b>，并交换初始序列号（ISN）。'},
+    {title:'步骤 1 · 客户端发 SYN(seq=x)，进入 SYN_SENT',chip:'第一次握手',chipC:'cb',
+     msgs:['fly','src','src'],bc:['SYN_SENT','stb'],bs:['LISTEN','sts'],hl:{8:'c'},
+     desc:'客户端调用 <code>connect()</code>，内核发出 <b>SYN 报文（seq=x）</b>，进入 <span class="bl">SYN_SENT</span>。x 是客户端的初始序列号（ISN）；SYN 不携带应用数据，但要<b>消耗一个序号</b>。'},
+    {title:'步骤 2 · 服务器收到 SYN，进入 SYN_RCVD',chip:'半连接',chipC:'ch',
+     msgs:['hist','src','src'],bc:['SYN_SENT','stb'],bs:['SYN_RCVD','sts'],hl:{3:'s'},
+     desc:'服务器收到 SYN，进入 <span class="br">SYN_RCVD</span>，把这个连接放入<b>半连接队列</b>。此刻服务器已经确认：<b>客户端能发、自己能收</b>。'},
+    {title:'步骤 3 · 服务器回 SYN+ACK(seq=y, ack=x+1)',chip:'第二次握手',chipC:'ch',
+     msgs:['hist','fly','src'],bc:['SYN_SENT','stb'],bs:['SYN_RCVD','sts'],hl:{3:'s'},
+     desc:'服务器回 <b>SYN+ACK（seq=y, ack=x+1）</b>，一个报文同时做两件事：<b>ack=x+1</b> 确认客户端的 SYN；<b>seq=y</b> 同步服务器自己的初始序列号。这正是"确认 + 同步"合并成一次的原因。'},
+    {title:'步骤 4 · 客户端收到 SYN+ACK，进入 ESTABLISHED',chip:'connect 返回',chipC:'cb',
+     msgs:['hist','hist','src'],bc:['ESTABLISHED','stg'],bs:['SYN_RCVD','sts'],hl:{8:'c'},
+     desc:'客户端收到 SYN+ACK，确认了"<b>自己能发也能收、对方能发也能收</b>"，进入 <span class="gr">ESTABLISHED</span>，<code>connect()</code> 返回。'},
+    {title:'步骤 5 · 客户端回 ACK(ack=y+1)，服务器进入 ESTABLISHED',chip:'第三次握手',chipC:'cg',
+     msgs:['hist','hist','fly'],bc:['ESTABLISHED','stg'],bs:['ESTABLISHED','stg'],hl:{4:'s'},
+     desc:'客户端回 <b>ACK（ack=y+1）</b>。服务器收到后进入 <span class="gr">ESTABLISHED</span>，连接从半连接队列移入<b>全连接队列</b>，<code>accept()</code> 取出并返回。双方可以开始传输数据。'},
+    {title:'步骤 6 · 总结:为什么必须三次',chip:'两次不够',chipC:'cd',
+     msgs:['hist','hist','hist'],bc:['ESTABLISHED','stg'],bs:['ESTABLISHED','stg'],hl:{4:'s',8:'c'},
+     desc:'三次各有使命：<b>第一次</b>证明客户端能发；<b>第二次</b>证明服务器能收、能发；<b>第三次</b>证明客户端能收。若只有两次握手，一个<span class="dg">迟到的旧 SYN</span> 到达服务器时，服务器会直接认为连接已建立，凭空建出一条<b>无效连接</b>浪费资源——第三次 ACK 正是客户端"我真的还要连"的最终确认。'}
+  ];
+  function mount(){
+    lifelineMount({pfx:'hs',h:360,la:'客户端',ra:'服务器',chips:chips,
+      cap:'<b>三次握手</b>:SYN → SYN+ACK → ACK，确认双向收发能力并同步序列号'});
+  }
+  function paint(s){
+    paintChips(chips,s.msgs);
+    setBadge('hs-bc',s.bc[0],s.bc[1]);
+    setBadge('hs-bs',s.bs[0],s.bs[1]);
+    hlCode(s.hl);
+  }
+  return {id:'handshake',label:'三次握手',sub:'SYN → SYN+ACK → ACK',steps,mount,paint,codeLines};
+})();
+
+/* ========== 场景 2：四次挥手 ========== */
+const wvScene=(()=>{
+  const chips=[
+    {id:'wv-m1',cls:'mc',text:'FIN seq=u ▸',sx:22,dx:78,sy:88,dy:120},
+    {id:'wv-m2',cls:'ms',text:'◂ ACK ack=u+1',sx:78,dx:22,sy:150,dy:182},
+    {id:'wv-m3',cls:'md',text:'◂ 剩余数据 data',sx:78,dx:22,sy:212,dy:244},
+    {id:'wv-m4',cls:'ms',text:'◂ FIN seq=w',sx:78,dx:22,sy:274,dy:306},
+    {id:'wv-m5',cls:'mc',text:'ACK ack=w+1 ▸',sx:22,dx:78,sy:336,dy:368}
+  ];
+  const codeLines=[
+    '<span class="cmt">/* 主动关闭方（客户端） */</span>',
+    '<span class="kw">close</span>(fd);             <span class="cmt">// 发 FIN → FIN_WAIT_1</span>',
+    ' ',
+    '<span class="cmt">/* 被动关闭方（服务器） */</span>',
+    '<span class="kw">read</span>() == 0            <span class="cmt">// 读到 0 = 收到 FIN</span>',
+    '<span class="kw">write</span>(cfd, rest, n);   <span class="cmt">// 半关闭:仍可发数据</span>',
+    '<span class="kw">close</span>(cfd);            <span class="cmt">// 发 FIN → LAST_ACK</span>'
+  ];
+  const steps=[
+    {title:'步骤 0 · 初始:双方 ESTABLISHED，客户端准备主动关闭',chip:'全双工',chipC:'c0',
+     msgs:['src','src','src','src','src'],bc:['ESTABLISHED','stg'],bs:['ESTABLISHED','stg'],hl:{},
+     desc:'TCP 是<b>全双工</b>的：FIN 只表示"<b>我没有数据要发了</b>"，并不影响接收。因此两个传输方向要<b>各自关闭一次</b>，一来一回共四次挥手。这里由客户端（主动方）先关。'},
+    {title:'步骤 1 · 客户端发 FIN(seq=u)，进入 FIN_WAIT_1',chip:'第一次挥手',chipC:'cb',
+     msgs:['fly','src','src','src','src'],bc:['FIN_WAIT_1','stb'],bs:['ESTABLISHED','stg'],hl:{1:'c'},
+     desc:'客户端调用 <code>close()</code>，发出 <b>FIN（seq=u）</b>，进入 <span class="bl">FIN_WAIT_1</span>，等待对方确认。'},
+    {title:'步骤 2 · 服务器回 ACK(ack=u+1) 进 CLOSE_WAIT，客户端进 FIN_WAIT_2',chip:'第二次挥手',chipC:'ch',
+     msgs:['hist','fly','src','src','src'],bc:['FIN_WAIT_2','stb'],bs:['CLOSE_WAIT','sts'],hl:{4:'s'},
+     desc:'服务器收到 FIN，立即回 <b>ACK（ack=u+1）</b>，进入 <span class="br">CLOSE_WAIT</span>——客户端方向的数据流结束，服务器的 <code>read()</code> 返回 0。客户端收到这个 ACK 后进入 <span class="bl">FIN_WAIT_2</span>。'},
+    {title:'步骤 3 · 半关闭:服务器仍可发送剩余数据',chip:'半关闭',chipC:'ch',
+     msgs:['hist','hist','fly','src','src'],bc:['FIN_WAIT_2','stb'],bs:['CLOSE_WAIT','sts'],hl:{5:'s'},
+     desc:'<b>半关闭</b>：FIN 只关闭了<b>客户端 → 服务器</b>这个发送方向；服务器 → 客户端方向仍然畅通，服务器可以把<b>剩余数据</b>继续发完，客户端也必须继续接收。这就是第二、三次挥手<b>不能合并</b>的原因（对比握手里 SYN+ACK 可以合并）。'},
+    {title:'步骤 4 · 服务器发 FIN(seq=w)，进入 LAST_ACK',chip:'第三次挥手',chipC:'ch',
+     msgs:['hist','hist','hist','fly','src'],bc:['FIN_WAIT_2','stb'],bs:['LAST_ACK','sts'],hl:{6:'s'},
+     desc:'服务器数据发完后也调用 <code>close()</code>，发出 <b>FIN（seq=w）</b>，进入 <span class="br">LAST_ACK</span>，等待最后一个确认。'},
+    {title:'步骤 5 · 客户端回 ACK(ack=w+1)，进入 TIME_WAIT',chip:'第四次挥手',chipC:'cb',
+     msgs:['hist','hist','hist','hist','fly'],bc:['TIME_WAIT','std'],bs:['LAST_ACK','sts'],hl:{1:'c'},
+     desc:'客户端回 <b>ACK（ack=w+1）</b>，进入 <span class="dg">TIME_WAIT</span>——注意它<b>不能直接 CLOSED</b>，还要等 2MSL 才能真正释放。'},
+    {title:'步骤 6 · 服务器收到 ACK，进入 CLOSED',chip:'被动方完成',chipC:'cg',
+     msgs:['hist','hist','hist','hist','hist'],bc:['TIME_WAIT','std'],bs:['CLOSED',''],hl:{6:'s'},
+     desc:'服务器收到最后的 ACK，进入 <b>CLOSED</b>，被动方释放完毕。四个报文 <b>FIN → ACK → FIN → ACK</b> 至此走完，但客户端还在 TIME_WAIT。'},
+    {title:'步骤 7 · TIME_WAIT 等待 2MSL',chip:'2MSL',chipC:'cd',
+     msgs:['hist','hist','hist','hist','hist'],bc:['TIME_WAIT','std'],bs:['CLOSED',''],msl:55,mslTxt:'TIME_WAIT · 等待 2MSL',hl:{1:'c'},
+     desc:'MSL（Maximum Segment Lifetime）是报文在网络中的最大生存时间，TIME_WAIT 要持续 <b>2MSL</b>。两个作用：① 若最后的 ACK <span class="dg">丢失</span>，服务器会重发 FIN，客户端还在场、可以<b>重发 ACK</b>；② 让本连接的<b>旧报文自然消亡</b>，不会窜进之后使用相同四元组的新连接。'},
+    {title:'步骤 8 · 2MSL 结束，客户端进入 CLOSED',chip:'连接释放',chipC:'cg',
+     msgs:['hist','hist','hist','hist','hist'],bc:['CLOSED',''],bs:['CLOSED',''],msl:100,mslTxt:'2MSL 结束',hl:{1:'c'},
+     desc:'2MSL 计时结束，客户端进入 <b>CLOSED</b>，连接彻底释放。TIME_WAIT 在高并发服务器上的代价与优化，见笔记《10.2 TIME_WAIT状态》。'}
+  ];
+  function mount(){
+    lifelineMount({pfx:'wv',h:474,la:'客户端（主动方）',ra:'服务器（被动方）',chips:chips,
+      cap:'<b>四次挥手</b>:FIN → ACK → FIN → ACK，两个方向分别关闭',
+      extra:'<div class="msl" id="mslBox"><div class="mlbl" id="mslLbl">TIME_WAIT · 等待 2MSL</div><div class="track"><div class="fill" id="mslFill"></div></div></div>'});
+  }
+  function paint(s){
+    paintChips(chips,s.msgs);
+    setBadge('wv-bc',s.bc[0],s.bc[1]);
+    setBadge('wv-bs',s.bs[0],s.bs[1]);
+    byId('mslBox').className='msl'+(s.msl!=null?' show':'');
+    byId('mslFill').style.width=(s.msl||0)+'%';
+    byId('mslLbl').textContent=s.mslTxt||'TIME_WAIT · 等待 2MSL';
+    hlCode(s.hl);
+  }
+  return {id:'wave',label:'四次挥手',sub:'FIN → ACK → FIN → ACK',steps,mount,paint,codeLines};
+})();
+
+/* ========== 场景 3：状态转换图 ========== */
+const stScene=(()=>{
+  const NODES={
+    CLOSED:{x:50,y:1},
+    SYN_SENT:{x:18,y:19},LISTEN:{x:82,y:19},
+    ESTABLISHED:{x:50,y:37},SYN_RCVD:{x:82,y:37},
+    FIN_WAIT_1:{x:18,y:56},CLOSE_WAIT:{x:82,y:56},
+    FIN_WAIT_2:{x:18,y:75},CLOSING:{x:45,y:75},LAST_ACK:{x:82,y:75},
+    TIME_WAIT:{x:18,y:92}
+  };
+  const COL={blue:'var(--blue)',brown:'var(--brown)',danger:'var(--danger)'};
+  const EDGES=[
+    {id:'e1',a:'CLOSED',b:'SYN_SENT',m:'h',o1:5,o2:-5,c:'blue',lbl:'主动打开 / 发 SYN'},
+    {id:'e2',a:'CLOSED',b:'LISTEN',m:'h',o1:5,o2:0,c:'brown',lbl:'被动打开 bind+listen'},
+    {id:'e3',a:'LISTEN',b:'SYN_RCVD',m:'v',o1:0,o2:0,c:'brown',lbl:'收到 SYN / 发 SYN+ACK'},
+    {id:'e4',a:'SYN_SENT',b:'ESTABLISHED',m:'h',o1:5,o2:-7,c:'blue',lbl:'收到 SYN+ACK / 发 ACK'},
+    {id:'e5',a:'SYN_RCVD',b:'ESTABLISHED',m:'h',o1:0,o2:-7,c:'brown',lbl:'收到 ACK'},
+    {id:'e6',a:'ESTABLISHED',b:'FIN_WAIT_1',m:'h',o1:7,o2:-6,c:'blue',lbl:'主动关闭 / 发 FIN'},
+    {id:'e7',a:'ESTABLISHED',b:'CLOSE_WAIT',m:'h',o1:7,o2:0,c:'brown',lbl:'收到 FIN / 发 ACK'},
+    {id:'e8',a:'FIN_WAIT_1',b:'FIN_WAIT_2',m:'v',o1:0,o2:0,c:'blue',lbl:'收到 ACK'},
+    {id:'e9',a:'FIN_WAIT_1',b:'CLOSING',m:'h',o1:6,o2:0,c:'danger',lbl:'收到 FIN / 发 ACK'},
+    {id:'e10',a:'FIN_WAIT_2',b:'TIME_WAIT',m:'v',o1:0,o2:0,c:'blue',lbl:'收到 FIN / 发 ACK'},
+    {id:'e11',a:'CLOSING',b:'TIME_WAIT',m:'h',o1:0,o2:0,c:'danger',lbl:'收到 ACK'},
+    {id:'e12',a:'CLOSE_WAIT',b:'LAST_ACK',m:'v',o1:0,o2:0,c:'brown',lbl:'应用 close / 发 FIN'},
+    {id:'e13',a:'LAST_ACK',b:'CLOSED',m:'bowr',o1:0,o2:-5,c:'brown',lbl:'收到 ACK'},
+    {id:'e14',a:'TIME_WAIT',b:'CLOSED',m:'bowl',o1:0,o2:-5,c:'blue',lbl:'2MSL 超时'}
+  ];
+  const codeLines=[
+    '<span class="cmt">$</span> ss -tan              <span class="cmt"># 内核 TCP 状态一览</span>',
+    'State       Local:Port     Peer:Port',
+    'LISTEN      0.0.0.0:80     *:*',
+    'SYN-RECV    10.0.0.2:80    10.0.0.9:52033',
+    'ESTAB       10.0.0.2:80    10.0.0.9:52034',
+    'TIME-WAIT   10.0.0.9:52034 10.0.0.2:80',
+    'CLOSE-WAIT  10.0.0.2:80    10.0.0.9:52035',
+    'LAST-ACK    10.0.0.2:80    10.0.0.9:52035'
+  ];
+  const steps=[
+    {title:'步骤 0 · 总览:TCP 的 11 种状态',chip:'状态机',chipC:'c0',cur:null,curCls:'',on:[],done:[],doneN:{},hl:{},
+     desc:'把笔记里的状态图铺开：<span class="bl">蓝色</span>是客户端的<b>主动路径</b>（主动打开 + 主动关闭），<span class="br">棕色</span>是服务器的<b>被动路径</b>，<span class="dg">红色</span>是少见的<b>同时关闭</b>路径。先沿客户端走一遍完整生命周期。'},
+    {title:'步骤 1 · 主动打开:CLOSED → SYN_SENT',chip:'客户端路径 1/6',chipC:'cb',cur:'SYN_SENT',curCls:'b',on:['e1'],done:[],doneN:{CLOSED:'b'},hl:{},
+     desc:'应用调用 <code>connect()</code>（<b>主动打开 / 发 SYN</b>）。<b>SYN_SENT</b>：已发出 SYN(seq=x)，正在等对方的 SYN+ACK。'},
+    {title:'步骤 2 · SYN_SENT → ESTABLISHED',chip:'客户端路径 2/6',chipC:'cb',cur:'ESTABLISHED',curCls:'b',on:['e4'],done:['e1'],doneN:{CLOSED:'b',SYN_SENT:'b'},hl:{4:'c'},
+     desc:'<b>收到 SYN+ACK / 发 ACK</b>，三次握手在客户端侧完成。<b>ESTABLISHED</b>：连接建立，双向都可以收发数据，是连接的"工作状态"。'},
+    {title:'步骤 3 · 主动关闭:ESTABLISHED → FIN_WAIT_1',chip:'客户端路径 3/6',chipC:'cb',cur:'FIN_WAIT_1',curCls:'b',on:['e6'],done:['e1','e4'],doneN:{CLOSED:'b',SYN_SENT:'b',ESTABLISHED:'b'},hl:{},
+     desc:'应用调用 <code>close()</code>（<b>主动关闭 / 发 FIN</b>）。<b>FIN_WAIT_1</b>：已发出 FIN(seq=u)，等待对方的 ACK（如果先等来的是对方的 FIN，就会走红色的 CLOSING 分支）。'},
+    {title:'步骤 4 · FIN_WAIT_1 → FIN_WAIT_2',chip:'客户端路径 4/6',chipC:'cb',cur:'FIN_WAIT_2',curCls:'b',on:['e8'],done:['e1','e4','e6'],doneN:{CLOSED:'b',SYN_SENT:'b',ESTABLISHED:'b',FIN_WAIT_1:'b'},hl:{},
+     desc:'<b>收到 ACK</b>。<b>FIN_WAIT_2</b>：己方发送方向已经关闭（<b>半关闭</b>），只等对方把数据发完后发来 FIN。'},
+    {title:'步骤 5 · FIN_WAIT_2 → TIME_WAIT',chip:'客户端路径 5/6',chipC:'cb',cur:'TIME_WAIT',curCls:'b',on:['e10'],done:['e1','e4','e6','e8'],doneN:{CLOSED:'b',SYN_SENT:'b',ESTABLISHED:'b',FIN_WAIT_1:'b',FIN_WAIT_2:'b'},hl:{5:'c'},
+     desc:'<b>收到 FIN(seq=w) / 发 ACK</b>。<b>TIME_WAIT</b>：已回出最后一个 ACK，但要停留 2MSL——既防最后的 ACK 丢失，也让旧报文在网络中消亡。'},
+    {title:'步骤 6 · 2MSL 超时:TIME_WAIT → CLOSED',chip:'客户端路径 6/6',chipC:'cg',cur:'CLOSED',curCls:'g',on:['e14'],done:['e1','e4','e6','e8','e10'],doneN:{SYN_SENT:'b',ESTABLISHED:'b',FIN_WAIT_1:'b',FIN_WAIT_2:'b',TIME_WAIT:'b'},hl:{},
+     desc:'<b>2MSL 超时</b>，回到 <b>CLOSED</b>。客户端的完整生命周期：CLOSED → SYN_SENT → ESTABLISHED → FIN_WAIT_1 → FIN_WAIT_2 → TIME_WAIT → CLOSED。接下来换服务器视角。'},
+    {title:'步骤 7 · 被动打开:CLOSED → LISTEN',chip:'服务器路径 1/6',chipC:'ch',cur:'LISTEN',curCls:'s',on:['e2'],done:[],doneN:{CLOSED:'s'},hl:{2:'s'},
+     desc:'服务器 <code>bind() + listen()</code>（<b>被动打开</b>）。<b>LISTEN</b>：监听端口，等待任意客户端的 SYN 到来。'},
+    {title:'步骤 8 · LISTEN → SYN_RCVD',chip:'服务器路径 2/6',chipC:'ch',cur:'SYN_RCVD',curCls:'s',on:['e3'],done:['e2'],doneN:{CLOSED:'s',LISTEN:'s'},hl:{3:'s'},
+     desc:'<b>收到 SYN / 发 SYN+ACK</b>。<b>SYN_RCVD</b>：已回出 SYN+ACK，等待客户端最后的 ACK——连接此刻挂在<b>半连接队列</b>里。'},
+    {title:'步骤 9 · SYN_RCVD → ESTABLISHED',chip:'服务器路径 3/6',chipC:'ch',cur:'ESTABLISHED',curCls:'s',on:['e5'],done:['e2','e3'],doneN:{CLOSED:'s',LISTEN:'s',SYN_RCVD:'s'},hl:{4:'s'},
+     desc:'<b>收到 ACK</b>，三次握手完成，连接移入<b>全连接队列</b>等待 <code>accept()</code>。服务器也进入 <b>ESTABLISHED</b> 开始收发数据。'},
+    {title:'步骤 10 · ESTABLISHED → CLOSE_WAIT',chip:'服务器路径 4/6',chipC:'ch',cur:'CLOSE_WAIT',curCls:'s',on:['e7'],done:['e2','e3','e5'],doneN:{CLOSED:'s',LISTEN:'s',SYN_RCVD:'s',ESTABLISHED:'s'},hl:{6:'s'},
+     desc:'<b>收到 FIN / 发 ACK</b>（被动关闭开始）。<b>CLOSE_WAIT</b>：对方不再发数据，但本端还可以发；一直停在这里等<b>本端应用</b>调用 close()。<span class="dg">大量 CLOSE_WAIT 往往意味着程序忘了 close</span>。'},
+    {title:'步骤 11 · CLOSE_WAIT → LAST_ACK',chip:'服务器路径 5/6',chipC:'ch',cur:'LAST_ACK',curCls:'s',on:['e12'],done:['e2','e3','e5','e7'],doneN:{CLOSED:'s',LISTEN:'s',SYN_RCVD:'s',ESTABLISHED:'s',CLOSE_WAIT:'s'},hl:{7:'s'},
+     desc:'<b>应用 close / 发 FIN</b>。<b>LAST_ACK</b>：已发出自己的 FIN(seq=w)，只差对方最后一个 ACK 就能关闭。'},
+    {title:'步骤 12 · LAST_ACK → CLOSED',chip:'服务器路径 6/6',chipC:'cg',cur:'CLOSED',curCls:'g',on:['e13'],done:['e2','e3','e5','e7','e12'],doneN:{LISTEN:'s',SYN_RCVD:'s',ESTABLISHED:'s',CLOSE_WAIT:'s',LAST_ACK:'s'},hl:{},
+     desc:'<b>收到 ACK</b>，回到 <b>CLOSED</b>。被动方不经过 TIME_WAIT——因为最后一个 ACK 是对方发的，等待的责任在主动关闭方。'},
+    {title:'步骤 13 · 少见路径:同时关闭经过 CLOSING',chip:'同时关闭',chipC:'cd',cur:'CLOSING',curCls:'d',on:['e9','e11'],done:[],doneN:{FIN_WAIT_1:'d',TIME_WAIT:'d'},hl:{},
+     desc:'若双方<b>同时</b>调用 close()，两个 FIN 在路上交错：各自在 FIN_WAIT_1 里<b>先收到对方的 FIN</b>（而不是 ACK），于是回 ACK 并进入 <span class="dg">CLOSING</span>；再收到对方对自己 FIN 的 ACK 后进入 TIME_WAIT。此时<b>双方都要等 2MSL</b>。这条路径少见，但状态机必须覆盖它。'}
+  ];
+  function mount(){
+    let nodesHtml='';
+    Object.keys(NODES).forEach(k=>{
+      const n=NODES[k];
+      nodesHtml+='<div class="node" id="nd-'+k+'" style="left:'+n.x+'%;top:'+n.y+'%">'+k+'</div>';
+    });
+    let svgHtml='<svg id="sgSvg">';
+    EDGES.forEach(e=>{
+      svgHtml+='<path class="edge" id="ep-'+e.id+'" style="stroke:'+COL[e.c]+'"></path>'+
+        '<path class="ah" id="ea-'+e.id+'" d="M 0 0 L -9 -5 L -9 5 Z" style="fill:'+COL[e.c]+'"></path>'+
+        '<text class="elbl" id="el-'+e.id+'" style="fill:'+COL[e.c]+'">'+e.lbl+'</text>';
+    });
+    svgHtml+='</svg>';
+    viz.innerHTML='<div class="vcap"><b>TCP 状态转换图</b>:<span style="color:var(--blue);font-weight:600">蓝 = 客户端主动路径</span> · <span style="color:var(--brown);font-weight:600">棕 = 服务器被动路径</span> · <span style="color:var(--danger);font-weight:600">红 = 同时关闭</span></div>'+
+      '<div class="sg" id="sgStage">'+svgHtml+nodesHtml+'</div>';
+    lit=new Set();
+    geo();
+    setTimeout(geo,80);
+  }
+  function geo(){
+    const stage=byId('sgStage');
+    if(!stage)return;
+    const R=stage.getBoundingClientRect();
+    if(R.width<10)return;
+    const nr={};
+    Object.keys(NODES).forEach(k=>{
+      const r=byId('nd-'+k).getBoundingClientRect();
+      nr[k]={x:r.left-R.left,y:r.top-R.top,w:r.width,h:r.height,
+             cx:r.left-R.left+r.width/2,cy:r.top-R.top+r.height/2};
+    });
+    EDGES.forEach(e=>{
+      const A=nr[e.a],B=nr[e.b];
+      let ax,ay,bx,by,d,lx,ly,anchor;
+      if(e.m==='v'){
+        const down=B.cy>A.cy;
+        ax=A.cx+e.o1;ay=down?A.y+A.h:A.y;
+        bx=B.cx+e.o2;by=down?B.y:B.y+B.h;
+        const k=Math.max(18,Math.abs(by-ay)*0.45)*(down?1:-1);
+        d=`M ${ax} ${ay} C ${ax} ${ay+k}, ${bx} ${by-k}, ${bx} ${by}`;
+      }else if(e.m==='h'){
+        const right=B.cx>A.cx;
+        ax=right?A.x+A.w:A.x;ay=A.cy+e.o1;
+        bx=right?B.x:B.x+B.w;by=B.cy+e.o2;
+        const k=Math.max(24,Math.abs(bx-ax)*0.45)*(right?1:-1);
+        d=`M ${ax} ${ay} C ${ax+k} ${ay}, ${bx-k} ${by}, ${bx} ${by}`;
+      }else{
+        const left=e.m==='bowl';
+        ax=left?A.x:A.x+A.w;ay=A.cy+e.o1;
+        bx=left?B.x:B.x+B.w;by=B.cy+e.o2;
+        const cpx=left?Math.min(ax,bx)-64:Math.max(ax,bx)+64;
+        d=`M ${ax} ${ay} C ${cpx} ${ay}, ${cpx} ${by}, ${bx} ${by}`;
+      }
+      const p=byId('ep-'+e.id);
+      p.setAttribute('d',d);
+      const L=p.getTotalLength();
+      const p1=p.getPointAtLength(Math.max(0,L-1)),p2=p.getPointAtLength(L);
+      const ang=Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI;
+      byId('ea-'+e.id).setAttribute('transform','translate('+p2.x+' '+p2.y+') rotate('+ang+')');
+      const mid=p.getPointAtLength(L/2);
+      const t=byId('el-'+e.id);
+      if(e.m==='v'){lx=mid.x+9;ly=mid.y+3;anchor='start';}
+      else if(e.m==='bowl'){lx=mid.x+34;ly=mid.y-7;anchor='middle';}
+      else if(e.m==='bowr'){lx=mid.x-34;ly=mid.y-7;anchor='middle';}
+      else{lx=mid.x;ly=mid.y-7;anchor='middle';}
+      t.setAttribute('x',lx);t.setAttribute('y',ly);t.setAttribute('text-anchor',anchor);
+    });
+  }
+  function drawIn(path){
+    const L=path.getTotalLength();
+    path.style.transition='none';
+    path.style.strokeDasharray=L;
+    path.style.strokeDashoffset=L;
+    void path.getBoundingClientRect();
+    path.style.transition='stroke-dashoffset 520ms '+getComputedStyle(document.documentElement).getPropertyValue('--ease');
+    path.style.strokeDashoffset='0';
+    clearTimeout(path._t);
+    path._t=setTimeout(()=>{
+      path.style.transition='';
+      path.style.strokeDasharray='';
+      path.style.strokeDashoffset='';
+    },560);
+  }
+  let lit=new Set();
+  function paint(s){
+    const active=new Set(s.on),done=new Set(s.done);
+    Object.keys(NODES).forEach(k=>{
+      const n=byId('nd-'+k);
+      let cls='node';
+      if(s.cur===k)cls+=' cur '+s.curCls;
+      else if(s.doneN[k])cls+=' done '+s.doneN[k];
+      n.className=cls;
+    });
+    const any=active.size>0;
+    EDGES.forEach(e=>{
+      const p=byId('ep-'+e.id),a=byId('ea-'+e.id),t=byId('el-'+e.id);
+      const st=active.has(e.id)?'on':(done.has(e.id)?'done':(any?'dim':''));
+      p.setAttribute('class','edge'+(st?' '+st:''));
+      a.setAttribute('class','ah'+(st?' '+st:''));
+      t.setAttribute('class','elbl'+(st==='on'?' on':''));
+      if(st==='on'&&!lit.has(e.id))drawIn(p);
+    });
+    lit=active;
+    hlCode(s.hl);
+  }
+  return {id:'state',label:'状态转换图',sub:'11 状态 · 2 条路径',steps,mount,paint,codeLines,relayout:geo};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[hsScene,wvScene,stScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();
+  codeBox.innerHTML=SCENES[si].codeLines.map(l=>'<div class="cl">'+l+'</div>').join('');
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2600;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+window.addEventListener('resize',()=>{if(SCENES[si].relayout)SCENES[si].relayout();});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

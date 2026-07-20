@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 920" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="920" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">iodepth：在途窗口穿过一串深浅不一的队列</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">吞吐 = 在途数 ÷ 单次延迟；有效深度 = 整条链上最窄的一级；维持深度靠「完成一个、补一个」</text>
+
+  <!-- 应用在途窗口 -->
+  <rect x="80" y="108" width="780" height="96" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="104" y="136" font-size="13.5" font-weight="700" fill="#2C4460">应用在途窗口：iodepth = 已提交、未收割的 IO 数（利特尔法则的 L）</text>
+  <rect x="104" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="150" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="196" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="242" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="288" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="334" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="380" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="426" y="152" width="40" height="30" rx="4" fill="#C7D6EC" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="486" y="172" font-size="11.5" fill="#2C4460">恒满窗（QD=8 示意）：完成 1 个 → 立刻补 1 个 —— 与 TCP 滑动窗口同构</text>
+
+  <line x1="340" y1="204" x2="340" y2="238" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="352" y="228" font-size="10.5" fill="#6B675C">提交路径 ↓</text>
+
+  <!-- 提交级联 -->
+  <rect x="80" y="240" width="520" height="56" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="104" y="264" font-size="12" font-weight="700" fill="#4A3F68">SQ 提交环（entries 如 256）——「提交暂存批」</text>
+  <text x="104" y="286" font-size="10.5" fill="#4A3F68">enter 消费后槽位即归还：它不是在途上限【易混点】</text>
+
+  <line x1="340" y1="296" x2="340" y2="316" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="318" width="520" height="56" rx="7" fill="#ECEAE0" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="104" y="342" font-size="12" font-weight="700" fill="#4A473F">io_uring_enter：一次陷入提交一批</text>
+  <text x="104" y="364" font-size="10.5" fill="#4A473F">SQPOLL 模式可把这一步也省掉（内核线程代提交，2.4）</text>
+
+  <line x1="340" y1="374" x2="340" y2="394" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="396" width="520" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="104" y="420" font-size="12" font-weight="700" fill="#24473F">内核提交：先试非阻塞 inline 完成</text>
+  <text x="104" y="442" font-size="10.5" fill="#24473F">页缓存命中当场返回；不能立即完成 → io-wq / 内部 poll【实现】</text>
+
+  <line x1="340" y1="452" x2="340" y2="472" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="474" width="520" height="56" rx="7" fill="#ECEAE0" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="104" y="498" font-size="12" font-weight="700" fill="#4A473F">文件系统：offset → 扇区，产出 bio</text>
+  <text x="104" y="520" font-size="10.5" fill="#4A473F">O_DIRECT：DMA 直达用户 buffer，绕过页缓存（1.3）</text>
+
+  <line x1="340" y1="530" x2="340" y2="550" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="552" width="520" height="56" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="104" y="576" font-size="12" font-weight="700" fill="#4A3F68">blk-mq：plug → 软件队列 ctx → tag 池（如 1023）</text>
+  <text x="104" y="598" font-size="10.5" fill="#4A3F68">tag = counting_semaphore：用尽则提交睡眠 —— 背压产生点（1.7）</text>
+
+  <line x1="340" y1="608" x2="340" y2="628" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="630" width="520" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="104" y="654" font-size="12" font-weight="700" fill="#733428">NVMe SQ + doorbell：填命令 → 写屏障 → 敲铃（3.2）</text>
+  <text x="104" y="676" font-size="10.5" fill="#733428">设备队列深度：每队列可达上千（具体看设备）</text>
+
+  <line x1="340" y1="686" x2="340" y2="706" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="80" y="708" width="520" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="104" y="732" font-size="12" font-weight="700" fill="#733428">NVMe 设备内部：通道 × 裸片并行执行（第 3 章）</text>
+  <text x="104" y="754" font-size="10.5" fill="#733428">真正的并行度上限在这里 —— 吞吐拐点由它决定【量级：几十路】</text>
+
+  <!-- 完成路径（右侧上行） -->
+  <path d="M600,736 L644,736 L644,206" fill="none" stroke="#2F6B5E" stroke-width="1.6" stroke-dasharray="7 5" marker-end="url(#arrt)"/>
+  <text x="656" y="712" font-size="10.5" fill="#24473F">① 设备写 CQE → 中断 / softirq</text>
+  <text x="656" y="730" font-size="10.5" fill="#24473F">　（IOPOLL 可改忙轮询，2.4）</text>
+  <text x="656" y="622" font-size="10.5" fill="#24473F">② bio_endio → 归还 tag（背压解除）</text>
+  <text x="656" y="532" font-size="10.5" fill="#24473F">③ io_uring 填 CQE →</text>
+  <text x="656" y="550" font-size="10.5" fill="#24473F">　store-release 推 CQ tail</text>
+  <text x="656" y="442" font-size="10.5" fill="#24473F">④ CQ 环暂存（默认 2×SQ 容量；</text>
+  <text x="656" y="460" font-size="10.5" fill="#24473F">　收割不及时 → overflow）</text>
+  <text x="656" y="352" font-size="10.5" fill="#24473F">⑤ 应用收割：acquire 读 tail →</text>
+  <text x="656" y="370" font-size="10.5" fill="#24473F">　检查 res → 推 head</text>
+  <text x="656" y="262" font-size="10.5" font-weight="700" fill="#24473F">⑥ 补位：收 1 个补 1 个，</text>
+  <text x="656" y="280" font-size="10.5" font-weight="700" fill="#24473F">　窗口恒满 ↑ 完成路径</text>
+
+  <!-- 利特尔法则卡 -->
+  <rect x="880" y="240" width="312" height="248" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="900" y="270" font-size="13.5" font-weight="700" fill="#2B2A26">利特尔法则（量级示例）</text>
+  <text x="900" y="300" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">吞吐 = iodepth ÷ 延迟</text>
+  <text x="900" y="326" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">延迟 80 μs 时：</text>
+  <text x="900" y="348" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">QD1  → 12.5K IOPS</text>
+  <text x="900" y="370" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">QD32 → 400K IOPS</text>
+  <text x="900" y="400" font-size="11.5" fill="#4A473F">拐点 = 设备并行度：</text>
+  <text x="900" y="422" font-size="11.5" fill="#4A473F">拐点前，加深 ≈ 线性涨吞吐</text>
+  <text x="900" y="444" font-size="11.5" fill="#A64B3C">拐点后，吞吐封顶、排队延迟</text>
+  <text x="900" y="462" font-size="11.5" fill="#A64B3C">线性涨 → p99 上天【取舍】</text>
+
+  <!-- 深度链卡 -->
+  <rect x="880" y="512" width="312" height="252" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="900" y="542" font-size="13.5" font-weight="700" fill="#4A3F68">深度链速查</text>
+  <text x="900" y="570" font-size="11" fill="#4A3F68">应用窗口：你定 —— 真正的 iodepth</text>
+  <text x="900" y="592" font-size="11" fill="#4A3F68">SQ entries：提交暂存，非在途上限</text>
+  <text x="900" y="614" font-size="11" fill="#4A3F68">blk-mq tag 池：如 1023（1.7）</text>
+  <text x="900" y="636" font-size="11" fill="#4A3F68">NVMe SQ：设备队列深度</text>
+  <text x="900" y="658" font-size="11" fill="#4A3F68">设备并行：通道×裸片，几十路</text>
+  <text x="900" y="688" font-size="11" font-weight="700" fill="#4A3F68">有效深度 = min(整条链)</text>
+  <text x="900" y="716" font-size="11" fill="#4A3F68">观测：iostat 的 aqu-sz ≈ 实际到达</text>
+  <text x="900" y="734" font-size="11" fill="#4A3F68">块层的深度；达不到设定值 →</text>
+  <text x="900" y="752" font-size="11" fill="#4A3F68">上游没喂满（先查提交循环）</text>
+
+  <!-- buffered 陷阱卡 -->
+  <rect x="880" y="788" width="312" height="104" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="900" y="816" font-size="12.5" font-weight="700" fill="#733428">buffered 陷阱</text>
+  <text x="900" y="840" font-size="11" fill="#733428">direct=0 时命中页缓存 inline 即完成：</text>
+  <text x="900" y="860" font-size="11" fill="#733428">测的是内存不是盘。打设备请用</text>
+  <text x="900" y="878" font-size="11" fill="#733428">O_DIRECT（fio direct=1）</text>
+
+  <!-- 底注 -->
+  <text x="80" y="812" font-size="12" fill="#4A473F">同步模型每线程 QD 恒为 1：想要 QD=32 要么开 32 个线程（贵），要么异步（io_uring）——</text>
+  <text x="80" y="836" font-size="12" fill="#4A473F">这就是 fio 里 iodepth 只对异步 engine 生效的原因（psync 引擎设了也没用）。</text>
+  <text x="80" y="872" font-size="11" fill="#6B675C">深度选型：延迟敏感 1–4；吞吐优先 32–128 起扫；拐点用 2.6 的实验亲手量出来。</text>
+</svg>

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="wok" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="wbad" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0503F"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">栅栏令牌：租约到期为什么还不够</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">被判死的节点可能只是「暂停」了；它醒来后那一笔写，必须由资源本身挡下 —— 与无锁编程用版本号打败 ABA 同构</text>
+
+  <!-- 事件竖线（贯穿三条泳道） -->
+  <line x1="300" y1="170" x2="300" y2="524" stroke="#C8C4B6" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="470" y1="170" x2="470" y2="524" stroke="#C8C4B6" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="690" y1="170" x2="690" y2="524" stroke="#C8C4B6" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="880" y1="170" x2="880" y2="524" stroke="#C8C4B6" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="1070" y1="170" x2="1070" y2="524" stroke="#C8C4B6" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="300" y="162" font-size="10.5" fill="#6B675C" text-anchor="middle">① A 持租约 #33</text>
+  <text x="470" y="162" font-size="10.5" fill="#6B675C" text-anchor="middle">② A 暂停</text>
+  <text x="690" y="162" font-size="10.5" fill="#6B675C" text-anchor="middle">③ 租约到期→B #34</text>
+  <text x="880" y="162" font-size="10.5" fill="#6B675C" text-anchor="middle">④ B 写 #34</text>
+  <text x="1070" y="162" font-size="10.5" fill="#6B675C" text-anchor="middle">⑤ A 醒来写 #33</text>
+
+  <!-- 泳道 A -->
+  <rect x="48" y="178" width="1144" height="92" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="128" y="218" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">节点 A</text>
+  <text x="128" y="236" font-size="11" fill="#6B675C" text-anchor="middle">（原主）</text>
+  <rect x="210" y="206" width="250" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="335" y="228" font-size="11" fill="#24473F" text-anchor="middle">持租约 · token=33 · 正常写</text>
+  <rect x="470" y="206" width="650" height="34" rx="6" fill="#E7E3D8" stroke="#A79E86" stroke-width="1.3" stroke-dasharray="5,3"/>
+  <text x="795" y="228" font-size="11" fill="#6B675C" text-anchor="middle">暂停：GC / D 态卡在坏盘 fsync（1.4）/ VM 冻结 —— 自己并不知道已失去租约</text>
+
+  <!-- 泳道 B -->
+  <rect x="48" y="290" width="1144" height="92" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="128" y="330" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">节点 B</text>
+  <text x="128" y="348" font-size="11" fill="#6B675C" text-anchor="middle">（接管）</text>
+  <rect x="690" y="318" width="430" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="905" y="340" font-size="11" fill="#24473F" text-anchor="middle">接管 · token=34 · 正常写</text>
+
+  <!-- 泳道 存储（裁判） -->
+  <rect x="48" y="402" width="1144" height="120" rx="8" fill="#FAF9F2" stroke="#8A8574" stroke-width="2"/>
+  <text x="128" y="452" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">存储</text>
+  <text x="128" y="470" font-size="11" fill="#6B675C" text-anchor="middle">（唯一裁判）</text>
+  <text x="230" y="432" font-size="11.5" font-weight="700" fill="#4A473F">规则：记住见过的最大 token；写请求 token &lt; max ⇒ 拒绝（fencing）</text>
+  <text x="230" y="470" font-size="11" fill="#6B675C">max_seen 单调不减：</text>
+  <rect x="360" y="456" width="40" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="380" y="472" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">33</text>
+  <text x="416" y="472" font-size="12" fill="#6B675C">→</text>
+  <rect x="432" y="456" width="40" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="452" y="472" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">34</text>
+
+  <!-- 写请求箭头 -->
+  <!-- A@T1 接受 -->
+  <line x1="300" y1="240" x2="300" y2="400" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#wok)"/>
+  <text x="290" y="322" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="end">#33 ✓</text>
+  <!-- B@T4 接受 -->
+  <line x1="880" y1="352" x2="880" y2="400" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#wok)"/>
+  <text x="890" y="378" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="start">#34 ✓</text>
+  <!-- A@T5 拒绝 -->
+  <line x1="1070" y1="240" x2="1070" y2="400" stroke="#B0503F" stroke-width="1.8" stroke-dasharray="6,3" marker-end="url(#wbad)"/>
+  <text x="1080" y="300" font-size="10.5" font-weight="700" fill="#B0503F" text-anchor="start">#33（旧）</text>
+
+  <!-- 存储内的接受/拒绝标记 -->
+  <text x="300" y="500" font-size="10.5" fill="#2F6B5E" text-anchor="middle">接受 → max=33</text>
+  <text x="880" y="500" font-size="10.5" fill="#2F6B5E" text-anchor="middle">接受 → max=34</text>
+  <path d="M1058,494 L1082,512 M1082,494 L1058,512" fill="none" stroke="#B0503F" stroke-width="3"/>
+  <text x="1070" y="490" font-size="11" font-weight="700" fill="#B0503F" text-anchor="middle">拒绝 33 &lt; 34</text>
+
+  <!-- 关键结论行 -->
+  <text x="48" y="548" font-size="12" fill="#4A473F">① 租约「自检到期」在 ② 处失效：暂停的进程没机会自检，醒来仍以为自己是主。<tspan font-weight="700" fill="#B0503F">别把正确性寄托在时钟上。</tspan></text>
+  <text x="48" y="568" font-size="12" fill="#4A473F">② 裁判是<tspan font-weight="700">资源本身</tspan>，不是时间：只要存储强制令牌单调，A 暂停多久、时钟偏多少都不影响正确性。</text>
+
+  <!-- C++ 桥接框 -->
+  <rect x="48" y="584" width="1144" height="96" rx="10" fill="#E9EDF5" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="72" y="610" font-size="14" font-weight="700" fill="#2C4460">同一招：单调世代号让「醒来的旧主」自动失效</text>
+  <text x="72" y="634" font-size="11.5" fill="#2C4460">无锁编程 · <tspan font-weight="700">ABA 标签</tspan>：带版本的指针，旧 CAS 因标签过期而失败　｜　控制面 · <tspan font-weight="700">resourceVersion</tspan>（10.3）：拿旧版本提交 → 409 Conflict</text>
+  <text x="72" y="656" font-size="11.5" fill="#2C4460">成员协议 · <tspan font-weight="700">SWIM incarnation</tspan>：节点自增世代号，驳回过时的「你已死」谣言</text>
+  <text x="72" y="674" font-size="11.5" font-weight="700" fill="#3D5A80">共同点：把「谁是最新」编码成一个只增不减的数，让落后者被一票否决。</text>
+</svg>

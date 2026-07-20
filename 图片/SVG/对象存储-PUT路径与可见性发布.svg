@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 740" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="740" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">对象存储 PUT：数据先落齐，名字最后一换——可见性是「发布」出来的</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">不可变对象 + 元数据原子切换 = 分布式版的 release/acquire：读者要么看到完整旧版，要么看到完整新版，永远没有半截</text>
+
+  <!-- ======== PUT 泳道 ======== -->
+  <rect x="70" y="116" width="130" height="54" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="135" y="139" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">client</text>
+  <text x="135" y="158" font-size="10" fill="#2C4460" text-anchor="middle">PUT /bucket/key</text>
+
+  <line x1="200" y1="143" x2="262" y2="143" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="264" y="110" width="240" height="80" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="384" y="134" font-size="12" font-weight="700" fill="#7A5518" text-anchor="middle">API 网关 / LB</text>
+  <text x="384" y="153" font-size="10.5" fill="#7A5518" text-anchor="middle">认证签名 · 路由 · 限流</text>
+  <text x="384" y="176" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">过载 → 503 SlowDown（显式背压）</text>
+
+  <line x1="504" y1="143" x2="566" y2="143" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 数据面 -->
+  <rect x="568" y="104" width="300" height="140" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="718" y="128" font-size="12" font-weight="700" fill="#48562B" text-anchor="middle">① 数据面：EC 编码扇出（7.1）</text>
+  <g font-size="10">
+    <rect x="588" y="140" width="60" height="26" rx="4" fill="#F5F4ED" stroke="#48562B" stroke-width="0.8"/>
+    <text x="618" y="157" fill="#48562B" text-anchor="middle">d1</text>
+    <rect x="656" y="140" width="60" height="26" rx="4" fill="#F5F4ED" stroke="#48562B" stroke-width="0.8"/>
+    <text x="686" y="157" fill="#48562B" text-anchor="middle">d2</text>
+    <rect x="724" y="140" width="60" height="26" rx="4" fill="#F5F4ED" stroke="#48562B" stroke-width="0.8"/>
+    <text x="754" y="157" fill="#48562B" text-anchor="middle">d3</text>
+    <rect x="792" y="140" width="60" height="26" rx="4" fill="#F5F4ED" stroke="#48562B" stroke-width="0.8"/>
+    <text x="822" y="157" fill="#48562B" text-anchor="middle">p1</text>
+  </g>
+  <text x="718" y="192" font-size="10.5" fill="#48562B" text-anchor="middle">k+m 个分片各自持久到不同故障域</text>
+  <text x="718" y="212" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">此刻对任何读者都不可见</text>
+  <text x="718" y="230" font-size="10" fill="#6B675C" text-anchor="middle">（写的是新版本的新位置，旧版本原封不动）</text>
+
+  <line x1="868" y1="174" x2="930" y2="174" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 元数据面 -->
+  <rect x="932" y="104" width="248" height="140" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.8"/>
+  <text x="1056" y="128" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">② 元数据面：提交</text>
+  <text x="1056" y="152" font-size="10.5" fill="#4A3F68" text-anchor="middle">key 的版本指针原子切换：</text>
+  <text x="1056" y="170" font-size="10.5" fill="#4A3F68" text-anchor="middle">key → v7 变为 key → v8</text>
+  <text x="1056" y="196" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">★ 可见点（发布 / release）</text>
+  <text x="1056" y="216" font-size="10" fill="#6B675C" text-anchor="middle">事务成功才回 200 OK；</text>
+  <text x="1056" y="232" font-size="10" fill="#6B675C" text-anchor="middle">并发 PUT 在此串行定序</text>
+
+  <!-- ======== 可见性时间线 ======== -->
+  <text x="70" y="292" font-size="14" font-weight="700" fill="#4A473F">可见性时间线（读 = acquire）</text>
+
+  <line x1="70" y1="352" x2="1180" y2="352" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="700" y1="316" x2="700" y2="388" stroke="#A64B3C" stroke-width="2.2"/>
+  <text x="700" y="306" font-size="12" font-weight="700" fill="#A64B3C" text-anchor="middle">★ 元数据切换瞬间</text>
+
+  <rect x="150" y="322" width="200" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="250" y="341" font-size="10.5" fill="#2C4460" text-anchor="middle">GET → 完整的 v7（旧版）</text>
+  <rect x="820" y="322" width="220" height="30" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="930" y="341" font-size="10.5" fill="#48562B" text-anchor="middle">GET → 完整的 v8（强读写一致）</text>
+  <text x="700" y="380" font-size="10.5" fill="#6B675C" text-anchor="middle">任何时刻的读都拿到某个完整版本——不可变性消灭了 torn read</text>
+
+  <!-- ======== 并发 PUT ======== -->
+  <rect x="70" y="412" width="540" height="150" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="94" y="440" font-size="12.5" font-weight="700" fill="#2B2A26">同 key 并发 PUT：last-writer-wins</text>
+  <text x="94" y="466" font-size="11" fill="#4A473F">writer A 与 writer B 各写各的分片集（互不干扰——不可变），</text>
+  <text x="94" y="486" font-size="11" fill="#4A473F">元数据事务串行化决定最终指针指向谁——输家的分片成为孤儿待回收</text>
+  <text x="94" y="512" font-size="11" font-weight="700" fill="#4A3F68">≈ 两个线程各自构造新对象，对同一 atomic 指针做 store：</text>
+  <text x="94" y="532" font-size="11" fill="#4A3F68">无 data race（各写各的内存），只有顺序之争（谁后 store 谁赢）</text>
+
+  <rect x="640" y="412" width="540" height="150" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="664" y="440" font-size="12.5" font-weight="700" fill="#2B2A26">条件写（If-Match / If-None-Match）= 分布式 CAS</text>
+  <text x="664" y="466" font-size="11" fill="#4A473F">「只有当前版本还是 v7 才允许我写 v8」——</text>
+  <text x="664" y="486" font-size="11" fill="#4A473F">元数据服务原子地比较并交换版本指针，失败返回 412</text>
+  <text x="664" y="512" font-size="11" font-weight="700" fill="#4A3F68">≈ compare_exchange_strong：失败拿到新值，重读重算重试</text>
+  <text x="664" y="532" font-size="11" fill="#4A3F68">乐观并发——无锁，冲突稀少时最划算</text>
+
+  <!-- ======== 底部 C++ 对照 ======== -->
+  <rect x="70" y="590" width="1110" height="126" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="96" y="618" font-size="13" font-weight="700" fill="#2B2A26">C++ 对照总表：</text>
+  <text x="96" y="644" font-size="11.5" fill="#4A473F">可见性：数据全持久 → 指针原子切换 → 读必见新版 ≈ 构造完整对象 → atomic&lt;shared_ptr&gt; store(release) → load(acquire)；「先数据后指针」与 6.1 的 WAL 纪律同源</text>
+  <text x="96" y="670" font-size="11.5" fill="#4A473F">背压：503 SlowDown + 指数退避 = 有界队列满时的显式拒绝——比「默默排队到超时」诚实；客户端重试不退避 ≈ 自旋锁忙等，把过载变雪崩</text>
+  <text x="96" y="696" font-size="11.5" fill="#4A473F">延迟：单次 GET 几十 ms（HTTP+认证+元数据+EC 读），比 NVMe 慢 3 个数量级——但吞吐靠并发深度补（Little 定律）：高延迟 × 高并发 = 高带宽，io_uring 的 iodepth 思想在 HTTP 层重演</text>
+</svg>

@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">一次 read（未命中）的全路径：等待点、拷贝与队列</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">应用线程在第 ③ 步之后睡着、第 ⑩ 步被唤醒 —— 中间的一切都是别人在干活</text>
+
+  <!-- 泳道背景 -->
+  <rect x="56" y="112" width="1128" height="136" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="134" font-size="12" font-weight="700" fill="#3D5A80">用户态 · 应用线程</text>
+  <rect x="56" y="258" width="1128" height="140" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="280" font-size="12" font-weight="700" fill="#2F6B5E">内核：VFS + Page Cache</text>
+  <rect x="56" y="408" width="1128" height="136" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="430" font-size="12" font-weight="700" fill="#6B5B95">内核：块层 blk-mq</text>
+  <rect x="56" y="554" width="1128" height="136" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="576" font-size="12" font-weight="700" fill="#A64B3C">硬件：驱动 + NVMe 设备</text>
+
+  <!-- L1 步骤 -->
+  <rect x="80" y="150" width="180" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="170" y="173" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① read(fd, buf, 4096)</text>
+  <text x="170" y="192" font-size="10.5" fill="#2C4460" text-anchor="middle">陷入：模式切换（1.1）</text>
+
+  <rect x="300" y="164" width="630" height="30" rx="6" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="615" y="184" font-size="11.5" fill="#4A473F" text-anchor="middle">线程睡眠中（等 folio 解锁）—— 让出 CPU，两次上下文切换</text>
+
+  <rect x="950" y="150" width="180" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1040" y="173" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑪ 返回用户态</text>
+  <text x="1040" y="192" font-size="10.5" fill="#2C4460" text-anchor="middle">总延迟由第 ⑦ 步主导</text>
+
+  <!-- L2 步骤 -->
+  <rect x="80" y="296" width="180" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="170" y="319" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">② 查页缓存：未命中</text>
+  <text x="170" y="338" font-size="10.5" fill="#24473F" text-anchor="middle">XArray 查找 ~百 ns（1.2）</text>
+
+  <rect x="300" y="296" width="190" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="395" y="319" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">③ 分配 folio · 置 Locked</text>
+  <text x="395" y="338" font-size="10.5" fill="#24473F" text-anchor="middle">连同预读窗口一起（1.6）</text>
+
+  <rect x="930" y="296" width="200" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1030" y="315" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑩ 唤醒 → copy_to_user</text>
+  <text x="1030" y="332" font-size="10.5" fill="#24473F" text-anchor="middle">置 Uptodate · 解锁 folio</text>
+  <text x="1030" y="346" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">CPU 拷贝 ×1：页缓存 → 用户 buf</text>
+
+  <!-- L3 步骤 -->
+  <rect x="300" y="446" width="190" height="56" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="395" y="469" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">④ bio：plug → 合并</text>
+  <text x="395" y="488" font-size="10.5" fill="#4A3F68" text-anchor="middle">本线程攒批下发（1.7）</text>
+
+  <rect x="530" y="446" width="200" height="56" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="630" y="469" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">⑤ 软件队列 → 硬件队列</text>
+  <text x="630" y="488" font-size="10.5" fill="#4A3F68" text-anchor="middle">拿 tag（用尽则等：背压）</text>
+
+  <rect x="930" y="446" width="200" height="56" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1030" y="469" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">⑨ softirq：bio_endio</text>
+  <text x="1030" y="488" font-size="10.5" fill="#4A3F68" text-anchor="middle">完成回调链 ~μs</text>
+
+  <!-- L4 步骤 -->
+  <rect x="530" y="592" width="200" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="630" y="615" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">⑥ 填 SQE → 敲门铃</text>
+  <text x="630" y="634" font-size="10.5" fill="#733428" text-anchor="middle">release 式发布（1.7）</text>
+
+  <rect x="770" y="592" width="190" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="2"/>
+  <text x="865" y="611" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">⑦ 设备执行</text>
+  <text x="865" y="628" font-size="10.5" fill="#733428" text-anchor="middle">DMA 写入页缓存页（非 CPU）</text>
+  <text x="865" y="643" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">几十 μs ~ ms：延迟大头</text>
+
+  <rect x="1000" y="592" width="150" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1075" y="615" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">⑧ 写 CQE → 中断</text>
+  <text x="1075" y="634" font-size="10.5" fill="#733428" text-anchor="middle">phase 位翻转</text>
+
+  <!-- 连接箭头 -->
+  <line x1="170" y1="208" x2="170" y2="292" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="264" y1="324" x2="296" y2="324" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="395" y1="354" x2="395" y2="442" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="494" y1="474" x2="526" y2="474" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="630" y1="504" x2="630" y2="588" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="734" y1="620" x2="766" y2="620" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="964" y1="620" x2="996" y2="620" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1075" y1="588" x2="1032" y2="506" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1030" y1="442" x2="1030" y2="356" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1040" y1="292" x2="1040" y2="210" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 延迟预算 -->
+  <text x="68" y="726" font-size="14" font-weight="700" fill="#2B2A26">延迟预算<tspan font-size="11.5" fill="#6B675C" font-weight="400">（宽度示意，不按真实比例；具体数值以 eBPF / iostat 实测为准 → 第9章）</tspan></text>
+
+  <rect x="80" y="742" width="130" height="34" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="145" y="763" font-size="10.5" fill="#24473F" text-anchor="middle">①–③ ~1 μs</text>
+  <rect x="210" y="742" width="140" height="34" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="280" y="763" font-size="10.5" fill="#4A3F68" text-anchor="middle">④–⑥ ~几 μs</text>
+  <rect x="350" y="742" width="560" height="34" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="630" y="763" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">⑦ 设备：几十 μs（NVMe）~ 10 ms（HDD）—— 优化前先确认钱花在这</text>
+  <rect x="910" y="742" width="120" height="34" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="970" y="763" font-size="10.5" fill="#4A3F68" text-anchor="middle">⑧–⑨ ~μs</text>
+  <rect x="1030" y="742" width="130" height="34" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1095" y="763" font-size="10.5" fill="#24473F" text-anchor="middle">⑩–⑪ ~几 μs</text>
+
+  <text x="80" y="806" font-size="11.5" fill="#4A473F">三处固定成本与数据量无关：陷入（①⑪）、两次上下文切换（③睡 / ⑩醒）、中断（⑧）—— 小 IO 时它们的占比最高，</text>
+  <text x="80" y="828" font-size="11.5" fill="#4A473F">这正是 io_uring 批量摊薄（第2章）与 SPDK 轮询归零（第5章）要解决的问题。</text>
+</svg>

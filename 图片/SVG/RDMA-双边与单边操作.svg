@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="660" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">双边 vs 单边：SEND/RECV 是消息队列，READ/WRITE 是远端共享内存</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">双边：两端软件都参与，数据落到对端预先挂好的缓冲；单边：携带 raddr + rkey 直达远端内存，对端 CPU 全程不知情</text>
+
+  <!-- 左面板: 双边 -->
+  <text x="48" y="122" font-size="14" font-weight="700" fill="#2B2A26">双边：SEND / RECV</text>
+  <rect x="48" y="136" width="230" height="300" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="60" y="160" font-size="12" font-weight="700" fill="#2C4460">本端（发起方）</text>
+  <rect x="60" y="176" width="206" height="46" rx="5" fill="#F5F4ED" stroke="#3D5A80" stroke-width="1"/>
+  <text x="70" y="195" font-size="10.5" fill="#2C4460">② ibv_post_send</text>
+  <text x="70" y="212" font-size="10.5" fill="#2C4460">SGE 指向本地 MR（lkey）</text>
+  <rect x="60" y="232" width="206" height="40" rx="5" fill="#F5F4ED" stroke="#3D5A80" stroke-width="1"/>
+  <text x="70" y="250" font-size="10.5" fill="#2C4460">③ doorbell → 网卡 DMA</text>
+  <text x="70" y="265" font-size="10.5" fill="#2C4460">读出数据发包</text>
+  <rect x="60" y="380" width="206" height="40" rx="5" fill="#F5F4ED" stroke="#3D5A80" stroke-width="1"/>
+  <text x="70" y="398" font-size="10.5" fill="#2C4460">⑥ 本端 CQE：发送完成</text>
+  <text x="70" y="413" font-size="10.5" fill="#2C4460">（对端已 ACK，RC 语义）</text>
+
+  <rect x="368" y="136" width="230" height="300" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="380" y="160" font-size="12" font-weight="700" fill="#24473F">对端（接收方）</text>
+  <rect x="380" y="176" width="206" height="46" rx="5" fill="#F5F4ED" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="390" y="195" font-size="10.5" fill="#24473F">① 预先 ibv_post_recv</text>
+  <text x="390" y="212" font-size="10.5" fill="#24473F">把空缓冲挂进 RQ</text>
+  <rect x="380" y="232" width="206" height="46" rx="5" fill="#F5F4ED" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="390" y="251" font-size="10.5" fill="#24473F">④ 网卡把数据 DMA 进</text>
+  <text x="390" y="268" font-size="10.5" fill="#24473F">RECV 缓冲，消费该 WQE</text>
+  <rect x="380" y="288" width="206" height="40" rx="5" fill="#F5F4ED" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="390" y="306" font-size="10.5" fill="#24473F">⑤ 对端 CQE：poll 得知</text>
+  <text x="390" y="321" font-size="10.5" fill="#24473F">"来了一条消息"</text>
+
+  <line x1="278" y1="252" x2="366" y2="252" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrt)"/>
+  <text x="284" y="244" font-size="10" fill="#24473F">RC：可靠有序</text>
+
+  <text x="48" y="466" font-size="10.5" fill="#7A392F">RQ 空了 → RNR NAK，重试耗尽则 QP 进错误态【陷阱】</text>
+
+  <!-- 右面板: 单边 -->
+  <text x="640" y="122" font-size="14" font-weight="700" fill="#2B2A26">单边：RDMA WRITE（READ 同理，方向相反）</text>
+  <rect x="640" y="136" width="230" height="300" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="652" y="160" font-size="12" font-weight="700" fill="#2C4460">本端（发起方）</text>
+  <rect x="652" y="176" width="206" height="46" rx="5" fill="#F5F4ED" stroke="#3D5A80" stroke-width="1"/>
+  <text x="662" y="195" font-size="10.5" fill="#2C4460">① 带外拿到 raddr + rkey</text>
+  <text x="662" y="212" font-size="10.5" fill="#2C4460">（建连时经 SEND/TCP 交换）</text>
+  <rect x="652" y="232" width="206" height="40" rx="5" fill="#F5F4ED" stroke="#3D5A80" stroke-width="1"/>
+  <text x="662" y="250" font-size="10.5" fill="#2C4460">② post_write(raddr, rkey)</text>
+  <text x="662" y="265" font-size="10.5" fill="#2C4460">③ doorbell → 网卡发出</text>
+  <rect x="652" y="380" width="206" height="40" rx="5" fill="#F5F4ED" stroke="#3D5A80" stroke-width="1"/>
+  <text x="662" y="398" font-size="10.5" fill="#2C4460">⑤ 本端 CQE：数据已写入</text>
+  <text x="662" y="413" font-size="10.5" fill="#2C4460">远端内存（网卡 ACK 证实）</text>
+
+  <rect x="960" y="136" width="230" height="300" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="972" y="160" font-size="12" font-weight="700" fill="#24473F">对端（被动方）</text>
+  <rect x="972" y="176" width="206" height="54" rx="5" fill="#F5F4ED" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="982" y="195" font-size="10.5" fill="#24473F">④ 网卡校验 rkey 与边界</text>
+  <text x="982" y="212" font-size="10.5" fill="#24473F">→ DMA 直写目标地址</text>
+  <rect x="972" y="244" width="206" height="54" rx="5" fill="#F0E3D3" stroke="#B07A3E" stroke-width="1.4"/>
+  <text x="982" y="264" font-size="10.5" font-weight="700" fill="#7A5426">对端 CPU / 应用全程不参与</text>
+  <text x="982" y="281" font-size="10.5" fill="#7A5426">无 CQE · 不消费 RECV WQE</text>
+
+  <polyline points="870,252 915,252 915,203 958,203" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrt)"/>
+
+  <text x="640" y="466" font-size="10.5" fill="#6B675C">通知要额外设计：WRITE_WITH_IMM（对端出一个 CQE）或补一条 SEND</text>
+
+  <!-- 底部选型 -->
+  <text x="48" y="510" font-size="13" font-weight="700" fill="#2B2A26">选型速查</text>
+  <rect x="48" y="524" width="364" height="72" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="64" y="548" font-size="12" font-weight="700" fill="#2B2A26">小消息 / 要通知对端</text>
+  <text x="64" y="570" font-size="10.5" fill="#6B675C">SEND，或 WRITE_WITH_IMM</text>
+  <text x="64" y="586" font-size="10.5" fill="#6B675C">（imm 32 位可捎带元数据）</text>
+  <rect x="430" y="524" width="364" height="72" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="446" y="548" font-size="12" font-weight="700" fill="#2B2A26">大块数据搬运</text>
+  <text x="446" y="570" font-size="10.5" fill="#6B675C">RDMA READ / WRITE：零拷贝直达</text>
+  <text x="446" y="586" font-size="10.5" fill="#6B675C">远端 CPU 成本为零</text>
+  <rect x="812" y="524" width="364" height="72" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="828" y="548" font-size="12" font-weight="700" fill="#2B2A26">分布式计数器 / 抢锁</text>
+  <text x="828" y="570" font-size="10.5" fill="#6B675C">ATOMIC CAS / FAA：</text>
+  <text x="828" y="586" font-size="10.5" fill="#6B675C">远端网卡上的 64 位原子操作</text>
+
+  <text x="48" y="630" font-size="10.5" fill="#6B675C">存储的组合拳（NVMe-oF）：命令走 SEND，数据由 target 端用 READ/WRITE 单边搬运 —— 见 5.2 / 5.3</text>
+</svg>

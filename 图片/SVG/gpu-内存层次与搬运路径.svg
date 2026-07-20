@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FAF9F2/#8A8574；框 #E3EAF4/#3D5A80/#2C4460；
+       瓶颈/成本 #A64B3C；直达/绿色 #2F6B5E；与本库既有 SVG 同一套 -->
+  <title>GPU 内存层次与数据搬运</title>
+  <desc>左侧为带宽阶梯：片上 SRAM 到网络逐层慢一个量级，PCIe 标红为显存唯一入口；右上为 pageable 与 pinned 两条 H2D 路径对比；右下为盘到显存传统路径的拷贝对账；底部为 nvidia-smi topo -m 字母表。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">GPU 内存层次与数据搬运：先数清账，再谈优化</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">每下一层慢约一个量级；PCIe x16 是每张 GPU 的数据入口——供给按它规划，不按集群总带宽</text>
+
+  <!-- 左：带宽阶梯 -->
+  <rect x="48" y="104" width="440" height="556" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="268" y="132" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">带宽阶梯（量级）</text>
+
+  <rect x="78" y="156" width="380" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="268" y="176" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">片上 SRAM（寄存器 / shared memory）</text>
+  <text x="268" y="198" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">~10 TB/s 级 · 容量 MB 级</text>
+
+  <rect x="78" y="224" width="380" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="268" y="244" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">HBM 显存（GPU 的「主存」）</text>
+  <text x="268" y="266" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">数 TB/s · 几十 GB——数据留在这里最便宜</text>
+
+  <rect x="78" y="292" width="380" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="268" y="310" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">NVLink（仅 GPU↔GPU，同机）</text>
+  <text x="268" y="330" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">数百 GB/s · 不通盘</text>
+
+  <rect x="78" y="356" width="380" height="64" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="2"/>
+  <text x="268" y="376" font-size="12.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">PCIe x16：显存与外界的唯一入口</text>
+  <text x="268" y="398" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">Gen4 理论 32 GB/s（实测 ~25–28）· Gen5 翻倍</text>
+  <text x="268" y="412" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">比 HBM 慢约两个数量级</text>
+
+  <rect x="78" y="432" width="380" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="268" y="450" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主机 DRAM</text>
+  <text x="268" y="470" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">一二百 GB/s / socket · 所有中转都消耗它</text>
+
+  <rect x="78" y="496" width="380" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="268" y="514" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">本地 NVMe（单盘 / 盘阵）</text>
+  <text x="268" y="534" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">几 GB/s ~ 几十 GB/s（3.7 的供给端）</text>
+
+  <rect x="78" y="560" width="380" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="268" y="578" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">数据中心网络（NVMe-oF / 对象存储）</text>
+  <text x="268" y="598" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">25~400 Gb/s ≈ 3~50 GB/s</text>
+
+  <text x="268" y="636" font-size="10.5" fill="#6B675C" text-anchor="middle" dominant-baseline="central">↑ 越往上越快、容量越小——「把数据留在显存」是第 8 章一半议题的动机</text>
+
+  <!-- 右上：pageable vs pinned -->
+  <rect x="512" y="104" width="680" height="280" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="852" y="132" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">cudaMemcpy 的分水岭：pageable vs pinned</text>
+
+  <rect x="542" y="156" width="180" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="632" y="174" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">pageable buffer</text>
+  <text x="632" y="194" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">malloc/new · 页可换出</text>
+  <path d="M722,182 L790,182" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <text x="756" y="168" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">CPU 拷贝</text>
+  <rect x="794" y="156" width="190" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="889" y="174" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">驱动 pinned 暂存区</text>
+  <text x="889" y="194" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">多一次总线往返</text>
+  <path d="M984,182 L1052,182" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="1018" y="168" font-size="10" fill="#4A473F" text-anchor="middle" dominant-baseline="central">DMA</text>
+  <rect x="1056" y="156" width="106" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1109" y="182" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">显存</text>
+  <text x="852" y="228" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">带宽约半速 · 吃 CPU · cudaMemcpyAsync 实际同步执行</text>
+
+  <rect x="542" y="252" width="180" height="52" rx="7" fill="#E3EAF4" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="632" y="270" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">pinned buffer</text>
+  <text x="632" y="290" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">cudaMallocHost · 页钉死</text>
+  <path d="M722,278 L1052,278" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+  <text x="887" y="264" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">直接 DMA（≈ 4.4 的内存注册，同一 OS 机制）</text>
+  <rect x="1056" y="252" width="106" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1109" y="278" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">显存</text>
+  <text x="852" y="328" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">拉满 PCIe · 真异步的入场券 · 毫秒级注册——池化复用，不可换出</text>
+  <text x="852" y="352" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">两条路径的差值 = 一次驱动暂存拷贝的价格（§6 的实验量它）</text>
+
+  <!-- 右下：传统路径对账 -->
+  <rect x="512" y="408" width="680" height="252" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="852" y="436" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">传统路径：一个 batch 从盘到显存</text>
+
+  <rect x="536" y="464" width="110" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="591" y="490" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">NVMe 盘</text>
+  <path d="M646,490 L676,490" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <text x="661" y="476" font-size="9.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">DMA①</text>
+  <rect x="680" y="464" width="110" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="735" y="484" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">页缓存</text>
+  <text x="735" y="504" font-size="9.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主存</text>
+  <path d="M790,490 L820,490" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+  <text x="805" y="476" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">CPU②</text>
+  <rect x="824" y="464" width="110" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="879" y="484" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">用户 buffer</text>
+  <text x="879" y="504" font-size="9.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主存</text>
+  <path d="M934,490 L964,490" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+  <text x="949" y="476" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">CPU③</text>
+  <rect x="968" y="464" width="110" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1023" y="484" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">pinned 暂存</text>
+  <text x="1023" y="504" font-size="9.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主存</text>
+  <path d="M1078,490 L1108,490" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <text x="1093" y="476" font-size="9.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">DMA④</text>
+  <rect x="1112" y="464" width="64" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1144" y="490" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">显存</text>
+
+  <rect x="536" y="544" width="640" height="52" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="856" y="562" font-size="12" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">合计：主存总线 6 次穿越 + CPU 拷贝 2 次，换 1 次 PCIe 穿越</text>
+  <text x="856" y="584" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">喂卡 10 GB/s = 主存总线 60 GB/s + 几个核搬字节</text>
+
+  <text x="852" y="626" font-size="10.5" fill="#6B675C" text-anchor="middle" dominant-baseline="central">第 8 章逐篇删这张表：O_DIRECT 删②（1.3）· pinned 用户缓冲删③（8.3）· GDS 全删（8.2）</text>
+
+  <!-- 底部：topo 字母表 -->
+  <rect x="48" y="688" width="1144" height="152" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="70" y="712" font-size="12.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">nvidia-smi topo -m 读法：P2P/GDS 的物理前提（3.8 的账，GPU 服务器版）</text>
+  <text x="70" y="738" font-size="11" fill="#4A473F" dominant-baseline="central">· PIX = 同一 PCIe Switch：P2P DMA 最优，设备互传不过根复合体、不过主存——GDS 收益的前提</text>
+  <text x="70" y="762" font-size="11" fill="#4A473F" dominant-baseline="central">· PXB = 跨多个 Switch（不过 CPU）：可行多一跳 · PHB = 经根复合体：带宽打折</text>
+  <text x="70" y="786" font-size="11" fill="#4A473F" dominant-baseline="central">· NODE / SYS = 同 / 跨 NUMA：SYS 走跨 socket 互联，P2P 带宽腰斩甚至不可用——插错槽位，第 8 章收益蒸发</text>
+  <text x="70" y="814" font-size="10.5" fill="#6B675C" dominant-baseline="central">健康值口径：Gen4 x16 pinned H2D 实测 ~25–28 GB/s（理论 32 含协议开销）；pageable 半速是设计不是故障</text>
+</svg>

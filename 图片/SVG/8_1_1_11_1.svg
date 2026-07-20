@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>rename、link、unlink 从系统调用到稳定存储</title>
+  <desc>图示分为运行时命名空间变更与持久化提交两个阶段，强调系统调用返回不等于状态已经落盘。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">rename / link / unlink：调用返回 ≠ 已经落盘</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">先改变运行时命名空间，再由应用显式发起持久化；崩溃语义取决于状态推进到了哪一层</text>
+
+  <!-- 阶段 A -->
+  <rect x="56" y="112" width="540" height="700" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <rect x="56" y="112" width="540" height="60" rx="10" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <path d="M56 162 H596" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="80" y="137" font-size="14" font-weight="700" fill="#2C4460">A · 运行时命名空间</text>
+  <text x="80" y="157" font-size="10.8" fill="#2C4460">系统调用成功：当前内核状态可见，但还不能推出掉电后仍存在</text>
+
+  <!-- A1 -->
+  <rect x="78" y="190" width="58" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="107" y="208" font-size="9.5" font-weight="700" fill="#2C4460" text-anchor="middle">USER</text>
+  <text x="107" y="223" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">①</text>
+  <rect x="150" y="186" width="416" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="170" y="208" font-size="12.5" font-weight="700" fill="#2C4460">renameat / linkat / unlinkat</text>
+  <text x="170" y="226" font-size="10.5" fill="#2C4460">应用表达一次目录命名空间变更</text>
+
+  <line x1="358" y1="240" x2="358" y2="257" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- A2 -->
+  <rect x="78" y="263" width="58" height="44" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="107" y="281" font-size="9.5" font-weight="700" fill="#4A473F" text-anchor="middle">ENTRY</text>
+  <text x="107" y="296" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">②</text>
+  <rect x="150" y="259" width="416" height="52" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.4"/>
+  <text x="170" y="281" font-size="12.5" font-weight="700" fill="#2B2A26">系统调用入口</text>
+  <text x="170" y="299" font-size="10.5" fill="#6B675C">从用户态进入内核统一入口</text>
+
+  <line x1="358" y1="313" x2="358" y2="330" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- A3 -->
+  <rect x="78" y="336" width="58" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="107" y="354" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">VFS</text>
+  <text x="107" y="369" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">③</text>
+  <rect x="150" y="332" width="416" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="170" y="354" font-size="12.5" font-weight="700" fill="#24473F">路径解析 · 权限检查 · 挂载点检查</text>
+  <text x="170" y="372" font-size="10.5" fill="#24473F">确定父目录、源/目标 dentry 与跨挂载边界</text>
+
+  <line x1="358" y1="386" x2="358" y2="403" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- A4 -->
+  <rect x="78" y="409" width="58" height="44" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="107" y="427" font-size="9.5" font-weight="700" fill="#4A3F68" text-anchor="middle">LOCK</text>
+  <text x="107" y="442" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">④</text>
+  <rect x="150" y="405" width="416" height="52" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="170" y="427" font-size="12.5" font-weight="700" fill="#4A3F68">dentry / inode 锁与并发协调</text>
+  <text x="170" y="445" font-size="10.5" fill="#4A3F68">串行化冲突更新，维持目录树与链接计数约束</text>
+
+  <line x1="358" y1="459" x2="358" y2="476" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- A5 -->
+  <rect x="78" y="482" width="58" height="44" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="107" y="500" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">FS</text>
+  <text x="107" y="515" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">⑤</text>
+  <rect x="150" y="478" width="416" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="170" y="500" font-size="12.5" font-weight="700" fill="#6B4E28">具体文件系统执行操作</text>
+  <text x="170" y="518" font-size="10.5" fill="#6B4E28">ext4 · XFS · Btrfs · NFS 客户端等，各自实现语义</text>
+
+  <line x1="358" y1="532" x2="358" y2="549" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- A6 -->
+  <rect x="78" y="555" width="58" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="107" y="576" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">META</text>
+  <text x="107" y="594" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">⑥</text>
+  <rect x="150" y="551" width="416" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="170" y="574" font-size="12.5" font-weight="700" fill="#6B4E28">修改目录块、inode 与链接计数</text>
+  <text x="170" y="593" font-size="10.5" fill="#6B4E28">标记脏状态，或把更新加入文件系统日志事务</text>
+
+  <line x1="358" y1="613" x2="358" y2="630" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- A7 -->
+  <rect x="78" y="636" width="58" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="107" y="657" font-size="9.5" font-weight="700" fill="#7A5518" text-anchor="middle">USER</text>
+  <text x="107" y="675" font-size="11" font-weight="700" fill="#7A5518" text-anchor="middle">⑦</text>
+  <rect x="150" y="632" width="416" height="60" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="170" y="655" font-size="12.5" font-weight="700" fill="#7A5518">系统调用返回：当前命名空间已经改变</text>
+  <text x="170" y="675" font-size="10.5" font-weight="700" fill="#A64B3C">此时崩溃，恢复后的结果仍可能不同</text>
+
+  <rect x="78" y="724" width="488" height="60" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="98" y="748" font-size="11.5" font-weight="700" fill="#733428">崩溃窗口</text>
+  <text x="98" y="768" font-size="10.5" fill="#733428">“其他进程现在看得到”与“重启后仍看得到”是两个不同承诺。</text>
+
+  <!-- 阶段 B -->
+  <rect x="644" y="112" width="540" height="700" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <rect x="644" y="112" width="540" height="60" rx="10" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <path d="M644 162 H1184" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="668" y="137" font-size="14" font-weight="700" fill="#24473F">B · 持久化提交</text>
+  <text x="668" y="157" font-size="10.8" fill="#24473F">应用选择同步对象与顺序，文件系统再把相关状态推进到设备</text>
+
+  <!-- B8 -->
+  <rect x="666" y="190" width="58" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="695" y="211" font-size="9.5" font-weight="700" fill="#2C4460" text-anchor="middle">USER</text>
+  <text x="695" y="229" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">⑧</text>
+  <rect x="738" y="186" width="416" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="758" y="209" font-size="12.5" font-weight="700" fill="#2C4460">fsync(file / dir)</text>
+  <text x="758" y="229" font-size="10.5" fill="#2C4460">请求提交相关文件内容或目录项；对象与顺序由协议决定</text>
+
+  <line x1="946" y1="248" x2="946" y2="273" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- B9 -->
+  <rect x="666" y="279" width="58" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="695" y="300" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">FS</text>
+  <text x="695" y="318" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">⑨</text>
+  <rect x="738" y="275" width="416" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="758" y="298" font-size="12.5" font-weight="700" fill="#6B4E28">日志提交与元数据写回</text>
+  <text x="758" y="318" font-size="10.5" fill="#6B4E28">等待关联事务，组织必要的写入与顺序约束</text>
+
+  <line x1="946" y1="337" x2="946" y2="362" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- B10 -->
+  <rect x="666" y="368" width="58" height="52" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="695" y="389" font-size="9.5" font-weight="700" fill="#4A3F68" text-anchor="middle">BLOCK</text>
+  <text x="695" y="407" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">⑩</text>
+  <rect x="738" y="364" width="416" height="60" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="758" y="387" font-size="12.5" font-weight="700" fill="#4A3F68">块层 → 驱动 → 控制器</text>
+  <text x="758" y="407" font-size="10.5" fill="#4A3F68">下发写请求及 flush / FUA 等持久化约束</text>
+
+  <line x1="946" y1="426" x2="946" y2="451" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- B11 -->
+  <rect x="666" y="457" width="58" height="52" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="695" y="478" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">DEVICE</text>
+  <text x="695" y="496" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">⑪</text>
+  <rect x="738" y="453" width="416" height="60" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="758" y="476" font-size="12.5" font-weight="700" fill="#733428">设备易失缓存</text>
+  <text x="758" y="496" font-size="10.5" fill="#733428">未兑现持久化命令时，掉电仍可能丢失</text>
+
+  <line x1="946" y1="515" x2="946" y2="540" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- B12 -->
+  <rect x="666" y="546" width="58" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="695" y="567" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">MEDIA</text>
+  <text x="695" y="585" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">⑫</text>
+  <rect x="738" y="542" width="416" height="60" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="758" y="565" font-size="12.5" font-weight="700" fill="#24473F">稳定存储</text>
+  <text x="758" y="585" font-size="10.5" font-weight="700" fill="#24473F">相关状态跨崩溃保存的最终落点</text>
+
+  <rect x="666" y="635" width="488" height="149" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="688" y="662" font-size="12.5" font-weight="700" fill="#2B2A26">如何判断“提交完成”</text>
+  <circle cx="693" cy="690" r="4" fill="#B07D2B"/>
+  <text x="707" y="694" font-size="10.8" fill="#4A473F">只看到系统调用返回：仅能证明运行时变更成功</text>
+  <circle cx="693" cy="719" r="4" fill="#3D5A80"/>
+  <text x="707" y="723" font-size="10.8" fill="#4A473F">相关 fsync 成功返回：文件系统已完成所承诺的提交</text>
+  <circle cx="693" cy="748" r="4" fill="#2F6B5E"/>
+  <text x="707" y="752" font-size="10.8" fill="#4A473F">设备还必须诚实兑现 flush / FUA；否则承诺链会断裂</text>
+
+  <!-- A → B：显式提交 -->
+  <path d="M568 662 H620 V216 H734" fill="none" stroke="#3D5A80" stroke-width="1.7" stroke-dasharray="6 4" marker-end="url(#arr-blue)"/>
+  <rect x="606" y="377" width="28" height="126" rx="6" fill="#F5F4ED" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="620" y="440" font-size="10.5" font-weight="700" fill="#3D5A80" text-anchor="middle" transform="rotate(-90 620 440)">应用显式发起持久化</text>
+
+  <!-- 底部结论 -->
+  <rect x="56" y="836" width="1128" height="40" rx="8" fill="#2B2A26"/>
+  <text x="620" y="861" font-size="12" font-weight="700" fill="#F5F4ED" text-anchor="middle">核心边界：原子可见性由 rename / link / unlink 的运行时语义保证；崩溃持久性由 fsync 顺序、文件系统与设备共同保证</text>
+</svg>

@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1030" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>io-wq 请求状态机与四条执行路径</title>
+  <desc>从 Prepared 到 CQE 的状态迁移；四条路径对照；worker 睡眠触发扩容与 hash 串行边界。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrp" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1030" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">请求状态：先试非阻塞，再 poll，最后才进 io-wq</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">Completed ≠ 应用已处理 · CQE res 才是最终事实 · worker 睡眠会触发扩容直到上限</text>
+
+  <!-- ========== A: four paths ========== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 四条执行路径（同一 opcode 也可能分流）</text>
+
+  <rect x="48" y="128" width="270" height="118" rx="9" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="68" y="156" font-size="13" font-weight="700" fill="#24473F">① Inline 快路径</text>
+  <text x="68" y="180" font-size="11" fill="#2F6B5E">页缓存命中 / NOP / 无等待</text>
+  <text x="68" y="200" font-size="11" fill="#2F6B5E">提交上下文直接完成</text>
+  <text x="68" y="224" font-size="11" fill="#6B675C">无 worker · 无设备等待</text>
+
+  <rect x="338" y="128" width="270" height="118" rx="9" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="358" y="156" font-size="13" font-weight="700" fill="#2C4460">② 原生异步下发</text>
+  <text x="358" y="180" font-size="11" fill="#3D5A80">O_DIRECT 异步 issue 成功</text>
+  <text x="358" y="200" font-size="11" fill="#3D5A80">设备回调 → CQE</text>
+  <text x="358" y="224" font-size="11" fill="#6B675C">iodepth ≠ worker 数</text>
+
+  <rect x="628" y="128" width="270" height="118" rx="9" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="648" y="156" font-size="13" font-weight="700" fill="#4A3F68">③ 内部 poll</text>
+  <text x="648" y="180" font-size="11" fill="#6B5B95">-EAGAIN 且 fd 可 poll</text>
+  <text x="648" y="200" font-size="11" fill="#6B5B95">等就绪 → task_work 重试</text>
+  <text x="648" y="224" font-size="11" fill="#6B675C">socket/pipe 优先此路</text>
+
+  <rect x="918" y="128" width="274" height="118" rx="9" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="938" y="156" font-size="13" font-weight="700" fill="#6B4E28">④ io-wq 退化</text>
+  <text x="938" y="180" font-size="11" fill="#8A6A3A">-EAGAIN 且不能挂 poll</text>
+  <text x="938" y="200" font-size="11" fill="#8A6A3A">或 IOSQE_ASYNC 强制</text>
+  <text x="938" y="224" font-size="11" fill="#6B675C">worker 可睡眠执行</text>
+
+  <!-- ========== B: state machine — three framed layers, orthogonal only ========== -->
+  <text x="48" y="286" font-size="13" font-weight="700" fill="#4A473F">B · 请求状态机（自上而下分层，正交连线）</text>
+
+  <rect x="48" y="302" width="1144" height="446" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+
+  <!-- Layer 1: submission, inline attempt, and poll retry stay in one frame -->
+  <rect x="68" y="326" width="1094" height="116" rx="8" fill="#F3F6FA" stroke="#C9D4E2" stroke-width="1.1"/>
+  <text x="84" y="348" font-size="10.5" font-weight="700" fill="#5D6C7D">① 提交与非阻塞尝试</text>
+
+  <rect x="88" y="360" width="140" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="158" y="384" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">Prepared</text>
+  <text x="158" y="402" font-size="10" fill="#3D5A80" text-anchor="middle">SQE 已接收</text>
+
+  <path d="M236,388 H270" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="253" y="378" font-size="9" fill="#6B675C" text-anchor="middle">默认</text>
+
+  <rect x="278" y="360" width="150" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="353" y="384" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">InlineIssue</text>
+  <text x="353" y="402" font-size="10" fill="#3D5A80" text-anchor="middle">非阻塞尝试</text>
+
+  <path d="M436,388 H814" fill="none" stroke="#6B5B95" stroke-width="1.5" marker-end="url(#arrp)"/>
+  <text x="625" y="378" font-size="9.5" fill="#6B5B95" text-anchor="middle">-EAGAIN + fd 可 poll</text>
+
+  <rect x="822" y="360" width="150" height="56" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="897" y="384" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">PollWaiting</text>
+  <text x="897" y="402" font-size="10" fill="#6B5B95" text-anchor="middle">等待 fd 就绪</text>
+
+  <path d="M897,420 V434 H353 V420" fill="none" stroke="#6B5B95" stroke-width="1.35" marker-end="url(#arrp)"/>
+  <rect x="556" y="424" width="138" height="14" rx="3" fill="#F3F6FA"/>
+  <text x="625" y="434" font-size="9" fill="#6B5B95" text-anchor="middle">fd 就绪 → task_work 重试</text>
+
+  <!-- Layer 2: fan-out and worker execution -->
+  <rect x="68" y="452" width="1094" height="186" rx="8" fill="#F8F7F1" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="84" y="473" font-size="10.5" font-weight="700" fill="#6B675C">② InlineIssue 分流与 worker 执行</text>
+
+  <!-- InlineIssue fan-out rail -->
+  <path d="M353,416 V486 H1080" fill="none" stroke="#5A564B" stroke-width="1.4"/>
+  <path d="M158,486 H353" fill="none" stroke="#5A564B" stroke-width="1.4"/>
+
+  <!-- IOSQE_ASYNC bypasses InlineIssue and joins only the io-wq branch -->
+  <path d="M158,420 V446 H558 V486" fill="none" stroke="#8A6A3A" stroke-width="1.5"/>
+  <circle cx="558" cy="486" r="3" fill="#8A6A3A"/>
+  <text x="300" y="442" font-size="9.5" fill="#8A6A3A" text-anchor="middle">IOSQE_ASYNC：绕过 InlineIssue</text>
+
+  <path d="M158,486 V506" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <text x="158" y="501" font-size="9" fill="#2F6B5E" text-anchor="middle">立即完成</text>
+  <rect x="88" y="510" width="140" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="158" y="534" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Completed</text>
+  <text x="158" y="552" font-size="10" fill="#2F6B5E" text-anchor="middle">当前上下文完成</text>
+
+  <path d="M338,486 V506" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <text x="338" y="501" font-size="9" fill="#2F6B5E" text-anchor="middle">原生异步下发</text>
+  <rect x="268" y="510" width="140" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="338" y="534" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">NativeInFlight</text>
+  <text x="338" y="552" font-size="10" fill="#2F6B5E" text-anchor="middle">异步在途</text>
+
+  <path d="M558,486 V506" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arra)"/>
+  <text x="558" y="501" font-size="9" fill="#8A6A3A" text-anchor="middle">EAGAIN 无 poll</text>
+  <rect x="488" y="510" width="140" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="558" y="534" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">IowqQueued</text>
+  <text x="558" y="552" font-size="10" fill="#8A6A3A" text-anchor="middle">work 排队</text>
+
+  <path d="M636,538 H680" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arra)"/>
+  <text x="658" y="528" font-size="9" fill="#8A6A3A" text-anchor="middle">worker 取走</text>
+  <rect x="688" y="510" width="140" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="758" y="534" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">IowqRunning</text>
+  <text x="758" y="552" font-size="10" fill="#8A6A3A" text-anchor="middle">worker 执行</text>
+
+  <path d="M748,570 V580" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrr)"/>
+  <rect x="688" y="584" width="140" height="42" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="758" y="603" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">IowqSleeping</text>
+  <text x="758" y="618" font-size="9" fill="#A64B3C" text-anchor="middle">等锁 / 页 / 设备</text>
+  <path d="M770,584 V570" fill="none" stroke="#A64B3C" stroke-width="1.3" marker-end="url(#arrr)"/>
+  <text x="790" y="580" font-size="8.5" fill="#A64B3C">条件满足</text>
+
+  <path d="M1080,486 V506" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrr)"/>
+  <text x="1080" y="501" font-size="9" fill="#A64B3C" text-anchor="middle">错误 / NOWAIT</text>
+  <rect x="1010" y="510" width="140" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="1080" y="534" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">Failed</text>
+  <text x="1080" y="552" font-size="10" fill="#A64B3C" text-anchor="middle">发布负 res</text>
+
+  <!-- Poll / queued cancellation uses a dedicated amber lane -->
+  <path d="M897,420 V578 H920 V580" fill="none" stroke="#F8F7F1" stroke-width="5"/>
+  <path d="M897,420 V578 H920 V580" fill="none" stroke="#8A6A3A" stroke-width="1.35" marker-end="url(#arra)"/>
+  <text x="908" y="568" font-size="8.5" fill="#8A6A3A">取消成功</text>
+
+  <path d="M558,566 V632 H920 V630" fill="none" stroke="#FBFBF6" stroke-width="5"/>
+  <path d="M558,566 V632 H920 V630" fill="none" stroke="#8A6A3A" stroke-width="1.3" marker-end="url(#arra)"/>
+  <text x="610" y="628" font-size="8.5" fill="#8A6A3A">排队时取消</text>
+
+  <rect x="850" y="584" width="140" height="42" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="920" y="609" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">Cancelled</text>
+
+  <!-- Native callback and worker completion share one green lane into Completed -->
+  <path d="M688,538 H672 V642 H338" fill="none" stroke="#2F6B5E" stroke-width="1.35"/>
+  <path d="M338,566 V642 H158 V570" fill="none" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrg)"/>
+  <text x="348" y="594" font-size="8.5" fill="#2F6B5E">回调完成</text>
+  <text x="678" y="635" font-size="8.5" fill="#2F6B5E">执行结束</text>
+
+  <!-- Layer 3: terminal states publish to one CQE rail -->
+  <rect x="68" y="650" width="1094" height="90" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="84" y="670" font-size="10.5" font-weight="700" fill="#6B675C">③ 终态发布：Completed / Failed / Cancelled → CQE</text>
+
+  <path d="M190,566 V680 H1080" fill="none" stroke="#3D5A80" stroke-width="1.45"/>
+  <path d="M1080,566 V680" fill="none" stroke="#3D5A80" stroke-width="1.35"/>
+  <path d="M920,626 V680" fill="none" stroke="#3D5A80" stroke-width="1.35"/>
+  <path d="M1080,680 V686" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arrb)"/>
+
+  <rect x="1000" y="690" width="160" height="28" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1080" y="708" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CqeVisible → 收割</text>
+
+  <text x="84" y="717" font-size="10.5" fill="#6B675C">绿：完成主路径 · 紫：poll 重试 · 琥珀：io-wq / 取消 · 红：失败或睡眠</text>
+  <text x="84" y="735" font-size="9.5" fill="#A64B3C">边界：取消 Running 只表示发起尝试，底层操作未必立刻中止。</text>
+
+  <!-- ========== C: worker + queue ========== -->
+  <g transform="translate(0 48)">
+  <text x="48" y="740" font-size="13" font-weight="700" fill="#4A473F">C · io-wq 排队与扩容（模拟有界线程池）</text>
+
+  <rect x="48" y="756" width="1144" height="188" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+
+  <text x="68" y="788" font-size="12" font-weight="700" fill="#4A473F">bounded workers（上限示例 = 4）</text>
+
+  <rect x="68" y="804" width="100" height="48" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="118" y="826" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">wrk0 睡眠</text>
+  <text x="118" y="842" font-size="9" fill="#A64B3C" text-anchor="middle">等 NFS</text>
+
+  <rect x="184" y="804" width="100" height="48" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="234" y="826" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">wrk1 睡眠</text>
+  <text x="234" y="842" font-size="9" fill="#A64B3C" text-anchor="middle">等 fsync</text>
+
+  <rect x="300" y="804" width="100" height="48" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="350" y="826" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">wrk2 睡眠</text>
+  <text x="350" y="842" font-size="9" fill="#A64B3C" text-anchor="middle">等锁</text>
+
+  <rect x="416" y="804" width="100" height="48" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="466" y="826" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">wrk3 睡眠</text>
+  <text x="466" y="842" font-size="9" fill="#A64B3C" text-anchor="middle">等设备</text>
+
+  <path d="M530,828 L570,828" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+
+  <rect x="580" y="804" width="280" height="48" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="720" y="826" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">work_list 排队</text>
+  <text x="720" y="842" font-size="10" fill="#8A6A3A" text-anchor="middle">req5 · req6 · req7 · … → p99 毛刺</text>
+
+  <rect x="880" y="804" width="280" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="1020" y="826" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">应用仍可 submit</text>
+  <text x="1020" y="842" font-size="10" fill="#3D5A80" text-anchor="middle">CQ 长时间无对应完成</text>
+
+  <rect x="68" y="872" width="360" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="88" y="894" font-size="12" font-weight="700" fill="#2C4460">扩容规则</text>
+  <text x="88" y="912" font-size="11" fill="#3D5A80">worker 睡眠 + 队列非空 → 补 worker 至上限</text>
+
+  <rect x="448" y="872" width="360" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="468" y="894" font-size="12" font-weight="700" fill="#6B4E28">hash 串行</text>
+  <text x="468" y="912" font-size="11" fill="#8A6A3A">同 inode key 不能并行 · 加上限也解不开</text>
+
+  <rect x="828" y="872" width="332" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="848" y="894" font-size="12" font-weight="700" fill="#733428">退化 ≠ 同步 API</text>
+  <text x="848" y="912" font-size="11" fill="#A64B3C">阻塞从应用线程挪到 iou-wrk</text>
+  </g>
+</svg>

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 940" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="940" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">rc_pingpong 一次往返：五条泳道、三类等待点、零次拷贝</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">数据路径上 CPU 只做两件事：填 WQE、收 CQE——字节只被两端网卡各 DMA 一次</text>
+
+  <!-- 泳道表头 -->
+  <rect x="80" y="108" width="180" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="170" y="130" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">客户端应用</text>
+  <rect x="310" y="108" width="180" height="44" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="400" y="130" font-size="12.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">客户端 NIC</text>
+  <rect x="530" y="108" width="180" height="44" rx="7" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="620" y="130" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">网络</text>
+  <rect x="750" y="108" width="180" height="44" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="840" y="130" font-size="12.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">服务端 NIC</text>
+  <rect x="980" y="108" width="180" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1070" y="130" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">服务端应用</text>
+
+  <!-- 泳道虚线 -->
+  <line x1="170" y1="152" x2="170" y2="740" stroke="#D8D5C8" stroke-width="1" stroke-dasharray="4 5"/>
+  <line x1="400" y1="152" x2="400" y2="740" stroke="#D8D5C8" stroke-width="1" stroke-dasharray="4 5"/>
+  <line x1="620" y1="152" x2="620" y2="740" stroke="#D8D5C8" stroke-width="1" stroke-dasharray="4 5"/>
+  <line x1="840" y1="152" x2="840" y2="740" stroke="#D8D5C8" stroke-width="1" stroke-dasharray="4 5"/>
+  <line x1="1070" y1="152" x2="1070" y2="740" stroke="#D8D5C8" stroke-width="1" stroke-dasharray="4 5"/>
+
+  <!-- 步骤 0：双方先挂 recv -->
+  <rect x="84" y="176" width="172" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="170" y="196" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">⓪ 先 post_recv</text>
+  <text x="170" y="216" font-size="10" fill="#7A5518" text-anchor="middle">把 RQ 挂满再建连</text>
+  <rect x="984" y="176" width="172" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="1070" y="196" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">⓪ 先 post_recv</text>
+  <text x="1070" y="216" font-size="10" fill="#7A5518" text-anchor="middle">把 RQ 挂满再建连</text>
+  <text x="620" y="202" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">顺序即正确性：RQ 空着就收包 → RNR NAK【等待点①】</text>
+
+  <!-- ① post_send -->
+  <path d="M180,262 L392,262" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <text x="286" y="250" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">① post_send + doorbell（一次 MMIO）</text>
+
+  <!-- ② DMA 读 -->
+  <rect x="314" y="286" width="172" height="52" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="400" y="306" font-size="11.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">② DMA 读 MR</text>
+  <text x="400" y="326" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">0 拷贝：CPU 不碰数据</text>
+
+  <!-- ③ 上网线 -->
+  <path d="M410,372 L832,372" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="620" y="360" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">③ RoCE v2 包过交换机（丢包由 PFC/ECN 压住，4.7）</text>
+
+  <!-- ④ 对端 DMA 写 -->
+  <rect x="754" y="396" width="172" height="52" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="840" y="416" font-size="11.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">④ 消费 RQ 首个 WQE</text>
+  <text x="840" y="436" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">DMA 直写 recv buffer：0 拷贝</text>
+
+  <!-- ⑤ ACK 回程 + ⑥ CQE -->
+  <path d="M832,482 L410,482" fill="none" stroke="#5A564B" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrn)"/>
+  <text x="620" y="470" font-size="10.5" fill="#4A473F" text-anchor="middle">⑤ 硬件 ACK（应用无感，客户端 NIC 随后写发送侧 CQE）</text>
+  <path d="M848,448 C920,470 990,494 1062,516" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+  <text x="985" y="480" font-size="10.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">⑥ 写接收侧 CQE</text>
+
+  <!-- ⑦ poll -->
+  <rect x="984" y="524" width="172" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1070" y="544" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑦ poll CQ 取到消息</text>
+  <text x="1070" y="564" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle">空转或事件阻塞【等待点②】</text>
+
+  <!-- ⑧ 回 pong -->
+  <path d="M1062,610 L640,610" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <text x="850" y="598" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑧ post_send 回 pong——镜像走一遍 ①–⑥</text>
+
+  <!-- ⑨ 客户端完成 -->
+  <rect x="84" y="646" width="172" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="170" y="666" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑨ 收到接收侧 CQE</text>
+  <text x="170" y="686" font-size="10" fill="#2C4460" text-anchor="middle">一次 RTT 完成（~几 μs）</text>
+  <path d="M632,634 C480,640 340,646 264,662" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <!-- 底部两卡 -->
+  <rect x="70" y="760" width="540" height="150" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="790" font-size="13.5" font-weight="700" fill="#2B2A26">三类等待点</text>
+  <text x="94" y="818" font-size="11" fill="#4A473F">① RNR：对端 RQ 空——预防靠先挂 recv；rnr_retry=7 是无限重试，卡死而不报错</text>
+  <text x="94" y="842" font-size="11" fill="#4A473F">② 等完成：忙轮询空转换低尾延迟；或 comp_channel 阻塞——fd 可进 epoll（接 2.2 的 Reactor）</text>
+  <text x="94" y="866" font-size="11" fill="#4A473F">③ SQ 满：在途数就是窗口——加深即 4.9 的 --tx-depth，利特尔法则管着它</text>
+
+  <rect x="630" y="760" width="540" height="150" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="654" y="790" font-size="13.5" font-weight="700" fill="#2B2A26">拷贝账</text>
+  <text x="654" y="818" font-size="11" fill="#4A473F">数据路径 0 次 CPU 拷贝：字节只被两端 NIC 各 DMA 一次</text>
+  <text x="654" y="842" font-size="11" fill="#4A473F">唯一例外：建连时 QPN/PSN/GID 走 TCP 的几十个字节（带外交换）</text>
+  <text x="654" y="866" font-size="11" font-weight="700" fill="#7A5518">INLINE 是自愿拷贝：小消息塞进 WQE，换掉一次 DMA 读【取舍】</text>
+</svg>

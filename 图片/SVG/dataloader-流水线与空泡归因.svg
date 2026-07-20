@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">DataLoader 流水线：空泡 = max(0, 数据时间 − 计算时间)</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">预取队列能吸收抖动，补不了均值——归因先分清「稳态不够快」还是「毛刺没盖住」，再决定往哪层动刀</text>
+
+  <!-- ======== 流水线 ======== -->
+  <rect x="70" y="110" width="180" height="60" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="160" y="134" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">存储读取</text>
+  <text x="160" y="153" font-size="10" fill="#2C4460" text-anchor="middle">本地盘 / NFS / 对象存储</text>
+
+  <line x1="250" y1="140" x2="296" y2="140" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="298" y="122" width="36" height="36" rx="4" fill="#EFEDE3" stroke="#5A564B" stroke-width="1"/>
+  <text x="316" y="144" font-size="12" fill="#4A473F" text-anchor="middle">⇥</text>
+
+  <rect x="352" y="110" width="200" height="60" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="452" y="134" font-size="12" font-weight="700" fill="#7A5518" text-anchor="middle">CPU 预处理（workers）</text>
+  <text x="452" y="153" font-size="10" fill="#7A5518" text-anchor="middle">解码 / 增广 / collate——常吃满核</text>
+
+  <line x1="552" y1="140" x2="598" y2="140" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="600" y="122" width="36" height="36" rx="4" fill="#EFEDE3" stroke="#5A564B" stroke-width="1"/>
+  <text x="618" y="144" font-size="12" fill="#4A473F" text-anchor="middle">⇥</text>
+
+  <rect x="654" y="110" width="190" height="60" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="749" y="134" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">pinned + H2D</text>
+  <text x="749" y="153" font-size="10" fill="#4A3F68" text-anchor="middle">pinned 才真异步（8.1 §2）</text>
+
+  <line x1="844" y1="140" x2="890" y2="140" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="892" y="110" width="190" height="60" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.8"/>
+  <text x="987" y="134" font-size="12" font-weight="700" fill="#48562B" text-anchor="middle">GPU 计算</text>
+  <text x="987" y="153" font-size="10" fill="#48562B" text-anchor="middle">前向 / 反向 / 通信</text>
+
+  <text x="316" y="185" font-size="9.5" fill="#6B675C" text-anchor="middle">预取队列</text>
+  <text x="618" y="185" font-size="9.5" fill="#6B675C" text-anchor="middle">预取队列</text>
+
+  <!-- ======== 两条时间线 ======== -->
+  <text x="70" y="232" font-size="13.5" font-weight="700" fill="#2F6B5E">健康：数据段 ≤ 计算段，预取把数据完全藏进计算背后</text>
+
+  <text x="86" y="262" font-size="10" fill="#6B675C">GPU</text>
+  <g>
+    <rect x="130" y="248" width="200" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+    <text x="230" y="264" font-size="9.5" fill="#48562B" text-anchor="middle">step N 计算</text>
+    <rect x="332" y="248" width="200" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+    <text x="432" y="264" font-size="9.5" fill="#48562B" text-anchor="middle">step N+1 计算</text>
+    <rect x="534" y="248" width="200" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+    <text x="634" y="264" font-size="9.5" fill="#48562B" text-anchor="middle">step N+2 计算</text>
+  </g>
+  <text x="86" y="292" font-size="10" fill="#6B675C">数据</text>
+  <g>
+    <rect x="130" y="278" width="150" height="24" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+    <text x="205" y="294" font-size="9.5" fill="#2C4460" text-anchor="middle">预取 batch N+1</text>
+    <rect x="332" y="278" width="150" height="24" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+    <text x="407" y="294" font-size="9.5" fill="#2C4460" text-anchor="middle">预取 batch N+2</text>
+    <rect x="534" y="278" width="150" height="24" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+    <text x="609" y="294" font-size="9.5" fill="#2C4460" text-anchor="middle">预取 batch N+3</text>
+  </g>
+  <text x="790" y="288" font-size="10.5" fill="#2F6B5E">重叠成功：GPU 无空泡，存储再快也不再加分</text>
+
+  <text x="70" y="342" font-size="13.5" font-weight="700" fill="#A64B3C">饥饿：数据段 > 计算段——队列很快抽干，每步都要等</text>
+
+  <text x="86" y="372" font-size="10" fill="#6B675C">GPU</text>
+  <g>
+    <rect x="130" y="358" width="150" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+    <text x="205" y="374" font-size="9.5" fill="#48562B" text-anchor="middle">计算</text>
+    <rect x="280" y="358" width="110" height="24" rx="3" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.2"/>
+    <text x="335" y="374" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">空泡（等数据）</text>
+    <rect x="390" y="358" width="150" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+    <text x="465" y="374" font-size="9.5" fill="#48562B" text-anchor="middle">计算</text>
+    <rect x="540" y="358" width="110" height="24" rx="3" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.2"/>
+    <text x="595" y="374" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">空泡</text>
+    <rect x="650" y="358" width="150" height="24" rx="3" fill="#E9EFDA" stroke="#48562B" stroke-width="1"/>
+    <text x="725" y="374" font-size="9.5" fill="#48562B" text-anchor="middle">计算</text>
+  </g>
+  <text x="86" y="402" font-size="10" fill="#6B675C">数据</text>
+  <g>
+    <rect x="130" y="388" width="260" height="24" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+    <text x="260" y="404" font-size="9.5" fill="#2C4460" text-anchor="middle">batch N+1（比计算长）</text>
+    <rect x="390" y="388" width="260" height="24" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+    <text x="520" y="404" font-size="9.5" fill="#2C4460" text-anchor="middle">batch N+2</text>
+  </g>
+  <text x="810" y="382" font-size="10.5" fill="#A64B3C">稳态吞吐差：加大队列没用——</text>
+  <text x="810" y="400" font-size="10.5" fill="#A64B3C">队列吸收方差，补不了均值</text>
+
+  <!-- ======== 归因决策树 ======== -->
+  <text x="70" y="456" font-size="14" font-weight="700" fill="#2B2A26">归因决策树：三刀切下去，层就定位了</text>
+
+  <rect x="70" y="474" width="260" height="56" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="200" y="497" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">第一刀：profiler 看 step 分解</text>
+  <text x="200" y="516" font-size="10" fill="#6B675C" text-anchor="middle">data_time 占比高？→ 是数据问题</text>
+
+  <line x1="330" y1="502" x2="378" y2="502" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="380" y="474" width="280" height="56" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="520" y="497" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">第二刀：换合成数据（内存直出）</text>
+  <text x="520" y="516" font-size="10" fill="#6B675C" text-anchor="middle">空泡消失？→ 分岔点</text>
+
+  <line x1="660" y1="490" x2="730" y2="474" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="660" y1="514" x2="730" y2="546" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="695" y="470" font-size="10" fill="#2F6B5E">消失</text>
+  <text x="695" y="548" font-size="10" fill="#A64B3C">不消失</text>
+
+  <rect x="732" y="446" width="448" height="70" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="756" y="470" font-size="11" font-weight="700" fill="#2C4460">存储/IO 侧：第三刀用 iostat / nfsstat / 对象存储指标定层</text>
+  <text x="756" y="490" font-size="10" fill="#2C4460">小文件海（元数据 QPS，7.2）· NFS 单入口饱和（7.6）· 随机读形状</text>
+  <text x="756" y="508" font-size="10" fill="#2C4460">第二个 epoch 明显变快 = 页缓存在帮忙,数据集大于内存后会消失</text>
+
+  <rect x="732" y="530" width="448" height="70" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="756" y="554" font-size="11" font-weight="700" fill="#7A5518">主机侧：CPU 预处理或 H2D</text>
+  <text x="756" y="574" font-size="10" fill="#7A5518">workers 不足 / 解码太贵（JPEG）/ 主存带宽被拷贝吃掉（8.1 §3 的账）</text>
+  <text x="756" y="592" font-size="10" fill="#7A5518">pageable 内存假异步（8.1 §2）——H2D 与计算没重叠</text>
+
+  <!-- ======== 底部 ======== -->
+  <rect x="70" y="628" width="1110" height="104" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="96" y="656" font-size="12" font-weight="700" fill="#2B2A26">修复杠杆按层对号（先归因后动刀，顺序反了全是无效调参）：</text>
+  <text x="96" y="682" font-size="11" fill="#4A473F">存储侧：小文件打包成顺序大文件（tar/WebDataset 类）· 本地 NVMe 缓存（7.3）· 拆入口（7.6）；主机侧：加 workers · 换便宜解码/离线预处理 · pinned 池化</text>
+  <text x="96" y="708" font-size="11" fill="#4A473F">重叠侧：加 prefetch 深度只治毛刺；GDS 只救大块顺序读（8.2 §2），救不了小文件海——每个杠杆都有明确的「不适用」清单</text>
+</svg>

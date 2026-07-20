@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">贯穿案例：双路存储节点的带宽预算</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">16 盘供 112 GB/s、网络出口 50 GB/s、内存每路 200+ GB/s、UPI 几十 GB/s——摆放决定哪条先到顶</text>
+
+  <!-- Socket 0 -->
+  <rect x="70" y="110" width="520" height="440" rx="10" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="90" y="138" font-size="14" font-weight="700" fill="#2C4460">Socket 0（本路闭环）</text>
+
+  <rect x="90" y="156" width="220" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="200" y="178" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">CPU0：IO 线程钉这</text>
+  <text x="200" y="200" font-size="10.5" fill="#2C4460" text-anchor="middle">队列中断也落本路核（§5）</text>
+
+  <rect x="90" y="260" width="220" height="88" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="200" y="284" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">本路内存 8 通道</text>
+  <text x="200" y="306" font-size="10.5" fill="#7A5518" text-anchor="middle">200+ GB/s【量级】</text>
+  <text x="200" y="326" font-size="10.5" fill="#7A5518" text-anchor="middle">盘的写 + 网卡的读都过这里</text>
+
+  <rect x="350" y="156" width="220" height="88" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="460" y="180" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">8 × NVMe Gen4 ×4</text>
+  <text x="460" y="202" font-size="10.5" fill="#733428" text-anchor="middle">每盘 ~7 GB/s</text>
+  <text x="460" y="222" font-size="10.5" fill="#733428" text-anchor="middle">本路半数盘合计 ~56 GB/s</text>
+
+  <rect x="350" y="290" width="220" height="76" rx="7" fill="#E2E9ED" stroke="#4E6E81" stroke-width="1.4"/>
+  <text x="460" y="314" font-size="12.5" font-weight="700" fill="#33505F" text-anchor="middle">200G RDMA 网卡</text>
+  <text x="460" y="338" font-size="10.5" fill="#33505F" text-anchor="middle">出口 25 GB/s（Gen4 ×16）</text>
+
+  <path d="M350,222 C322,240 316,254 312,276" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+  <text x="322" y="244" font-size="10" font-weight="700" fill="#2F6B5E">① DMA 写</text>
+  <path d="M310,320 C324,322 334,324 344,326" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+  <text x="252" y="368" font-size="10" font-weight="700" fill="#2F6B5E">② DMA 读</text>
+
+  <text x="90" y="524" font-size="10.5" font-weight="700" fill="#2F6B5E">闭环：盘 → 本路内存 → 本路网卡，数据全程不出 socket</text>
+
+  <!-- Socket 1 -->
+  <rect x="650" y="110" width="520" height="440" rx="10" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="670" y="138" font-size="14" font-weight="700" fill="#2C4460">Socket 1（对称的另一半）</text>
+
+  <rect x="670" y="156" width="220" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="780" y="178" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">CPU1</text>
+  <text x="780" y="200" font-size="10.5" fill="#2C4460" text-anchor="middle">服务本路盘与本路网卡</text>
+
+  <rect x="670" y="260" width="220" height="88" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="780" y="284" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">本路内存 8 通道</text>
+  <text x="780" y="306" font-size="10.5" fill="#7A5518" text-anchor="middle">200+ GB/s【量级】</text>
+
+  <rect x="930" y="156" width="220" height="88" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="1040" y="180" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">另 8 × NVMe Gen4 ×4</text>
+  <text x="1040" y="202" font-size="10.5" fill="#733428" text-anchor="middle">合计 ~56 GB/s</text>
+
+  <rect x="930" y="290" width="220" height="76" rx="7" fill="#E2E9ED" stroke="#4E6E81" stroke-width="1.4"/>
+  <text x="1040" y="314" font-size="12.5" font-weight="700" fill="#33505F" text-anchor="middle">另一张 200G 网卡</text>
+  <text x="1040" y="338" font-size="10.5" fill="#33505F" text-anchor="middle">出口 25 GB/s</text>
+
+  <path d="M930,222 C902,240 896,254 892,276" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+  <path d="M890,320 C904,322 914,324 924,326" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrt)"/>
+
+  <text x="670" y="524" font-size="10.5" font-weight="700" fill="#2F6B5E">对称闭环：两路合计出口 2 × 25 = 50 GB/s</text>
+
+  <!-- UPI（画在两个容器之后，避免被容器盖住） -->
+  <line x1="590" y1="330" x2="650" y2="330" stroke="#5A564B" stroke-width="2.5"/>
+  <text x="620" y="308" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">UPI/xGMI</text>
+  <text x="620" y="352" font-size="9.5" fill="#6B675C" text-anchor="middle">几十 GB/s·共享</text>
+  <text x="620" y="368" font-size="9.5" fill="#6B675C" text-anchor="middle">远端访存 ~1.5–2×</text>
+
+  <!-- 错位路径 -->
+  <path d="M314,340 C480,392 760,388 926,342" fill="none" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#arrr)"/>
+  <text x="96" y="398" font-size="10.5" font-weight="700" fill="#A64B3C">错位摆放：对路网卡来取数</text>
+  <text x="96" y="416" font-size="10.5" font-weight="700" fill="#A64B3C">→ 数据面挤上 UPI → 服务时间抖 → p99 上翘</text>
+
+  <!-- 带宽账 -->
+  <rect x="70" y="580" width="1100" height="136" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="610" font-size="13.5" font-weight="700" fill="#2B2A26">全节点带宽账【量级】</text>
+  <text x="94" y="636" font-size="11.5" fill="#4A473F">供给：16 盘 × 7 ≈ 112 GB/s　　出口：2 × 200 Gbps = 50 GB/s　　→ 盘喂得饱出口，瓶颈被有意设计在网络上</text>
+  <text x="94" y="660" font-size="11.5" fill="#4A473F">内存税：零拷贝时内存流量 ≈ 出口 × 2 = 100 GB/s；每多一次 CPU 拷贝 +100 GB/s——两次拷贝 ≈ 300 GB/s，逼近双路内存合计</text>
+  <text x="94" y="684" font-size="11.5" font-weight="700" fill="#A64B3C">能不能跑满 50 GB/s，取决于每个字节过内存几次——这正是 4.1 RDMA 的入场理由</text>
+
+  <!-- 摆放原则 -->
+  <rect x="70" y="740" width="1100" height="92" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="770" font-size="13.5" font-weight="700" fill="#2B2A26">摆放三原则</text>
+  <text x="94" y="798" font-size="11.5" fill="#4A473F">① 盘与网卡对半分到两路　　② 线程 / buffer / 中断与设备同路（10.5 的三要素对齐）　　③ 数据面不过 UPI，跨路只走控制流</text>
+</svg>

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 840" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="840" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">ib_write_bw 在测什么：恒满窗下的两段曲线</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">窗口机制决定"测的是上限"；消息大小决定落在消息率区还是线速区——拐点 ≈ 线速 ÷ 消息率</text>
+
+  <!-- 左：恒满窗机制 -->
+  <rect x="70" y="110" width="520" height="440" rx="10" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="90" y="138" font-size="14" font-weight="700" fill="#2C4460">恒满窗（--tx-depth）</text>
+
+  <rect x="150" y="158" width="380" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="340" y="180" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">开局 post 满 tx-depth 个 WQE</text>
+  <text x="340" y="202" font-size="10.5" fill="#2C4460" text-anchor="middle">之后收 1 补 1——2.3 的恒满窗搬到网络</text>
+
+  <path d="M340,222 L340,248" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <rect x="150" y="252" width="380" height="64" rx="7" fill="#E3EFE9" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="340" y="274" font-size="12.5" font-weight="700" fill="#1F4A3E" text-anchor="middle">网卡逐个执行</text>
+  <text x="340" y="296" font-size="10.5" fill="#1F4A3E" text-anchor="middle">DMA 读 MR → 网线 → 对端 DMA 写 → ACK → CQE</text>
+
+  <path d="M340,316 L340,342" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+
+  <rect x="150" y="346" width="380" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="340" y="368" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">poll CQ 收割</text>
+  <text x="340" y="390" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">CQ 空 → 空转【等待点②】</text>
+
+  <path d="M150,378 C96,360 96,220 146,196" fill="none" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrr)"/>
+  <text x="106" y="286" font-size="10.5" font-weight="700" fill="#A64B3C" transform="rotate(-90 106 286)" text-anchor="middle">收 1 补 1；SQ 满【等待点①】</text>
+
+  <text x="90" y="452" font-size="11" fill="#4A473F">在途消息数 L = 带宽 × 单程时延——利特尔法则第三次出场</text>
+  <text x="90" y="478" font-size="11" fill="#4A473F">窗口常空 → 测的是提交侧；窗口常满 → 测的才是网卡/网络上限</text>
+  <text x="90" y="504" font-size="11" font-weight="700" fill="#2F6B5E">先确认窗口打满，再谈曲线——与 2.6 的 aqu-sz 验证同一纪律</text>
+
+  <!-- 右：两段曲线 -->
+  <rect x="650" y="110" width="520" height="440" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="670" y="138" font-size="14" font-weight="700" fill="#4A473F">消息大小扫描（-s 2 … 8M，横轴对数）</text>
+
+  <!-- 坐标轴 -->
+  <line x1="700" y1="480" x2="1140" y2="480" stroke="#5A564B" stroke-width="1.5"/>
+  <line x1="700" y1="480" x2="700" y2="170" stroke="#5A564B" stroke-width="1.5"/>
+  <text x="686" y="166" font-size="10.5" fill="#6B675C">带宽</text>
+
+  <!-- 曲线：先线性后平台 -->
+  <polyline points="700,468 760,440 830,380 900,290 950,225 990,212 1140,210" fill="none" stroke="#185FA5" stroke-width="2.5"/>
+  <circle cx="960" cy="219" r="5" fill="#A64B3C"/>
+
+  <!-- 刻度示意 -->
+  <text x="700" y="496" font-size="9.5" fill="#6B675C" text-anchor="middle">2B</text>
+  <text x="810" y="496" font-size="9.5" fill="#6B675C" text-anchor="middle">4KB</text>
+  <text x="960" y="496" font-size="9.5" fill="#6B675C" text-anchor="middle">64KB</text>
+  <text x="1110" y="496" font-size="9.5" fill="#6B675C" text-anchor="middle">1MB</text>
+
+  <text x="730" y="330" font-size="10.5" font-weight="700" fill="#2C4460">消息率受限区：</text>
+  <text x="730" y="348" font-size="10.5" fill="#2C4460">带宽 = 消息率 × size，斜线上升</text>
+  <text x="730" y="366" font-size="10.5" fill="#2C4460">看 MsgRate 列而不是 BW 列</text>
+
+  <text x="985" y="188" font-size="10.5" font-weight="700" fill="#1F4A3E">线速平台 ~25 GB/s（200G）</text>
+  <text x="900" y="252" font-size="10.5" font-weight="700" fill="#A64B3C">拐点 ≈ 线速 ÷ 消息率</text>
+
+  <text x="670" y="524" font-size="11" fill="#4A473F">平台矮了 → 查链路 / MTU（3.8）；斜线平了 → 提交侧 CPU 或单 QP 消息率到顶</text>
+
+  <!-- 底部：交叉观测 -->
+  <rect x="70" y="588" width="1100" height="200" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="94" y="618" font-size="13.5" font-weight="700" fill="#2B2A26">同一次实验的三个观测点</text>
+  <text x="94" y="646" font-size="11.5" fill="#4A473F">应用视角：perftest 自带的 BW average / MsgRate / t_typical / 99%——第一手数字</text>
+  <text x="94" y="670" font-size="11.5" fill="#4A473F">CPU 视角：mpstat——轮询核恒 100% 是设计不是瓶颈；softirq 应接近 0，高了说明数据在走软件路径（4.8）</text>
+  <text x="94" y="694" font-size="11.5" fill="#4A473F">网络视角：ethtool -S 里的 pause 帧计数——非零说明交换机在按 PFC 刹车（4.7）</text>
+  <text x="94" y="726" font-size="11.5" font-weight="700" fill="#A64B3C">数字必须带环境快照：设备型号、固件、MTU、链路状态（3.8）、是否 rxe（4.8）——否则既不可比也不可复现</text>
+</svg>

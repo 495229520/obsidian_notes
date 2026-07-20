@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 560" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="560" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">崩溃一致地替换一个文件：四步缺一不可</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">目标：任何时刻掉电，重启后要么看到完整旧文件，要么看到完整新文件 —— 绝不出现半截</text>
+
+  <rect x="64" y="130" width="260" height="150" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="84" y="160" font-size="14" font-weight="700" fill="#2C4460">① 写临时文件</text>
+  <text x="84" y="186" font-size="12" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">write(dir/.tmp)</text>
+  <text x="84" y="216" font-size="11" fill="#6B675C">此步后崩溃：</text>
+  <text x="84" y="236" font-size="11.5" fill="#4A473F">旧文件完好；残留 tmp 可清理</text>
+
+  <rect x="364" y="130" width="260" height="150" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="384" y="160" font-size="14" font-weight="700" fill="#24473F">② 刷新文件内容</text>
+  <text x="384" y="186" font-size="12" fill="#24473F" font-family="'SF Mono',Menlo,Consolas,monospace">fsync(tmp_fd)</text>
+  <text x="384" y="216" font-size="11" fill="#6B675C">此步后崩溃：</text>
+  <text x="384" y="236" font-size="11.5" fill="#4A473F">旧文件完好；新内容已确定在盘上</text>
+
+  <rect x="664" y="130" width="260" height="150" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="684" y="160" font-size="14" font-weight="700" fill="#7A5518">③ 原子切换目录项</text>
+  <text x="684" y="186" font-size="12" fill="#7A5518" font-family="'SF Mono',Menlo,Consolas,monospace">rename(tmp, target)</text>
+  <text x="684" y="216" font-size="11" fill="#6B675C">此步后崩溃：</text>
+  <text x="684" y="236" font-size="11.5" fill="#4A473F">看到旧或新【POSIX 原子】，不会半截</text>
+
+  <rect x="964" y="130" width="260" height="150" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="984" y="160" font-size="14" font-weight="700" fill="#4A3F68">④ 刷新目录本身</text>
+  <text x="984" y="186" font-size="12" fill="#4A3F68" font-family="'SF Mono',Menlo,Consolas,monospace">fsync(dir_fd)</text>
+  <text x="984" y="216" font-size="11" fill="#6B675C">完成后：</text>
+  <text x="984" y="236" font-size="11.5" fill="#4A473F">目录项也是数据 —— 替换结果保证持久</text>
+
+  <line x1="328" y1="205" x2="358" y2="205" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <line x1="628" y1="205" x2="658" y2="205" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <line x1="928" y1="205" x2="958" y2="205" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+
+  <rect x="64" y="340" width="1160" height="150" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="88" y="372" font-size="13.5" font-weight="700" fill="#733428">两个最常被跳过的步骤</text>
+  <text x="88" y="402" font-size="12.5" fill="#733428">跳过②：rename 可能先于数据落盘持久 —— 崩溃后 target 指向空文件 / 半截文件（ext4 的 auto_da_alloc 只是缓解，别依赖）</text>
+  <text x="88" y="430" font-size="12.5" fill="#733428">跳过④：rename 这个目录修改本身还没持久 —— 崩溃后新文件"消失"，重新看到旧文件</text>
+  <text x="88" y="462" font-size="12" fill="#4A473F">数据库的 WAL / checkpoint 文件管理都遵循这套模式；任何"写配置 / 存档"想崩溃安全，也照此办理</text>
+</svg>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 750" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="750" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">空盘 ≠ 稳态：同一块盘的三个性能状态</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">SNIA PTS：FOB → 过渡 → 稳态。短测试只看见左边，生产负载活在右边 —— 对比必须在同一状态下进行</text>
+
+  <!-- 区域底色 -->
+  <rect x="110" y="130" width="250" height="370" fill="#E3EAF4" opacity="0.35"/>
+  <rect x="360" y="130" width="360" height="370" fill="#F0E3D3" opacity="0.4"/>
+  <rect x="720" y="130" width="440" height="370" fill="#DCE9E3" opacity="0.35"/>
+  <line x1="360" y1="130" x2="360" y2="500" stroke="#9B968A" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="720" y1="130" x2="720" y2="500" stroke="#9B968A" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <text x="130" y="152" font-size="13" font-weight="700" fill="#2C4460">① FOB（空盘）</text>
+  <text x="500" y="152" font-size="13" font-weight="700" fill="#7A5426">② 过渡</text>
+  <text x="740" y="152" font-size="13" font-weight="700" fill="#24473F">③ 稳态</text>
+
+  <!-- 坐标轴 -->
+  <line x1="110" y1="130" x2="110" y2="500" stroke="#5A564B" stroke-width="1.4"/>
+  <line x1="110" y1="500" x2="1165" y2="500" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="48" y="118" font-size="11" fill="#6B675C">随机写 IOPS（相对空盘峰值）</text>
+  <text x="1030" y="524" font-size="11" fill="#6B675C">持续写入时间 →</text>
+  <line x1="104" y1="190" x2="110" y2="190" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="98" y="194" font-size="10" fill="#6B675C" text-anchor="end">100%</text>
+  <line x1="104" y1="440" x2="110" y2="440" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="98" y="444" font-size="10" fill="#6B675C" text-anchor="end">~15%</text>
+
+  <!-- 性能曲线 -->
+  <path d="M110,190 L245,190 C250,190 252,238 258,243 L360,250 C430,258 470,330 540,390 C610,428 670,438 720,440 L1160,440"
+        fill="none" stroke="#3D5A80" stroke-width="2.5"/>
+
+  <!-- 悬崖标注 -->
+  <text x="272" y="170" font-size="10.5" font-weight="700" fill="#7A5426">悬崖①：SLC 缓存写满</text>
+  <text x="272" y="186" font-size="10.5" fill="#7A5426">（秒~分钟级，顺序写也躲不过）</text>
+  <line x1="268" y1="182" x2="254" y2="218" stroke="#B07A3E" stroke-width="1.1"/>
+  <text x="430" y="300" font-size="10.5" font-weight="700" fill="#7A392F">悬崖②：空闲块耗尽，GC 进入关键路径</text>
+  <line x1="426" y1="296" x2="404" y2="270" stroke="#A05248" stroke-width="1.1"/>
+
+  <!-- 区域注解 -->
+  <text x="125" y="290" font-size="10.5" fill="#2C4460">空闲块充足：GC 不在关键路径</text>
+  <text x="125" y="308" font-size="10.5" fill="#2C4460">读未写 LBA：控制器直接回 0</text>
+  <text x="740" y="410" font-size="10.5" fill="#24473F">主机写与 GC 搬运分抢同一份 NAND 带宽；空盘落差常见 2–10×【量级】</text>
+
+  <!-- 稳态窗口 -->
+  <line x1="720" y1="425" x2="1160" y2="425" stroke="#2F6B5E" stroke-width="1.2" stroke-dasharray="5,4"/>
+  <line x1="720" y1="455" x2="1160" y2="455" stroke="#2F6B5E" stroke-width="1.2" stroke-dasharray="5,4"/>
+  <text x="730" y="480" font-size="10.5" fill="#24473F">稳态窗口：波动 ≤ 20% 且无下行趋势（简化 SNIA 判据）—— 只在这里取数</text>
+
+  <!-- 预处理流水线 -->
+  <text x="48" y="556" font-size="13" font-weight="700" fill="#2B2A26">预处理（Preconditioning）：先把盘推进目标状态，再开始计数</text>
+  <rect x="48" y="572" width="262" height="78" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="64" y="598" font-size="12.5" font-weight="700" fill="#2B2A26">① 清盘 Purge</text>
+  <text x="64" y="620" font-size="10" fill="#6B675C">blkdiscard 或 nvme format</text>
+  <text x="64" y="636" font-size="10" fill="#6B675C">回到 FOB（毁灭性操作）</text>
+  <line x1="310" y1="611" x2="338" y2="611" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="340" y="572" width="262" height="78" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="356" y="598" font-size="12.5" font-weight="700" fill="#2B2A26">② 顺序写满 2× 容量</text>
+  <text x="356" y="620" font-size="10" fill="#6B675C">fio --rw=write --bs=1M --loops=2</text>
+  <text x="356" y="636" font-size="10" fill="#6B675C">让每个 LBA 都有真实数据</text>
+  <line x1="602" y1="611" x2="630" y2="611" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="632" y="572" width="262" height="78" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="648" y="598" font-size="12.5" font-weight="700" fill="#2B2A26">③ 目标负载压到稳态</text>
+  <text x="648" y="620" font-size="10" fill="#6B675C">fio --steadystate=iops_slope:0.3%</text>
+  <text x="648" y="636" font-size="10" fill="#6B675C">或长跑 + 事后判稳</text>
+  <line x1="894" y1="611" x2="922" y2="611" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="924" y="572" width="262" height="78" rx="7" fill="#F0EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="940" y="598" font-size="12.5" font-weight="700" fill="#2B2A26">④ 稳态窗口内测量</text>
+  <text x="940" y="620" font-size="10" fill="#6B675C">IOPS 均值 + p99 / p999 延迟</text>
+  <text x="940" y="636" font-size="10" fill="#6B675C">一起报告，不取峰值</text>
+
+  <text x="48" y="690" font-size="10.5" fill="#6B675C">读测试同理：先铺满数据再测读 —— 对已 TRIM 的 LBA，控制器常直接返回零，根本不碰 NAND【实现】</text>
+  <text x="48" y="714" font-size="10.5" fill="#6B675C">远端盘（NVMe-oF）同理：预处理针对的是盘的状态，与访问路径无关</text>
+</svg>

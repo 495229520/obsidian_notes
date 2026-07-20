@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1010" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FAF9F2/#8A8574；步骤框 #E3EAF4/#3D5A80/#2C4460；
+       成本/等待 #A64B3C；零成本/免除 #2F6B5E；中性箭头 #5A564B；与本库既有 rdma-*.svg 同一套 -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1010" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">ib_write_bw 的一次迭代：一条 RDMA WRITE 的全路径</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">数据路径 0 系统调用、0 CPU 拷贝、0 中断——应用只做两件事：填 WQE 敲门铃，然后自旋等 CQE；其余全在硬件里</text>
+
+  <!-- 四条泳道 -->
+  <rect x="48" y="104" width="272" height="700" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="184" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">发起端应用（用户态）</text>
+  <rect x="336" y="104" width="272" height="700" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="472" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">发起端网卡</text>
+  <rect x="624" y="104" width="232" height="700" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="740" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">网络</text>
+  <rect x="872" y="104" width="320" height="700" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="1032" y="132" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">远端节点（网卡 + 内存）</text>
+
+  <!-- ① 填 WQE -->
+  <rect x="64" y="152" width="240" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="184" y="175" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① 填 WQE 进 SQ</text>
+  <text x="184" y="196" font-size="10.5" fill="#2C4460" text-anchor="middle">普通用户态内存写，纳秒级，不陷入</text>
+
+  <path d="M184,210 L184,244" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ② doorbell -->
+  <rect x="64" y="248" width="240" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="184" y="271" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 写 doorbell（MMIO）</text>
+  <text x="184" y="292" font-size="10.5" fill="#2C4460" text-anchor="middle">PCIe posted 写：发出即返回，CPU 不等</text>
+
+  <path d="M304,277 L348,277" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ③ NIC DMA 读 -->
+  <rect x="352" y="220" width="112" height="20" rx="4" fill="#F1E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="408" y="234" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点（硬件侧）</text>
+  <rect x="352" y="248" width="240" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="472" y="271" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ DMA 读 WQE 与数据</text>
+  <text x="472" y="292" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">内存总线第①次 · PCIe 读往返</text>
+
+  <path d="M472,306 L472,348" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ④ 分段封包 -->
+  <rect x="352" y="352" width="240" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="472" y="375" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">④ 分段封包、上线发送</text>
+  <text x="472" y="396" font-size="10.5" fill="#2C4460" text-anchor="middle">串行化 = 大小 ÷ 线速；传输层在网卡里</text>
+
+  <path d="M592,381 L636,458" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑤ 交换机 -->
+  <rect x="640" y="436" width="200" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="740" y="459" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑤ 交换机转发</text>
+  <text x="740" y="480" font-size="10.5" fill="#2C4460" text-anchor="middle">每跳 ~几百 ns【量级】</text>
+
+  <path d="M840,465 L884,542" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑥ 远端 DMA 写 -->
+  <rect x="888" y="520" width="288" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1032" y="543" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑥ 远端网卡 DMA 写入 MR</text>
+  <text x="1032" y="564" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">内存总线第②次；远端 CPU 全程不参与</text>
+
+  <path d="M1032,578 L1032,612" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑦ ACK -->
+  <rect x="888" y="616" width="288" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1032" y="639" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑦ 网卡硬件回 ACK</text>
+  <text x="1032" y="660" font-size="10.5" fill="#2C4460" text-anchor="middle">RC 的可靠性由网卡传输层承担</text>
+
+  <path d="M888,655 L596,725" fill="none" stroke="#2F6B5E" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrt)"/>
+  <text x="742" y="672" font-size="10.5" fill="#2F6B5E" text-anchor="middle">ACK 原路返回</text>
+
+  <!-- ⑧ 写 CQE -->
+  <rect x="352" y="700" width="240" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="472" y="723" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑧ DMA 写 CQE 进 CQ</text>
+  <text x="472" y="744" font-size="10.5" fill="#2C4460" text-anchor="middle">一次小额 DMA 写，落在主机内存</text>
+
+  <path d="M352,729 L308,729" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ⑨ poll CQ -->
+  <rect x="64" y="672" width="112" height="20" rx="4" fill="#F1E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="120" y="686" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle">等待点（软件侧）</text>
+  <rect x="64" y="700" width="240" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="184" y="723" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑨ poll CQ 收割完成</text>
+  <text x="184" y="744" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">应用唯一等待点：用户态自旋</text>
+
+  <!-- 对账条 -->
+  <rect x="48" y="824" width="700" height="160" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="852" font-size="13.5" font-weight="700" fill="#4A473F">一次 WRITE 的对账</text>
+  <text x="72" y="882" font-size="12" fill="#4A473F">拷贝：CPU 拷贝 0 次；数据过内存总线 2 次（发端 DMA 读、收端 DMA 写）</text>
+  <text x="72" y="912" font-size="12" fill="#4A473F">内核：数据路径系统调用 0 次、中断 0 次——内核只在建连期出场（建资源 + TCP 带外交换）</text>
+  <text x="72" y="942" font-size="12" fill="#4A473F">等待：软件只在 ⑨ 自旋；其余时间都花在硬件里（PCIe 往返、串行化、交换机、ACK 返程）</text>
+
+  <rect x="764" y="824" width="428" height="160" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="788" y="852" font-size="13.5" font-weight="700" fill="#4A473F">bw 与 lat 怎么测</text>
+  <text x="788" y="882" font-size="12" fill="#4A473F">bw：恒满窗——保持 tx-depth 条 WRITE 在途，数完成字节</text>
+  <text x="788" y="912" font-size="12" fill="#4A473F">lat：单发乒乓——一来一回，报告值 = 往返时间的一半</text>
+  <text x="788" y="942" font-size="12" fill="#4A473F">write_lat 靠盯收侧 buffer 末字节发现对端写到达</text>
+</svg>

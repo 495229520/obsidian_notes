@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 840" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1180" height="840" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">一次 read(fd, buf, n)：从函数调用到 VFS 分发</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">系统调用是受控的跨特权级调用；VFS 用函数指针表在内核里实现运行时多态</text>
+
+  <!-- 主链 -->
+  <rect x="80" y="120" width="440" height="62" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="300" y="146" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">ifs.read(buf, n) → ::read(fd, buf, n)</text>
+  <text x="300" y="168" font-size="11.5" fill="#2C4460" text-anchor="middle">应用与库代码：普通函数调用，仍在用户态</text>
+  <line x1="300" y1="184" x2="300" y2="211" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="80" y="216" width="440" height="62" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="300" y="242" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">glibc：装配调用号与参数，执行 syscall</text>
+  <text x="300" y="264" font-size="11.5" fill="#2C4460" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">rax=0 (SYS_read) · rdi=fd · rsi=buf · rdx=n</text>
+  <line x1="300" y1="280" x2="300" y2="325" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <line x1="60" y1="308" x2="1120" y2="308" stroke="#A64B3C" stroke-width="1.4" stroke-dasharray="7 5"/>
+  <text x="560" y="300" font-size="12" fill="#A64B3C">syscall 指令：Ring 3 → Ring 0，模式切换（同一线程，没有调度发生）</text>
+
+  <rect x="80" y="330" width="440" height="62" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="300" y="356" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">entry_SYSCALL_64（内核入口）</text>
+  <text x="300" y="378" font-size="11.5" fill="#24473F" text-anchor="middle">保存用户现场 → 查 sys_call_table[0] → ksys_read</text>
+  <line x1="300" y1="392" x2="300" y2="421" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="80" y="426" width="440" height="62" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="300" y="452" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">vfs_read(file, buf, n, &amp;pos)</text>
+  <text x="300" y="474" font-size="11.5" fill="#24473F" text-anchor="middle">用 fd 作下标从进程 fd 表取 struct file；校验权限与范围</text>
+  <line x1="300" y1="488" x2="300" y2="517" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="80" y="522" width="440" height="70" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="300" y="550" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">file-&gt;f_op-&gt;read_iter(iocb, iter)</text>
+  <text x="300" y="574" font-size="11.5" fill="#24473F" text-anchor="middle">按函数指针表分发到具体文件系统 —— 内核版“虚函数调用”</text>
+  <line x1="300" y1="592" x2="300" y2="621" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="80" y="626" width="440" height="62" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="300" y="652" font-size="14" font-weight="700" fill="#7A5518" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">generic_file_read_iter → filemap_read</text>
+  <text x="300" y="674" font-size="11.5" fill="#7A5518" text-anchor="middle">进入 Page Cache：命中拷贝返回，未命中发起设备 IO（→ 1.2）</text>
+  <line x1="300" y1="688" x2="300" y2="717" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="80" y="722" width="440" height="62" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="300" y="748" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">copy_to_user → 恢复现场 → 回到用户态</text>
+  <text x="300" y="770" font-size="11.5" fill="#2C4460" text-anchor="middle">返回值 = 实际读到的字节数（可能少于 n：短读）</text>
+
+  <!-- 右侧：说明卡 1 -->
+  <rect x="600" y="120" width="520" height="150" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="624" y="148" font-size="14" font-weight="700" fill="#2B2A26">模式切换 ≠ 上下文切换</text>
+  <text x="624" y="176" font-size="12" fill="#4A473F">· 同一线程、同一地址空间：只换特权级与栈</text>
+  <text x="624" y="198" font-size="12" fill="#4A473F">· 不发生调度，寄存器现场由内核保存并恢复</text>
+  <text x="624" y="220" font-size="12" fill="#4A473F">· 往返开销量级约百纳秒（受 KPTI 等缓解措施影响）</text>
+  <text x="624" y="242" font-size="12" fill="#4A473F">· 只有阻塞等待时才让出 CPU，那才是上下文切换</text>
+
+  <!-- 右侧：f_op 分发扇出 -->
+  <text x="660" y="432" font-size="11.5" fill="#6B675C">open() 时由文件系统把自家实现填进 f_op</text>
+
+  <path d="M524,548 C590,548 600,475 654,475" fill="none" stroke="#2F6B5E" stroke-width="1.3" marker-end="url(#arrg)"/>
+  <path d="M524,556 C590,556 600,529 654,529" fill="none" stroke="#2F6B5E" stroke-width="1.3" marker-end="url(#arrg)"/>
+  <path d="M524,564 C590,564 600,583 654,583" fill="none" stroke="#2F6B5E" stroke-width="1.3" marker-end="url(#arrg)"/>
+  <path d="M524,572 C590,572 600,637 654,637" fill="none" stroke="#2F6B5E" stroke-width="1.3" marker-end="url(#arrg)"/>
+
+  <rect x="660" y="452" width="230" height="46" rx="7" fill="#E9EFDA" stroke="#6A7F3F" stroke-width="1.4"/>
+  <text x="675" y="471" font-size="12.5" font-weight="700" fill="#48562B" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">ext4_file_read_iter</text>
+  <text x="675" y="489" font-size="10.5" fill="#48562B">本地磁盘文件系统</text>
+
+  <rect x="660" y="506" width="230" height="46" rx="7" fill="#E9EFDA" stroke="#6A7F3F" stroke-width="1.4"/>
+  <text x="675" y="525" font-size="12.5" font-weight="700" fill="#48562B" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">xfs_file_read_iter</text>
+  <text x="675" y="543" font-size="10.5" fill="#48562B">同一接口，另一套实现</text>
+
+  <rect x="660" y="560" width="230" height="46" rx="7" fill="#E2E9ED" stroke="#4E6E81" stroke-width="1.4"/>
+  <text x="675" y="579" font-size="12.5" font-weight="700" fill="#33505F" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">nfs_file_read</text>
+  <text x="675" y="597" font-size="10.5" fill="#33505F">读操作变成网络 RPC</text>
+
+  <rect x="660" y="614" width="230" height="46" rx="7" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="675" y="633" font-size="12.5" font-weight="700" fill="#4A473F" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">proc_reg_read_iter</text>
+  <text x="675" y="651" font-size="10.5" fill="#4A473F">读的是内核状态，不碰磁盘</text>
+
+  <!-- 右侧：说明卡 2 -->
+  <rect x="600" y="690" width="520" height="110" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="624" y="718" font-size="14" font-weight="700" fill="#2B2A26">f_op 从哪里来？</text>
+  <text x="624" y="746" font-size="12" fill="#4A473F">· open() 解析路径找到 inode 后，把该文件系统的操作表装进新建的 struct file</text>
+  <text x="624" y="768" font-size="12" fill="#4A473F">· 之后每次 read / write 都经这张表分发 —— 与 C++ 虚表同构，只是手工装配</text>
+</svg>

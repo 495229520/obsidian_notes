@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>one-shot vs multishot · provide vs pbuf ring 成本对照</title>
+  <desc>左：提交侧 SQE 与完成侧 CQE 的定性对比柱状示意；右：旧式 provide buffers 与 pbuf ring 的控制路径；底部实验指标。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">买到什么、付出什么：提交侧 vs 供给侧</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">multishot 砍 SQE · pbuf ring 砍供给 SQE · CQE 不会因 multishot 消失 · 下图为定性对照，非固定倍数</text>
+
+  <!-- ========== Chart A: SQE vs CQE ========== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">实验 A 直觉 · 处理 M 条消息时的相对流量（定性）</text>
+
+  <rect x="48" y="128" width="560" height="360" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+
+  <!-- axes -->
+  <line x1="110" y1="420" x2="540" y2="420" stroke="#4A473F" stroke-width="1.5"/>
+  <line x1="110" y1="420" x2="110" y2="170" stroke="#4A473F" stroke-width="1.5"/>
+  <text x="80" y="300" font-size="11" fill="#6B675C" transform="rotate(-90 80 300)">相对计数</text>
+  <text x="325" y="450" font-size="12" fill="#4A473F" text-anchor="middle">模式</text>
+
+  <!-- y ticks -->
+  <line x1="105" y1="200" x2="115" y2="200" stroke="#9B968A" stroke-width="1"/>
+  <line x1="105" y1="280" x2="115" y2="280" stroke="#9B968A" stroke-width="1"/>
+  <line x1="105" y1="360" x2="115" y2="360" stroke="#9B968A" stroke-width="1"/>
+  <text x="98" y="204" font-size="10" fill="#6B675C" text-anchor="end">高</text>
+  <text x="98" y="284" font-size="10" fill="#6B675C" text-anchor="end">中</text>
+  <text x="98" y="364" font-size="10" fill="#6B675C" text-anchor="end">低</text>
+
+  <!-- one-shot group -->
+  <text x="200" y="440" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">one-shot recv</text>
+  <!-- SQE bar high -->
+  <rect x="150" y="210" width="40" height="210" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="170" y="200" font-size="10" fill="#2C4460" text-anchor="middle">SQE</text>
+  <!-- CQE bar high -->
+  <rect x="200" y="210" width="40" height="210" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="220" y="200" font-size="10" fill="#24473F" text-anchor="middle">CQE</text>
+
+  <!-- multishot group -->
+  <text x="380" y="440" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">multishot recv</text>
+  <!-- SQE bar low -->
+  <rect x="330" y="360" width="40" height="60" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="350" y="350" font-size="10" fill="#2C4460" text-anchor="middle">SQE</text>
+  <!-- CQE bar still high -->
+  <rect x="380" y="210" width="40" height="210" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="400" y="200" font-size="10" fill="#24473F" text-anchor="middle">CQE</text>
+
+  <!-- legend -->
+  <rect x="460" y="180" width="120" height="70" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="474" y="196" width="16" height="12" rx="2" fill="#E3EAF4" stroke="#3D5A80"/>
+  <text x="498" y="206" font-size="11" fill="#2C4460">提交 SQE</text>
+  <rect x="474" y="218" width="16" height="12" rx="2" fill="#DCE9E3" stroke="#2F6B5E"/>
+  <text x="498" y="228" font-size="11" fill="#24473F">完成 CQE</text>
+
+  <text x="120" y="470" font-size="11" fill="#6B675C">预期：SQE 显著下降 · CQE 大致仍随消息数走 · 不是「完成也变少」</text>
+
+  <!-- ========== Chart B provide vs pbuf ========== -->
+  <rect x="632" y="128" width="560" height="360" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="656" y="160" font-size="13" font-weight="700" fill="#4A473F">实验 B 直觉 · 供给/归还控制路径</text>
+
+  <!-- provide path -->
+  <text x="656" y="196" font-size="12" font-weight="700" fill="#733428">旧式 PROVIDE_BUFFERS</text>
+  <rect x="656" y="210" width="100" height="44" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="706" y="236" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">业务完成</text>
+  <path d="M764,232 L788,232" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="796" y="210" width="110" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="851" y="236" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">SQE 归还</text>
+  <path d="M914,232 L938,232" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="946" y="210" width="110" height="44" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1001" y="236" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">CQE 确认</text>
+  <path d="M1064,232 L1088,232" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="1096" y="210" width="72" height="44" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="1132" y="236" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">enter</text>
+  <text x="656" y="276" font-size="11" fill="#733428">稳态：归还也走 SQ/CQ · 控制流量大</text>
+
+  <!-- pbuf path -->
+  <text x="656" y="316" font-size="12" font-weight="700" fill="#24473F">pbuf ring</text>
+  <rect x="656" y="330" width="100" height="44" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="706" y="356" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">业务完成</text>
+  <path d="M764,352 L788,352" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="796" y="330" width="200" height="44" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="896" y="356" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">add + advance（用户态）</text>
+  <path d="M1004,352 L1028,352" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="1036" y="330" width="132" height="44" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1102" y="356" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">内核可再选</text>
+  <text x="656" y="400" font-size="11" fill="#24473F">稳态：归还不经 SQE/syscall · 但共享环约束更严</text>
+  <text x="656" y="424" font-size="11" fill="#6B675C">兼容旧内核：旧式 provide · 高频接收：pbuf ring</text>
+  <text x="656" y="456" font-size="11" fill="#6B675C">两者都是 provided buffer 语义；pbuf 是高效供给机制</text>
+
+  <!-- ========== Tradeoff table ========== -->
+  <rect x="48" y="512" width="1144" height="160" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="72" y="544" font-size="13" font-weight="700" fill="#4A473F">方案对照</text>
+
+  <text x="72" y="576" font-size="11" font-weight="700" fill="#6B675C">方案</text>
+  <text x="260" y="576" font-size="11" font-weight="700" fill="#6B675C">收益</text>
+  <text x="620" y="576" font-size="11" font-weight="700" fill="#6B675C">成本 / 限制</text>
+  <line x1="72" y1="586" x2="1160" y2="586" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="72" y="610" font-size="12" fill="#2C4460">one-shot recv</text>
+  <text x="260" y="610" font-size="12" fill="#2B2A26">状态机直观 · 兼容广</text>
+  <text x="620" y="610" font-size="12" fill="#2B2A26">每次完成后都需新 SQE</text>
+
+  <text x="72" y="634" font-size="12" fill="#6B4E28">multishot recv</text>
+  <text x="260" y="634" font-size="12" fill="#2B2A26">降低 SQE 与提交压力</text>
+  <text x="620" y="634" font-size="12" fill="#2B2A26">cancel / 终态 / F_MORE 更复杂</text>
+
+  <text x="72" y="658" font-size="12" fill="#733428">旧式 provide buffers</text>
+  <text x="260" y="658" font-size="12" fill="#2B2A26">兼容较早内核</text>
+  <text x="620" y="658" font-size="12" fill="#2B2A26">供给/归还占 SQE·CQE</text>
+
+  <!-- metrics -->
+  <rect x="48" y="692" width="1144" height="156" rx="10" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="72" y="724" font-size="13" font-weight="700" fill="#2C4460">对照实验必须先定义的指标</text>
+
+  <rect x="72" y="744" width="170" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="157" y="774" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">SQE / 消息</text>
+  <text x="157" y="796" font-size="10" fill="#3D5A80" text-anchor="middle">控制 SQE 单列</text>
+
+  <rect x="258" y="744" width="170" height="80" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="343" y="774" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">CQE / 消息</text>
+  <text x="343" y="796" font-size="10" fill="#2F6B5E" text-anchor="middle">数据/控制分列</text>
+
+  <rect x="444" y="744" width="170" height="80" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="529" y="774" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">syscall / 消息</text>
+  <text x="529" y="796" font-size="10" fill="#8A6A3A" text-anchor="middle">enter / register</text>
+
+  <rect x="630" y="744" width="170" height="80" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="715" y="774" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">-ENOBUFS</text>
+  <text x="715" y="796" font-size="10" fill="#A64B3C" text-anchor="middle">池 · 持有时间</text>
+
+  <rect x="816" y="744" width="170" height="80" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.1"/>
+  <text x="901" y="774" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">P99 延迟</text>
+  <text x="901" y="796" font-size="10" fill="#6B5B95" text-anchor="middle">固定时钟口径</text>
+
+  <rect x="1002" y="744" width="162" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="1083" y="774" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CPU / IO</text>
+  <text x="1083" y="796" font-size="10" fill="#3D5A80" text-anchor="middle">避免少做事假象</text>
+</svg>

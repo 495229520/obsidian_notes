@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 712" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；蓝框 #E3EAF4/#3D5A80/#2C4460；红/网络/危险 #F0E0DB/#A64B3C/#733428；
+       绿/收尾 #DCE9E3/#2F6B5E/#24473F；中性 #F1EFE8/#D8D5C8/#4A473F；与库内既有 SVG 同一套 -->
+  <title>Runbook：p99 毛刺排障决策阶梯（沿数据路径自顶向下）</title>
+  <desc>从告警触发开始，先辨真伪（回归还是噪声），再按 client 端到端与服务端延迟差分段；服务端段沿数据路径自顶向下下钻缓存、设备/块层、邻居干扰三层，每层给出观测工具与命中后的动作及爆炸半径；网络/客户端段单列诊断卡；底部是验证 SLI 恢复与回灌注入/SLO 的收尾三件套。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="712" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">Runbook：p99 毛刺排障决策阶梯——沿数据路径自顶向下</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">告警响了不是从头猜，而是照这张梯子一层层排除；每个动作都标好爆炸半径，改完必须验证 SLI 恢复</text>
+
+  <!-- 告警 -->
+  <rect x="430" y="96" width="380" height="42" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="620" y="122" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">告警触发：SLO 快烧 / p99 毛刺（9.7）</text>
+  <path d="M620,138 L620,156" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- 第0步 辨真伪 -->
+  <rect x="360" y="156" width="520" height="42" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="620" y="182" font-size="11.5" fill="#4A473F" text-anchor="middle">第 0 步 · 辨真伪：SLI vs 基线分布，是回归还是噪声（9.7）—— 噪声则消警不动手</text>
+  <path d="M620,198 L620,214" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- 第1步 分段 -->
+  <rect x="340" y="214" width="560" height="52" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.6"/>
+  <text x="620" y="236" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">第 1 步 · 分段：client 端到端延迟 − 服务端延迟（9.1 clat / 5.4）</text>
+  <text x="620" y="256" font-size="10.5" fill="#2C4460" text-anchor="middle">差值大 → 网络 / 客户端段；差值小 → 服务端段</text>
+
+  <!-- 向下：服务端段 -->
+  <path d="M438,266 L438,286" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="360" y="282" font-size="10" fill="#4A473F" text-anchor="end">服务端段 ↓</text>
+  <!-- 向右：网络段 -->
+  <path d="M900,240 L1020,240 L1020,286" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <text x="912" y="232" font-size="10" fill="#733428">端到端 ≫ 服务端 → 网络段</text>
+
+  <!-- 数据路径 ↓ 竖标 -->
+  <text x="40" y="418" font-size="10.5" font-weight="700" fill="#8A8574" transform="rotate(-90 40 418)" text-anchor="middle">数据路径 ↓ 自顶向下</text>
+
+  <!-- 服务端阶梯 rung1 缓存 -->
+  <rect x="58" y="286" width="770" height="66" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="66" y="294" width="118" height="50" rx="7" fill="#3D5A80"/>
+  <text x="125" y="315" font-size="11" font-weight="700" fill="#F5F4ED" text-anchor="middle">① 缓存层</text>
+  <text x="125" y="333" font-size="9.5" fill="#DCE6F2" text-anchor="middle">1.2</text>
+  <text x="196" y="309" font-size="10.5" fill="#2C4460"><tspan font-weight="700">观测：</tspan>Page Cache 命中率骤降？（free / vmtouch，9.2 的读放大信号）</text>
+  <text x="196" y="329" font-size="10.5" fill="#4A473F"><tspan font-weight="700">命中→动作：</tspan>查内存压力 / 预读回退（1.6），必要时扩缓存或改 O_DIRECT　<tspan font-weight="700" fill="#A88A4A">爆炸半径 中</tspan></text>
+
+  <!-- rung2 设备/块层 -->
+  <rect x="58" y="360" width="770" height="112" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="66" y="368" width="118" height="96" rx="7" fill="#3D5A80"/>
+  <text x="125" y="410" font-size="11" font-weight="700" fill="#F5F4ED" text-anchor="middle">② 设备 / 块层</text>
+  <text x="125" y="428" font-size="9.5" fill="#DCE6F2" text-anchor="middle">1.7</text>
+  <text x="196" y="384" font-size="10.5" fill="#2C4460"><tspan font-weight="700">观测：</tspan>iostat %util≈100 或 aqu-sz 高？（9.2）→ 再用 blktrace / eBPF 拆段（9.3 / 9.4）</text>
+  <line x1="196" y1="392" x2="812" y2="392" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="196" y="412" font-size="10.5" fill="#733428"><tspan font-weight="700">D2C 高（设备内部慢）→</tspan> 慢盘 / GC（3.5 / 3.6）→ 摘除或限速重建（10.6）　<tspan font-weight="700" fill="#A64B3C">爆炸半径 高</tspan></text>
+  <text x="196" y="434" font-size="10.5" fill="#2C4460"><tspan font-weight="700">Q2C 高（块层排队）→</tspan> 加深已无收益，减 iodepth / 分摊负载 / 扩盘（2.3）　<tspan font-weight="700" fill="#2F6B5E">爆炸半径 低</tspan></text>
+  <text x="196" y="456" font-size="10.5" fill="#4A473F"><tspan font-weight="700">写掉悬崖 →</tspan> ENOSPC / SLC 缓存耗尽 / 稳态掉速（3.6）→ 扩容或限写</text>
+
+  <!-- rung3 邻居 -->
+  <rect x="58" y="480" width="770" height="60" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="66" y="488" width="118" height="44" rx="7" fill="#6B6553"/>
+  <text x="125" y="514" font-size="11" font-weight="700" fill="#F5F4ED" text-anchor="middle">③ 邻居干扰</text>
+  <text x="196" y="504" font-size="10.5" fill="#2C4460"><tspan font-weight="700">观测：</tspan>同盘 / 同机 / 同网卡有他人重负载？（分设备 iostat、cgroup 统计）</text>
+  <text x="196" y="524" font-size="10.5" fill="#4A473F"><tspan font-weight="700">命中→动作：</tspan>cgroup / QoS 限流隔离，前台 IO 优先　<tspan font-weight="700" fill="#2F6B5E">爆炸半径 低</tspan></text>
+
+  <!-- 网络诊断卡 -->
+  <rect x="848" y="286" width="344" height="254" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="868" y="310" font-size="11.5" font-weight="700" fill="#733428">网络 / 客户端段诊断</text>
+  <line x1="868" y1="320" x2="1172" y2="320" stroke="#D8B8AE" stroke-width="1"/>
+  <text x="868" y="340" font-size="10.5" font-weight="700" fill="#733428">· 重传 / 丢包高？（ss -ti）</text>
+  <text x="880" y="358" font-size="10" fill="#4A473F">真网络故障 → 确认多路径切换生效（5.5）</text>
+  <text x="868" y="382" font-size="10.5" font-weight="700" fill="#733428">· 路径 flap / ANA 翻转？</text>
+  <text x="880" y="400" font-size="10" fill="#4A473F">查 nvme ANA log，多半 target 侧倒换（5.5）</text>
+  <text x="868" y="424" font-size="10.5" font-weight="700" fill="#733428">· RDMA：PFC 风暴 / ECN 未生效？</text>
+  <text x="880" y="442" font-size="10" fill="#4A473F">无损网络塌了（4.7）</text>
+  <text x="868" y="466" font-size="10.5" font-weight="700" fill="#733428">· hung IO 不返回？</text>
+  <text x="880" y="484" font-size="10" fill="#4A473F">检测窗口 = KATO；查应用超时是否 &lt; 检测窗口（5.5）</text>
+  <line x1="868" y1="498" x2="1172" y2="498" stroke="#D8B8AE" stroke-width="1"/>
+  <text x="868" y="518" font-size="10" fill="#733428">灰色故障：慢而不死，靠同伴对比而非绝对阈值（10.6）</text>
+
+  <!-- 收尾三件套 -->
+  <rect x="58" y="558" width="1134" height="130" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="78" y="582" font-size="12.5" font-weight="700" fill="#24473F">收尾三件套（改完才算完，不是「不报警了」就算完）</text>
+  <text x="78" y="608" font-size="11" fill="#24473F"><tspan font-weight="700">① 验证：</tspan>盯 SLI 回到基线分布再离场——「告警停了」可能只是抖动过去，不等于根因消除（9.7）</text>
+  <text x="78" y="632" font-size="11" fill="#24473F"><tspan font-weight="700">② 记录：</tspan>写下时间线、根因、每一步的观测证据与动作——这就是下一次 runbook 的素材</text>
+  <text x="78" y="656" font-size="11" fill="#24473F"><tspan font-weight="700">③ 回灌：</tspan>把这次故障加成一条故障注入用例（9.6），并校准 SLO / 告警阈值（9.7）——闭环，别让同一坑绊两次</text>
+  <text x="78" y="678" font-size="10" fill="#2F6B5E">每个 page 级告警都必须挂一份这样的 runbook；没有 runbook 的告警是 bug。</text>
+</svg>

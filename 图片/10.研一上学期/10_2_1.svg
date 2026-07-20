@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1240" viewBox="0 0 1280 1240">
+  <title>MFMS 数据中台整体分层架构</title>
+  <desc>从 Qt UI 到下位机物理设备的九层架构，含 MySQL 事件通道</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1280" height="1240" fill="rgb(245, 244, 237)"/>
+
+  <text x="640" y="26" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#444441">MFMS 数据中台整体分层架构（main @ 4f33b3b，2026-07）</text>
+
+  <!-- L1 Qt UI -->
+  <rect x="300" y="50" width="940" height="66" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="770" y="70" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">Qt UI 主线程（QApplication 事件循环）</text>
+  <text x="770" y="94" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">hybrid_robot_system · Control（控制权轮询 2s / 导航轮询 1s）· TaskManager · VisualProgram · Myviz(RViz)</text>
+
+  <line x1="770" y1="116" x2="770" y2="174" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="790" y="142" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">槽调用（UI 线程）→ emit requestXxx</text>
+
+  <!-- L2 Impl -->
+  <rect x="300" y="176" width="940" height="60" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="770" y="196" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">CommunicationInterfaceImpl —— Meyers 单例（UI 线程侧）</text>
+  <text x="770" y="218" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">requestXxx 信号 ≈30 路 · nextRequestId_ 原子发号（运动接口返回 ID）· deviceTree / deviceStatus 缓存</text>
+
+  <text x="770" y="252" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">Qt::QueuedConnection 跨线程边界（worker 已 moveToThread，自动队列投递）</text>
+  <line x1="300" y1="268" x2="1240" y2="268" stroke="#854F0B" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="770" y1="236" x2="770" y2="294" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L3 Worker -->
+  <rect x="300" y="296" width="940" height="64" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="770" y="316" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">CommunicationWorker —— QThread 独立线程（事件循环）</text>
+  <text x="770" y="340" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">rosNode_ = communication_worker_node · doXxx 槽 ≈34 个 · 组连接状态机（2s 延迟收尾 / 20s 死线）</text>
+
+  <line x1="770" y1="360" x2="770" y2="418" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="790" y="386" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">直接成员调用（同线程）</text>
+
+  <!-- L4 Gateway -->
+  <rect x="300" y="420" width="940" height="60" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="770" y="440" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">MfmsGatewayImpl —— 门面 Facade（parent 链同属 worker 线程）</text>
+  <text x="770" y="462" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">信号直通 ≈30 条（signal→signal）· gateway↔mfms 类型转换 · start: db → ros_bridge → cmd（stop 逆序）</text>
+
+  <line x1="436" y1="480" x2="436" y2="538" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="769" y1="480" x2="769" y2="538" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="1103" y1="480" x2="1103" y2="538" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L5 三服务 -->
+  <rect x="300" y="540" width="273" height="112" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="436" y="562" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">MfmsDbService</text>
+  <text x="436" y="586" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">QMYSQL 连接 mfms_db_&lt;this&gt;</text>
+  <text x="436" y="606" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">100ms 轮询 *_ui_event 消费即删</text>
+  <text x="436" y="626" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">load/unload/lua 写状态·触发器回退</text>
+
+  <rect x="633" y="540" width="273" height="112" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="769" y="562" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">MfmsRosBridge</text>
+  <text x="769" y="586" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">spin_some @100Hz（QTimer 10ms）</text>
+  <text x="769" y="606" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">1s 状态评估 · 3s 设备列表轮询</text>
+  <text x="769" y="626" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">订阅 /{id}_state · 心跳窗口 3s</text>
+
+  <rect x="966" y="540" width="274" height="112" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="1103" y="562" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">MfmsCommandService</text>
+  <text x="1103" y="586" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">臂指令 worker 线程同步直调</text>
+  <text x="1103" y="606" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">AGV 指令 QtConcurrent 池异步</text>
+  <text x="1103" y="626" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">agv_path / robot_waypoint 直连 DB</text>
+
+  <!-- cmd -> adapters -->
+  <polyline points="1050,652 1050,682 760,682 760,710" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="1150" y1="652" x2="1150" y2="710" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L6 适配器 -->
+  <rect x="620" y="712" width="280" height="100" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="760" y="734" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">RobotProxyAdapter</text>
+  <text x="760" y="758" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">PIMPL · executor std::thread</text>
+  <text x="760" y="776" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">全局锁 + 每设备 opMutex</text>
+  <text x="760" y="794" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">RPC 超时 8s→3s · 1s 预检</text>
+
+  <rect x="960" y="712" width="280" height="100" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="1100" y="734" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">AgvProxyAdapter</text>
+  <text x="1100" y="758" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">PIMPL · executor std::thread</text>
+  <text x="1100" y="776" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">SeerCtrl 表 · opMutexes_</text>
+  <text x="1100" y="794" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">selfControl_ 控制权指纹缓存</text>
+
+  <!-- adapters -> proxies -->
+  <polyline points="720,812 720,842 695,842 695,870" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="800,812 800,842 925,842 925,870" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="1100,812 1100,842 1155,842 1155,870" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L7 hyrms proxies -->
+  <rect x="610" y="872" width="170" height="64" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="695" y="892" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">FrRobot</text>
+  <text x="695" y="914" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">Node {id}_proxy</text>
+
+  <rect x="840" y="872" width="170" height="64" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="925" y="892" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">AuboRobot</text>
+  <text x="925" y="914" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">Node {id}_proxy</text>
+
+  <rect x="1070" y="872" width="170" height="64" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="1155" y="892" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">SeerCtrl</text>
+  <text x="1155" y="914" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">Node {id}_proxy</text>
+
+  <line x1="695" y1="936" x2="695" y2="994" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="925" y1="936" x2="925" y2="994" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="1155" y1="936" x2="1155" y2="994" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L8 ROS 网络 -->
+  <rect x="560" y="996" width="680" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="900" y="1016" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">ROS 2 DDS 图（进程间通信）</text>
+  <text x="900" y="1038" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">/{id}_cmd Service（1ms 忙轮询等 future）· /{id}_state Topic（RELIABLE 发布）</text>
+
+  <!-- state topic -> ros_bridge -->
+  <polyline points="580,996 580,600 631,600" fill="none" stroke="#0F6E56" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="566" y="770" text-anchor="end" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">/{id}_state 状态订阅</text>
+  <text x="566" y="790" text-anchor="end" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">SensorDataQoS(BEST_EFFORT)</text>
+
+  <line x1="900" y1="1060" x2="900" y2="1118" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L9 下位机 -->
+  <rect x="560" y="1120" width="680" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="900" y="1140" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">下位机 HyRMS linker（设备适配节点）+ 物理设备</text>
+  <text x="900" y="1162" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">Fairino / Aubo 机械臂 · 仙工 AGV（SEER RBK）· 西门子 PLC（预留）</text>
+
+  <!-- MySQL 侧栏 -->
+  <rect x="40" y="540" width="200" height="380" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="140" y="564" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">MySQL MFMS_BASE</text>
+  <text x="140" y="592" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">device / device_state</text>
+  <text x="140" y="614" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">device_state_event ↓</text>
+  <text x="140" y="636" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">device_ui_event ↑</text>
+  <text x="140" y="658" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">lua_script / lua_state</text>
+  <text x="140" y="680" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">lua_state/ui_event</text>
+  <text x="140" y="702" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">trg_device_state_event</text>
+  <text x="140" y="724" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">trg_lua_state_event</text>
+  <text x="140" y="746" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">agv_path(+station)</text>
+  <text x="140" y="768" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">robot_waypoint · users</text>
+  <text x="140" y="794" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">compose 内置 mysql:8.0</text>
+
+  <line x1="242" y1="570" x2="296" y2="570" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="298" y1="598" x2="244" y2="598" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <polyline points="140,920 140,1152 552,1152" fill="none" stroke="#854F0B" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="330" y="1132" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#633806">下位机轮询 *_state_event / 回写 device_state 与 *_ui_event</text>
+
+  <!-- 图例与补充 -->
+  <rect x="40" y="996" width="460" height="88" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="270" y="1020" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">补充：ros_bridge（3s 设备列表）与 cmd_service（路径/路点）</text>
+  <text x="270" y="1040" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">各持独立 QMYSQL 连接直查同一 MySQL</text>
+  <text x="270" y="1062" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">实线 = 同步调用 · 虚线 = 异步 / 事件 / 跨进程</text>
+</svg>

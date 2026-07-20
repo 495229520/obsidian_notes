@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrp" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">io_uring：把内核-设备的环形队列协议搬进用户态</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">两个 mmap 共享内存环：SQ 应用生产、内核消费；CQ 内核生产、应用消费 —— 与 1.7 的门铃同一协议</text>
+
+  <!-- 应用线程（提交侧） -->
+  <rect x="80" y="108" width="640" height="132" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="104" y="136" font-size="13.5" font-weight="700" fill="#2C4460">应用线程（提交侧，用户态）</text>
+  <text x="104" y="162" font-size="11.5" fill="#2C4460">① 取空位填 SQE：opcode、fd、buffer 地址、len、offset、user_data（普通内存写）</text>
+  <text x="104" y="186" font-size="11.5" fill="#2C4460">② store-release 推 SQ tail —— 1.7 的“敲门铃”，但这里只是一次原子写，无 MMIO</text>
+  <text x="104" y="210" font-size="11.5" fill="#2C4460">③ io_uring_enter(提交 N, 等待 M)：一次陷入提交一批 —— syscall 数与 IO 数解耦</text>
+
+  <!-- 提交/完成方向箭头 -->
+  <line x1="280" y1="240" x2="280" y2="270" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="292" y="262" font-size="10.5" fill="#6B675C">提交方向</text>
+  <path d="M560,270 L560,240" fill="none" stroke="#2F6B5E" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrt)"/>
+  <text x="572" y="262" font-size="10.5" fill="#2F6B5E">收割方向</text>
+
+  <!-- mmap 共享内存容器 -->
+  <rect x="80" y="274" width="640" height="330" rx="8" fill="#ECEAE0" stroke="#9B9685" stroke-width="1.4" stroke-dasharray="7 5"/>
+  <text x="104" y="302" font-size="12.5" font-weight="700" fill="#4A473F">mmap 共享内存 —— 用户态与内核同时可见，描述符零拷贝传递</text>
+
+  <!-- SQE 数组 -->
+  <rect x="104" y="316" width="592" height="34" rx="6" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="400" y="338" font-size="11" fill="#4A3F68" text-anchor="middle">SQE 数组：64 B/条，只装“操作描述”——数据 buffer 仍在应用自己的内存里</text>
+
+  <!-- SQ 提交环 -->
+  <text x="104" y="380" font-size="12" font-weight="700" fill="#4A3F68">SQ 提交环（环里存 SQE 数组下标）</text>
+  <rect x="104" y="390" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="154" y="390" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="204" y="390" width="46" height="38" rx="4" fill="#D9CFE8" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="254" y="390" width="46" height="38" rx="4" fill="#D9CFE8" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="304" y="390" width="46" height="38" rx="4" fill="#D9CFE8" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="354" y="390" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="404" y="390" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="454" y="390" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#6B5B95" stroke-width="1.2"/>
+  <line x1="227" y1="452" x2="227" y2="432" stroke="#6B5B95" stroke-width="1.4" marker-end="url(#arrp)"/>
+  <text x="227" y="466" font-size="10.5" fill="#4A3F68" text-anchor="middle">head（内核消费推进）</text>
+  <line x1="377" y1="452" x2="377" y2="432" stroke="#6B5B95" stroke-width="1.4" marker-end="url(#arrp)"/>
+  <text x="400" y="466" font-size="10.5" fill="#4A3F68" text-anchor="middle">tail（应用生产推进）</text>
+  <text x="520" y="414" font-size="10.5" fill="#4A3F68">← 阴影 = 已填好、内核尚未消费</text>
+
+  <!-- CQ 完成环 -->
+  <text x="104" y="502" font-size="12" font-weight="700" fill="#24473F">CQ 完成环（直接存 CQE：user_data + res + flags，16 B/条；默认容量 = 2 × SQ）</text>
+  <rect x="104" y="512" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="154" y="512" width="46" height="38" rx="4" fill="#C9DECF" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="204" y="512" width="46" height="38" rx="4" fill="#C9DECF" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="254" y="512" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="304" y="512" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="354" y="512" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="404" y="512" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="454" y="512" width="46" height="38" rx="4" fill="#F8F7F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <line x1="177" y1="574" x2="177" y2="554" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrt)"/>
+  <text x="177" y="588" font-size="10.5" fill="#24473F" text-anchor="middle">head（应用收割推进）</text>
+  <line x1="277" y1="574" x2="277" y2="554" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrt)"/>
+  <text x="300" y="588" font-size="10.5" fill="#24473F" text-anchor="middle">tail（内核生产推进）</text>
+  <text x="520" y="536" font-size="10.5" fill="#24473F">← 阴影 = 已完成、应用尚未收割</text>
+  <text x="520" y="556" font-size="10" fill="#6B675C" font-family="'SF Mono',Menlo,Consolas,monospace">下标 = index &amp; (entries-1)</text>
+
+  <line x1="280" y1="604" x2="280" y2="634" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M560,634 L560,604" fill="none" stroke="#2F6B5E" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrt)"/>
+
+  <!-- 内核（消费/完成侧） -->
+  <rect x="80" y="638" width="640" height="152" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="104" y="666" font-size="13.5" font-weight="700" fill="#24473F">内核（消费 / 完成侧）</text>
+  <text x="104" y="692" font-size="11.5" fill="#24473F">④ acquire 读 SQ tail，逐条消费 SQE；先尝试非阻塞完成（页缓存命中可当场返回）</text>
+  <text x="104" y="716" font-size="11.5" fill="#24473F">⑤ 不能立即完成：交给 io-wq 工作线程池，或挂内部 poll 等就绪再执行【实现，随版本演进】</text>
+  <text x="104" y="740" font-size="11.5" fill="#24473F">⑥ 真正的设备 IO 走老路：文件系统 → blk-mq → NVMe —— 1.7/1.8 的每一步原样发生</text>
+  <text x="104" y="764" font-size="11.5" fill="#24473F">⑦ 完成：填 CQE → store-release 推 CQ tail →（应用若在 enter 里等待则）唤醒</text>
+
+  <!-- 内存序卡 -->
+  <rect x="760" y="108" width="432" height="252" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="784" y="138" font-size="13.5" font-weight="700" fill="#2B2A26">内存序：与 1.7 门铃完全同一协议</text>
+  <text x="784" y="166" font-size="11.5" fill="#4A473F">生产者：填数据 → store-release 推 tail</text>
+  <text x="784" y="188" font-size="11.5" fill="#4A473F">消费者：load-acquire 读 tail → 取数据 → 推 head</text>
+  <text x="784" y="216" font-size="11.5" fill="#4A473F">C++ 对应：memory_order_release / acquire</text>
+  <text x="784" y="238" font-size="11.5" fill="#4A473F">liburing 已把屏障封装进 submit / peek_cqe</text>
+  <text x="784" y="266" font-size="11.5" fill="#4A473F">SQ 与 CQ 各自都是 SPSC 环：</text>
+  <text x="784" y="288" font-size="11.5" fill="#4A473F">单生产者单消费者，天然无锁</text>
+  <text x="784" y="316" font-size="11" fill="#A64B3C">【类比】1.7 在内核-设备之间做这套协议，</text>
+  <text x="784" y="334" font-size="11" fill="#A64B3C">io_uring 在用户态-内核之间原样再做一遍</text>
+
+  <!-- 边界卡 -->
+  <rect x="760" y="384" width="432" height="220" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="784" y="414" font-size="13.5" font-weight="700" fill="#733428">边界【事实】</text>
+  <text x="784" y="442" font-size="11.5" fill="#733428">io_uring 不会让设备变快：</text>
+  <text x="784" y="462" font-size="11.5" fill="#733428">设备段（1.8 的 ⑦）一纳秒也省不了</text>
+  <text x="784" y="490" font-size="11.5" fill="#733428">它削减的是每笔 IO 的固定成本：</text>
+  <text x="784" y="510" font-size="11.5" fill="#733428">陷入 / 切换 / 中断，从「×每笔」变「×每批」</text>
+  <text x="784" y="538" font-size="11.5" fill="#733428">完成可以乱序：先完成的先进 CQ</text>
+  <text x="784" y="558" font-size="11.5" fill="#733428">—— 必须用 user_data 对号入座</text>
+  <text x="784" y="586" font-size="11.5" fill="#733428">buffer 从提交到完成归内核使用，期间不得动</text>
+
+  <!-- 三个系统调用卡 -->
+  <rect x="760" y="628" width="432" height="162" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="784" y="658" font-size="13.5" font-weight="700" fill="#2B2A26">全部 API：三个系统调用（Linux 5.1+）</text>
+  <text x="784" y="688" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">io_uring_setup    建环，返回 fd 供 mmap</text>
+  <text x="784" y="712" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">io_uring_enter    提交一批 / 等待完成</text>
+  <text x="784" y="736" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">io_uring_register 预注册 buffer / 文件</text>
+  <text x="784" y="766" font-size="11" fill="#6B675C">日常编程用 liburing 封装（2.5），不裸调</text>
+
+  <!-- 底注 -->
+  <text x="80" y="834" font-size="12" fill="#4A473F">一次批量读的一生：①②③（用户态）→ ④⑤⑥（内核）→ 设备执行（1.8 全路径）→ ⑦ → 应用 acquire 收割 CQE、推 CQ head —— 睡眠等待变成了批量收割</text>
+  <text x="80" y="858" font-size="11" fill="#6B675C">对照 1.7：SQE 填写 = 填 NVMe 命令；推 tail = 敲门铃；CQE + tail 推进 = 完成中断 —— 同一张图，换了一对生产者/消费者</text>
+</svg>

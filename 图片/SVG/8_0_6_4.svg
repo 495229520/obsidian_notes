@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 960" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>thread-per-core 与通知模型选型：亲和性隔离 + 决策树 + IRQ 坑</title>
+  <desc>上半：每核 poller 拥有本地队列的结构；中部：SLO/CPU 预算决策树；下半：IRQ 与 poller 同核导致 p99 变差的故障结构。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="960" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">thread-per-core 倾向轮询：绑核 · 单线程队列所有权 · 非阻塞 loop</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">先问 SLO 与 CPU 预算再选型 · 轮询核必须与 IRQ / 普通任务隔离，否则 p99 仍会抖</text>
+
+  <!-- ============ A: thread-per-core 结构 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 每核一个 poller：本地队列 + 本地状态 · 跨核只传消息</text>
+
+  <!-- Core 0 -->
+  <rect x="48" y="128" width="360" height="200" rx="10" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.5"/>
+  <rect x="48" y="128" width="360" height="32" rx="10" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <rect x="48" y="148" width="360" height="12" fill="#E3EAF4"/>
+  <text x="68" y="150" font-size="13" font-weight="700" fill="#2C4460">Core 0 · 隔离核</text>
+
+  <rect x="72" y="180" width="100" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="122" y="200" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Poller 0</text>
+  <text x="122" y="218" font-size="10" fill="#2F6B5E" text-anchor="middle">affinity=0</text>
+
+  <path d="M176,204 L200,204" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="204" y="180" width="100" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="254" y="200" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Queue 0</text>
+  <text x="254" y="218" font-size="10" fill="#3D5A80" text-anchor="middle">SQ/CQ 本地</text>
+
+  <path d="M308,204 L332,204" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="72" y="248" width="312" height="56" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="228" y="272" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">I/O state 0 · 连接 / 会话本地</text>
+  <text x="228" y="292" font-size="10.5" fill="#8A6A3A" text-anchor="middle">无共享锁 · 热路径非阻塞</text>
+
+  <!-- Core 1 -->
+  <rect x="440" y="128" width="360" height="200" rx="10" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+  <rect x="440" y="128" width="360" height="32" rx="10" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <rect x="440" y="148" width="360" height="12" fill="#DCE9E3"/>
+  <text x="460" y="150" font-size="13" font-weight="700" fill="#24473F">Core 1 · 隔离核</text>
+
+  <rect x="464" y="180" width="100" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="514" y="200" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Poller 1</text>
+  <text x="514" y="218" font-size="10" fill="#2F6B5E" text-anchor="middle">affinity=1</text>
+
+  <path d="M568,204 L592,204" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="596" y="180" width="100" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="646" y="200" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Queue 1</text>
+  <text x="646" y="218" font-size="10" fill="#3D5A80" text-anchor="middle">SQ/CQ 本地</text>
+
+  <rect x="464" y="248" width="312" height="56" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="620" y="272" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">I/O state 1 · 连接 / 会话本地</text>
+  <text x="620" y="292" font-size="10.5" fill="#8A6A3A" text-anchor="middle">跨核：消息传递 · 不共享写</text>
+
+  <!-- Core 2 -->
+  <rect x="832" y="128" width="360" height="200" rx="10" fill="#FBFBF6" stroke="#8A6A3A" stroke-width="1.5"/>
+  <rect x="832" y="128" width="360" height="32" rx="10" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <rect x="832" y="148" width="360" height="12" fill="#EFE7DA"/>
+  <text x="852" y="150" font-size="13" font-weight="700" fill="#6B4E28">Core 2 · 隔离核</text>
+
+  <rect x="856" y="180" width="100" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="906" y="200" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Poller 2</text>
+  <text x="906" y="218" font-size="10" fill="#2F6B5E" text-anchor="middle">affinity=2</text>
+
+  <path d="M960,204 L984,204" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+
+  <rect x="988" y="180" width="100" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="1038" y="200" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Queue 2</text>
+  <text x="1038" y="218" font-size="10" fill="#3D5A80" text-anchor="middle">SQ/CQ 本地</text>
+
+  <rect x="856" y="248" width="312" height="56" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="1012" y="272" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">I/O state 2 · 连接 / 会话本地</text>
+  <text x="1012" y="292" font-size="10.5" fill="#8A6A3A" text-anchor="middle">配合 IRQ affinity · NUMA 对齐</text>
+
+  <!-- event loop strip -->
+  <rect x="48" y="344" width="1144" height="48" rx="7" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="620" y="374" font-size="12.5" fill="#24473F" text-anchor="middle">事件循环：poll_storage() · poll_network() · run_local_tasks() · flush_submissions()  ·  代表：SPDK reactor / poller</text>
+
+  <!-- ============ B: 决策树 ============ -->
+  <text x="48" y="428" font-size="13" font-weight="700" fill="#4A473F">B · 选型决策：先 SLO 与 CPU 预算，再谈中断 / 轮询 / 混合</text>
+
+  <rect x="48" y="444" width="1144" height="200" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- root -->
+  <rect x="480" y="460" width="280" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="620" y="485" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">严格尾延迟 SLO？</text>
+
+  <path d="M480,480 L300,480 L300,520" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <text x="380" y="472" font-size="11" fill="#A64B3C">否</text>
+  <path d="M760,480 L940,480 L940,520" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <text x="860" y="472" font-size="11" fill="#2F6B5E">是</text>
+
+  <rect x="180" y="528" width="240" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="300" y="553" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">优先 Interrupt</text>
+
+  <rect x="800" y="528" width="280" height="40" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="940" y="553" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">能预留并隔离 core？</text>
+
+  <path d="M800,548 L620,548 L620,588" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <text x="700" y="540" font-size="11" fill="#A64B3C">否</text>
+  <path d="M1080,548 L1120,548 L1120,588" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <text x="1100" y="540" font-size="11" fill="#2F6B5E">是</text>
+
+  <rect x="480" y="596" width="280" height="32" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="620" y="617" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Hybrid + 批处理</text>
+
+  <rect x="980" y="596" width="200" height="32" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1080" y="617" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">持续繁忙？→ Poll</text>
+
+  <!-- ============ C: IRQ 同核故障 ============ -->
+  <text x="48" y="680" font-size="13" font-weight="700" fill="#4A473F">C · 故障结构：开启 busy polling 后 p99 仍抖 · poller 与 IRQ 争同一核</text>
+
+  <!-- Bad -->
+  <rect x="48" y="696" width="560" height="180" rx="10" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="68" y="724" font-size="13" font-weight="700" fill="#733428">错误：Poller + IRQ 同核</text>
+
+  <rect x="72" y="744" width="200" height="88" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="172" y="772" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">CPU 4</text>
+  <text x="172" y="794" font-size="11" fill="#A64B3C" text-anchor="middle">Poller 绑在此</text>
+  <text x="172" y="814" font-size="11" fill="#A64B3C" text-anchor="middle">IRQ 也投到此</text>
+
+  <rect x="300" y="744" width="280" height="36" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="440" y="767" font-size="11.5" fill="#733428" text-anchor="middle">中断打断 poll loop · 批次积压</text>
+  <rect x="300" y="792" width="280" height="36" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="440" y="815" font-size="11.5" fill="#733428" text-anchor="middle">p99 尖峰 · cs / migration 仍在</text>
+
+  <!-- Good -->
+  <rect x="632" y="696" width="560" height="180" rx="10" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="652" y="724" font-size="13" font-weight="700" fill="#24473F">修复：数据面核与 housekeeping 分离</text>
+
+  <rect x="656" y="748" width="150" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="731" y="776" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">CPU 4–7</text>
+  <text x="731" y="796" font-size="10.5" fill="#2F6B5E" text-anchor="middle">专用 poller</text>
+
+  <rect x="832" y="748" width="150" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="907" y="776" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CPU 0–1</text>
+  <text x="907" y="796" font-size="10.5" fill="#3D5A80" text-anchor="middle">IRQ / housekeep</text>
+
+  <rect x="1008" y="748" width="160" height="72" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="1088" y="776" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">NUMA 对齐</text>
+  <text x="1088" y="796" font-size="10.5" fill="#8A6A3A" text-anchor="middle">队列·设备·核</text>
+
+  <text x="652" y="852" font-size="11.5" fill="#4A473F">再验证：p99 · context-switches · migrations · IRQ 差值 · CPU 成本一起看</text>
+
+  <!-- bottom -->
+  <rect x="48" y="896" width="1144" height="44" rx="7" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="68" y="924" font-size="12" fill="#4A473F">IOPOLL 轮询 I/O 完成 · SQPOLL 轮询提交队列 · 二者优化阶段不同 · 开启 flag ≠ 必然更快，约束 + 实测才算结论</text>
+</svg>

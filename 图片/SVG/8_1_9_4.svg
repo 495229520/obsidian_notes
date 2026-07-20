@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>XFS：CIL、LSN、AIL 与 intent/done</title>
+  <desc>模拟 XFS 元数据写前日志路径：事务 log item → CIL → 日志 checkpoint/LSN → AIL 跟踪写回 → tail 推进；以及 intent/done 拆分大操作。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">XFS：元数据写前日志 · 不要套 ext4 的 data= 三分法</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">log item → CIL push → LSN 稳定 → AIL 跟踪 home 写回 → tail 推进 · 文件数据通常不进元数据日志</text>
+
+  <!-- ========== Pipeline ========== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">提交与回收管线（内存结构 + 磁盘日志）</text>
+
+  <!-- step boxes -->
+  <rect x="48" y="128" width="200" height="120" rx="9" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="148" y="160" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">① 内存事务</text>
+  <text x="148" y="184" font-size="11" fill="#3D5A80" text-anchor="middle">高层元数据操作</text>
+  <text x="148" y="206" font-size="11" fill="#2C4460" text-anchor="middle">log item 集合</text>
+  <text x="148" y="226" font-size="10" fill="#6B675C" text-anchor="middle">inode / buf / 配额…</text>
+
+  <path d="M256,188 L284,188" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="292" y="128" width="200" height="120" rx="9" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="392" y="160" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">② CIL</text>
+  <text x="392" y="184" font-size="11" fill="#6B5B95" text-anchor="middle">Committed Item List</text>
+  <text x="392" y="206" font-size="11" fill="#4A3F68" text-anchor="middle">聚合已提交项</text>
+  <text x="392" y="226" font-size="10" fill="#6B675C" text-anchor="middle">批量 push</text>
+
+  <path d="M500,188 L528,188" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="536" y="128" width="220" height="120" rx="9" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="646" y="160" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">③ on-disk log</text>
+  <text x="646" y="184" font-size="11" fill="#2F6B5E" text-anchor="middle">log checkpoint 写入</text>
+  <text x="646" y="206" font-size="11" fill="#24473F" text-anchor="middle">获得 LSN</text>
+  <text x="646" y="226" font-size="10" fill="#6B675C" text-anchor="middle">恢复已具备信息</text>
+
+  <path d="M764,188 L792,188" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="800" y="128" width="180" height="120" rx="9" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="890" y="160" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">④ AIL</text>
+  <text x="890" y="184" font-size="11" fill="#8A6A3A" text-anchor="middle">Active Item List</text>
+  <text x="890" y="206" font-size="11" fill="#6B4E28" text-anchor="middle">按 LSN 跟踪</text>
+  <text x="890" y="226" font-size="10" fill="#6B675C" text-anchor="middle">未写回正式位置</text>
+
+  <path d="M988,188 L1016,188" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="1024" y="128" width="168" height="120" rx="9" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1108" y="160" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">⑤ home 写回</text>
+  <text x="1108" y="184" font-size="11" fill="#3D5A80" text-anchor="middle">元数据正式位置</text>
+  <text x="1108" y="206" font-size="11" fill="#2C4460" text-anchor="middle">移出 AIL</text>
+  <text x="1108" y="226" font-size="10" fill="#6B675C" text-anchor="middle">推进 tail</text>
+
+  <!-- ========== LSN bar ========== -->
+  <rect x="48" y="272" width="1144" height="100" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="72" y="302" font-size="13" font-weight="700" fill="#4A473F">LSN · Log Sequence Number 在说什么</text>
+
+  <!-- LSN strip -->
+  <rect x="72" y="320" width="900" height="28" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.1"/>
+  <rect x="72" y="320" width="220" height="28" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="292" y="320" width="180" height="28" rx="0" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="472" y="320" width="140" height="28" rx="0" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+
+  <text x="182" y="339" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">已可回收</text>
+  <text x="382" y="339" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">AIL 活跃区</text>
+  <text x="542" y="339" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">新写入</text>
+  <text x="700" y="339" font-size="11" fill="#6B675C">… head 方向 →</text>
+
+  <text x="72" y="368" font-size="12" fill="#4A473F">LSN 用于：项位置 · fsync/log force 等待目标 · 最老活跃项决定 tail</text>
+  <text x="990" y="340" font-size="12" font-weight="700" fill="#2C4460">log force</text>
+  <text x="990" y="360" font-size="11" fill="#6B675C">推到目标 LSN 稳定</text>
+  <text x="990" y="376" font-size="11" fill="#6B675C">≠ 全部 checkpoint home</text>
+
+  <!-- ========== Memory structures detail ========== -->
+  <text x="48" y="410" font-size="13" font-weight="700" fill="#4A473F">内存结构示意 · CIL 与 AIL 分工</text>
+
+  <rect x="48" y="426" width="560" height="200" rx="10" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="68" y="454" font-size="13" font-weight="700" fill="#4A3F68">CIL · 聚合「已提交、待写入日志」</text>
+
+  <rect x="72" y="474" width="100" height="40" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.1"/>
+  <text x="122" y="499" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">item i</text>
+  <rect x="184" y="474" width="100" height="40" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.1"/>
+  <text x="234" y="499" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">item j</text>
+  <rect x="296" y="474" width="100" height="40" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.1"/>
+  <text x="346" y="499" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">item k</text>
+  <rect x="408" y="474" width="160" height="40" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="488" y="499" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">CIL push → log</text>
+
+  <text x="72" y="544" font-size="12" fill="#4A473F">· 事务提交后项进入 CIL，不必立即单独写盘</text>
+  <text x="72" y="566" font-size="12" fill="#4A473F">· push 把一批项格式化为日志 checkpoint</text>
+  <text x="72" y="588" font-size="12" fill="#4A473F">· 注意：XFS 的 log checkpoint ≠ home 全部写回</text>
+  <text x="72" y="610" font-size="11" fill="#6B675C">日志 checkpoint 可靠后，恢复已有信息；元数据本体可稍后写回</text>
+
+  <rect x="632" y="426" width="560" height="200" rx="10" fill="#FBFBF6" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="652" y="454" font-size="13" font-weight="700" fill="#6B4E28">AIL · 跟踪「日志已持久、home 未完成」</text>
+
+  <rect x="656" y="474" width="120" height="48" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="716" y="494" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">LSN 最老</text>
+  <text x="716" y="510" font-size="10" fill="#8A6A3A" text-anchor="middle">钉住 tail</text>
+
+  <rect x="792" y="474" width="100" height="48" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="842" y="502" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">item …</text>
+
+  <rect x="908" y="474" width="100" height="48" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="958" y="502" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">item …</text>
+
+  <rect x="1024" y="474" width="140" height="48" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1094" y="494" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">写回完成</text>
+  <text x="1094" y="510" font-size="10" fill="#2F6B5E" text-anchor="middle">移出 AIL</text>
+
+  <text x="656" y="552" font-size="12" fill="#4A473F">· 项进入持久日志后进 AIL 管理</text>
+  <text x="656" y="574" font-size="12" fill="#4A473F">· home 写回后移除；最老项决定 tail</text>
+  <text x="656" y="596" font-size="12" fill="#4A473F">· 长期未写回 → tail 被钉住 → 日志压力</text>
+  <text x="656" y="616" font-size="11" fill="#6B675C">与 ext4 checkpoint 队列同属「待回写跟踪」思想</text>
+
+  <!-- ========== Intent / done ========== -->
+  <text x="48" y="662" font-size="13" font-weight="700" fill="#4A473F">intent / done · 大操作拆成可恢复的多事务</text>
+
+  <rect x="48" y="678" width="1144" height="190" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+
+  <rect x="72" y="704" width="220" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="182" y="732" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">intent item</text>
+  <text x="182" y="752" font-size="11" fill="#3D5A80" text-anchor="middle">「这项操作必须完成」</text>
+
+  <path d="M300,740 L328,740" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="336" y="704" width="240" height="72" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="456" y="732" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">后续事务执行步骤</text>
+  <text x="456" y="752" font-size="11" fill="#8A6A3A" text-anchor="middle">可跨多个可控事务</text>
+
+  <path d="M584,740 L612,740" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="620" y="704" width="220" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="730" y="732" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">done item</text>
+  <text x="730" y="752" font-size="11" fill="#2F6B5E" text-anchor="middle">意图已处理完毕</text>
+
+  <path d="M848,740 L876,740" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="884" y="704" width="280" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="1024" y="732" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">崩溃：未完成 intent 可再驱动</text>
+  <text x="1024" y="752" font-size="11" fill="#A64B3C" text-anchor="middle">保留恢复线索 · 非应用事务 API</text>
+
+  <text x="72" y="812" font-size="12" fill="#2B2A26">与 ext4 对照：XFS 主要记录格式化的元数据事务项/区域，不提供 data=ordered/writeback/journal 挂载分类。</text>
+  <text x="72" y="836" font-size="12" fill="#2B2A26">数据持久性仍依赖 data writeback、fsync/fdatasync 与下层 flush/FUA；文件系统日志解决的是元数据崩溃一致性。</text>
+  <text x="72" y="860" font-size="11" fill="#6B675C">共同原则：写前日志 · commit 与 home 写回分离 · 日志空间靠后续写回回收</text>
+</svg>

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">Checkpoint 三级演进：同步停算 → 异步重叠 → 分片摊薄</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">同一份 ~100 GB 状态（7B 模型 + 优化器），三种写法的 GPU 停算时间：20 s → 4 s → 0.5 s——省的都是最贵的卡时</text>
+
+  <!-- ======== 时间线 1:同步 ======== -->
+  <text x="70" y="126" font-size="13.5" font-weight="700" fill="#A64B3C">① 同步 checkpoint：写完才继续算</text>
+  <text x="1170" y="126" font-size="11" fill="#A64B3C" text-anchor="end">停算 ≈ 20 s / 次</text>
+
+  <rect x="70" y="138" width="200" height="36" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="170" y="161" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">GPU 计算</text>
+  <rect x="270" y="138" width="110" height="36" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="325" y="155" font-size="10.5" font-weight="700" fill="#7A5518" text-anchor="middle">D2H 快照</text>
+  <text x="325" y="169" font-size="9.5" fill="#7A5518" text-anchor="middle">显存→主存 ~4 s</text>
+  <rect x="380" y="138" width="420" height="36" rx="4" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="590" y="155" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">写存储 + fsync（~100 GB / 5 GB/s ≈ 20 s，GPU 干等）</text>
+  <text x="590" y="169" font-size="9.5" fill="#A64B3C" text-anchor="middle">持久化语义照 6.1：没 fsync 的 checkpoint 不算数</text>
+  <rect x="800" y="138" width="200" height="36" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="900" y="161" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">GPU 计算</text>
+
+  <!-- ======== 时间线 2:异步 ======== -->
+  <text x="70" y="230" font-size="13.5" font-weight="700" fill="#B07D2B">② 异步 checkpoint：只停快照那一下，写盘与计算重叠</text>
+  <text x="1170" y="230" font-size="11" fill="#B07D2B" text-anchor="end">停算 ≈ 4 s / 次</text>
+
+  <rect x="70" y="242" width="200" height="36" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="170" y="265" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">GPU 计算</text>
+  <rect x="270" y="242" width="110" height="36" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="325" y="259" font-size="10.5" font-weight="700" fill="#7A5518" text-anchor="middle">D2H 快照</text>
+  <text x="325" y="273" font-size="9.5" fill="#7A5518" text-anchor="middle">step 边界,状态静止</text>
+  <rect x="380" y="242" width="620" height="36" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="690" y="265" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">GPU 继续计算（不等写盘）</text>
+
+  <rect x="380" y="288" width="420" height="30" rx="4" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="590" y="307" font-size="10.5" fill="#4A3F68" text-anchor="middle">后台线程：主存 pinned 副本 → 写存储 + fsync（与计算重叠）</text>
+  <text x="850" y="307" font-size="9.5" fill="#A64B3C">前提：主存多备一份 ~100 GB</text>
+
+  <!-- ======== 时间线 3:异步+分片 ======== -->
+  <text x="70" y="374" font-size="13.5" font-weight="700" fill="#2F6B5E">③ 异步 + 分片：8 个 rank 各写 1/8，聚合带宽 × 8</text>
+  <text x="1170" y="374" font-size="11" fill="#2F6B5E" text-anchor="end">停算 ≈ 0.5–4 s；后台写窗口 /8</text>
+
+  <rect x="70" y="386" width="200" height="36" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="170" y="409" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">GPU 计算（全体 rank）</text>
+  <rect x="270" y="386" width="70" height="36" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="305" y="404" font-size="10" font-weight="700" fill="#7A5518" text-anchor="middle">D2H</text>
+  <text x="305" y="417" font-size="9" fill="#7A5518" text-anchor="middle">各拷各的</text>
+  <rect x="340" y="386" width="660" height="36" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="670" y="409" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">GPU 继续计算</text>
+
+  <g font-size="9.5">
+    <rect x="340" y="432" width="80" height="24" rx="4" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1"/>
+    <text x="380" y="448" fill="#4A3F68" text-anchor="middle">rank0：1/8</text>
+    <rect x="424" y="432" width="80" height="24" rx="4" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1"/>
+    <text x="464" y="448" fill="#4A3F68" text-anchor="middle">rank1：1/8</text>
+    <rect x="508" y="432" width="80" height="24" rx="4" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1"/>
+    <text x="548" y="448" fill="#4A3F68" text-anchor="middle">…并行写…</text>
+    <rect x="592" y="432" width="80" height="24" rx="4" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1"/>
+    <text x="632" y="448" fill="#4A3F68" text-anchor="middle">rank7：1/8</text>
+  </g>
+  <text x="700" y="449" font-size="10" fill="#2F6B5E">拆入口：7.6 的 per-shard 队列思想——每 rank 直写自己的 shard</text>
+
+  <!-- ======== 提交纪律 ======== -->
+  <rect x="70" y="490" width="560" height="132" rx="8" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="94" y="518" font-size="12.5" font-weight="700" fill="#A64B3C">提交纪律：先数据后指针（6.1 / 7.7 的第三次出场）</text>
+  <text x="94" y="544" font-size="11" fill="#4A473F">① 所有 rank 的 shard 全部写完并 fsync（部分成功 = 没成功）；</text>
+  <text x="94" y="566" font-size="11" fill="#4A473F">② 才原子写入 manifest（记录 step、shard 清单、校验和）——可见点；</text>
+  <text x="94" y="588" font-size="11" fill="#4A473F">③ 新 manifest 生效前，上一份 checkpoint 不许删——恢复永远有完整的一份</text>
+  <text x="94" y="610" font-size="10.5" fill="#A64B3C">崩在任何一步：恢复端只认 manifest 指向的那份——半份新 checkpoint 不可见</text>
+
+  <!-- ======== 账本 ======== -->
+  <rect x="660" y="490" width="520" height="132" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="684" y="518" font-size="12.5" font-weight="700" fill="#2B2A26">量级账（7B 模型，混合精度 + Adam）</text>
+  <text x="684" y="544" font-size="11" fill="#4A473F">状态 ≈ 每参数 ~14 B（fp16 参数 2 + fp32 主参数 4 + 动量 4 + 方差 4）</text>
+  <text x="684" y="566" font-size="11" fill="#4A473F">→ 7B ≈ 100 GB 级；70B ≈ 1 TB 级——按 rank 分片后才是可写的尺寸</text>
+  <text x="684" y="588" font-size="11" fill="#4A473F">停算成本 = 快照量 ÷ min(PCIe 入口, 存储带宽)——瓶颈在哪层，8.1 的账</text>
+  <text x="684" y="610" font-size="10.5" fill="#6B675C">goodput = 有效训练时间占比：checkpoint 开销与故障回退丢的步数都从它扣</text>
+
+  <!-- ======== 底部结论 ======== -->
+  <rect x="70" y="648" width="1110" height="86" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="96" y="676" font-size="12" font-weight="700" fill="#2B2A26">C++ 对照：异步 checkpoint = 双缓冲 + 生产者消费者</text>
+  <text x="96" y="700" font-size="11" fill="#4A473F">快照必须发生在 optimizer step 边界（状态静止点）≈ 读共享状态前先 quiesce；D2H 拷到 pinned 缓冲才真异步（8.1 §2）；</text>
+  <text x="96" y="722" font-size="11" fill="#4A473F">后台写线程独占缓冲直到 fsync + manifest 完成 ≈ 缓冲归还队列前不许复用——上一次没写完就到下一次快照点，只能跳过或阻塞（背压）</text>
+</svg>

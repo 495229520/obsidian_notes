@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 920" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>first-touch 与内存策略</title>
+  <desc>上半：first-touch 错位事故时间线。中部：正确顺序。下半：五种内存策略对照与策略只影响后续分配的提醒。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="920" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">物理页位置由 first-touch 决定，不是由后来的绑核决定</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">mmap 先给 VA · 缺页时才分配物理页 · 谁第一次写入，页就优先落在谁所在节点</text>
+
+  <!-- ============ Panel A：错位事故 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 典型错位：主线程清零，worker 钉到另一节点</text>
+
+  <rect x="48" y="124" width="1144" height="160" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.5"/>
+
+  <rect x="72" y="148" width="220" height="100" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="182" y="180" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">① 主线程 node0</text>
+  <text x="182" y="204" font-size="12" fill="#4A473F" text-anchor="middle">创建并清零大 buffer</text>
+  <text x="182" y="226" font-size="11" fill="#A64B3C" text-anchor="middle">触发 first-touch</text>
+
+  <path d="M292,198 L320,198" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+
+  <rect x="324" y="148" width="220" height="100" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="434" y="180" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">② 物理页 → node0</text>
+  <text x="434" y="204" font-size="12" fill="#4A473F" text-anchor="middle">清零写过的每一页</text>
+  <text x="434" y="226" font-size="11" fill="#A64B3C" text-anchor="middle">位置已固定</text>
+
+  <path d="M544,198 L572,198" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+
+  <rect x="576" y="148" width="240" height="100" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="696" y="180" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">③ 交给 worker node1</text>
+  <text x="696" y="204" font-size="12" fill="#4A473F" text-anchor="middle">affinity 钉到 node1</text>
+  <text x="696" y="226" font-size="11" fill="#A64B3C" text-anchor="middle">页不会自动搬家</text>
+
+  <path d="M816,198 L844,198" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+
+  <rect x="848" y="148" width="320" height="100" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1008" y="180" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">④ 每次访问交远端税</text>
+  <text x="1008" y="204" font-size="12" fill="#4A473F" text-anchor="middle">钉核反而把“偶尔远端”</text>
+  <text x="1008" y="226" font-size="11" fill="#A64B3C" text-anchor="middle">变成“永远远端”</text>
+
+  <!-- ============ Panel B：正确顺序 ============ -->
+  <text x="48" y="320" font-size="13" font-weight="700" fill="#4A473F">B · 正确顺序：先钉核，再分配；谁使用，谁首次写入</text>
+
+  <rect x="48" y="332" width="1144" height="120" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+
+  <rect x="72" y="356" width="230" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="187" y="386" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">① worker 先绑定目标 CPU</text>
+  <text x="187" y="408" font-size="11" fill="#2F6B5E" text-anchor="middle">taskset / cpunodebind</text>
+
+  <path d="M302,392 L332,392" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+
+  <rect x="336" y="356" width="250" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="461" y="386" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">② 接管尚未触碰的 VA</text>
+  <text x="461" y="408" font-size="11" fill="#2F6B5E" text-anchor="middle">mmap 后未写 = 未分配物理页</text>
+
+  <path d="M586,392 L616,392" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+
+  <rect x="620" y="356" width="230" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="735" y="386" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">③ worker 自己逐页初始化</text>
+  <text x="735" y="408" font-size="11" fill="#2F6B5E" text-anchor="middle">first-touch 落在本节点</text>
+
+  <path d="M850,392 L880,392" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+
+  <rect x="884" y="356" width="280" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1024" y="386" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">④ 长期使用这些页</text>
+  <text x="1024" y="408" font-size="11" fill="#2F6B5E" text-anchor="middle">后续绑核不会自动改已有页</text>
+
+  <!-- ============ Panel C：策略表 ============ -->
+  <text x="48" y="488" font-size="13" font-weight="700" fill="#4A473F">C · 常见内存策略：主要影响之后发生的页分配</text>
+
+  <!-- 5 strategy cards in 2 rows -->
+  <rect x="48" y="502" width="220" height="130" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="502" width="220" height="30" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="48" y="520" width="220" height="12" fill="#E3EAF4"/>
+  <text x="68" y="522" font-size="12" font-weight="700" fill="#2C4460">default / first-touch</text>
+  <text x="68" y="552" font-size="12" fill="#4A473F">首次触碰者节点优先</text>
+  <text x="68" y="574" font-size="11" fill="#6B675C">线程与数据天然分片</text>
+  <text x="68" y="600" font-size="11" fill="#A64B3C">初始化线程错 → 全错位</text>
+
+  <rect x="284" y="502" width="220" height="130" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="284" y="502" width="220" height="30" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="284" y="520" width="220" height="12" fill="#DCE9E3"/>
+  <text x="304" y="522" font-size="12" font-weight="700" fill="#24473F">bind</text>
+  <text x="304" y="552" font-size="12" fill="#4A473F">只从指定节点分配</text>
+  <text x="304" y="574" font-size="11" fill="#6B675C">延迟敏感 · 位置确定</text>
+  <text x="304" y="600" font-size="11" fill="#A64B3C">本地不足可能分配失败</text>
+
+  <rect x="520" y="502" width="220" height="130" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="520" y="502" width="220" height="30" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="520" y="520" width="220" height="12" fill="#EFE7DA"/>
+  <text x="540" y="522" font-size="12" font-weight="700" fill="#6B4E28">preferred</text>
+  <text x="540" y="552" font-size="12" fill="#4A473F">优先指定，必要时回退</text>
+  <text x="540" y="574" font-size="11" fill="#6B675C">要局部性又不能失败</text>
+  <text x="540" y="600" font-size="11" fill="#8A6A3A">回退后出现远端页</text>
+
+  <rect x="756" y="502" width="220" height="130" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="756" y="502" width="220" height="30" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="756" y="520" width="220" height="12" fill="#E3EAF4"/>
+  <text x="776" y="522" font-size="12" font-weight="700" fill="#2C4460">local</text>
+  <text x="776" y="552" font-size="12" fill="#4A473F">从当前执行节点分配</text>
+  <text x="776" y="574" font-size="11" fill="#6B675C">worker 已可靠钉核</text>
+  <text x="776" y="600" font-size="11" fill="#3D5A80">迁移会改后续页落点</text>
+
+  <rect x="992" y="502" width="200" height="130" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="992" y="502" width="200" height="30" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="992" y="520" width="200" height="12" fill="#EDEAF3"/>
+  <text x="1012" y="522" font-size="12" font-weight="700" fill="#6B5B95">interleave</text>
+  <text x="1012" y="552" font-size="12" fill="#4A473F">多节点轮流分页</text>
+  <text x="1012" y="574" font-size="11" fill="#6B675C">聚合多路带宽</text>
+  <text x="1012" y="600" font-size="11" fill="#A64B3C">延迟敏感路径通常不合适</text>
+
+  <!-- bottom warnings -->
+  <rect x="48" y="656" width="560" height="220" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="656" width="560" height="34" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <rect x="48" y="678" width="560" height="12" fill="#EFE7DA"/>
+  <text x="68" y="679" font-size="13" font-weight="700" fill="#6B4E28">三个关键字</text>
+  <text x="68" y="716" font-size="13" fill="#4A473F">· 第一次：后续钉核不改已有物理页</text>
+  <text x="68" y="744" font-size="13" fill="#4A473F">· 写入：只预留 VA ≠ 完成物理分配</text>
+  <text x="68" y="772" font-size="13" fill="#4A473F">· 页粒度：同一 buffer 各页可落不同节点</text>
+  <text x="68" y="808" font-size="12" fill="#6B675C">迁移需要 migratepages / move_pages / mbind</text>
+  <text x="68" y="832" font-size="12" fill="#6B675C">迁移本身有成本，不是免费搬家</text>
+  <text x="68" y="856" font-size="12" fill="#8A6A3A">策略主要影响之后的分配，不重写历史</text>
+
+  <rect x="632" y="656" width="560" height="220" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="632" y="656" width="560" height="34" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <rect x="632" y="678" width="560" height="12" fill="#F0E0DB"/>
+  <text x="652" y="679" font-size="13" font-weight="700" fill="#733428">自动 NUMA balancing 不是免费修好</text>
+  <text x="652" y="716" font-size="13" fill="#4A473F">· 采样与页迁移引入额外工作</text>
+  <text x="652" y="744" font-size="13" fill="#4A473F">· 只能逐渐纠偏，≠ 一开始布局正确</text>
+  <text x="652" y="772" font-size="13" fill="#4A473F">· 设备 DMA / 线程 / 中断仍需显式安排</text>
+  <text x="652" y="808" font-size="12" fill="#6B675C">适合无显式管理的通用负载</text>
+  <text x="652" y="832" font-size="12" fill="#6B675C">固定队列 + busy-poll 数据面要谨慎</text>
+  <text x="652" y="856" font-size="12" fill="#A64B3C">基准测试记录 numa_balancing 并保持一致</text>
+</svg>

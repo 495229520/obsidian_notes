@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="700" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">SPDK bdev 分层与三个测量点：探针放在哪层，量到的就是哪层</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">同一块盘、同一负载（4KiB randread, qd=1），把探针 A / B / C 的读数相减，各层成本就被拆出来了</text>
+
+  <!-- ======== 左：内核路径 ======== -->
+  <text x="265" y="122" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">内核路径</text>
+
+  <rect x="120" y="136" width="290" height="54" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="265" y="159" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">fio --ioengine=io_uring</text>
+  <text x="265" y="177" font-size="11" fill="#2C4460" text-anchor="middle">应用（用户态）</text>
+
+  <line x1="265" y1="190" x2="265" y2="212" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="120" y="214" width="290" height="72" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="265" y="240" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">系统调用 → VFS → O_DIRECT</text>
+  <text x="265" y="259" font-size="11" fill="#6B675C" text-anchor="middle">每次 IO 陷入内核 / 从内核返回</text>
+  <text x="265" y="275" font-size="11" fill="#6B675C" text-anchor="middle">（io_uring 可摊薄，见第 2 章）</text>
+
+  <line x1="265" y1="286" x2="265" y2="308" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="120" y="310" width="290" height="54" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="265" y="333" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">块层 blk-mq</text>
+  <text x="265" y="351" font-size="11" fill="#6B675C" text-anchor="middle">bio 排队 · 合并 · 每核软件队列</text>
+
+  <line x1="265" y1="364" x2="265" y2="386" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="120" y="388" width="290" height="72" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="265" y="414" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">内核 NVMe 驱动</text>
+  <text x="265" y="433" font-size="11" fill="#7A5518" text-anchor="middle">提交 SQE / doorbell</text>
+  <text x="265" y="449" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">完成靠中断 + 唤醒</text>
+
+  <line x1="265" y1="460" x2="265" y2="484" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 探针 C 括号 -->
+  <path d="M 78 140 L 66 140 L 66 456 L 78 456" fill="none" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="52" y="284" font-size="13" font-weight="700" fill="#A64B3C" text-anchor="middle" transform="rotate(-90 52 284)">探针 C：fio(io_uring)，量到整条内核路径</text>
+
+  <!-- ======== 右：SPDK 用户态路径 ======== -->
+  <text x="852" y="122" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">SPDK 用户态路径（全程不陷入内核）</text>
+
+  <rect x="600" y="136" width="250" height="54" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="725" y="159" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">bdevperf / 自研应用</text>
+  <text x="725" y="177" font-size="11" fill="#2C4460" text-anchor="middle">回调驱动，run-to-completion</text>
+
+  <line x1="725" y1="190" x2="725" y2="212" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- bdev 层 -->
+  <rect x="560" y="214" width="440" height="150" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="780" y="240" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">bdev 层：用户态的通用块设备抽象</text>
+  <text x="780" y="259" font-size="11" fill="#4A3F68" text-anchor="middle">统一读写接口 · 每线程 io_channel（无锁） · 可叠加虚拟 bdev</text>
+
+  <rect x="580" y="274" width="95" height="34" rx="6" fill="#F5F4ED" stroke="#6B5B95" stroke-width="1"/>
+  <text x="627" y="295" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">NVMe bdev</text>
+  <rect x="685" y="274" width="95" height="34" rx="6" fill="#F5F4ED" stroke="#6B5B95" stroke-width="1"/>
+  <text x="732" y="295" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">Malloc bdev</text>
+  <rect x="790" y="274" width="95" height="34" rx="6" fill="#F5F4ED" stroke="#6B5B95" stroke-width="1"/>
+  <text x="837" y="295" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">Null bdev</text>
+  <rect x="895" y="274" width="95" height="34" rx="6" fill="#F5F4ED" stroke="#6B5B95" stroke-width="1"/>
+  <text x="942" y="295" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">Lvol / Crypto</text>
+
+  <text x="627" y="326" font-size="10" fill="#6B675C" text-anchor="middle">→ 真实盘</text>
+  <text x="732" y="326" font-size="10" fill="#6B675C" text-anchor="middle">→ DRAM 假盘</text>
+  <text x="837" y="326" font-size="10" fill="#6B675C" text-anchor="middle">→ 直接丢弃</text>
+  <text x="942" y="326" font-size="10" fill="#6B675C" text-anchor="middle">叠在别的 bdev 上</text>
+  <text x="780" y="352" font-size="10.5" fill="#6B675C" text-anchor="middle">换 Malloc/Null 当底座 = 把「盘」从算式里拿掉，量 bdev 框架自身</text>
+
+  <line x1="627" y1="364" x2="627" y2="386" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="560" y="388" width="330" height="72" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="725" y="414" font-size="12.5" font-weight="700" fill="#7A5518" text-anchor="middle">SPDK 用户态 NVMe 驱动</text>
+  <text x="725" y="433" font-size="11" fill="#7A5518" text-anchor="middle">MMIO 直接摸 doorbell / CQ</text>
+  <text x="725" y="449" font-size="11" font-weight="700" fill="#48562B" text-anchor="middle">完成靠轮询，无中断无唤醒</text>
+
+  <line x1="725" y1="460" x2="725" y2="484" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 探针 B 括号 -->
+  <path d="M 1022 140 L 1034 140 L 1034 456 L 1022 456" fill="none" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="1052" y="298" font-size="13" font-weight="700" fill="#2F6B5E" text-anchor="middle" transform="rotate(90 1052 298)">探针 B：bdevperf，量 bdev 层 + 驱动 + 盘</text>
+
+  <!-- 探针 A：绕过 bdev 直压驱动 -->
+  <rect x="1080" y="378" width="130" height="52" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="1145" y="399" font-size="12" font-weight="700" fill="#48562B" text-anchor="middle">探针 A</text>
+  <text x="1145" y="417" font-size="10.5" fill="#48562B" text-anchor="middle">spdk_nvme_perf</text>
+  <line x1="1080" y1="410" x2="896" y2="418" stroke="#2F6B5E" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#arrTeal)"/>
+  <text x="1000" y="443" font-size="10.5" fill="#2F6B5E" text-anchor="middle">不经 bdev，直压驱动</text>
+
+  <!-- ======== 共同终点：盘 ======== -->
+  <rect x="120" y="486" width="935" height="56" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="587" y="510" font-size="13" font-weight="700" fill="#48562B" text-anchor="middle">同一块 NVMe SSD（SQ/CQ · 盘内并行 · 介质延迟几十 μs）</text>
+  <text x="587" y="530" font-size="11" fill="#48562B" text-anchor="middle">setup.sh 之后由 SPDK 独占（内核里 /dev/nvme* 消失）；reset 归还内核</text>
+
+  <!-- ======== 底部对账公式 ======== -->
+  <rect x="120" y="568" width="1090" height="104" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="146" y="596" font-size="13" font-weight="700" fill="#2B2A26">对账（都用 qd=1 的平均延迟，排队项为零）：</text>
+  <text x="146" y="622" font-size="12.5" fill="#4A473F">A ≈ 用户态驱动 + 盘（最接近介质本身的读数）</text>
+  <text x="146" y="646" font-size="12.5" fill="#4A473F">B − A ≈ bdev 层的代价　　　C − B ≈ 内核栈固定成本（系统调用 + blk-mq + 中断/唤醒）</text>
+  <text x="700" y="622" font-size="12.5" font-weight="700" fill="#A64B3C">B′（Malloc 底座）≈ bdev 框架自身，微秒以下</text>
+</svg>

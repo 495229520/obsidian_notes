@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 810" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="810" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">write 的全路径与背压链：线程为什么被四层之下拖住</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">左列：数据向下流（黑箭头）；右列：压力向上传（红虚线）—— 每一级都是一个有界队列</text>
+
+  <text x="270" y="118" font-size="13.5" font-weight="700" fill="#2B2A26" text-anchor="middle">数据流（自上而下）</text>
+  <text x="930" y="118" font-size="13.5" font-weight="700" fill="#A64B3C" text-anchor="middle">背压传导（自下而上，⓪ 是源头）</text>
+
+  <!-- 左列：数据流 -->
+  <rect x="110" y="130" width="320" height="64" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="270" y="156" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">应用：write(fd, buf, n)</text>
+  <text x="270" y="178" font-size="11" fill="#2C4460" text-anchor="middle">CPU 拷贝 ×1 → 标脏 → 返回（~μs）</text>
+  <line x1="270" y1="194" x2="270" y2="226" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="110" y="230" width="320" height="88" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="270" y="256" font-size="13.5" font-weight="700" fill="#7A5518" text-anchor="middle">Page Cache：Dirty 池</text>
+  <text x="270" y="276" font-size="11" fill="#7A5518" text-anchor="middle">脏页存量（占可回收内存比例）</text>
+  <rect x="140" y="288" width="260" height="10" rx="5" fill="#ECEAE0" stroke="#B07D2B" stroke-width="0.8"/>
+  <rect x="140" y="288" width="150" height="10" rx="5" fill="#B07D2B"/>
+  <line x1="244" y1="284" x2="244" y2="302" stroke="#733428" stroke-width="1.4"/>
+  <text x="244" y="313" font-size="9.5" fill="#733428" text-anchor="middle">background</text>
+  <line x1="348" y1="284" x2="348" y2="302" stroke="#733428" stroke-width="1.4"/>
+  <text x="348" y="313" font-size="9.5" fill="#733428" text-anchor="middle">ratio</text>
+  <line x1="270" y1="318" x2="270" y2="354" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="110" y="358" width="320" height="64" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="270" y="384" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">flusher 内核线程：攒批写回</text>
+  <text x="270" y="406" font-size="11" fill="#24473F" text-anchor="middle">把脏页组装成 bio（1.2 / 1.4）</text>
+  <line x1="270" y1="422" x2="270" y2="458" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="110" y="462" width="320" height="64" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="270" y="488" font-size="13.5" font-weight="700" fill="#4A3F68" text-anchor="middle">块层：队列 + tag（1.7）</text>
+  <text x="270" y="510" font-size="11" fill="#4A3F68" text-anchor="middle">合并 · 调度 · 有界并发</text>
+  <line x1="270" y1="526" x2="270" y2="562" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="110" y="566" width="320" height="64" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="270" y="592" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">设备：写缓存 → 介质</text>
+  <text x="270" y="614" font-size="11" fill="#733428" text-anchor="middle">FLUSH / FUA 由 fsync 触发（1.4）</text>
+
+  <!-- 右列：背压 -->
+  <rect x="700" y="130" width="460" height="64" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="930" y="156" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">④ balance_dirty_pages：write() 睡眠限速</text>
+  <text x="930" y="178" font-size="11" fill="#733428" text-anchor="middle">应用线程直接变慢 —— 背压的终点就是你的代码</text>
+
+  <rect x="700" y="230" width="460" height="64" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="256" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">③ Dirty 存量越过水位线</text>
+  <text x="930" y="278" font-size="11" fill="#733428" text-anchor="middle">先 background（后台加速写回），再 ratio（前台限速）</text>
+
+  <rect x="700" y="358" width="460" height="64" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="384" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">② 写回吞吐 &lt; 写脏速度</text>
+  <text x="930" y="406" font-size="11" fill="#733428" text-anchor="middle">队列排不动，Dirty 池只进不出</text>
+
+  <rect x="700" y="462" width="460" height="64" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="488" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">① tag 池耗尽：新请求排队等 tag</text>
+  <text x="930" y="510" font-size="11" fill="#733428" text-anchor="middle">有界信号量打满（1.7）—— 提交者开始睡眠</text>
+
+  <rect x="700" y="566" width="460" height="64" rx="8" fill="#F2DEDA" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="592" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">⓪ 设备写入饱和（背压源头）</text>
+  <text x="930" y="614" font-size="11" fill="#733428" text-anchor="middle">写缓存吃满 · SSD GC 抬头（第3章 稳态性能）</text>
+
+  <!-- 背压向上箭头 -->
+  <line x1="930" y1="562" x2="930" y2="530" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#arrr)"/>
+  <line x1="930" y1="458" x2="930" y2="426" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#arrr)"/>
+  <line x1="930" y1="354" x2="930" y2="298" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#arrr)"/>
+  <line x1="930" y1="226" x2="930" y2="198" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#arrr)"/>
+
+  <!-- 层级虚线连接 -->
+  <line x1="434" y1="162" x2="696" y2="162" stroke="#B4B0A4" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="434" y1="262" x2="696" y2="262" stroke="#B4B0A4" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="434" y1="390" x2="696" y2="390" stroke="#B4B0A4" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="434" y1="494" x2="696" y2="494" stroke="#B4B0A4" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="434" y1="598" x2="696" y2="598" stroke="#B4B0A4" stroke-width="1" stroke-dasharray="3 4"/>
+
+  <!-- 底部实践卡 -->
+  <rect x="110" y="670" width="1050" height="110" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="134" y="700" font-size="13.5" font-weight="700" fill="#2B2A26">排查顺序【实践】：从下往上找根因</text>
+  <text x="134" y="728" font-size="12" fill="#4A473F">iostat -x（设备 await / aqu-sz，⓪①）→ /proc/meminfo 的 Dirty / Writeback 是否持续高位（②③）→ write 延迟是否周期性抖动（④）</text>
+  <text x="134" y="754" font-size="12" fill="#4A473F">fsync 的角色：把整条背压链瞬间同步兑现 —— 平时欠的债，fsync 一次还清（1.4）；观测工具全景见第9章</text>
+</svg>

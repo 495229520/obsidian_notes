@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">同一千个客户端：汇聚进一个机头 vs 条带化直连所有节点</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">NAS 塌掉的不是盘，是「单入口 + 强语义」——单队列饱和与网络尺度的锁；AI 存储的答案是拆入口、弱语义、少共享</text>
+
+  <!-- ======== 左：传统 NAS ======== -->
+  <text x="300" y="122" font-size="14" font-weight="700" fill="#A64B3C" text-anchor="middle">传统 NAS（NFS 机头）</text>
+
+  <!-- 客户端群 -->
+  <g font-size="10.5" fill="#2C4460">
+    <rect x="80" y="140" width="90" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="125" y="159" text-anchor="middle">GPU 节点 1</text>
+    <rect x="190" y="140" width="90" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="235" y="159" text-anchor="middle">GPU 节点 2</text>
+    <rect x="300" y="140" width="90" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="345" y="159" text-anchor="middle">…</text>
+    <rect x="410" y="140" width="90" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="455" y="159" text-anchor="middle">GPU 节点 1000</text>
+  </g>
+
+  <!-- 汇聚箭头 -->
+  <g stroke="#A64B3C" stroke-width="1.5">
+    <line x1="125" y1="170" x2="270" y2="228" marker-end="url(#arrRed)"/>
+    <line x1="235" y1="170" x2="288" y2="228" marker-end="url(#arrRed)"/>
+    <line x1="345" y1="170" x2="308" y2="228" marker-end="url(#arrRed)"/>
+    <line x1="455" y1="170" x2="328" y2="228" marker-end="url(#arrRed)"/>
+  </g>
+  <text x="470" y="210" font-size="10.5" fill="#A64B3C">全部流量汇进同一入口（incast）</text>
+
+  <!-- 机头 -->
+  <rect x="180" y="232" width="240" height="130" rx="8" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="300" y="256" font-size="12.5" font-weight="700" fill="#A64B3C" text-anchor="middle">机头（filer / gateway）</text>
+  <rect x="200" y="268" width="200" height="28" rx="4" fill="#F5F4ED" stroke="#A64B3C" stroke-width="1"/>
+  <text x="300" y="286" font-size="10.5" fill="#A64B3C" text-anchor="middle">单一请求队列（越排越长）</text>
+  <text x="300" y="316" font-size="10.5" fill="#4A473F" text-anchor="middle">POSIX 强一致：目录锁 / range lock</text>
+  <text x="300" y="334" font-size="10.5" fill="#4A473F" text-anchor="middle">= 跨网络的 mutex，临界区 RTT 级</text>
+  <text x="300" y="352" font-size="10.5" fill="#4A473F" text-anchor="middle">2×100GbE 机头带宽 ≈ 25 GB/s 封顶</text>
+
+  <line x1="300" y1="362" x2="300" y2="392" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="180" y="394" width="240" height="44" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="300" y="412" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">后端盘阵</text>
+  <text x="300" y="430" font-size="10" fill="#6B675C" text-anchor="middle">盘还闲着，门口已经排爆</text>
+
+  <rect x="80" y="462" width="480" height="86" rx="8" fill="#F5E5E0" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="104" y="488" font-size="11.5" font-weight="700" fill="#A64B3C">单队列的数学（Little 定律）：</text>
+  <text x="104" y="510" font-size="11" fill="#4A473F">服务率 μ 固定在机头；λ → μ 时队长与延迟发散，</text>
+  <text x="104" y="530" font-size="11" fill="#4A473F">超时触发客户端重试 → λ 进一步放大 → 雪崩（无准入控制）</text>
+
+  <!-- ======== 右：并行架构 ======== -->
+  <text x="920" y="122" font-size="14" font-weight="700" fill="#2F6B5E" text-anchor="middle">AI 并行存储（并行 FS / 对象存储）</text>
+
+  <g font-size="10.5" fill="#2C4460">
+    <rect x="700" y="140" width="90" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="745" y="159" text-anchor="middle">GPU 节点 1</text>
+    <rect x="810" y="140" width="90" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="855" y="159" text-anchor="middle">GPU 节点 2</text>
+    <rect x="920" y="140" width="90" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="965" y="159" text-anchor="middle">…</text>
+    <rect x="1030" y="140" width="110" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="1085" y="159" text-anchor="middle">GPU 节点 1000</text>
+  </g>
+
+  <!-- 条带化直连 -->
+  <g stroke="#2F6B5E" stroke-width="1.2">
+    <line x1="745" y1="170" x2="725" y2="250" marker-end="url(#arrTeal)"/>
+    <line x1="745" y1="170" x2="845" y2="250" marker-end="url(#arrTeal)"/>
+    <line x1="855" y1="170" x2="965" y2="250" marker-end="url(#arrTeal)"/>
+    <line x1="855" y1="170" x2="725" y2="250" marker-end="url(#arrTeal)"/>
+    <line x1="1085" y1="170" x2="1085" y2="250" marker-end="url(#arrTeal)"/>
+    <line x1="1085" y1="170" x2="965" y2="250" marker-end="url(#arrTeal)"/>
+  </g>
+  <text x="1150" y="215" font-size="10.5" fill="#2F6B5E" text-anchor="end">文件条带化：</text>
+  <text x="1150" y="232" font-size="10.5" fill="#2F6B5E" text-anchor="end">一个文件散在 N 个节点</text>
+
+  <g font-size="10.5">
+    <rect x="680" y="252" width="90" height="56" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+    <text x="725" y="275" font-weight="700" fill="#48562B" text-anchor="middle">存储节点 1</text>
+    <text x="725" y="294" fill="#48562B" text-anchor="middle">独立队列</text>
+    <rect x="800" y="252" width="90" height="56" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+    <text x="845" y="275" font-weight="700" fill="#48562B" text-anchor="middle">存储节点 2</text>
+    <text x="845" y="294" fill="#48562B" text-anchor="middle">独立队列</text>
+    <rect x="920" y="252" width="90" height="56" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+    <text x="965" y="275" font-weight="700" fill="#48562B" text-anchor="middle">…</text>
+    <rect x="1040" y="252" width="90" height="56" rx="6" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+    <text x="1085" y="275" font-weight="700" fill="#48562B" text-anchor="middle">存储节点 100</text>
+    <text x="1085" y="294" fill="#48562B" text-anchor="middle">独立队列</text>
+  </g>
+
+  <rect x="680" y="330" width="215" height="52" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="787" y="352" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">元数据面（独立扩展）</text>
+  <text x="787" y="370" font-size="10" fill="#4A3F68" text-anchor="middle">打开/布局查询走这，不碰数据流</text>
+
+  <rect x="915" y="330" width="215" height="52" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="1022" y="352" font-size="11" font-weight="700" fill="#7A5518" text-anchor="middle">本地 NVMe 缓存层（可选）</text>
+  <text x="1022" y="370" font-size="10" fill="#7A5518" text-anchor="middle">热数据集贴近 GPU（7.3 / 第 8 章）</text>
+
+  <rect x="680" y="462" width="500" height="86" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.2"/>
+  <text x="704" y="488" font-size="11.5" font-weight="700" fill="#48562B">拆掉的三样东西：</text>
+  <text x="704" y="510" font-size="11" fill="#4A473F">单入口 → N 个独立队列（每节点自己的 μ，聚合带宽线性长）</text>
+  <text x="704" y="530" font-size="11" fill="#4A473F">强语义 → 不可变文件/追加 + close-to-open，一致性够用、锁几乎消失</text>
+
+  <!-- ======== 底部对照 ======== -->
+  <rect x="70" y="576" width="1110" height="120" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="96" y="604" font-size="13" font-weight="700" fill="#2B2A26">C++ 线程模型对照：</text>
+  <text x="96" y="630" font-size="11.5" fill="#4A473F">机头 = 所有线程共用一个带全局锁的任务队列：核再多也卡在队列头的串行化；并行存储 = per-shard 队列 + 无共享（sharding），吞吐随分片数线性扩展</text>
+  <text x="96" y="656" font-size="11.5" fill="#4A473F">POSIX 目录/范围锁 = 把 mutex 拉到网络尺度：临界区从 ns 膨胀到 RTT（μs–ms），争用队列同步放大——「不可变数据不需要锁」在这里价值千金</text>
+  <text x="96" y="682" font-size="11.5" fill="#4A473F">背压：NFS 客户端超时重试没有全局准入 ≈ 无界队列 + 自动加压；对象存储的显式限流（503/退避）才是「有界队列 + 条件变量等待」的分布式版本</text>
+</svg>

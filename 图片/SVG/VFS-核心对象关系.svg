@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="780" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">fd 只是下标：file · dentry · inode · address_space</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">两次 open → 两个 file（偏移独立）；fork / dup → 共享一个 file（偏移共享）；页缓存挂在 inode 上（全局一份）</text>
+
+  <!-- 进程 A -->
+  <rect x="64" y="130" width="260" height="204" rx="8" fill="#E9EFF7" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="80" y="156" font-size="14" font-weight="700" fill="#2C4460">进程 A（task_struct）</text>
+  <text x="80" y="174" font-size="11" fill="#2C4460">files → fd 数组（下标即 fd）</text>
+
+  <rect x="84" y="184" width="220" height="30" rx="5" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1" opacity="0.9"/>
+  <text x="96" y="204" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">fd 0 · 终端 stdin</text>
+  <rect x="84" y="220" width="220" height="30" rx="5" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1" opacity="0.9"/>
+  <text x="96" y="240" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">fd 3 · 第一次 open</text>
+  <rect x="84" y="256" width="220" height="30" rx="5" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1" opacity="0.9"/>
+  <text x="96" y="276" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">fd 4 · 第二次 open</text>
+  <rect x="84" y="292" width="220" height="30" rx="5" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1" opacity="0.9"/>
+  <text x="96" y="312" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">fd 5 · dup(3) 复制槽位</text>
+
+  <!-- 进程 B -->
+  <rect x="64" y="400" width="260" height="126" rx="8" fill="#E9EFF7" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="80" y="426" font-size="14" font-weight="700" fill="#2C4460">进程 B = fork(A)</text>
+  <text x="80" y="444" font-size="11" fill="#2C4460">fd 表按值复制，file 对象不复制</text>
+  <rect x="84" y="456" width="220" height="30" rx="5" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1" opacity="0.9"/>
+  <text x="96" y="476" font-size="11.5" fill="#2C4460" font-family="'SF Mono',Menlo,Consolas,monospace">fd 3 · 与 A 指向同一 file</text>
+
+  <!-- struct file X -->
+  <rect x="430" y="180" width="270" height="150" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="446" y="206" font-size="13.5" font-weight="700" fill="#24473F">struct file X（打开文件描述）</text>
+  <text x="446" y="232" font-size="12" fill="#24473F" font-family="'SF Mono',Menlo,Consolas,monospace">f_pos：读写偏移（共享！）</text>
+  <text x="446" y="256" font-size="12" fill="#24473F" font-family="'SF Mono',Menlo,Consolas,monospace">f_op：文件系统操作表</text>
+  <text x="446" y="280" font-size="12" fill="#24473F" font-family="'SF Mono',Menlo,Consolas,monospace">f_count = 3（3 个 fd 持有）</text>
+  <text x="446" y="304" font-size="12" fill="#24473F" font-family="'SF Mono',Menlo,Consolas,monospace">f_path → dentry</text>
+
+  <!-- struct file Y -->
+  <rect x="430" y="400" width="270" height="110" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="446" y="426" font-size="13.5" font-weight="700" fill="#24473F">struct file Y</text>
+  <text x="446" y="452" font-size="12" fill="#24473F" font-family="'SF Mono',Menlo,Consolas,monospace">f_pos：独立偏移 = 0</text>
+  <text x="446" y="476" font-size="12" fill="#24473F">同一路径第二次 open 的产物</text>
+
+  <!-- 指向箭头 -->
+  <path d="M306,235 C370,235 380,238 424,240" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M306,307 C380,307 390,270 424,262" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M306,271 C380,271 390,430 424,438" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M306,471 C380,471 390,320 424,312" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrw)"/>
+  <text x="338" y="542" font-size="11" fill="#A64B3C">fork：共享 file X，偏移互相影响</text>
+
+  <!-- dentry -->
+  <rect x="790" y="150" width="190" height="90" rx="8" fill="#EFEDE3" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="806" y="176" font-size="13.5" font-weight="700" fill="#2B2A26" font-family="'SF Mono',Menlo,Consolas,monospace">dentry</text>
+  <text x="806" y="196" font-size="11.5" fill="#4A473F">路径名 → inode 的缓存</text>
+  <text x="806" y="216" font-size="11.5" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">"/data/log.bin"</text>
+
+  <!-- inode -->
+  <rect x="790" y="300" width="190" height="120" rx="8" fill="#E9EFDA" stroke="#6A7F3F" stroke-width="1.5"/>
+  <text x="806" y="326" font-size="13.5" font-weight="700" fill="#48562B">inode（每文件一个）</text>
+  <text x="806" y="350" font-size="11.5" fill="#48562B">i_size · 权限 · 块映射</text>
+  <text x="806" y="372" font-size="11.5" fill="#48562B" font-family="'SF Mono',Menlo,Consolas,monospace">i_mapping → 页缓存</text>
+  <text x="806" y="394" font-size="11.5" fill="#48562B">文件的“本体”</text>
+
+  <!-- superblock -->
+  <rect x="790" y="470" width="190" height="80" rx="8" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="806" y="496" font-size="13.5" font-weight="700" fill="#2B2A26" font-family="'SF Mono',Menlo,Consolas,monospace">superblock</text>
+  <text x="806" y="518" font-size="11.5" fill="#4A473F">挂载的文件系统实例</text>
+
+  <!-- address_space -->
+  <rect x="1030" y="300" width="180" height="120" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="1046" y="326" font-size="13.5" font-weight="700" fill="#7A5518" font-family="'SF Mono',Menlo,Consolas,monospace">address_space</text>
+  <text x="1046" y="350" font-size="11.5" fill="#7A5518">Page Cache 的索引</text>
+  <text x="1046" y="372" font-size="11.5" fill="#7A5518">XArray：页号 → folio</text>
+  <text x="1046" y="394" font-size="11.5" fill="#7A5518">全局只有一份</text>
+
+  <!-- folio cells -->
+  <rect x="1040" y="448" width="46" height="28" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="1096" y="448" width="46" height="28" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="1152" y="448" width="46" height="28" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="1052" y="467" font-size="10.5" fill="#7A5518">页0</text>
+  <text x="1108" y="467" font-size="10.5" fill="#7A5518">页1</text>
+  <text x="1164" y="467" font-size="10.5" fill="#7A5518">页2</text>
+  <text x="1040" y="498" font-size="10.5" fill="#6B675C">folio（4 KiB 页的组）</text>
+
+  <!-- 对象之间的箭头 -->
+  <path d="M704,255 C740,255 750,205 784,198" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M704,455 C755,455 765,230 784,218" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="885" y1="244" x2="885" y2="294" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="885" y1="424" x2="885" y2="464" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="898" y="450" font-size="10.5" fill="#6B675C">属于</text>
+  <line x1="984" y1="360" x2="1024" y2="360" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1120" y1="424" x2="1120" y2="442" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 底部结论卡 -->
+  <rect x="64" y="580" width="1146" height="160" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="88" y="610" font-size="14" font-weight="700" fill="#2B2A26">三个决定行为的推论</text>
+  <text x="88" y="640" font-size="12.5" fill="#4A473F">① 偏移属于 file，不属于 fd 也不属于 inode：fork / dup 后共享 file，两边 read 会互相推进偏移 —— 并发访问同一文件用 pread / pwrite。</text>
+  <text x="88" y="668" font-size="12.5" fill="#4A473F">② f_count 是内核里的引用计数：close(fd) 只是减一，减到 0 才真正释放 —— 语义与 std::shared_ptr 相同。</text>
+  <text x="88" y="696" font-size="12.5" fill="#4A473F">③ address_space 挂在 inode 上：无论多少进程、多少 fd，同一文件的 Page Cache 只有一份，所有进程共享（→ 1.2）。</text>
+  <text x="88" y="724" font-size="12.5" fill="#6B675C">对照实验：两个终端同时 strace 读同一文件，观察 lseek 结果；或用 ls -l /proc/&lt;pid&gt;/fd 看 fd 指向。</text>
+</svg>

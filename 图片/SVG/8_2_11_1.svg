@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Multishot recv + pbuf ring 端到端路径</title>
+  <desc>三个环：SQ、CQ、pbuf ring 分管请求与空闲 buffer；一份长期 recv 请求多次 CQE，F_MORE 表示仍活跃。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">一份 multishot recv + 一个 pbuf ring：三个环各管一件事</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">SQ/CQ 管请求与完成 · pbuf ring 管空闲 buffer 所有权 · 不是 N 个并行 recv</text>
+
+  <!-- ========== Three rings ========== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">共享内存结构 · 三个环</text>
+
+  <!-- SQ -->
+  <rect x="48" y="128" width="360" height="170" rx="10" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="68" y="156" font-size="13" font-weight="700" fill="#2C4460">SQ · 提交环</text>
+  <rect x="68" y="172" width="320" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="228" y="192" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">1 × multishot recv SQE</text>
+  <text x="228" y="208" font-size="10" fill="#3D5A80" text-anchor="middle">BUFFER_SELECT · buf_group=bgid</text>
+  <text x="68" y="244" font-size="12" fill="#4A473F">· 不绑死某块数据地址</text>
+  <text x="68" y="266" font-size="12" fill="#4A473F">· 内核保留一份长期请求</text>
+  <text x="68" y="288" font-size="11" fill="#6B675C">优化：提交侧 SQE 流量</text>
+
+  <!-- CQ -->
+  <rect x="440" y="128" width="360" height="170" rx="10" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="460" y="156" font-size="13" font-weight="700" fill="#24473F">CQ · 完成环</text>
+  <rect x="460" y="172" width="90" height="44" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="505" y="192" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">CQE1</text>
+  <text x="505" y="208" font-size="9" fill="#2F6B5E" text-anchor="middle">F_MORE</text>
+  <rect x="560" y="172" width="90" height="44" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="605" y="192" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">CQE2</text>
+  <text x="605" y="208" font-size="9" fill="#2F6B5E" text-anchor="middle">F_MORE</text>
+  <rect x="660" y="172" width="110" height="44" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="715" y="192" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">CQEn</text>
+  <text x="715" y="208" font-size="9" fill="#8A6A3A" text-anchor="middle">无 F_MORE=终态</text>
+  <text x="460" y="244" font-size="12" fill="#4A473F">· 每次完成仍要一个 CQE</text>
+  <text x="460" y="266" font-size="12" fill="#4A473F">· F_BUFFER + bid 标识选中块</text>
+  <text x="460" y="288" font-size="11" fill="#6B675C">生命周期只看 F_MORE，不看 res</text>
+
+  <!-- pbuf -->
+  <rect x="832" y="128" width="360" height="170" rx="10" fill="#FBFBF6" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="852" y="156" font-size="13" font-weight="700" fill="#6B4E28">pbuf ring · 空闲 buffer 环</text>
+  <rect x="852" y="172" width="70" height="44" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="887" y="198" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">bid0</text>
+  <rect x="930" y="172" width="70" height="44" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="965" y="198" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">bid1</text>
+  <rect x="1008" y="172" width="70" height="44" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1" stroke-dasharray="4 3"/>
+  <text x="1043" y="198" font-size="11" fill="#6B675C" text-anchor="middle">…</text>
+  <rect x="1086" y="172" width="80" height="44" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="1126" y="198" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">bidN</text>
+  <text x="852" y="244" font-size="12" fill="#4A473F">· 描述符：addr / len / bid</text>
+  <text x="852" y="266" font-size="12" fill="#4A473F">· 稳态归还不经 SQE</text>
+  <text x="852" y="288" font-size="11" fill="#6B675C">优化：buffer 供给侧</text>
+
+  <!-- ========== Pipeline steps ========== -->
+  <text x="48" y="338" font-size="13" font-weight="700" fill="#4A473F">端到端步骤 · 一次完成切片</text>
+
+  <rect x="48" y="354" width="1144" height="280" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+
+  <!-- steps as numbered flow -->
+  <rect x="68" y="378" width="160" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="148" y="406" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① 建池 + 发布</text>
+  <text x="148" y="428" font-size="10" fill="#3D5A80" text-anchor="middle">N 描述符 → advance</text>
+
+  <path d="M236,413 L256,413" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="264" y="378" width="160" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="344" y="406" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">② 提交 SQE</text>
+  <text x="344" y="428" font-size="10" fill="#3D5A80" text-anchor="middle">1 个长期 recv</text>
+
+  <path d="M432,413 L452,413" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="460" y="378" width="160" height="70" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="540" y="406" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">③ socket 就绪</text>
+  <text x="540" y="428" font-size="10" fill="#6B5B95" text-anchor="middle">有数据才选 buffer</text>
+
+  <path d="M628,413 L648,413" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="656" y="378" width="160" height="70" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="736" y="406" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">④ 消费 pbuf</text>
+  <text x="736" y="428" font-size="10" fill="#8A6A3A" text-anchor="middle">取 bid · 写入数据</text>
+
+  <path d="M824,413 L844,413" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="852" y="378" width="160" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="932" y="406" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑤ 发布 CQE</text>
+  <text x="932" y="428" font-size="10" fill="#2F6B5E" text-anchor="middle">res · F_BUFFER · F_MORE?</text>
+
+  <path d="M1020,413 L1040,413" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="1048" y="378" width="120" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1108" y="406" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑥ 应用消费</text>
+  <text x="1108" y="428" font-size="10" fill="#2F6B5E" text-anchor="middle">先拷字段再 seen</text>
+
+  <!-- lower row return path -->
+  <rect x="68" y="490" width="240" height="70" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="188" y="518" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">⑦ 业务释放所有权</text>
+  <text x="188" y="540" font-size="10" fill="#8A6A3A" text-anchor="middle">解析 / 写盘 / 异步任务结束</text>
+
+  <path d="M316,525 L336,525" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="344" y="490" width="240" height="70" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="464" y="518" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">⑧ 归还 pbuf ring</text>
+  <text x="464" y="540" font-size="10" fill="#8A6A3A" text-anchor="middle">add 描述符 · advance tail</text>
+
+  <path d="M592,525 L612,525" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="620" y="490" width="260" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="750" y="518" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">⑨ 有 F_MORE → 继续等数据</text>
+  <text x="750" y="540" font-size="10" fill="#3D5A80" text-anchor="middle">无 F_MORE → 必须重新提交 SQE</text>
+
+  <rect x="900" y="490" width="268" height="70" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="1034" y="518" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">耗尽 → -ENOBUFS</text>
+  <text x="1034" y="540" font-size="10" fill="#A64B3C" text-anchor="middle">仍看 F_MORE · 立刻归还持有块</text>
+
+  <text x="68" y="596" font-size="12" fill="#4A473F">网络路径：socket 收包 → 内核网络栈 → 复制到被选中的用户 buffer（pbuf 不是零拷贝，也不是 fixed registration）</text>
+  <text x="68" y="616" font-size="11" fill="#6B675C">multishot accept 交付新 fd，不选数据 buffer；新连接上的 recv 才使用 buffer group</text>
+
+  <!-- ========== F_MORE independence ========== -->
+  <rect x="48" y="660" width="1144" height="210" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+  <text x="72" y="692" font-size="13" font-weight="700" fill="#4A473F">两个独立标志 · 不要互相推断</text>
+
+  <rect x="72" y="714" width="340" height="128" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="92" y="744" font-size="13" font-weight="700" fill="#24473F">IORING_CQE_F_MORE</text>
+  <text x="92" y="770" font-size="12" fill="#24473F">问：请求是否还活着？</text>
+  <text x="92" y="794" font-size="12" fill="#4A473F">有 → 还可能继续出 CQE</text>
+  <text x="92" y="818" font-size="12" fill="#4A473F">无 → 终态，需重提才能继续</text>
+
+  <rect x="440" y="714" width="340" height="128" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="460" y="744" font-size="13" font-weight="700" fill="#6B4E28">IORING_CQE_F_BUFFER</text>
+  <text x="460" y="770" font-size="12" fill="#6B4E28">问：本次是否拿到 buffer？</text>
+  <text x="460" y="794" font-size="12" fill="#4A473F">有 → 用 SHIFT 解码 bid</text>
+  <text x="460" y="818" font-size="12" fill="#4A473F">无 → 高位不是 bid</text>
+
+  <rect x="808" y="714" width="352" height="128" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="828" y="744" font-size="13" font-weight="700" fill="#733428">cqe-&gt;res</text>
+  <text x="828" y="770" font-size="12" fill="#733428">问：本次完成结果是什么？</text>
+  <text x="828" y="794" font-size="12" fill="#4A473F">&gt;0 字节 · 0 关闭 · &lt;0 -errno</text>
+  <text x="828" y="818" font-size="12" fill="#733428">≠ 请求生命周期协议</text>
+</svg>

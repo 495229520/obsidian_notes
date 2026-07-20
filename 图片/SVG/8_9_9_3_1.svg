@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 视觉系统对齐 9.7 / 9.2：
+       底色 rgb(245,244,237)
+       蓝 #E3EAF4 / #3D5A80 / #2C4460
+       绿 #DCE9E3 / #2F6B5E / #24473F
+       琥珀 #EFE7DA / #8A6A3A / #6B4E28
+       红 #F0E0DB / #A64B3C / #733428
+       中性 #F1EFE8 / #D8D5C8 / #4A473F / #6B675C / #2B2A26
+       面板底 #FBFBF6 · 实心三角箭头 #5A564B -->
+  <title>blktrace：把块层平均等待拆成事件时间线</title>
+  <desc>上半：块请求生命周期 Q→G/I/M/F/X→D→驱动以下→C，并标出块层之前与之后不可见时间。下半：Q→D、D→C、Q→C 三段时间含义，三种异常签名与配对前提。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">blktrace：把块层平均等待拆成事件时间线</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">事件集合随内核、调度器与设备而变；Q、D、C 是分析边界，不是所有请求的固定状态机</text>
+
+  <!-- ============ Panel A：生命周期 ============ -->
+  <text x="48" y="108" font-size="13" font-weight="700" fill="#4A473F">A · 请求生命周期：块层之前 → Q → 软件处理 → D → 驱动以下 → C → 之后</text>
+
+  <rect x="48" y="120" width="1144" height="280" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 主时间线节点 y=200 -->
+  <!-- 块层之前 -->
+  <rect x="68" y="168" width="150" height="72" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="143" y="192" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">块层之前</text>
+  <text x="143" y="212" font-size="10.5" fill="#4A473F" text-anchor="middle">应用队列 · VFS</text>
+  <text x="143" y="228" font-size="10.5" fill="#4A473F" text-anchor="middle">FS 锁 · Page Cache</text>
+  <path d="M218,204 L248,204" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- Q -->
+  <circle cx="280" cy="204" r="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.8"/>
+  <text x="280" y="200" font-size="18" font-weight="700" fill="#2C4460" text-anchor="middle">Q</text>
+  <text x="280" y="216" font-size="9.5" fill="#2C4460" text-anchor="middle">queue</text>
+  <text x="280" y="250" font-size="10.5" font-weight="700" fill="#3D5A80" text-anchor="middle">进入块层</text>
+  <path d="M310,204 L340,204" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- G/I/M/F/X -->
+  <rect x="342" y="168" width="200" height="72" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="442" y="192" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">G / I / M / F / X</text>
+  <text x="442" y="212" font-size="10.5" fill="#2C4460" text-anchor="middle">分配 · 插入 · 合并 · 拆分</text>
+  <text x="442" y="228" font-size="10.5" fill="#2C4460" text-anchor="middle">调度器 · tag · 映射层</text>
+  <path d="M542,204 L572,204" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- D -->
+  <circle cx="604" cy="204" r="30" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="604" y="200" font-size="18" font-weight="700" fill="#24473F" text-anchor="middle">D</text>
+  <text x="604" y="216" font-size="9.5" fill="#24473F" text-anchor="middle">issue</text>
+  <text x="604" y="250" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">下发驱动</text>
+  <path d="M634,204 L664,204" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- 驱动以下 -->
+  <rect x="666" y="168" width="230" height="72" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="781" y="192" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">驱动以下</text>
+  <text x="781" y="212" font-size="10.5" fill="#24473F" text-anchor="middle">本地：控制器 · FTL · DMA · IRQ</text>
+  <text x="781" y="228" font-size="10.5" fill="#24473F" text-anchor="middle">远端：传输 · target · 远端介质</text>
+  <path d="M896,204 L926,204" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- C -->
+  <circle cx="958" cy="204" r="30" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.8"/>
+  <text x="958" y="200" font-size="18" font-weight="700" fill="#6B4E28" text-anchor="middle">C</text>
+  <text x="958" y="216" font-size="9.5" fill="#6B4E28" text-anchor="middle">complete</text>
+  <text x="958" y="250" font-size="10.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">块层完成</text>
+  <path d="M988,204 L1018,204" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- 之后 -->
+  <rect x="1020" y="168" width="148" height="72" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="1094" y="192" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">之后</text>
+  <text x="1094" y="212" font-size="10.5" fill="#4A473F" text-anchor="middle">softirq · 唤醒</text>
+  <text x="1094" y="228" font-size="10.5" fill="#4A473F" text-anchor="middle">调度 · 用户态恢复</text>
+
+  <!-- 三段括号 -->
+  <path d="M280,270 L280,286 L604,286 L604,270" fill="none" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="442" y="308" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Q → D · 块层软件等待</text>
+  <text x="442" y="326" font-size="10.5" fill="#2C4460" text-anchor="middle">plug · 调度 · tag · 映射 · CPU 资源</text>
+
+  <path d="M604,270 L604,348 L958,348 L958,270" fill="none" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="781" y="370" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">D → C · 驱动以下完成时间</text>
+  <text x="781" y="388" font-size="10.5" fill="#24473F" text-anchor="middle">非纯 NAND；网络块设备还跨传输与 target</text>
+
+  <!-- Q→C 总跨度（虚线总括号） -->
+  <path d="M280,270 L280,262 L958,262 L958,270" fill="none" stroke="#8A6A3A" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="619" y="256" font-size="10.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">Q → C · 所追踪设备层总驻留</text>
+  <text x="68" y="144" font-size="11" fill="#6B675C">灰色两端不可见 · 中间 Q/D/C 是分析锚点 · 事件序列不是固定协议</text>
+
+  <!-- ============ Panel B：三段含义 + 异常 ============ -->
+  <text x="48" y="436" font-size="13" font-weight="700" fill="#4A473F">B · 三段时间各自代表什么 · 三种异常形状与下一步</text>
+
+  <!-- 三段卡片 -->
+  <rect x="48" y="448" width="370" height="100" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="68" y="472" font-size="12" font-weight="700" fill="#2C4460">Q → D · 软件等待</text>
+  <text x="68" y="494" font-size="10.5" fill="#2C4460">plug 攒批 · 调度公平 · 合并拆分</text>
+  <text x="68" y="514" font-size="10.5" fill="#2C4460">blk-mq tag · dm/加密/RAID 上层</text>
+  <text x="68" y="534" font-size="10.5" fill="#3D5A80">≠「CPU 算了这么久」· 含资源等待</text>
+
+  <rect x="434" y="448" width="370" height="100" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="454" y="472" font-size="12" font-weight="700" fill="#24473F">D → C · 驱动以下</text>
+  <text x="454" y="494" font-size="10.5" fill="#24473F">本地：PCIe/NVMe · 控制器 · FTL · GC</text>
+  <text x="454" y="514" font-size="10.5" fill="#24473F">远端：网络 · target 队列 · 远端介质</text>
+  <text x="454" y="534" font-size="10.5" fill="#2F6B5E">客户端 trace 拆不开「网络 vs 盘」</text>
+
+  <rect x="820" y="448" width="372" height="100" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="840" y="472" font-size="12" font-weight="700" fill="#6B4E28">Q → C · 块层总驻留</text>
+  <text x="840" y="494" font-size="10.5" fill="#6B4E28">与 iostat await 观测边界接近</text>
+  <text x="840" y="514" font-size="10.5" fill="#6B4E28">统计方法不同 · 只做量级交叉验证</text>
+  <text x="840" y="534" font-size="10.5" fill="#8A6A3A">不含 C 之后唤醒与用户态恢复</text>
+
+  <!-- 三种异常 -->
+  <rect x="48" y="568" width="370" height="120" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="233" y="594" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① Q→D 增长 · D→C 稳定</text>
+  <text x="68" y="618" font-size="11" fill="#2C4460">候选：QD 过深 · tag · 调度器 · dm · CPU</text>
+  <text x="68" y="640" font-size="11" fill="#2C4460">动作：降低 QD；查 aqu-sz 与软件队列</text>
+  <text x="68" y="668" font-size="10.5" font-weight="700" fill="#3D5A80">→ 瓶颈更可能在块层软件侧</text>
+
+  <rect x="434" y="568" width="370" height="120" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="619" y="594" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">② Q→D 稳定 · D→C 增长</text>
+  <text x="454" y="618" font-size="11" fill="#24473F">候选：设备 GC/温控 · 链路 · 网络 · target</text>
+  <text x="454" y="640" font-size="11" fill="#24473F">动作：查 SMART、错误、重传与服务端</text>
+  <text x="454" y="668" font-size="10.5" font-weight="700" fill="#2F6B5E">→ 瓶颈更可能在驱动以下</text>
+
+  <rect x="820" y="568" width="372" height="120" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1006" y="594" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">③ fio clat 高 · Q→C 低</text>
+  <text x="840" y="618" font-size="11" fill="#733428">候选：块层之前/之后，或追错设备层</text>
+  <text x="840" y="640" font-size="11" fill="#733428">动作：换 tracepoint；核对 MAJ:MIN 映射</text>
+  <text x="840" y="668" font-size="10.5" font-weight="700" fill="#A64B3C">→ 延迟不在所追踪的块层内</text>
+
+  <!-- 配对前提 -->
+  <rect x="48" y="708" width="1144" height="152" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="68" y="734" font-size="12" font-weight="700" fill="#2B2A26">配对前提 · 采集纪律</text>
+  <text x="68" y="760" font-size="11" fill="#4A473F">① merge / split / requeue / 多层映射会改变请求身份和数量，不能只按扇区做简单一对一匹配。</text>
+  <text x="68" y="784" font-size="11" fill="#4A473F">② 先用 iostat 缩小设备和时间窗，再短时采集；原始 trace 写到另一块设备并检查丢事件。</text>
+  <text x="68" y="808" font-size="11" fill="#4A473F">③ 高 IOPS 全量追踪成本高：生产先用 eBPF 直方图过滤，再缩到几十秒 blktrace 窗口。</text>
+  <text x="68" y="832" font-size="11" fill="#4A473F">④ 排障顺序：fio/SLO → iostat 定位 → blktrace 拆段 → eBPF 补齐块层前后。</text>
+</svg>

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拥塞控制动画 · 慢启动 / 拥塞避免 / 快重传快恢复 / cwnd 曲线</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+@keyframes pop{0%{transform:scale(.7);}70%{transform:scale(1.14);}100%{transform:scale(1);}}
+
+/* ===== 柱状图（场景 1 / 2 共用） ===== */
+.bc-wrap{position:relative;width:500px;margin:6px auto 0;}
+.bc-area{position:relative;border-left:1.5px solid var(--line);border-bottom:1.5px solid var(--line);display:flex;align-items:flex-end;justify-content:space-around;padding:0 14px;}
+.bc-bar{width:64px;background:var(--blue);border-radius:6px 6px 0 0;height:0;position:relative;transition:height var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.bc-bar.avoid{background:var(--green);}
+.bc-bar.limit{box-shadow:0 0 0 3px rgba(154,91,14,.28);}
+.bc-val{position:absolute;top:-22px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ink);opacity:1;transition:opacity var(--dur) var(--ease);}
+.bc-val.off{opacity:0;}
+.bc-thresh{position:absolute;left:0;right:0;border-top:2px dashed var(--brown);transition:bottom var(--dur) var(--ease);pointer-events:none;}
+.bc-thresh span{position:absolute;right:2px;top:-20px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brown);}
+.bc-x{display:flex;justify-content:space-around;padding:0 14px;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:6px;}
+.bc-x span{width:64px;text-align:center;}
+.bc-formula{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:18px;}
+.bc-formula b{color:var(--green);}
+
+/* 在途报文段小视图（场景 1） */
+.fl-strip{margin-top:20px;display:flex;flex-direction:column;gap:8px;align-items:center;}
+.fl-row{display:flex;align-items:center;gap:6px;min-height:24px;}
+.fl-tag{font-family:var(--mono);font-size:11px;color:var(--faint);width:88px;text-align:right;margin-right:4px;}
+.fl-chip{width:26px;height:22px;border-radius:5px;border:1.5px solid var(--blue);background:var(--bluebg);color:var(--blue);font-family:var(--mono);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(8px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.fl-chip.ack{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.fl-chip.show{opacity:1;transform:none;}
+.op-note{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:auto;padding-top:12px;}
+.op-note b{color:var(--ink);}
+
+/* ===== 场景 3：双生命线 ===== */
+.rc-stage{display:flex;gap:14px;flex:1;margin-top:4px;}
+.rc-side{width:150px;display:flex;flex-direction:column;gap:10px;align-items:center;}
+.rc-title{font-weight:600;font-size:13.5px;}
+.rc-panel{width:100%;border:1.5px solid var(--grid);border-radius:10px;padding:8px 10px;font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:5px;background:var(--paper);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.rc-panel .pt{font-size:10.5px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease);}
+.rc-panel .row{display:flex;justify-content:space-between;gap:6px;}
+.rc-panel b{color:var(--ink);display:inline-block;transition:color var(--dur) var(--ease);}
+.rc-panel.caseB{border-color:var(--danger);background:var(--dangerbg);}
+.rc-panel.caseB .pt{color:var(--danger);}
+.rc-panel.caseB b{color:var(--danger);}
+.flash{animation:pop .5s var(--ease);}
+.rc-cnt{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--muted);border:1.5px solid var(--line);background:var(--gray);border-radius:999px;padding:3px 12px;transition:all var(--dur) var(--ease);}
+.rc-cnt.hot{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);box-shadow:0 0 0 3px rgba(179,64,47,.2);}
+.rc-chan{flex:1;position:relative;border-left:1.5px dashed var(--line);border-right:1.5px dashed var(--line);min-height:330px;}
+.rc-chan.dim .rc-chip{opacity:.15;}
+.rc-chip{position:absolute;left:2%;font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 9px;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue);color:#fff;white-space:nowrap;opacity:0;box-shadow:0 2px 6px rgba(60,55,40,.1);transition:left var(--dur) var(--ease),opacity 380ms var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.rc-chip.show{opacity:1;}
+.rc-chip.ackc{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.rc-chip.lost{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);border-style:dashed;}
+.rc-chip.retx{background:var(--brown);border-color:var(--brown);box-shadow:0 0 0 3px rgba(154,91,14,.3);}
+.rc-rto{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);font-size:12px;font-weight:700;color:var(--danger);background:var(--dangerbg);border:1.5px solid var(--danger);border-radius:9px;padding:6px 14px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;z-index:2;}
+.rc-rto.on{opacity:1;}
+.rc-slots{display:flex;gap:4px;}
+.rc-slot{width:22px;height:26px;border:1.5px solid var(--line);border-radius:5px;background:var(--gray);color:var(--faint);font-family:var(--mono);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all var(--dur) var(--ease);}
+.rc-slot.got{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.rc-slot.miss{background:var(--dangerbg);border-color:var(--danger);color:var(--danger);border-style:dashed;}
+.rc-slot.re{background:var(--brownbg);border-color:var(--brown);color:var(--brown);}
+.rc-wait{font-size:11px;font-family:var(--mono);color:var(--muted);text-align:center;min-height:34px;padding:0 4px;}
+.rc-cmp{display:flex;gap:10px;margin-top:12px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.rc-cmp.on{opacity:1;}
+.rc-cmp .box{flex:1;border:1.5px solid;border-radius:10px;padding:7px 11px;font-size:11px;line-height:1.55;}
+.rc-cmp .box b{font-size:11.5px;}
+.rc-cmp .bad{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+.rc-cmp .ok{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+
+/* ===== 场景 4：完整曲线 ===== */
+.cv-svg{width:100%;max-width:560px;margin:0 auto;display:block;overflow:visible;}
+.cv-axis{stroke:var(--line);stroke-width:1.5;}
+.cv-grid{stroke:var(--grid);stroke-width:1;}
+.cv-ylbl,.cv-xlbl{font-family:var(--mono);font-size:9.5px;fill:var(--faint);}
+.cv-band rect{transition:opacity var(--dur) var(--ease);opacity:0;}
+.cv-band text{font-family:var(--mono);font-size:10px;fill:var(--muted);text-anchor:middle;transition:opacity var(--dur) var(--ease);opacity:0;}
+.cv-band.on rect,.cv-band.on text{opacity:1;}
+.cv-evt line{stroke:var(--danger);stroke-width:2;}
+.cv-evt.big line{stroke-width:4;}
+.cv-evt text{font-family:var(--mono);font-size:10px;font-weight:700;fill:var(--danger);text-anchor:middle;}
+.cv-evt{opacity:0;transition:opacity var(--dur) var(--ease);}
+.cv-evt.on{opacity:1;}
+#cvSSg{transition:transform var(--dur) var(--ease);}
+#cvSSg line{stroke:var(--brown);stroke-width:2;stroke-dasharray:6 5;}
+#cvSSg text{font-family:var(--mono);font-size:10.5px;font-weight:700;fill:var(--brown);}
+#cvPath{fill:none;stroke:var(--blue);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;transition:stroke-dashoffset .6s var(--ease);}
+#cvDot{fill:var(--blue);stroke:#FBFAF6;stroke-width:2;transition:transform var(--dur) var(--ease);}
+.cv-stat{text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:14px;display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;}
+.cv-stat b{color:var(--ink);font-size:15px;display:inline-block;}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>拥塞控制动画 · 慢启动 / 拥塞避免 / 快重传快恢复 / cwnd 曲线</h1>
+    <p>配套笔记《8.10 拥塞控制》 · 别把网络压垮：cwnd 随 ACK 与丢包信号动态伸缩　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+function setV(id,txt){const e=el(id);if(e.textContent!==txt){e.textContent=txt;e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');}}
+
+/* 四个场景共用同一份「教学版规则总结」伪代码（笔记 8.10），按步骤高亮当前分支 */
+const CODE=codeOf([
+'<span class="kw">if</span> (timeout) {                     <span class="cmt">// 超时:整条路堵死</span>',
+'    ssthresh = max(cwnd/2, 2*MSS);',
+'    cwnd  = 1 * MSS;                <span class="cmt">// 打回起点</span>',
+'    state = SLOW_START;             <span class="cmt">// 重回慢启动</span>',
+'} <span class="kw">else if</span> (dup_ack == 3) {        <span class="cmt">// 3 个重复 ACK</span>',
+'    retransmit_lost_segment();      <span class="cmt">// 快重传:不等 RTO</span>',
+'    ssthresh = max(cwnd/2, 2*MSS);',
+'    cwnd  = ssthresh;               <span class="cmt">// 快恢复(教学简化)</span>',
+'    state = CONGESTION_AVOIDANCE;',
+'} <span class="kw">else if</span> (state == SLOW_START) {',
+'    grow_cwnd_exponentially();      <span class="cmt">// ≈ 每 RTT 翻倍</span>',
+'} <span class="kw">else if</span> (state == CONGESTION_AVOIDANCE) {',
+'    grow_cwnd_linearly();           <span class="cmt">// ≈ 每 RTT +1 MSS</span>',
+'}'
+]);
+
+/* ========== 场景 1：慢启动（指数增长） ========== */
+const slowScene=(()=>{
+  const V=[1,2,4,8],U=24,N=8;
+  const steps=[
+    {title:'步骤 0 · 刚建连：从 cwnd = 1 MSS 起步',chip:'网络容量未知',chipC:'c0',r:1,p4:false,send:1,ack:0,lines:[9,10],
+     note:'虚线 ssthresh = 8 是慢启动的切换门限',
+     desc:'三次握手刚完成，发送方对这条路径能扛多少数据<b>一无所知</b>。贸然开大窗口可能瞬间压垮中间路由器，于是从最小的 <b>cwnd = 1 MSS</b> 起步——先发 1 个报文段试试水。上方虚线是慢启动门限 <b>ssthresh = 8</b>：低于它用慢启动快速探测，达到它就改用保守的拥塞避免。'},
+    {title:'RTT1 · 发 1 段、收 1 个 ACK → cwnd = 2',chip:'cwnd 1→2',chipC:'cb',r:2,p4:false,send:1,ack:1,lines:[9,10],
+     note:'收到 1 个 ACK：cwnd = 1 + 1 = 2',
+     desc:'第 1 轮发出 1 个报文段，ACK 顺利返回。慢启动规则：<b>每收到一个 ACK，cwnd += 1 MSS</b>。1 个 ACK 到手，cwnd 变成 <span class="bl">2</span>——下一轮可以发 2 段了。ACK 能回来，说明这条路目前扛得住。'},
+    {title:'RTT2 · 发 2 段、收 2 个 ACK → cwnd = 4',chip:'cwnd 2→4',chipC:'cb',r:3,p4:false,send:2,ack:2,lines:[9,10],
+     note:'每个 ACK 都 +1 → 一轮下来正好翻倍',
+     desc:'发 2 段、回 2 个 ACK，每个 ACK 让 cwnd +1 → cwnd = 2 + 2 = <span class="bl">4</span>。注意规则是"逐 ACK +1"，但<b>按 RTT 看效果就是翻倍</b>——发多少、确认多少、就再涨多少，这正是指数增长的来源。'},
+    {title:'RTT3 · 发 4 段、收 4 个 ACK → cwnd = 8',chip:'cwnd 4→8',chipC:'cb',r:4,p4:false,send:4,ack:4,lines:[9,10],
+     note:'1 → 2 → 4 → 8：指数逼近门限',
+     desc:'同样的机制继续滚雪球：4 段全部确认，cwnd = 4 + 4 = <span class="bl">8</span>。短短 3 个 RTT，窗口从 1 冲到 8——柱子的高度差就是"指数"两个字的直观形状。'},
+    {title:'cwnd 触到 ssthresh = 8 → 切换拥塞避免',chip:'cwnd ≥ ssthresh',chipC:'ch',r:4,p4:true,send:8,ack:0,lines:[11,12],
+     note:'柱子变色：指数阶段到此为止',
+     desc:'cwnd 摸到虚线：<b>cwnd ≥ ssthresh</b> 成立，慢启动结束。指数增长再翻一倍就是 16，很可能直接把路径打爆，所以 TCP 在这里"换挡"——进入<span class="gr">拥塞避免</span>，改为每 RTT 只加 1 MSS 的线性爬坡（见下一场景）。'},
+    {title:'"慢启动"一点也不慢',chip:'指数探测',chipC:'cg',r:4,p4:true,send:8,ack:8,lines:[9,10],
+     note:'慢的只是起点，增速是指数级',
+     desc:'名字里的"慢"指<b>起点低</b>（从 1 MSS 开始），不是速度慢——每 RTT 翻倍是最快的探测方式。它的使命：在完全未知的网络上，用最少的轮次找到"大概能扛多少"的量级。'},
+    {title:'慢启动的三个出口',chip:'门限 / 超时 / 3 dup ACK',chipC:'cd',r:4,p4:true,send:8,ack:8,lines:[0,4],
+     note:'出口 ① cwnd ≥ ssthresh　② 超时　③ 3 个重复 ACK',
+     desc:'慢启动在三种情况下结束：① <b>cwnd 涨到 ssthresh</b> → 平滑换挡进拥塞避免（本例走的路）；② <span class="dg">超时</span> → 网络可能堵死，cwnd 直接打回 1；③ <span class="dg">3 个重复 ACK</span> → 疑似丢包，走快重传 + 快恢复。后两种见场景 3。'},
+  ];
+  function mount(){
+    let bars='';
+    for(let i=0;i<4;i++)bars+='<div class="bc-bar" id="s1b'+i+'"><span class="bc-val off" id="s1v'+i+'">'+V[i]+'</span></div>';
+    let xl='';['RTT1','RTT2','RTT3','RTT4'].forEach(t=>xl+='<span>'+t+'</span>');
+    let sc='',ac='';
+    for(let i=0;i<N;i++){sc+='<div class="fl-chip" id="s1s'+i+'" style="transition-delay:'+(i*45)+'ms">'+(i+1)+'</div>';ac+='<div class="fl-chip ack" id="s1a'+i+'" style="transition-delay:'+(i*45)+'ms">'+(i+1)+'</div>';}
+    viz.innerHTML='<div class="vcap"><b>慢启动</b>：每收到一个 ACK，cwnd +1 —— 按 RTT 看是指数翻倍</div>'+
+      '<div class="bc-wrap"><div class="bc-area" style="height:212px">'+
+        '<div class="bc-thresh" style="bottom:'+(8*U)+'px"><span>ssthresh = 8</span></div>'+bars+
+      '</div><div class="bc-x">'+xl+'</div></div>'+
+      '<div class="fl-strip">'+
+        '<div class="fl-row"><span class="fl-tag">本轮发出</span>'+sc+'</div>'+
+        '<div class="fl-row"><span class="fl-tag">收到 ACK</span>'+ac+'</div>'+
+      '</div>'+
+      '<div class="op-note" id="s1Note"></div>';
+  }
+  function paint(s){
+    for(let i=0;i<4;i++){
+      const on=i<s.r;
+      const b=el('s1b'+i);
+      b.style.height=(on?V[i]*U:0)+'px';
+      b.className='bc-bar'+((s.p4&&i===3)?' avoid limit':'');
+      el('s1v'+i).className='bc-val'+(on?'':' off');
+    }
+    for(let i=0;i<N;i++){
+      el('s1s'+i).classList.toggle('show',i<s.send);
+      el('s1a'+i).classList.toggle('show',i<s.ack);
+    }
+    el('s1Note').innerHTML=s.note||'';
+  }
+  return {id:'slowstart',label:'慢启动',sub:'cwnd 指数翻倍 1→2→4→8',steps,mount,paint,code:CODE};
+})();
+
+/* ========== 场景 2：拥塞避免（线性增长） ========== */
+const avoidScene=(()=>{
+  const V=[8,9,10,11],U=18;
+  const steps=[
+    {title:'步骤 0 · 过了门限：改走 AIMD 加性增大',chip:'Additive Increase',chipC:'c0',r:1,lines:[11,12],
+     desc:'车流已经不少，还猛踩油门翻倍就是自找拥塞。拥塞避免阶段每收到一个 ACK 只加一点点：<code>cwnd += MSS × MSS / cwnd</code>。一个 RTT 里约有 cwnd/MSS 个 ACK，累积起来正好 <b>+1 MSS</b>——从"翻倍"降档成"+1"。'},
+    {title:'RTT5 · 8 → 9',chip:'+1 MSS',chipC:'cg',r:2,lines:[11,12],
+     desc:'一整轮 8 个报文段全部确认，cwnd 才涨 1：8 → <span class="gr">9</span>。对比慢启动：同样一轮、同样数量的 ACK，那边能 8 → 16——增幅差了 8 倍。'},
+    {title:'RTT6 · 9 → 10',chip:'+1 MSS',chipC:'cg',r:3,lines:[11,12],
+     desc:'继续小步慢爬：9 → <span class="gr">10</span>。路上车多了，只能一辆一辆往里加——每一步都在试探"还能不能再多一点"，一旦丢包立刻收手。'},
+    {title:'RTT7 · 10 → 11',chip:'+1 MSS',chipC:'cg',r:4,lines:[11,12],
+     desc:'10 → <span class="gr">11</span>。三个 RTT 只涨了 3 MSS，而慢启动三轮能翻 8 倍。柱状图上两种坡度的对比，就是"指数探测"与"线性保守"的全部区别。'},
+    {title:'线性增长 = 保守探测，为"减半"埋伏笔',chip:'AIMD 全貌',chipC:'ch',r:4,lines:[6,7],
+     desc:'AIMD = <b>加性增大</b>（每 RTT +1，慢慢逼近容量）+ <b>乘性减小</b>（一旦怀疑拥塞，ssthresh = cwnd/2，窗口直接砍半）。涨得慢、跌得狠，多条 TCP 流才能在瓶颈处收敛到公平共享。下一场景就看"怀疑拥塞"时发生什么。'},
+  ];
+  function mount(){
+    let bars='';
+    for(let i=0;i<4;i++)bars+='<div class="bc-bar'+(i>0?' avoid':'')+'" id="s2b'+i+'"><span class="bc-val off" id="s2v'+i+'">'+V[i]+'</span></div>';
+    let xl='';['RTT4','RTT5','RTT6','RTT7'].forEach(t=>xl+='<span>'+t+'</span>');
+    viz.innerHTML='<div class="vcap"><b>拥塞避免</b>：从 cwnd = 8 继续，每个 RTT 只 +1 MSS</div>'+
+      '<div class="bc-wrap"><div class="bc-area" style="height:226px">'+
+        '<div class="bc-thresh" style="bottom:'+(8*U)+'px"><span>ssthresh = 8</span></div>'+bars+
+      '</div><div class="bc-x">'+xl+'</div></div>'+
+      '<div class="bc-formula">每收到一个 ACK：cwnd += MSS × MSS / cwnd　→　<b>每 RTT ≈ +1 MSS</b></div>'+
+      '<div class="op-note" id="s2Note">蓝柱 = 慢启动的终点（8）　·　绿柱 = 拥塞避免的线性爬坡</div>';
+  }
+  function paint(s){
+    for(let i=0;i<4;i++){
+      const on=i<s.r;
+      el('s2b'+i).style.height=(on?V[i]*U:0)+'px';
+      el('s2v'+i).className='bc-val'+(on?'':' off');
+    }
+  }
+  return {id:'avoid',label:'拥塞避免',sub:'每 RTT +1 MSS 8→9→10→11',steps,mount,paint,code:CODE};
+})();
+
+/* ========== 场景 3：快重传 + 快恢复 vs 超时 ========== */
+const recovScene=(()=>{
+  const RR='calc(100% - 46px)',KA='2%',KS='calc(100% - 70px)';
+  const CH={ // id: [top, 初始left, 基础类, 标签]
+    d1:['2%','2%','rc-chip','1'],  d2:['11%','2%','rc-chip','2'],
+    d3:['20%','2%','rc-chip','3'], d4:['29%','2%','rc-chip','4'],
+    d5:['38%','2%','rc-chip','5'], d6:['47%','2%','rc-chip','6'],
+    d3r:['20%','2%','rc-chip','重传 3'],
+    k0:['58%',KS,'rc-chip ackc','ACK=3'], k1:['67%',KS,'rc-chip ackc','ACK=3'],
+    k2:['76%',KS,'rc-chip ackc','ACK=3'], k3:['85%',KS,'rc-chip ackc','ACK=3'],
+  };
+  const A={cw:'11 MSS',ss:'8 MSS',st:'拥塞避免',cs:'情形 A · 3 个重复 ACK'};
+  const A2={cw:'5 MSS',ss:'5 MSS',st:'快恢复→拥塞避免',cs:'情形 A · 3 个重复 ACK'};
+  const B={cw:'1 MSS',ss:'3 MSS',st:'慢启动',cs:'情形 B · 超时（设 cwnd=7）'};
+  const SL={g12:{1:'got',2:'got'},g4:{1:'got',2:'got',3:'miss',4:'got'},g45:{1:'got',2:'got',3:'miss',4:'got',5:'got'},re:{1:'got',2:'got',3:'re',4:'got',5:'got'}};
+  const steps=[
+    {title:'步骤 0 · 发送方连发报文段 1–5',chip:'窗口内连发',chipC:'c0',lines:[11,12],
+     ch:{d1:['58%'],d2:['46%'],d3:['34%'],d4:['22%'],d5:['10%']},slots:{},cnt:0,pv:A,wait:'期待 seq=1',
+     desc:'拥塞避免阶段（cwnd = 11、ssthresh = 8），发送方在窗口额度内一口气发出报文段 <b>1 2 3 4 5</b>，它们正排成车队穿过网络。接收方按序接收、<b>累计确认</b>：ACK=n 表示"n 之前的都收到了，我在等 n"。'},
+    {title:'步骤 1 · 3 号报文段在中途丢失',chip:'丢包',chipC:'cd',lines:[],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:['40%'],d5:['28%'],k0:[KA]},slots:SL.g12,cnt:0,pv:A,wait:'收到 1、2 → 回 ACK=3',
+     desc:'1、2 顺利到达，接收方回 <b>ACK=3</b>（累计确认到 2，期待 3）。而 <span class="dg">3 号段在半路被拥塞的路由器丢掉了</span>——4、5 还跟在后面飞，对此毫不知情。'},
+    {title:'步骤 2 · 4 到达 → 第 1 个重复 ACK=3',chip:'dup ACK ×1',chipC:'ch',lines:[],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:[RR],d5:['52%'],k0:[KA],k1:[KA]},slots:SL.g4,cnt:1,pv:A,wait:'4 先缓存：缺口在 3，仍回 ACK=3',
+     desc:'4 号到达，但累计确认<b>卡在缺口上</b>：3 没到就不能确认到 4。接收方把 4 先缓存起来，再回一个一模一样的 <b>ACK=3</b>——"我还在等 3"。这就是第 <b>1</b> 个重复 ACK。'},
+    {title:'步骤 3 · 5 到达 → 第 2 个重复 ACK=3',chip:'dup ACK ×2',chipC:'ch',lines:[],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:[RR],d5:[RR],k0:[KA],k1:[KA],k2:[KA]},slots:SL.g45,cnt:2,pv:A,wait:'5 也只能缓存，再催一次 ACK=3',
+     desc:'5 号同样只能缓存，又催回一个 <b>ACK=3</b>。发送方开始起疑：连着两个重复确认，3 号八成出事了——但也可能只是<b>乱序</b>（后发先至同样会催出重复 ACK），再等等。'},
+    {title:'步骤 4 · 第 3 个重复 ACK 到达 → 计数器亮红',chip:'dup ACK ×3',chipC:'cd',lines:[4],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:[RR],d5:[RR],d6:[RR],k0:[KA],k1:[KA],k2:[KA],k3:[KA]},slots:SL.g45,cnt:3,pv:A,wait:'每个乱序到达都催回一个 ACK=3',
+     desc:'窗口还有额度，发送方继续发出 6 号段；它到达后又催回第 3 个 <b>ACK=3</b>。计数器到 <span class="dg">3</span>——这被视为"3 号真的丢了"的<b>强信号</b>，触发条件满足。'},
+    {title:'步骤 5 · 快重传：立即补发 3 号，不等 RTO',chip:'Fast Retransmit',chipC:'ch',lines:[4,5],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:[RR],d5:[RR],d6:[RR],k0:[KA],k1:[KA],k2:[KA],k3:[KA],d3r:[RR,'retx']},slots:SL.re,cnt:3,pv:A,wait:'3 补上 → 缓存的 4、5、6 一并交付',
+     desc:'不必干等重传定时器（RTO 往往几百毫秒起步），发送方<b>立刻重传 3 号段</b>。它一到，接收方把缓存的 4、5、6 一并按序交付，下一个 ACK 直接跳到最新位置。这就是快重传——用重复 ACK 抢在超时之前把洞补上。'},
+    {title:'步骤 6 · 快恢复：ssthresh = 11/2 ≈ 5，cwnd 降到 5',chip:'Fast Recovery',chipC:'cg',lines:[6,7,8],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:[RR],d5:[RR],d6:[RR],k0:[KA],k1:[KA],k2:[KA],k3:[KA],d3r:[RR,'retx']},slots:SL.re,cnt:3,pv:A2,wait:'数据仍在流动，无需归零',
+     desc:'重复 ACK 还在源源不断地回来，说明<b>路没有断，数据仍在流动</b>，没必要把 cwnd 打回起点。教学简化版：<b>ssthresh = cwnd/2 = 11/2 ≈ 5</b>，<b>cwnd = ssthresh = 5</b>，然后留在拥塞避免里继续线性增长（对应笔记示例 RTT8 起的 5→6→7）。'},
+    {title:'步骤 7 · 对比：若是超时 → cwnd 归 1，重回慢启动',chip:'RTO 超时',chipC:'cd',lines:[0,1,2,3],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:[RR],d5:[RR],d6:[RR],k0:[KA],k1:[KA],k2:[KA],k3:[KA],d3r:[RR,'retx']},slots:SL.re,cnt:3,pv:B,caseB:true,dim:true,rto:true,wait:'连 ACK 都收不到了……',
+     desc:'换一种剧本：迟迟等不到任何 ACK、重传定时器到点（笔记示例里拥塞避免走到 cwnd = 7 时超时）——TCP 判定网络可能<b>严重拥塞</b>：ssthresh = 7/2 ≈ <span class="dg">3</span>，<b>cwnd 直接归 1</b>，重回慢启动。反应比 3 个重复 ACK 激烈得多。'},
+    {title:'步骤 8 · 为什么偏偏是 3 个？',chip:'强信号 vs 弱信号',chipC:'cg',lines:[0,4],
+     ch:{d1:[RR],d2:[RR],d3:['46%','lost'],d4:[RR],d5:[RR],d6:[RR],k0:[KA],k1:[KA],k2:[KA],k3:[KA],d3r:[RR,'retx']},slots:SL.re,cnt:3,pv:A2,cmp:true,wait:'两种信号，两种力度',
+     desc:'1、2 个重复 ACK 可能只是<b>报文乱序</b>，连续 3 个才更像"真丢了"。两种信号的直觉：<span class="dg">超时 = 整条路堵死</span>，连 ACK 都回不来，所以归 1 重来；<b>3 个重复 ACK = 掉了一个包，但后面的车还在动</b>，所以只减半、温和处理。'},
+  ];
+  function mount(){
+    let chips='';
+    Object.keys(CH).forEach(id=>{const c=CH[id];chips+='<div class="'+c[2]+'" id="rc-'+id+'" style="top:'+c[0]+';left:'+c[1]+'">'+c[3]+'</div>';});
+    let slots='';for(let i=1;i<=5;i++)slots+='<div class="rc-slot" id="rcSl'+i+'">'+i+'</div>';
+    viz.innerHTML='<div class="vcap"><b>快重传 + 快恢复</b>：3 个重复 ACK ≠ 超时，处理温和得多</div>'+
+      '<div class="rc-stage">'+
+        '<div class="rc-side"><div class="rc-title">发送方</div>'+
+          '<div class="rc-panel" id="rcPanel"><div class="pt" id="rcCase">情形 A · 3 个重复 ACK</div>'+
+            '<div class="row"><span>cwnd</span><b id="rcCwnd">11 MSS</b></div>'+
+            '<div class="row"><span>ssthresh</span><b id="rcSs">8 MSS</b></div>'+
+            '<div class="row"><span>状态</span><b id="rcState">拥塞避免</b></div></div>'+
+          '<div class="rc-cnt" id="rcCnt">重复 ACK × 0</div></div>'+
+        '<div class="rc-chan" id="rcChan">'+chips+'<div class="rc-rto" id="rcRto">⏰ RTO 超时</div></div>'+
+        '<div class="rc-side"><div class="rc-title">接收方</div>'+
+          '<div class="rc-slots">'+slots+'</div>'+
+          '<div class="rc-wait" id="rcWait">缓冲区按序交付</div></div>'+
+      '</div>'+
+      '<div class="rc-cmp" id="rcCmp">'+
+        '<div class="box bad"><b>超时</b> = 整条路堵死<br>ssthresh=cwnd/2 · cwnd=1 · 重回慢启动</div>'+
+        '<div class="box ok"><b>3 dup ACK</b> = 局部丢包，车流仍在动<br>ssthresh=cwnd/2 · cwnd=ssthresh · 留在拥塞避免</div>'+
+      '</div>';
+  }
+  function paint(s){
+    Object.keys(CH).forEach(id=>{
+      const c=CH[id],e=el('rc-'+id),spec=s.ch[id];
+      if(spec){e.className=c[2]+' show'+(spec[1]?' '+spec[1]:'');e.style.left=spec[0];}
+      else{e.className=c[2];e.style.left=c[1];}
+    });
+    for(let i=1;i<=5;i++)el('rcSl'+i).className='rc-slot'+(s.slots[i]?' '+s.slots[i]:'');
+    setV('rcCwnd',s.pv.cw);setV('rcSs',s.pv.ss);setV('rcState',s.pv.st);
+    el('rcCase').textContent=s.pv.cs;
+    el('rcPanel').classList.toggle('caseB',!!s.caseB);
+    const cnt=el('rcCnt');
+    setV('rcCnt','重复 ACK × '+s.cnt);
+    cnt.classList.toggle('hot',s.cnt>=3);
+    el('rcChan').classList.toggle('dim',!!s.dim);
+    el('rcRto').classList.toggle('on',!!s.rto);
+    el('rcCmp').classList.toggle('on',!!s.cmp);
+    el('rcWait').textContent=s.wait||'';
+  }
+  return {id:'recovery',label:'快重传·快恢复',sub:'3 个重复 ACK vs 超时',steps,mount,paint,code:CODE};
+})();
+
+/* ========== 场景 4：cwnd / ssthresh 完整曲线 ========== */
+const curveScene=(()=>{
+  const xs=r=>40+(r-1)*40, ys=c=>272-c*20;
+  const PTS=[[1,1],[2,2],[3,4],[4,8],[5,9],[6,10],[7,11],[8,5],[9,6],[10,7],[11,1],[12,2]];
+  const steps=[
+    {title:'步骤 0 · 起点：cwnd=1，ssthresh=8',chip:'完整示例',chipC:'c0',n:1,ssv:8,bands:1,e1:false,e2:false,lines:[9,10],c:1,ph:'慢启动',phC:'cb',
+     desc:'把笔记的完整示例画成一条曲线：横轴是 RTT 轮次，纵轴是 cwnd（MSS）。起点 <b>cwnd = 1</b>，虚线是 <b>ssthresh = 8</b>。规则只有一句：<b>虚线之下指数涨，虚线之上线性爬，出事就砍</b>。'},
+    {title:'慢启动：1 → 2 → 4',chip:'指数段',chipC:'cb',n:3,ssv:8,bands:1,e1:false,e2:false,lines:[9,10],c:4,ph:'慢启动',phC:'cb',
+     desc:'每 RTT 翻倍，曲线一段比一段陡——这是<span class="bl">蓝色区间</span>的慢启动段。三轮把窗口从 1 探到 4，探测速度是指数级的。'},
+    {title:'RTT4 触线：cwnd = 8 = ssthresh',chip:'到达门限',chipC:'ch',n:4,ssv:8,bands:1,e1:false,e2:false,lines:[9,10],c:8,ph:'慢启动→拥塞避免',phC:'ch',
+     desc:'第 4 轮 cwnd 正好摸到虚线。指数增长到此为止——再翻一倍就是 16，风险太大，于是切入<span class="gr">拥塞避免</span>。'},
+    {title:'拥塞避免：9 → 10 → 11',chip:'线性段',chipC:'cg',n:7,ssv:8,bands:2,e1:false,e2:false,lines:[11,12],c:11,ph:'拥塞避免',phC:'cg',
+     desc:'绿色区间里每 RTT 只 +1：8 → 9 → 10 → 11。曲线从陡坡折成缓坡，<b>斜率的骤变</b>就是"换挡"发生的位置。'},
+    {title:'事件① · 3 个重复 ACK：ssthresh 8→5，cwnd 11→5',chip:'乘性减小',chipC:'cd',n:8,ssv:5,bands:3,e1:true,e2:false,lines:[4,6,7],c:5,ph:'快重传+快恢复',phC:'cd',
+     desc:'RTT7 之后收到 3 个重复 ACK（红竖线）。乘性减小：<b>ssthresh = 11/2 ≈ 5</b>（看虚线滑下来），<b>cwnd 从 11 跌到 5</b>——快重传补洞、快恢复接管，不必归零。'},
+    {title:'快恢复后继续线性：5 → 6 → 7',chip:'再爬坡',chipC:'cg',n:10,ssv:5,bands:3,e1:true,e2:false,lines:[11,12],c:7,ph:'拥塞避免',phC:'cg',
+     desc:'从减半后的 5 出发，仍在拥塞避免里小步上爬：5 → 6 → 7。曲线开始呈现"锯齿"的雏形——TCP 的稳态就是这样一轮轮试探、回落、再试探。'},
+    {title:'事件② · 超时：ssthresh = 7/2 ≈ 3，cwnd 跌回 1',chip:'处罚最重',chipC:'cd',n:11,ssv:3,bands:3,e1:true,e2:true,lines:[0,1,2],c:1,ph:'超时→慢启动',phC:'cd',
+     desc:'这次是<b>超时</b>（更粗的红线）：连 ACK 都收不到，判定拥塞严重。<b>ssthresh = 7/2 ≈ 3</b>（虚线再往下滑），<b>cwnd 直接跌回 1</b>——曲线断崖式坠底，处罚远重于事件①。'},
+    {title:'重新慢启动：1 → 2 → …',chip:'从头再来',chipC:'cb',n:12,ssv:3,bands:4,e1:true,e2:true,lines:[3,9,10],c:2,ph:'慢启动',phC:'cb',
+     desc:'从 1 重新指数爬升：1 → 2 → …，这次门限只有 3，很快就会再切拥塞避免。整条曲线就是 TCP 的一生：<b>爬升 — 受挫 — 收缩 — 再爬升</b>。'},
+    {title:'两条核心规律',chip:'AIMD',chipC:'cg',n:12,ssv:3,bands:4,e1:true,e2:true,lines:[],c:2,ph:'慢启动',phC:'cb',
+     desc:'① <b>网络顺畅时逐步增大</b>：门限下指数、门限上线性；② <b>怀疑拥塞时迅速减小</b>：3 个重复 ACK 减半，超时归 1。涨得越谨慎、跌得越果断，整张网络越稳定。'},
+    {title:'别忘了流控制：发送窗口 = min(rwnd, cwnd)',chip:'min(rwnd, cwnd)',chipC:'c0',n:12,ssv:3,bands:4,e1:true,e2:true,lines:[],c:2,ph:'慢启动',phC:'cb',
+     desc:'cwnd 只是约束之一。真正能发出去的数据量 = <b>min(rwnd, cwnd)</b>：<b>rwnd</b> 管"接收方吃不吃得下"（流控制），<b>cwnd</b> 管"网络路上扛不扛得住"（拥塞控制）。两道闸门，永远取更小的那道。'},
+  ];
+  let path=null,lastLen=0;
+  function setCurve(n){
+    const d=PTS.slice(0,n).map((p,i)=>(i?'L ':'M ')+xs(p[0])+' '+ys(p[1])).join(' ');
+    path.setAttribute('d',d);
+    const L=path.getTotalLength();
+    if(L>lastLen+0.5){
+      path.style.transition='none';
+      path.style.strokeDasharray=L+' '+L;
+      path.style.strokeDashoffset=(L-lastLen);
+      void path.getBoundingClientRect();
+      path.style.transition='';
+      path.style.strokeDashoffset='0';
+      clearTimeout(path._t);
+      path._t=setTimeout(()=>{path.style.strokeDasharray='';path.style.strokeDashoffset='';},680);
+    }else{
+      path.style.strokeDasharray='';path.style.strokeDashoffset='';
+    }
+    lastLen=L;
+  }
+  function mount(){
+    lastLen=0;
+    let grid='';
+    for(let c=2;c<=12;c+=2)grid+='<line class="cv-grid" x1="36" y1="'+ys(c)+'" x2="516" y2="'+ys(c)+'"/><text class="cv-ylbl" x="30" y="'+(ys(c)+3)+'" text-anchor="end">'+c+'</text>';
+    let xl='';
+    for(let r=1;r<=12;r++)xl+='<text class="cv-xlbl" x="'+xs(r)+'" y="287" text-anchor="middle">'+r+'</text>';
+    const band=(id,x,w,fill,lbl)=>'<g class="cv-band" id="'+id+'"><rect x="'+x+'" y="20" width="'+w+'" height="252" fill="'+fill+'" fill-opacity=".55"/><text x="'+(x+w/2)+'" y="34">'+lbl+'</text></g>';
+    viz.innerHTML='<div class="vcap"><b>完整曲线</b>：笔记示例 RTT1–12 的 cwnd 轨迹，ssthresh 8 → 5 → 3</div>'+
+      '<svg class="cv-svg" viewBox="0 0 560 300">'+
+        band('cvB0',36,144,'#E6F1FB','慢启动')+
+        band('cvB1',180,120,'#E1F5EE','拥塞避免')+
+        band('cvB2',300,120,'#E1F5EE','拥塞避免')+
+        band('cvB3',420,96,'#E6F1FB','慢启动')+
+        grid+
+        '<line class="cv-axis" x1="36" y1="20" x2="36" y2="272"/><line class="cv-axis" x1="36" y1="272" x2="516" y2="272"/>'+
+        xl+'<text class="cv-xlbl" x="536" y="287" text-anchor="middle">RTT</text>'+
+        '<text class="cv-ylbl" x="14" y="16">MSS</text>'+
+        '<g class="cv-evt" id="cvE1"><line x1="300" y1="20" x2="300" y2="272"/><text x="300" y="14">3 dup ACK</text></g>'+
+        '<g class="cv-evt big" id="cvE2"><line x1="420" y1="20" x2="420" y2="272"/><text x="420" y="14">超时</text></g>'+
+        '<g id="cvSSg"><line x1="36" y1="'+ys(8)+'" x2="516" y2="'+ys(8)+'"/><text x="44" y="'+(ys(8)-6)+'" id="cvSSt">ssthresh = 8</text></g>'+
+        '<path id="cvPath" d=""/>'+
+        '<circle id="cvDot" cx="0" cy="0" r="5"/>'+
+      '</svg>'+
+      '<div class="cv-stat">cwnd = <b id="cvC">1</b> MSS　·　ssthresh = <b id="cvS">8</b> MSS　·　<span class="chip cb" id="cvP">慢启动</span></div>';
+    path=el('cvPath');
+  }
+  function paint(s){
+    setCurve(s.n);
+    const p=PTS[s.n-1];
+    el('cvDot').style.transform='translate('+xs(p[0])+'px,'+ys(p[1])+'px)';
+    el('cvSSg').style.transform='translateY('+(ys(s.ssv)-ys(8))+'px)';
+    el('cvSSt').textContent='ssthresh = '+s.ssv;
+    for(let i=0;i<4;i++)el('cvB'+i).classList.toggle('on',i<s.bands);
+    el('cvE1').classList.toggle('on',s.e1);
+    el('cvE2').classList.toggle('on',s.e2);
+    setV('cvC',''+s.c);setV('cvS',''+s.ssv);
+    const ph=el('cvP');ph.textContent=s.ph;ph.className='chip '+s.phC;
+  }
+  return {id:'curve',label:'完整曲线',sub:'cwnd/ssthresh 全程锯齿',steps,mount,paint,code:CODE};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[slowScene,avoidScene,recovScene,curveScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  const hl=s.lines||[];
+  [...codeBox.querySelectorAll('.cl')].forEach((c,idx)=>c.classList.toggle('hl',hl.includes(idx)));
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2600;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

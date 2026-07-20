@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="720" viewBox="0 0 1240 720">
+  <title>上下位机数据库事件驱动协议</title>
+  <desc>上位机写意图态、下位机写事实态，MySQL 触发器分流到双事件表，各自轮询消费</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="620" y="26" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#444441">上下位机数据库事件驱动协议（MySQL 触发器 + 双事件表）</text>
+  <text x="620" y="60" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">中间四框均为 MySQL MFMS_BASE 库内对象</text>
+
+  <!-- 上位机 -->
+  <rect x="40" y="90" width="300" height="180" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="190" y="112" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">上位机 MfmsDbService</text>
+  <text x="190" y="136" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">写 device_state：load / unload</text>
+  <text x="190" y="156" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">写 lua_state：ready/pause/resume/abort</text>
+  <text x="190" y="176" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">100ms 轮询 *_ui_event</text>
+  <text x="190" y="196" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">id 游标 + 消费即删（DELETE）</text>
+  <text x="190" y="216" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">启动水位 = MAX(id)，跳过历史</text>
+  <text x="190" y="236" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">触发器缺失 → 应用层回退直写</text>
+
+  <!-- MySQL 内对象 -->
+  <rect x="460" y="90" width="320" height="76" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="620" y="112" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">device_state / lua_state</text>
+  <text x="620" y="138" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">state 枚举 + info JSON + @change_reason</text>
+
+  <line x1="620" y1="166" x2="620" y2="224" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="460" y="226" width="320" height="88" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="620" y="248" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">AFTER UPDATE 触发器 ×2</text>
+  <text x="620" y="272" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">trg_device_state_event</text>
+  <text x="620" y="292" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">trg_lua_state_event（按 NEW.state 分流）</text>
+
+  <line x1="620" y1="314" x2="620" y2="372" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="780,270 820,270 820,566 782,566" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="460" y="374" width="320" height="88" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="620" y="396" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">*_state_event（下位机消费）</text>
+  <text x="620" y="420" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">device: load / unload</text>
+  <text x="620" y="440" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">lua: ready / abort / pause / resume</text>
+
+  <rect x="460" y="522" width="320" height="88" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="620" y="544" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">*_ui_event（上位机消费）</text>
+  <text x="620" y="568" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">device: online / connected / offline</text>
+  <text x="620" y="588" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">lua: running / wait / paused / aborted</text>
+
+  <!-- 下位机 -->
+  <rect x="900" y="90" width="300" height="180" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="1050" y="112" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">下位机 HyRMS</text>
+  <text x="1050" y="136" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">轮询 *_state_event → 执行加载/脚本</text>
+  <text x="1050" y="156" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">回写 device_state：online/connected/offline</text>
+  <text x="1050" y="176" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">回写 lua_state：running/wait/paused/aborted</text>
+  <text x="1050" y="196" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">Lua 解释器 + 设备驱动（linker）</text>
+
+  <!-- 跨列箭头 -->
+  <line x1="340" y1="130" x2="458" y2="130" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="399" y="114" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#085041">UPDATE + 会话变量传 reason</text>
+
+  <polyline points="782,418 852,418 852,200 898,200" fill="none" stroke="#185FA5" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="858" y="402" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#0C447C">下位机轮询</text>
+
+  <polyline points="900,240 870,240 870,146 782,146" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="876" y="224" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">UPDATE state</text>
+
+  <polyline points="458,566 190,566 190,272" fill="none" stroke="#0F6E56" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="330" y="550" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#085041">100ms 轮询 + DELETE</text>
+
+  <text x="620" y="666" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">指令-确认分离：上位机只写意图态（load / ready / …），下位机只写事实态（online / running / …），各自只消费对方产生的事件表</text>
+</svg>

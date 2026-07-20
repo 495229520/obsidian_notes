@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 850" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="850" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">buffered read：Page Cache 命中与未命中</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">同一行 read() 代码，两条路径：一次内存拷贝，或一次设备 IO 加两次上下文切换</text>
+
+  <!-- 入口 -->
+  <rect x="420" y="108" width="400" height="64" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="620" y="134" font-size="14.5" font-weight="700" fill="#2C4460" text-anchor="middle" font-family="'SF Mono','JetBrains Mono',Menlo,Consolas,monospace">read(fd, buf, 4096)</text>
+  <text x="620" y="157" font-size="11.5" fill="#2C4460" text-anchor="middle">filemap_read：按（inode，页号 = 偏移 &gt;&gt; 12）查 XArray</text>
+  <line x1="620" y1="172" x2="620" y2="199" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="470" y="204" width="300" height="46" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="620" y="232" font-size="13.5" font-weight="700" fill="#7A5518" text-anchor="middle">folio 在缓存中且 Uptodate？</text>
+
+  <path d="M466,227 C390,227 325,238 325,262" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrt)"/>
+  <text x="408" y="218" font-size="12.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">是 · 命中</text>
+  <path d="M774,227 C860,227 930,238 930,262" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrr)"/>
+  <text x="846" y="218" font-size="12.5" font-weight="700" fill="#A64B3C" text-anchor="middle">否 · 未命中</text>
+
+  <!-- 命中列 -->
+  <rect x="110" y="266" width="430" height="58" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="325" y="290" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">① 找到 folio（Uptodate）</text>
+  <text x="325" y="310" font-size="11.5" fill="#24473F" text-anchor="middle">数据已在内存，全程不碰设备</text>
+  <line x1="325" y1="324" x2="325" y2="355" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="110" y="360" width="430" height="58" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="325" y="384" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">② copy_to_user → 用户 buf</text>
+  <text x="325" y="404" font-size="11.5" fill="#24473F" text-anchor="middle">命中 ≠ 零拷贝：仍有一次 CPU 内存拷贝</text>
+  <line x1="325" y1="418" x2="325" y2="449" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="110" y="454" width="430" height="58" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="325" y="478" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">③ 标记页活跃（LRU）→ 返回</text>
+  <text x="325" y="498" font-size="11.5" fill="#24473F" text-anchor="middle">全程不阻塞，不发生上下文切换</text>
+  <line x1="325" y1="512" x2="325" y2="543" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="110" y="548" width="430" height="64" rx="8" fill="#2F6B5E"/>
+  <text x="325" y="575" font-size="15" font-weight="700" fill="#F5F4ED" text-anchor="middle">量级：亚微秒 ~ 几 μs</text>
+  <text x="325" y="597" font-size="11.5" fill="#F5F4ED" opacity="0.92" text-anchor="middle">成本 = 一次系统调用 + 一次内存拷贝</text>
+
+  <rect x="110" y="656" width="430" height="104" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.5"/>
+  <text x="134" y="684" font-size="13" font-weight="700" fill="#2B2A26">为什么第二遍读同一个文件飞快</text>
+  <text x="134" y="710" font-size="12" fill="#4A473F">第一遍读完，页都留在缓存里；第二遍全程走左列。</text>
+  <text x="134" y="734" font-size="12" fill="#4A473F">冷读与热读常差 1–2 个数量级 —— 见笔记末尾实验。</text>
+
+  <!-- 未命中列 -->
+  <rect x="700" y="266" width="460" height="58" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="290" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">① 分配 folio，插入 XArray</text>
+  <text x="930" y="310" font-size="11.5" fill="#733428" text-anchor="middle">置 Locked · !Uptodate，占位防止重复 IO</text>
+  <line x1="930" y1="324" x2="930" y2="355" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="700" y="360" width="460" height="58" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="384" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">② 组装 bio，连同预读窗口提交块层</text>
+  <text x="930" y="404" font-size="11.5" fill="#733428" text-anchor="middle">readahead 顺带多读几页（→ 1.6 / 1.7）</text>
+  <line x1="930" y1="418" x2="930" y2="449" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="700" y="454" width="460" height="58" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="478" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">③ 进程睡眠，等待 folio 解锁</text>
+  <text x="930" y="498" font-size="11.5" fill="#733428" text-anchor="middle">让出 CPU：第一次上下文切换</text>
+  <line x1="930" y1="512" x2="930" y2="543" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="700" y="548" width="460" height="58" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="572" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">④ 设备 DMA 完成 → 硬中断</text>
+  <text x="930" y="592" font-size="11.5" fill="#733428" text-anchor="middle">bio_endio：置 Uptodate · 解锁 · 唤醒等待者</text>
+  <line x1="930" y1="606" x2="930" y2="637" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="700" y="642" width="460" height="58" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="666" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">⑤ 被唤醒（第二次切换）→ 拷贝返回</text>
+  <text x="930" y="686" font-size="11.5" fill="#733428" text-anchor="middle">该页此后对所有进程都是命中</text>
+  <line x1="930" y1="700" x2="930" y2="731" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="700" y="736" width="460" height="64" rx="8" fill="#A64B3C"/>
+  <text x="930" y="763" font-size="15" font-weight="700" fill="#F5F4ED" text-anchor="middle">量级：几十 μs（NVMe）~ 10 ms（HDD）</text>
+  <text x="930" y="785" font-size="11.5" fill="#F5F4ED" opacity="0.92" text-anchor="middle">成本 += 一次设备 IO + 两次上下文切换 + 一次中断</text>
+</svg>

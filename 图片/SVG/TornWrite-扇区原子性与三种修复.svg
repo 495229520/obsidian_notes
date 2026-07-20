@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">Torn Write：设备只承诺扇区原子，你的 16 KiB 页跨了 4 个扇区</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">掉电可以停在任意两个扇区之间——校验和负责发现「半新半旧」，修复必须靠另一份冗余</text>
+
+  <!-- ======== 上：一次 torn write ======== -->
+  <text x="70" y="122" font-size="13.5" font-weight="700" fill="#4A473F">一次 16 KiB 数据页覆写，写到一半掉电：</text>
+
+  <!-- 页框 -->
+  <rect x="70" y="140" width="720" height="98" rx="8" fill="none" stroke="#5A564B" stroke-width="1.5"/>
+  <text x="80" y="132" font-size="0" fill="#6B675C">.</text>
+
+  <!-- 4 个扇区 -->
+  <rect x="86" y="156" width="164" height="52" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="168" y="178" font-size="12" font-weight="700" fill="#48562B" text-anchor="middle">扇区 0：新</text>
+  <text x="168" y="196" font-size="10.5" fill="#48562B" text-anchor="middle">已写入</text>
+
+  <rect x="262" y="156" width="164" height="52" rx="4" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="344" y="178" font-size="12" font-weight="700" fill="#48562B" text-anchor="middle">扇区 1：新</text>
+  <text x="344" y="196" font-size="10.5" fill="#48562B" text-anchor="middle">已写入</text>
+
+  <rect x="438" y="156" width="164" height="52" rx="4" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="520" y="178" font-size="12" font-weight="700" fill="#6B675C" text-anchor="middle">扇区 2：旧</text>
+  <text x="520" y="196" font-size="10.5" fill="#6B675C" text-anchor="middle">还是上个版本</text>
+
+  <rect x="614" y="156" width="164" height="52" rx="4" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="696" y="178" font-size="12" font-weight="700" fill="#6B675C" text-anchor="middle">扇区 3：旧</text>
+  <text x="696" y="196" font-size="10.5" fill="#6B675C" text-anchor="middle">还是上个版本</text>
+
+  <!-- 掉电线 -->
+  <line x1="432" y1="132" x2="432" y2="250" stroke="#A64B3C" stroke-width="2.2"/>
+  <path d="M 432 118 l -6 12 l 8 0 l -6 12" stroke="#A64B3C" stroke-width="2" fill="none"/>
+  <text x="432" y="108" font-size="12" font-weight="700" fill="#A64B3C" text-anchor="middle">掉电停在这</text>
+
+  <text x="430" y="262" font-size="11.5" fill="#A64B3C" text-anchor="middle">页内容 = 一半新 + 一半旧：既不是旧版本也不是新版本，是「第三种状态」</text>
+
+  <!-- 检测框 -->
+  <rect x="830" y="140" width="350" height="98" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1005" y="166" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">检测：页级校验和</text>
+  <text x="1005" y="188" font-size="11" fill="#4A3F68" text-anchor="middle">写入时算好 CRC 存进页头；</text>
+  <text x="1005" y="206" font-size="11" fill="#4A3F68" text-anchor="middle">读到「半新半旧」时 CRC 必然对不上</text>
+  <text x="1005" y="228" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">校验和只能发现，不能修复</text>
+
+  <!-- ======== 下：三种修复 ======== -->
+  <text x="48" y="316" font-size="15" font-weight="700" fill="#2B2A26">修复靠冗余：同一难题的三种答案</text>
+
+  <rect x="70" y="338" width="350" height="270" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="245" y="366" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">Full-Page Write（PostgreSQL）</text>
+  <text x="245" y="392" font-size="11" fill="#2C4460" text-anchor="middle">checkpoint 后第一次改某页时，</text>
+  <text x="245" y="410" font-size="11" fill="#2C4460" text-anchor="middle">把整页镜像塞进 WAL</text>
+  <text x="245" y="434" font-size="11" fill="#2C4460" text-anchor="middle">恢复：redo 用完整镜像整页覆盖，</text>
+  <text x="245" y="452" font-size="11" fill="#2C4460" text-anchor="middle">torn 页无论烂成什么样都被重写</text>
+  <line x1="100" y1="474" x2="390" y2="474" stroke="#3D5A80" stroke-width="0.8" stroke-dasharray="4 3"/>
+  <text x="245" y="500" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">代价：WAL 流量放大</text>
+  <text x="245" y="520" font-size="10.5" fill="#6B675C" text-anchor="middle">每轮 checkpoint 后出现写入尖峰；</text>
+  <text x="245" y="538" font-size="10.5" fill="#6B675C" text-anchor="middle">WAL 还要流向备机 → 复制网络带宽</text>
+  <text x="245" y="556" font-size="10.5" fill="#6B675C" text-anchor="middle">跟着一起放大</text>
+  <text x="245" y="590" font-size="10.5" fill="#6B675C" text-anchor="middle">改动的是日志内容，页仍原地覆写</text>
+
+  <rect x="450" y="338" width="350" height="270" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="625" y="366" font-size="13" font-weight="700" fill="#7A5518" text-anchor="middle">Doublewrite Buffer（InnoDB）</text>
+  <text x="625" y="392" font-size="11" fill="#7A5518" text-anchor="middle">刷脏页前，先把整批页顺序写进</text>
+  <text x="625" y="410" font-size="11" fill="#7A5518" text-anchor="middle">doublewrite 区并落盘，再写回原位</text>
+  <text x="625" y="434" font-size="11" fill="#7A5518" text-anchor="middle">恢复：原位页 CRC 不过 →</text>
+  <text x="625" y="452" font-size="11" fill="#7A5518" text-anchor="middle">从 doublewrite 区取完整副本修复</text>
+  <line x1="480" y1="474" x2="770" y2="474" stroke="#B07D2B" stroke-width="0.8" stroke-dasharray="4 3"/>
+  <text x="625" y="500" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">代价：数据页写两遍</text>
+  <text x="625" y="520" font-size="10.5" fill="#6B675C" text-anchor="middle">但第一遍是大块顺序写，被介质的</text>
+  <text x="625" y="538" font-size="10.5" fill="#6B675C" text-anchor="middle">顺序带宽稀释，实测远小于 2× 直觉</text>
+  <text x="625" y="590" font-size="10.5" fill="#6B675C" text-anchor="middle">两个写位置在同一块盘上即可</text>
+
+  <rect x="830" y="338" width="350" height="270" rx="8" fill="#E9EFDA" stroke="#48562B" stroke-width="1.5"/>
+  <text x="1005" y="366" font-size="13" font-weight="700" fill="#48562B" text-anchor="middle">Copy-on-Write / LSM（RocksDB、ZFS）</text>
+  <text x="1005" y="392" font-size="11" fill="#48562B" text-anchor="middle">从不原地覆写：新数据永远写到新位置，</text>
+  <text x="1005" y="410" font-size="11" fill="#48562B" text-anchor="middle">写完校验通过才切换引用</text>
+  <text x="1005" y="434" font-size="11" fill="#48562B" text-anchor="middle">torn 只可能发生在「还没人引用」的</text>
+  <text x="1005" y="452" font-size="11" fill="#48562B" text-anchor="middle">新副本上——旧版本始终完好</text>
+  <line x1="860" y1="474" x2="1150" y2="474" stroke="#48562B" stroke-width="0.8" stroke-dasharray="4 3"/>
+  <text x="1005" y="500" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">代价：空间放大 + 后台整理</text>
+  <text x="1005" y="520" font-size="10.5" fill="#6B675C" text-anchor="middle">旧版本要靠 compaction/GC 回收，</text>
+  <text x="1005" y="538" font-size="10.5" fill="#6B675C" text-anchor="middle">整理与前台抢盘带宽 → p99 毛刺</text>
+  <text x="1005" y="590" font-size="10.5" fill="#6B675C" text-anchor="middle">WAL 残尾截断即可（6.1），无 torn page 问题</text>
+
+  <!-- 底部结论 -->
+  <rect x="70" y="632" width="1110" height="60" rx="8" fill="#EFEDE3" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="96" y="658" font-size="12.5" font-weight="700" fill="#2B2A26">同一句话的三种写法：不信任「原地覆写」这个动作——要么留完整镜像（前两者），要么根本不做这个动作（第三者）。</text>
+  <text x="96" y="680" font-size="11.5" fill="#6B675C">硬件正在改变前提：NVMe 可上报原子写单元（AWUPF），若 ≥ 页大小且对齐正确，可以关掉这些机制换回吞吐——这是前提变化，不是机制失效。</text>
+</svg>

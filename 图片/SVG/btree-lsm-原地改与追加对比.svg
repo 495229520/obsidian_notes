@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1040" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FAF9F2/#8A8574；结构框 #E3EAF4/#3D5A80/#2C4460；
+       盘/硬件专色 #EFE7D6/#8A6D3B；收益 #E2EFE9/#2F6B5E；代价 #F4E3DE/#B0503F -->
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0503F"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1040" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">B+ tree vs LSM：共享可变＋锁，还是不可变快照＋追加</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">in-place 原地改页 vs out-of-place 永远追加 —— 两边都付写放大，付法不同：前台按次付清 vs 后台分期偿还</text>
+
+  <!-- ═══ 左：B+ tree ═══ -->
+  <rect x="48" y="104" width="556" height="484" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">B+ tree（in-place）：页式有序树</text>
+
+  <!-- 树 -->
+  <rect x="256" y="148" width="120" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="316" y="170" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">根页（热点）</text>
+  <path d="M296,182 L216,208" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M336,182 L416,208" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <rect x="136" y="212" width="150" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="211" y="234" font-size="10.5" fill="#2C4460" text-anchor="middle">内节点（常驻内存）</text>
+  <rect x="346" y="212" width="150" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="421" y="234" font-size="10.5" fill="#2C4460" text-anchor="middle">内节点（常驻内存）</text>
+  <path d="M186,246 L146,272" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M236,246 L276,272" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M396,246 L356,272" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M446,246 L486,272" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <rect x="90" y="276" width="112" height="34" rx="6" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.3"/>
+  <rect x="222" y="276" width="112" height="34" rx="6" fill="#F4E3DE" stroke="#B0503F" stroke-width="1.6"/>
+  <rect x="354" y="276" width="112" height="34" rx="6" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.3"/>
+  <rect x="486" y="276" width="94" height="34" rx="6" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.3"/>
+  <text x="146" y="298" font-size="10" fill="#5C4A28" text-anchor="middle">叶子页 16 KiB</text>
+  <text x="278" y="298" font-size="10" font-weight="700" fill="#B0503F" text-anchor="middle">原地改这一页</text>
+  <text x="410" y="298" font-size="10" fill="#5C4A28" text-anchor="middle">叶子页</text>
+  <text x="533" y="298" font-size="10" fill="#5C4A28" text-anchor="middle">叶子页</text>
+  <path d="M202,293 L220,293 M334,293 L352,293 M466,293 L484,293" stroke="#8A6D3B" stroke-width="1.3" stroke-dasharray="3,2"/>
+  <text x="316" y="330" font-size="9.5" fill="#6B675C" text-anchor="middle">叶子间有序链表 → 范围扫描天然顺序、局部性好</text>
+
+  <!-- 写路径说明 -->
+  <rect x="76" y="348" width="500" height="110" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="96" y="372" font-size="11" font-weight="700" fill="#4A473F">写路径：WAL 记日志（6.1）→ 改 buffer pool 里的页 → 延迟写回原位</text>
+  <text x="96" y="394" font-size="10.5" fill="#B0503F">改 100 B 也要整页写回；torn page 靠 doublewrite / full-page write 兜底（6.4）</text>
+  <text x="96" y="416" font-size="10.5" fill="#B0503F">页满分裂逐层上传 → 写延迟毛刺；checkpoint 刷脏 → 周期性风暴</text>
+  <text x="96" y="438" font-size="10.5" fill="#2C4460">并发 ＝ 锁耦合（hand-over-hand latch）：读写互相阻塞，根页是共享热点</text>
+
+  <rect x="76" y="474" width="500" height="94" rx="8" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.5"/>
+  <text x="326" y="500" font-size="12" font-weight="700" fill="#5C4A28" text-anchor="middle">盘上形态：随机小页写（16 KiB 级）</text>
+  <text x="326" y="524" font-size="10.5" fill="#5C4A28" text-anchor="middle">抬高 SSD 内部 GC 的设备级 WAF（3.5）</text>
+  <text x="326" y="548" font-size="10.5" fill="#5C4A28" text-anchor="middle">点查稳定 1 次盘 IO（内节点常驻）—— 读延迟方差小</text>
+
+  <!-- ═══ 右：LSM ═══ -->
+  <rect x="636" y="104" width="556" height="484" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="660" y="132" font-size="14" font-weight="700" fill="#4A473F">LSM（out-of-place）：追加 ＋ 归并</text>
+
+  <rect x="664" y="148" width="220" height="44" rx="7" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.4"/>
+  <text x="774" y="166" font-size="11" font-weight="700" fill="#5C4A28" text-anchor="middle">WAL 顺序追加</text>
+  <text x="774" y="184" font-size="10" fill="#5C4A28" text-anchor="middle">提交点 ＝ fdatasync（6.1）</text>
+  <rect x="944" y="148" width="220" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1054" y="166" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">memtable（内存有序）</text>
+  <text x="1054" y="184" font-size="10" fill="#2C4460" text-anchor="middle">前台写到此为止 —— 纯追加</text>
+  <path d="M1054,192 L1054,220" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arrn)"/>
+  <text x="1066" y="212" font-size="9.5" fill="#6B675C">flush（顺序写）</text>
+
+  <rect x="826" y="224" width="100" height="30" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="906" y="230" width="100" height="30" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="986" y="224" width="100" height="30" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="956" y="245" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">L0（重叠）</text>
+  <path d="M956,260 L956,284" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arrn)"/>
+  <rect x="836" y="288" width="280" height="30" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="976" y="308" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">L1（每层 1 份有序）</text>
+  <path d="M976,318 L976,342" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arrn)"/>
+  <rect x="796" y="346" width="360" height="30" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="976" y="366" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">L2（大头数据）</text>
+  <text x="770" y="270" font-size="9.5" fill="#6B675C" text-anchor="end">compaction 后台归并：</text>
+  <text x="770" y="286" font-size="9.5" fill="#6B675C" text-anchor="end">写放大在这里支付（6.6/6.7）</text>
+
+  <rect x="664" y="392" width="500" height="66" rx="8" fill="#F3F1E8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="684" y="416" font-size="10.5" fill="#2C4460">并发 ＝ 不可变快照：读端引用计数持有文件清单（≈ shared_ptr&lt;const&gt;），永不加锁</text>
+  <text x="684" y="438" font-size="10.5" fill="#B0503F">读要探多结构（bloom/缓存压制）；扫描付墓碑税；写太快触发 stall 背压</text>
+
+  <rect x="664" y="474" width="500" height="94" rx="8" fill="#EFE7D6" stroke="#8A6D3B" stroke-width="1.5"/>
+  <text x="914" y="500" font-size="12" font-weight="700" fill="#5C4A28" text-anchor="middle">盘上形态：大块顺序写</text>
+  <text x="914" y="524" font-size="10.5" fill="#5C4A28" text-anchor="middle">设备级 WAF ≈ 1（3.4/3.5）—— 与 SSD 天生一对</text>
+  <text x="914" y="548" font-size="10.5" fill="#5C4A28" text-anchor="middle">写延迟极稳（纯追加）；读方差大、stall 是悬崖 —— 毛刺换了位置</text>
+
+  <!-- ═══ 对账条 ═══ -->
+  <rect x="48" y="610" width="1144" height="288" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="72" y="638" font-size="14" font-weight="700" fill="#4A473F">六维对账</text>
+  <text x="330" y="638" font-size="12" font-weight="700" fill="#2C4460">B+ tree</text>
+  <text x="800" y="638" font-size="12" font-weight="700" fill="#2C4460">LSM</text>
+  <path d="M72,650 L1168,650" stroke="#8A8574" stroke-width="1"/>
+
+  <text x="76" y="676" font-size="11" font-weight="700" fill="#4A473F">写路径</text>
+  <text x="240" y="676" font-size="10.5" fill="#4A473F">随机页写＋WAL；改 100 B 写整页</text>
+  <text x="700" y="676" font-size="10.5" fill="#4A473F">纯顺序追加；重写全部推给后台</text>
+
+  <text x="76" y="712" font-size="11" font-weight="700" fill="#4A473F">写放大</text>
+  <text x="240" y="712" font-size="10.5" fill="#4A473F">页粒度＋doublewrite＋分裂 —— 前台按次付清</text>
+  <text x="700" y="712" font-size="10.5" fill="#4A473F">WA ≈ 2＋T×(L−1) —— 后台分期偿还</text>
+
+  <text x="76" y="748" font-size="11" font-weight="700" fill="#4A473F">点查</text>
+  <text x="240" y="748" font-size="10.5" fill="#4A473F">稳定 1 次盘 IO，方差小</text>
+  <text x="700" y="748" font-size="10.5" fill="#4A473F">多结构探测；L0 堆积即恶化</text>
+
+  <text x="76" y="784" font-size="11" font-weight="700" fill="#4A473F">扫描</text>
+  <text x="240" y="784" font-size="10.5" fill="#4A473F">叶子链表天然有序、局部性好</text>
+  <text x="700" y="784" font-size="10.5" fill="#4A473F">多 run 归并＋逐个跳墓碑</text>
+
+  <text x="76" y="820" font-size="11" font-weight="700" fill="#4A473F">并发</text>
+  <text x="240" y="820" font-size="10.5" fill="#4A473F">锁耦合，读写互相阻塞，热点页竞争</text>
+  <text x="700" y="820" font-size="10.5" fill="#4A473F">快照读无锁；复杂度转移给 compaction</text>
+
+  <text x="76" y="856" font-size="11" font-weight="700" fill="#4A473F">毛刺来源</text>
+  <text x="240" y="856" font-size="10.5" fill="#4A473F">页分裂、checkpoint 刷脏风暴</text>
+  <text x="700" y="856" font-size="10.5" fill="#4A473F">write stall、compaction 抢 IO</text>
+
+  <path d="M620,656 L620,872" stroke="#8A8574" stroke-width="0.8" stroke-dasharray="4,4"/>
+  <text x="620" y="888" font-size="10" fill="#6B675C" text-anchor="middle">延迟形状比均值更能区分两者 —— 选型先问业务对哪一侧的尾延迟敏感（9.5）</text>
+
+  <!-- ═══ 结论条 ═══ -->
+  <rect x="48" y="920" width="1144" height="88" rx="10" fill="#E2EFE9" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="620" y="950" font-size="12.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">并发哲学是根本分歧：共享可变＋细粒度锁（mutex 细化） vs 不可变快照＋单写者（copy-on-write）—— 同一道 C++ 选择题的盘上版本</text>
+  <text x="620" y="976" font-size="11" fill="#2F6B5E" text-anchor="middle">B+ 把复杂度花在「怎么安全共享可变状态」，LSM 花在「怎么摊销重建不可变状态」；失败模式也一一对应：锁竞争 vs 重建风暴</text>
+  <text x="620" y="996" font-size="10.5" fill="#4A473F" text-anchor="middle">两边都付写放大，付法不同 —— 对比测试必须两边都灌到稳态（6.7 §6 / 3.6）</text>
+</svg>

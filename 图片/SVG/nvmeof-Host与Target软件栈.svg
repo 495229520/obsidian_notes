@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 810" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FAF9F2/#8A8574；数据面框 #E3EAF4/#3D5A80/#2C4460；
+       控制面 #FAEEDA/#854F0B；等待点 #A64B3C；与本库既有 nvmeof-*.svg 同一套 -->
+  <title>Host 与 Target 软件栈</title>
+  <desc>host 侧从应用到网卡、target 侧从网卡到盘的软件分层，控制面与数据面分色，标注队列映射与每个调度等待点。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#854F0B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="810" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">打开两个黑盒：Host 与 Target 的软件栈、控制面与数据面</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">target 本质是「NVMe 命令 → 本地 bio」的翻译层——backend 之下就是第 1 章的本地故事</text>
+
+  <!-- 泳道 -->
+  <rect x="48" y="104" width="470" height="546" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="283" y="130" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">Host（发起 IO）</text>
+  <rect x="722" y="104" width="470" height="546" rx="10" fill="#FAF9F2" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="957" y="130" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">Target（持有盘）</text>
+
+  <!-- Host 控制面 -->
+  <rect x="88" y="148" width="410" height="76" rx="7" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+  <text x="293" y="166" font-size="12" font-weight="700" fill="#633806" text-anchor="middle" dominant-baseline="central">控制面：nvme-cli discover / connect</text>
+  <text x="293" y="188" font-size="10.5" fill="#633806" text-anchor="middle" dominant-baseline="central">参数字符串一次写入 /dev/nvme-fabrics</text>
+  <text x="293" y="208" font-size="10.5" fill="#633806" text-anchor="middle" dominant-baseline="central">Fabrics Connect → target 动态创建 controller</text>
+  <path d="M98,224 L98,240 L78,240 L78,431 L84,431" fill="none" stroke="#854F0B" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arra)"/>
+
+  <!-- Host 数据面 -->
+  <rect x="88" y="270" width="410" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="293" y="286" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">应用：fio / io_uring 恒满窗</text>
+  <text x="293" y="306" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">对上层与本地盘零改动</text>
+  <path d="M293,318 L293,330" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="332" width="410" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="293" y="350" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">块层 blk-mq：每核 hctx · tag 池</text>
+  <text x="293" y="372" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 H-a：tag 满则睡（背压终点）</text>
+  <path d="M293,388 L293,400" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="402" width="410" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="293" y="420" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">nvme-core + nvme-fabrics</text>
+  <text x="293" y="442" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">控制器状态机 · keep-alive · 重连（ctrl_loss_tmo）</text>
+  <path d="M293,458 L293,470" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="472" width="410" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="293" y="490" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">nvme-tcp / nvme-rdma：transport 驱动</text>
+  <text x="293" y="512" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 H-b：每队列 io_work 被调度</text>
+  <text x="293" y="532" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">组 CapsuleCmd PDU / 填 WQE + 门铃</text>
+  <path d="M293,544 L293,556" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="88" y="558" width="410" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="293" y="576" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">内核 TCP 栈 + 网卡 / RDMA 网卡</text>
+  <text x="293" y="598" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 H-c：socket 发送缓冲满则停（网络背压落点）</text>
+
+  <!-- Target 控制面 -->
+  <rect x="742" y="148" width="410" height="76" rx="7" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+  <text x="947" y="166" font-size="12" font-weight="700" fill="#633806" text-anchor="middle" dominant-baseline="central">控制面：configfs 目录树（nvmetcli 落盘）</text>
+  <text x="947" y="188" font-size="10.5" fill="#633806" text-anchor="middle" dominant-baseline="central">subsystems/NQN/namespaces/1/device_path</text>
+  <text x="947" y="208" font-size="10.5" fill="#633806" text-anchor="middle" dominant-baseline="central">ports/N + 软链接 = 导出 · allowed_hosts = 权限</text>
+  <path d="M1142,224 L1142,240 L1162,240 L1162,445 L1156,445" fill="none" stroke="#854F0B" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arra)"/>
+
+  <!-- Target 数据面 -->
+  <rect x="742" y="270" width="410" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="947" y="286" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">网卡收包 → 中断 / softirq</text>
+  <text x="947" y="306" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 T-a：softirq 排队</text>
+  <path d="M947,318 L947,330" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="742" y="332" width="410" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="947" y="350" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">nvmet-tcp / nvmet-rdma：每队列 io_work</text>
+  <text x="947" y="372" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 T-b：io_work 调度 · 写路径 R2T 往返</text>
+  <text x="947" y="392" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">TCP 收侧：CPU 把数据 skb → 页（每字节拷贝）</text>
+  <path d="M947,404 L947,416" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="742" y="418" width="410" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="947" y="436" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">nvmet core：查 subsystem / controller / namespace</text>
+  <text x="947" y="458" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">权限检查 allowed_hosts · 一 host 一 controller</text>
+  <path d="M947,474 L947,486" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="742" y="488" width="410" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="947" y="504" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">backend：bdev → bio / file → VFS</text>
+  <text x="947" y="524" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">从这里往下是 1.7 / 1.8 的本地故事</text>
+  <path d="M947,536 L947,548" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <rect x="742" y="550" width="410" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="947" y="568" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">本地 blk-mq → NVMe 盘</text>
+  <text x="947" y="590" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">等待点 T-c：本地盘队列 + 盘服务时间（最大头）</text>
+
+  <!-- 中缝：队列映射 + 网络往返 -->
+  <rect x="530" y="170" width="180" height="88" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="620" y="188" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">队列映射</text>
+  <text x="620" y="208" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">Admin + 每核一条 IO 队列</text>
+  <text x="620" y="226" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">每条队列 = 一条</text>
+  <text x="620" y="244" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">TCP 连接 / RC QP</text>
+
+  <path d="M498,578 L608,578 L608,286 L736,286" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="553" y="564" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">capsule / 数据 去程</text>
+  <path d="M742,302 L632,302 L632,600 L504,600" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="570" y="616" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">响应 / 数据 回程</text>
+
+  <!-- 底部要点 -->
+  <rect x="48" y="676" width="1144" height="94" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="70" y="700" font-size="11.5" fill="#4A473F" dominant-baseline="central">· 琥珀 = 控制面：全是文件操作与 Admin 命令，数据面的字节一个都不经过它（控制面 / 数据面分离）</text>
+  <text x="70" y="724" font-size="11.5" fill="#4A473F" dominant-baseline="central">· 红 = 内核路径的调度等待点：比本地盘多 2–3 个，是远端 p99 抖动的第一嫌疑——SPDK 用独占核轮询删掉它们（5.7）</text>
+  <text x="70" y="748" font-size="11.5" fill="#4A473F" dominant-baseline="central">· 背压接力：本地盘队列（T-c）→ R2T 停发（T-b）→ socket 缓冲（H-c）→ tag 池（H-a）→ 应用被限速</text>
+</svg>
