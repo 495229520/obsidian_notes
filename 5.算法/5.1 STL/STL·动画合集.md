@@ -19,21 +19,21 @@ tags:
 
 ### 1 · vector 扩容机制
 
-[▶ 打开动画](<file:///Users/melene/Documents/C++/obsidian_notes-main/5.算法/5.1 STL/vector扩容机制.html>)
+[▶ 打开动画](<../5.1 STL/vector扩容机制.html>)
 
 `_first/_last/_end` 三指针 → size==capacity 触发扩容 → 分配 2 倍新内存、逐个搬迁、释放旧块、指针换家，顺带解释摊还 O(1) 和 reserve 的意义。实验区可连续 push_back 亲手触发扩容、体验 reserve(16) 的效果。
 **对应笔记**：[[5.1.1 vector]] 底层机制一节。
 
 ### 2 · 迭代器失效与安全删除
 
-[▶ 打开动画](<file:///Users/melene/Documents/C++/obsidian_notes-main/5.算法/5.1 STL/迭代器失效与安全删除.html>)
+[▶ 打开动画](<../5.1 STL/迭代器失效与安全删除.html>)
 
 删除 `{1,2,2,3}` 里所有的 2：先演示错误写法怎么"静悄悄漏删"（erase 后元素前移 + ++it 跳过），再演示 `it = erase(it)` 的正确姿势，结尾提示 insert 扩容导致的全体失效。
 **对应笔记**：[[5.1.7 迭代器]]、[[5.1.1 vector]]、[[12.3 迭代器的失效问题]]。
 
 ### 3 · deque 分块结构
 
-[▶ 打开动画](<file:///Users/melene/Documents/C++/obsidian_notes-main/5.算法/5.1 STL/deque分块结构.html>)
+[▶ 打开动画](<../5.1 STL/deque分块结构.html>)
 
 中控 map（第一维指针数组）+ 定长数据块（第二维）：push_front 为什么 O(1)、头块用完挂新块（老元素一个不搬）、map 扩容只搬指针且旧指针从 oldsize/2 居中摆放。含三道高频面经答案。
 **对应笔记**：[[5.1.2 queue]] deque 一节、[[5.1.3 list及其与其他结构的区别]]、[[5.1.8 容器适配器]]。
@@ -42,14 +42,14 @@ tags:
 
 ### 4 · list 与 vector 插入删除对比
 
-[▶ 打开动画](<file:///Users/melene/Documents/C++/obsidian_notes-main/5.算法/5.1 STL/list与vector插入删除对比.html>)
+[▶ 打开动画](<../5.1 STL/list与vector插入删除对比.html>)
 
 同一个"中间插入 25"：vector 搬移后半段 O(n) vs list 改两对指针 O(1)；随机访问时形势反转（直达 vs 顺藤摸瓜）；再补上缓存友好性这个面试加分维度，收尾给选型口诀。
 **对应笔记**：[[5.1.3 list及其与其他结构的区别]]、[[5.1.1 vector]]。
 
 ### 5 · priority_queue 大根堆
 
-[▶ 打开动画](<file:///Users/melene/Documents/C++/obsidian_notes-main/5.算法/5.1 STL/priority_queue大根堆.html>)
+[▶ 打开动画](<../5.1 STL/priority_queue大根堆.html>)
 
 树形与数组双视图同步：push 尾部追加 + 上浮两跳登顶，pop 末尾补位 + 下沉修复，直观看到"堆就是躺在 vector 里的完全二叉树"（2i+1 / 2i+2 / (i−1)/2）。
 **对应笔记**：[[5.1.2 queue]]、[[5.1.8 容器适配器]]、[[5.算法/5.2 算法/5.2.11 堆与优先队列|5.2.11 堆与优先队列]]。
@@ -58,14 +58,14 @@ tags:
 
 ### 6 · lower_bound 与 upper_bound
 
-[▶ 打开动画](<file:///Users/melene/Documents/C++/obsidian_notes-main/5.算法/5.1 STL/lower_bound与upper_bound.html>)
+[▶ 打开动画](<../5.1 STL/lower_bound与upper_bound.html>)
 
 把二分理解成"找性质分界线"：`[l, r)` 区间三轮收缩夹住第一个 ≥x 的位置；upper_bound 只是把性质换成 >x；含 `[lower, upper)` 框住等值区、返回 end()、≤x 取前一格等技巧。实验区可对 7/1/10 自动跑二分。
 **对应笔记**：[[5.1.11 算法]] 二分一节、[[5.算法/5.2 算法/5.2.6 二分查找与二分答案|5.2.6 二分查找与二分答案]]。
 
 ### 7 · erase-remove 惯用法
 
-[▶ 打开动画](<file:///Users/melene/Documents/C++/obsidian_notes-main/5.算法/5.1 STL/erase-remove惯用法.html>)
+[▶ 打开动画](<../5.1 STL/erase-remove惯用法.html>)
 
 remove_if 为什么"删不掉"东西：read/write 双指针搬运保留元素 → 返回逻辑结尾 → 尾巴是残留垃圾、size 不变 → 必须 erase(newEnd, end()) 截断。收尾讲 STL"算法与容器解耦"的设计哲学与 C++20 `std::erase_if`。
 **对应笔记**：[[5.1.6 string]] remove_if 一节、[[5.1.11 算法]]。
