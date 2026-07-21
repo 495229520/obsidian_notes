@@ -4,10 +4,7 @@ aliases:
   - SRC开发使用方案
   - SRC-1000 开发使用方案
 tags:
-  - robot
-  - amr
-  - src-controller
-  - project
+  - 研一上学期/复合机器人开发-SRC-1000的使用与二次开发
 status: in-progress
 updated: 2026-03-30
 ---

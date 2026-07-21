@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week05
+---
 # Week05 渐进式练习
 
 > 配合 [[Week 5 ServingBench 服务基准测试框架 项目解析]] 使用。答案基于仓库源码与 docs 推理；凡涉及实测 TTFT/TPOT/TPS 数字之处，给出**预期方向**，真实数值请在你的 GPU 上 `make smoke` / `make bench-all` / `make report` 后回填到 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week05/profiling|profiling]]。

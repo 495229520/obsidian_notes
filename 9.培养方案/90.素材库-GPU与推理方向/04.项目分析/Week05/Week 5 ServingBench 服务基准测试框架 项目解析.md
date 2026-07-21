@@ -2,10 +2,7 @@
 title: Week 5 ServingBench 服务基准测试框架 项目解析
 date: 2026-05-31
 tags:
-  - infra
-  - LLM-Serving
-  - benchmark
-  - 项目分析
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week05
 aliases:
   - ServingBench 项目解析
   - Week5 Serving Benchmark Harness 解析

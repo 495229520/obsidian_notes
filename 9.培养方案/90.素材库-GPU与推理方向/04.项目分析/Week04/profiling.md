@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week04
+---
 # Week04 Benchmark & Profiling
 
 > 配合 [[CUDA Week 4 MatMul v0 项目解析]]。与前几周不同，本周仓库 `docs/benchmark.md` / `docs/profiling.md` 已有**本卡（GTX 1660 SUPER, Turing, sm_75）实测数据**，下文如实记录并给出分析方法论。换卡请在你的 GPU 上重测后回填到「其它 GPU」一节，不要直接套用本卡数字。

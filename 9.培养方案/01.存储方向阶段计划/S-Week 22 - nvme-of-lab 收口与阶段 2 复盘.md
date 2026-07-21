@@ -2,9 +2,7 @@
 title: S-Week 22 - nvme-of-lab 收口与阶段 2 复盘
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/总结
 status: active
 ---
 

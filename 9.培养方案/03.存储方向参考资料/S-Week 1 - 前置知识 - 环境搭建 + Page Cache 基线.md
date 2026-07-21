@@ -2,9 +2,7 @@
 title: S-Week 1 - 前置知识 - 环境搭建 + Page Cache 基线
 date: 2026-07-10
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/计划
 aliases:
   - 存储 Week 1 前置知识
   - Page Cache 基线前置知识

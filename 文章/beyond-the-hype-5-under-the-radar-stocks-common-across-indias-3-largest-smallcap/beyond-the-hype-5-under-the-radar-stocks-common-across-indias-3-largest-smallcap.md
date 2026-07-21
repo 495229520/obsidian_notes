@@ -1,6 +1,8 @@
 ---
 title: "Beyond the hype: 5 under-the-radar stocks common across India's 3 largest smallcap portfolios"
 source: https://economictimes.indiatimes.com/markets/stocks/news/beyond-the-hype-5-under-the-radar-stocks-common-across-indias-3-largest-smallcap-portfolios/articleshow/131786106.cms
+tags:
+  - 文章/资讯
 ---
 
 # Beyond the hype: 5 under-the-radar stocks common across India's 3 largest smallcap portfolios

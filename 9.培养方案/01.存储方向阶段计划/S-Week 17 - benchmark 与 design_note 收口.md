@@ -2,9 +2,7 @@
 title: S-Week 17 - benchmark 与 design_note 收口
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/总结
 status: active
 ---
 
@@ -25,7 +23,7 @@ status: active
 
 - 写 bench 工具，固定 workload：fillseq / fillrandom / readrandom / 恢复时间（不同 log 大小）。
 - 矩阵：三档 fsync × value 128B / 4K / 64K，每组 3 次，产出曲线与结论表。
-- issue reproduction #1（阶段 2 验收项）：给 fio 或 RocksDB 复现一个已知 issue，时间盒 1 天，产出复现记录（环境、步骤、现象对照）。
+- issue reproduction \#1（阶段 2 验收项）：给 fio 或 RocksDB 复现一个已知 issue，时间盒 1 天，产出复现记录（环境、步骤、现象对照）。
 
 ## 2. RocksDB 对照与 DDIA 收尾（Day 3）
 

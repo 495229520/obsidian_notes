@@ -1,6 +1,8 @@
 ---
 title: "PM Modi good friend, India and US will get to trade deal: Trump"
 source: https://economictimes.indiatimes.com/news/economy/foreign-trade/pm-modi-good-friend-india-and-us-will-get-to-trade-deal-trump/articleshow/131519086.cms
+tags:
+  - 文章/资讯
 ---
 
 # PM Modi good friend, India and US will get to trade deal: Trump

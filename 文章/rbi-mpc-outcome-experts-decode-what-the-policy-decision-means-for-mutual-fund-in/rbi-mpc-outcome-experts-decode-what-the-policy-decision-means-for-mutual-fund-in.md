@@ -1,6 +1,8 @@
 ---
 title: "RBI MPC outcome: Experts decode what the policy decision means for mutual fund investors"
 source: https://economictimes.indiatimes.com/mf/analysis/rbi-mpc-outcome-experts-decode-what-the-policy-decision-means-for-mutual-fund-investors/articleshow/131528381.cms
+tags:
+  - 文章/资讯
 ---
 
 # RBI MPC outcome: Experts decode what the policy decision means for mutual fund investors

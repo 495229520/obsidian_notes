@@ -2,11 +2,8 @@
 title: JAX TPU Dynamic Shape 认知边界
 date: 2026-05-24
 tags:
-  - infra
-  - JAX
-  - TPU
-  - 面试
-roadmap_week: "Week 8, Week 17+"
+  - AI-infra/素材库-GPU与推理方向/推理专题清单
+roadmap_week: Week 8, Week 17+
 sort_order: "08.20"
 status: active
 ---

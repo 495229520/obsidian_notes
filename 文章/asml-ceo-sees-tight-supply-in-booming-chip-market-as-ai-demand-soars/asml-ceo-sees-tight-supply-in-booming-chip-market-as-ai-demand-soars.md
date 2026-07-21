@@ -1,6 +1,8 @@
 ---
-title: "ASML CEO sees tight supply in booming chip market as AI demand soars"
+title: ASML CEO sees tight supply in booming chip market as AI demand soars
 source: https://economictimes.indiatimes.com/tech/artificial-intelligence/asml-ceo-sees-tight-supply-in-booming-chip-market-as-ai-demand-soars/articleshow/131228020.cms
+tags:
+  - 文章/资讯
 ---
 
 # ASML CEO sees tight supply in booming chip market as AI demand soars

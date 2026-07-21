@@ -1,3 +1,7 @@
+---
+tags:
+  - LLM应用/数值分析笔记
+---
 # 第07次课 Hermite 插值与分段低次插值
 
 > 课程：计算方法 / 数值分析（Numerical Analysis）

@@ -2,9 +2,7 @@
 title: S-Week 27 - 作品集收口 storage-ai-infra-portfolio
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/总结
 status: active
 ---
 

@@ -1,6 +1,8 @@
 ---
 title: "Stagflation risks rise as oil prices threaten global growth outlook: Peter Cardillo"
 source: https://economictimes.indiatimes.com/markets/expert-view/stagflation-risks-rise-as-oil-prices-threaten-global-growth-outlook-peter-cardillo/articleshow/131523767.cms
+tags:
+  - 文章/资讯
 ---
 
 # Stagflation risks rise as oil prices threaten global growth outlook: Peter Cardillo

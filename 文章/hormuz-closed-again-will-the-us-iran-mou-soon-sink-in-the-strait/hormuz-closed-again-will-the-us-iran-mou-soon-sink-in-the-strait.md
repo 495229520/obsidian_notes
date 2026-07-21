@@ -1,6 +1,8 @@
 ---
 title: "Hormuz closed again: Will the US-Iran MoU soon sink in the strait?"
 source: https://economictimes.indiatimes.com/news/defence/hormuz-closed-again-will-the-us-iran-mou-soon-sink-in-the-strait/articleshow/131879227.cms
+tags:
+  - 文章/资讯
 ---
 
 # Hormuz closed again: Will the US-Iran MoU soon sink in the strait?

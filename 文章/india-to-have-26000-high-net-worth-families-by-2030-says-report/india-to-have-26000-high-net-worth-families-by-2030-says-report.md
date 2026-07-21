@@ -1,6 +1,8 @@
 ---
-title: "India to have 26,000 high net-worth families by 2030, says report"
+title: India to have 26,000 high net-worth families by 2030, says report
 source: https://economictimes.indiatimes.com/news/india/india-to-have-26000-high-net-worth-families-by-2030-says-report/articleshow/131866275.cms
+tags:
+  - 文章/资讯
 ---
 
 # India to have 26,000 high net-worth families by 2030, says report

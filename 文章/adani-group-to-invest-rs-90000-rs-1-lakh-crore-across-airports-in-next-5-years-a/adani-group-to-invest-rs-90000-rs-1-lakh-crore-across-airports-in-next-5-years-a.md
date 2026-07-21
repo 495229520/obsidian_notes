@@ -1,6 +1,8 @@
 ---
-title: "Adani Group to invest Rs 90,000-Rs 1 lakh crore across airports in next 5 years as Mundra commercial operations take off"
+title: Adani Group to invest Rs 90,000-Rs 1 lakh crore across airports in next 5 years as Mundra commercial operations take off
 source: https://economictimes.indiatimes.com/industry/transportation/airlines-/-aviation/adani-group-to-invest-rs-90000-rs-1-lakh-crore-across-airports-in-next-5-years-as-mundra-commercial-operations-take-off/articleshow/131931187.cms
+tags:
+  - 文章/资讯
 ---
 
 # Adani Group to invest Rs 90,000-Rs 1 lakh crore across airports in next 5 years as Mundra commercial operations take off

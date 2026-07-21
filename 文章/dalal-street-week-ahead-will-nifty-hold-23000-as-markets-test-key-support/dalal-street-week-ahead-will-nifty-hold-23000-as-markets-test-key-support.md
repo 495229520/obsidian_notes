@@ -1,6 +1,8 @@
 ---
 title: "Dalal Street Week Ahead: Will Nifty hold 23,000 as markets test key support?"
 source: https://economictimes.indiatimes.com/markets/stocks/news/dalal-street-week-ahead-will-nifty-hold-23000-as-markets-test-key-support/articleshow/131550486.cms
+tags:
+  - 文章/资讯
 ---
 
 # Dalal Street Week Ahead: Will Nifty hold 23,000 as markets test key support?

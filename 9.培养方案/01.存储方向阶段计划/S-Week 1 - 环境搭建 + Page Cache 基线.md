@@ -2,9 +2,7 @@
 title: S-Week 1 - 环境搭建 + Page Cache 基线
 date: 2026-07-08
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/计划
 status: active
 ---
 

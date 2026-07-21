@@ -2,9 +2,7 @@
 title: CUDA Week 4 MatMul v0 项目解析
 date: 2026-05-31
 tags:
-  - infra
-  - CUDA
-  - 项目分析
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week04
 aliases:
   - CUDA Week4 项目解析
   - MatMul v0 工程解析

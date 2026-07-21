@@ -2,9 +2,7 @@
 title: S-Week 21 - NVMe-oF RDMA 与 SPDK
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/计划
 status: active
 ---
 
@@ -43,7 +41,7 @@ status: active
 
 - JuiceFS / 3FS 两篇对比笔记落库（总纲最低产出）：元数据路径对比、副本 vs EC、与传统 NAS 的差异。3FS 重点看它为什么用 RDMA + NVMe SSD——和本仓库路线的对标点。
 - Ceph 只读架构文档（RADOS / CRUSH 概念），能画出写路径即止。
-- 可选：issue reproduction #2（JuiceFS / LMCache 任一，时间盒 1 天）。
+- 可选：issue reproduction \#2（JuiceFS / LMCache 任一，时间盒 1 天）。
 
 ## 5. 推理保温（约 25%）
 

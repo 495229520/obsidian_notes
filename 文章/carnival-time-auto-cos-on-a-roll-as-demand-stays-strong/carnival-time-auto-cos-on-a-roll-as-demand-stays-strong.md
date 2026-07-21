@@ -1,6 +1,8 @@
 ---
-title: "Carnival Time! Auto cos on a roll as demand stays strong"
+title: Carnival Time! Auto cos on a roll as demand stays strong
 source: https://economictimes.indiatimes.com/industry/auto/auto-news/carnival-time-auto-cos-on-a-roll-as-demand-stays-strong/articleshow/131754029.cms
+tags:
+  - 文章/资讯
 ---
 
 # Carnival Time! Auto cos on a roll as demand stays strong

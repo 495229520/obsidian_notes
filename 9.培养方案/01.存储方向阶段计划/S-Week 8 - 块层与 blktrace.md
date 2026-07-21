@@ -2,9 +2,7 @@
 title: S-Week 8 - 块层与 blktrace
 date: 2026-07-11
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/计划
 status: active
 ---
 

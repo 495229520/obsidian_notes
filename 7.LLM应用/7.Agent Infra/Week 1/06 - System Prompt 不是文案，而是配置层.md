@@ -1,6 +1,6 @@
 ---
 tags:
-  - LLM
+  - LLM应用/Agent-Infra/Week-1
 ---
 
 # System Prompt 不是文案，而是配置层

@@ -2,10 +2,8 @@
 title: AI Infra 岗算法笔试保底清单
 date: 2026-05-24
 tags:
-  - infra
-  - 面试
-  - 算法
-roadmap_week: "求职全程"
+  - AI-infra/素材库-GPU与推理方向/推理专题清单/清单
+roadmap_week: 求职全程
 sort_order: "99.00"
 status: active
 ---

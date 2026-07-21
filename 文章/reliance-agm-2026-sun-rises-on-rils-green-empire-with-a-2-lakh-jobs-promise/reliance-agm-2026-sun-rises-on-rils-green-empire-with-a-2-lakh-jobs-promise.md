@@ -1,6 +1,8 @@
 ---
 title: "Reliance AGM 2026: Sun rises on RIL's green empire with a 2 lakh jobs promise"
 source: https://economictimes.indiatimes.com/industry/renewables/reliance-agm-2026-sun-rises-on-rils-green-empire-with-a-2-lakh-jobs-promise/articleshow/131851319.cms
+tags:
+  - 文章/资讯
 ---
 
 # Reliance AGM 2026: Sun rises on RIL's green empire with a 2 lakh jobs promise

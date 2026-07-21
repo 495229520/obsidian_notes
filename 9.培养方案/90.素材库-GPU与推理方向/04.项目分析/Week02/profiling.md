@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week02
+---
 # Week02 Nsight Compute Profiling
 
 使用 Nsight Compute (`ncu`) 对三种 reduce kernel 进行性能分析。

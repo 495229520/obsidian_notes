@@ -2,9 +2,7 @@
 title: S-Week 26 - 前置知识 - checkpoint 干扰与 S4 报告收口
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/总结
 aliases:
   - 存储 Week 26 前置知识
   - S4 收口前置知识

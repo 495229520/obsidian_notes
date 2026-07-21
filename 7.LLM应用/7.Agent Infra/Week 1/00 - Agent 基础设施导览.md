@@ -1,7 +1,7 @@
 ---
 status: 进行中
 tags:
-  - LLM
+  - LLM应用/Agent-Infra/Week-1
 ---
 
 # Agent 基础设施导览

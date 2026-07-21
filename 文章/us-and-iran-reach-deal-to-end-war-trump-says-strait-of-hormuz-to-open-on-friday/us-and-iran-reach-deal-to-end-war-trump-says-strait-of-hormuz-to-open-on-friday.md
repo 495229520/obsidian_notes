@@ -1,6 +1,8 @@
 ---
-title: "US and Iran reach deal to end war, Trump says Strait of Hormuz to open on Friday"
+title: US and Iran reach deal to end war, Trump says Strait of Hormuz to open on Friday
 source: https://economictimes.indiatimes.com/news/defence/us-iran-reach-deal-to-end-war-signing-set-for-friday-hormuz-now-open/articleshow/131730676.cms
+tags:
+  - 文章/资讯
 ---
 
 # US and Iran reach deal to end war, Trump says Strait of Hormuz to open on Friday

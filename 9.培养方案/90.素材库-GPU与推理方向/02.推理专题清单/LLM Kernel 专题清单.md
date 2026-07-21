@@ -2,13 +2,11 @@
 title: LLM Kernel 专题清单
 date: 2026-05-06
 tags:
-  - infra
-  - Reasoning
-  - 专题清单
+  - AI-infra/素材库-GPU与推理方向/推理专题清单/清单
 aliases:
   - LLM CUDA Kernel
   - LLM 算子清单
-roadmap_week: "Week 4, Week 9-16"
+roadmap_week: Week 4, Week 9-16
 sort_order: "04.10"
 status: active
 ---

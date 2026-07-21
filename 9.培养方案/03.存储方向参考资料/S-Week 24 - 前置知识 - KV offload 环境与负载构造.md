@@ -2,9 +2,7 @@
 title: S-Week 24 - 前置知识 - KV offload 环境与负载构造
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/计划
 aliases:
   - 存储 Week 24 前置知识
   - KV offload 环境前置知识

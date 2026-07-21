@@ -1,6 +1,8 @@
 ---
-title: "India’s growth faces crude and monsoon test as FY27 GDP seen moderating to 6.5%"
+title: India’s growth faces crude and monsoon test as FY27 GDP seen moderating to 6.5%
 source: https://economictimes.indiatimes.com/news/economy/indicators/fy27-gdp-growth-seen-moderating-to-6-5-as-el-nino-and-geopolitical-costs-weigh-reports/articleshow/131561451.cms
+tags:
+  - 文章/资讯
 ---
 
 # India’s growth faces crude and monsoon test as FY27 GDP seen moderating to 6.5%

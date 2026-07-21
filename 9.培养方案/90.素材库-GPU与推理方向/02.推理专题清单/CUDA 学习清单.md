@@ -2,13 +2,11 @@
 title: CUDA 学习清单
 date: 2026-05-06
 tags:
-  - infra
-  - CUDA
-  - 专题清单
+  - AI-infra/素材库-GPU与推理方向/推理专题清单/清单
 aliases:
   - CUDA checklist
   - CUDA 路线清单
-roadmap_week: "Week 1-4"
+roadmap_week: Week 1-4
 sort_order: "01.00"
 status: active
 ---

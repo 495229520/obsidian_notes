@@ -1,6 +1,8 @@
 ---
-title: "Morgan Stanley says Indian stock market poised for strong year ahead. Here’s why"
+title: Morgan Stanley says Indian stock market poised for strong year ahead. Here’s why
 source: https://economictimes.indiatimes.com/markets/stocks/news/morgan-stanley-says-indian-stock-market-poised-for-strong-year-ahead-heres-why/articleshow/131453800.cms
+tags:
+  - 文章/资讯
 ---
 
 # Morgan Stanley says Indian stock market poised for strong year ahead. Here’s why

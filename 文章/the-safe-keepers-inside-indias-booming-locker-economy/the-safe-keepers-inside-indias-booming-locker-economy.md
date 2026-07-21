@@ -1,6 +1,8 @@
 ---
 title: "The safe keepers: Inside India's booming locker economy"
 source: https://economictimes.indiatimes.com/industry/banking/finance/banking/the-safe-keepers-inside-indias-booming-locker-economy/articleshow/131561267.cms
+tags:
+  - 文章/资讯
 ---
 
 # The safe keepers: Inside India's booming locker economy

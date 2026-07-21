@@ -2,9 +2,7 @@
 title: S-Week 25 - 前置知识 - KV offload 三档对照与收支对账
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/计划
 aliases:
   - 存储 Week 25 前置知识
   - KV offload 对账前置知识

@@ -2,11 +2,8 @@
 title: 分布式推理通信与 TP 切分速记
 date: 2026-05-24
 tags:
-  - infra
-  - distributed
-  - Reasoning
-  - 面试
-roadmap_week: "Week 5-8, Week 17+"
+  - AI-infra/素材库-GPU与推理方向/推理专题清单
+roadmap_week: Week 5-8, Week 17+
 sort_order: "05.20"
 status: active
 ---

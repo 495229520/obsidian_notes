@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week04
+---
 # Week04 必答问题
 
 > 配合 [[CUDA Week 4 MatMul v0 项目解析]]。这些是阶段计划与 README 里的核心面试问题，逐题展开。数字为本卡（GTX 1660 SUPER）实测。

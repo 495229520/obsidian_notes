@@ -1,6 +1,8 @@
 ---
-title: "SpaceX valuation hinges on uncertain AI economics, says Professor Aswath Damodaran"
+title: SpaceX valuation hinges on uncertain AI economics, says Professor Aswath Damodaran
 source: https://economictimes.indiatimes.com/tech/technology/spacex-valuation-hinges-on-uncertain-ai-economics-says-professor-aswath-damodaran/articleshow/131876895.cms
+tags:
+  - 文章/资讯
 ---
 
 # SpaceX valuation hinges on uncertain AI economics, says Professor Aswath Damodaran

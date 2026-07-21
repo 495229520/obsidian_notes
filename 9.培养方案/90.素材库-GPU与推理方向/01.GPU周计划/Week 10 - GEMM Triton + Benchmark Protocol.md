@@ -2,9 +2,7 @@
 title: Week 10 - GEMM Triton + Benchmark Protocol
 date: 2026-05-16
 tags:
-  - infra
-  - CUDA
-  - 阶段计划
+  - AI-infra/素材库-GPU与推理方向/GPU周计划/计划
 aliases:
   - 阶段二 Week 10
   - GEMM Triton

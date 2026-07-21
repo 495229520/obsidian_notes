@@ -1,6 +1,8 @@
 ---
-title: "Hudco mulls $1 billion foreign debt under RBI forex swap facility"
+title: Hudco mulls $1 billion foreign debt under RBI forex swap facility
 source: https://economictimes.indiatimes.com/industry/services/property-/-cstruction/hudco-mulls-1-billion-foreign-debt-under-rbi-forex-swap-sacility/articleshow/131728294.cms
+tags:
+  - 文章/资讯
 ---
 
 # Hudco mulls $1 billion foreign debt under RBI forex swap facility

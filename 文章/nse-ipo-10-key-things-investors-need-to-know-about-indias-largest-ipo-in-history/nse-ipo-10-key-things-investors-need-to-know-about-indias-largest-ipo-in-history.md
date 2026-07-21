@@ -1,6 +1,8 @@
 ---
 title: "NSE IPO: 10 key things investors need to know about India’s largest IPO in history"
 source: https://economictimes.indiatimes.com/markets/stocks/news/nse-ipo-10-key-things-investors-need-to-know-about-indias-largest-ipo-in-history/articleshow/131816120.cms
+tags:
+  - 文章/资讯
 ---
 
 # NSE IPO: 10 key things investors need to know about India’s largest IPO in history

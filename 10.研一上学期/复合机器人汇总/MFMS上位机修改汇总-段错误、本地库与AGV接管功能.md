@@ -2,12 +2,7 @@
 title: MFMS 上位机修改汇总：段错误、本地库与 AGV 接管功能
 date: 2026-07-15
 tags:
-  - MFMS
-  - 复合机器人
-  - debug
-  - ROS2
-  - Qt
-  - Docker
+  - 研一上学期/复合机器人汇总
 status: 已完成
 ---
 

@@ -1,6 +1,8 @@
 ---
-title: "Call to extend duty cuts on critical inputs soon"
+title: Call to extend duty cuts on critical inputs soon
 source: https://economictimes.indiatimes.com/news/economy/foreign-trade/call-to-extend-duty-cuts-on-critical-inputs-soon/articleshow/131692467.cms
+tags:
+  - 文章/资讯
 ---
 
 # Call to extend duty cuts on critical inputs soon

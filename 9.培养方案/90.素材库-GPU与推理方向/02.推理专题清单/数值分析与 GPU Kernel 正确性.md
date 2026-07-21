@@ -2,13 +2,11 @@
 title: 数值分析与 GPU Kernel 正确性
 date: 2026-05-08
 tags:
-  - infra
-  - CUDA
-  - 专题清单
+  - AI-infra/素材库-GPU与推理方向/推理专题清单
 aliases:
   - GPU Kernel 数值正确性
   - 数值分析到 GPU Performance
-roadmap_week: "Week 2-4"
+roadmap_week: Week 2-4
 sort_order: "02.00"
 status: active
 ---

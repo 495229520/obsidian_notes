@@ -1,3 +1,7 @@
+---
+tags:
+  - 研一上学期
+---
 # MFMS 数据中台完整技术文档
 
 本文面向开发交接，基于当前 `src/mfms_server`、`src/qt_file`、`src/com_interfaces` 的真实代码整理。这里的“数据中台”不是单一数据库，而是 `client_api + CommunicationWorker + gateway + db_service + ros_bridge + cmd_service + 设备代理` 组成的上位机通信中间层。

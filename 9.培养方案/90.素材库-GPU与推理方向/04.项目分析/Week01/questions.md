@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week01
+---
 # Week01 必答问题
 
 > 配合 [[CUDA Week 1 Hello World 项目解析]]。这些是 README、阶段计划里的核心面试问题，逐题展开。

@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week05
+---
 # Week05 必答问题
 
 > 配合 [[Week 5 ServingBench 服务基准测试框架 项目解析]]。这些是 plan 的 7 个学习目标 + README/阶段计划里的核心面试问题，逐题展开。

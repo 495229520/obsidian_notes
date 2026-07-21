@@ -1,3 +1,7 @@
+---
+tags:
+  - 项目/ros通讯服务器/周报/总结
+---
 # MFMS 系统测试报告
 
 **项目名称**: MFMS (Manufacturing Flow Management System)

@@ -2,10 +2,8 @@
 title: AI Infra 项目开源科研叙事模板
 date: 2026-05-24
 tags:
-  - infra
-  - 面试
-  - 简历
-roadmap_week: "Week 8, Week 16, Week 17+"
+  - AI-infra/素材库-GPU与推理方向/推理专题清单/模板
+roadmap_week: Week 8, Week 16, Week 17+
 sort_order: "08.30"
 status: active
 ---

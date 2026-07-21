@@ -2,9 +2,7 @@
 title: S-Week 13 - 前置知识 - checksum 与崩溃恢复
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/计划
 aliases:
   - 存储 Week 13 前置知识
   - crash recovery 前置知识

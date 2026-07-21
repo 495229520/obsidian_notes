@@ -1,8 +1,7 @@
 ---
 tags:
-  - 项目/远控系统
-  - debug
-git: "8d2e3c3"
+  - 项目/远控系统/Debug日志
+git: 8d2e3c3
 ---
 
 # Debug-019 PostThreadMessage 失败路径未释放 PACKET_DATA

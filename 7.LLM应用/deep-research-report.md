@@ -1,5 +1,6 @@
 ---
-tags: LLM
+tags:
+  - LLM应用
 ---
 
 # 十个月 AI Agent + C++ 精细学习路线

@@ -1,6 +1,8 @@
 ---
-title: "Dow Jones Adds 5th Magnificent Seven Stock"
+title: Dow Jones Adds 5th Magnificent Seven Stock
 source: https://www.investors.com/news/google-parent-alphabet-join-dow-jones-industrial-average-replacing-verizon/
+tags:
+  - 文章/资讯
 ---
 
 # Dow Jones Adds 5th Magnificent Seven Stock

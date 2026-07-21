@@ -1,6 +1,8 @@
 ---
-title: "Govt said to accept tweaks to Securities Markets Code draft"
+title: Govt said to accept tweaks to Securities Markets Code draft
 source: https://economictimes.indiatimes.com/news/economy/policy/govt-said-to-accept-tweaks-to-securities-markets-code-draft/articleshow/131728523.cms
+tags:
+  - 文章/资讯
 ---
 
 # Govt said to accept tweaks to Securities Markets Code draft

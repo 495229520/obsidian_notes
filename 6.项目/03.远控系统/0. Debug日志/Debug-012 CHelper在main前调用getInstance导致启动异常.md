@@ -1,6 +1,6 @@
 ---
 tags:
-  - 项目/远控系统
+  - 项目/远控系统/Debug日志
 ---
 
 # Debug-012：CHelper 在 main 前调用 getInstance 导致启动异常

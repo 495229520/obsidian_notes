@@ -2,11 +2,7 @@
 title: MFMS 上位机 Bug 修复汇总：锁、竞态与控制权
 date: 2026-07-16
 tags:
-  - MFMS
-  - 复合机器人
-  - debug
-  - ROS2
-  - Qt
+  - 研一上学期/复合机器人汇总
 status: 已完成
 ---
 

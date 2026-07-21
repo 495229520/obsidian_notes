@@ -1,6 +1,8 @@
 ---
 title: "Beyond Jio IPO: 5 triggers Mukesh Ambani has lined up to revive Reliance shares for 44 lakh investors"
 source: https://economictimes.indiatimes.com/markets/ipos/fpos/beyond-jio-ipo-5-triggers-mukesh-ambani-has-lined-up-to-revive-reliance-shares-for-44-lakh-investors/articleshow/131923718.cms
+tags:
+  - 文章/资讯
 ---
 
 # Beyond Jio IPO: 5 triggers Mukesh Ambani has lined up to revive Reliance shares for 44 lakh investors

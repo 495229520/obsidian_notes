@@ -2,11 +2,8 @@
 title: 副本与 EC 取舍专题
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 分布式
-  - 面试
-roadmap_week: "阶段 2（配菜阅读线，随 JuiceFS/3FS 对比笔记一并沉淀）"
+  - 高性能存储/存储方向专题清单
+roadmap_week: 阶段 2（配菜阅读线，随 JuiceFS/3FS 对比笔记一并沉淀）
 sort_order: "04.10"
 status: active
 ---

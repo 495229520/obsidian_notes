@@ -2,9 +2,7 @@
 title: S-Week 6 - 前置知识 - MVP 收口与报告
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/总结
 aliases:
   - 存储 Week 6 前置知识
   - MVP 收口前置知识

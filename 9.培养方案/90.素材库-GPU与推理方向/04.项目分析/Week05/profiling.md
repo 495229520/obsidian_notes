@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week05
+---
 # Week05 Serving Benchmark 测量与结果
 
 > 配合 [[Week 5 ServingBench 服务基准测试框架 项目解析]]。serving 没有 Nsight 那种 kernel profiling，"profiling" 在这里指**测量方法论 + 指标该看什么 + 结果回填**。本机已用缩小版 smoke 真实跑通五类 workload 形状（2026-05-31），下文给出真实 smoke 表 + 正式矩阵的**待填模板**——正式数字请在脱离 sandbox 的真机上 `make bench-all && make report` 后回填，不要照抄 smoke 值。

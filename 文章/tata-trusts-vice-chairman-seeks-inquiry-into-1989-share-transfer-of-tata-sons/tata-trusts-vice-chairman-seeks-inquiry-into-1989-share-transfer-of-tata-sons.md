@@ -1,6 +1,8 @@
 ---
-title: "Tata Trusts vice chairman seeks inquiry into 1989 share transfer of Tata Sons"
+title: Tata Trusts vice chairman seeks inquiry into 1989 share transfer of Tata Sons
 source: https://economictimes.indiatimes.com/news/company/corporate-trends/tata-trusts-vice-chairman-seeks-inquiry-into-1989-share-transfer-of-tata-sons/articleshow/131695970.cms
+tags:
+  - 文章/资讯
 ---
 
 # Tata Trusts vice chairman seeks inquiry into 1989 share transfer of Tata Sons

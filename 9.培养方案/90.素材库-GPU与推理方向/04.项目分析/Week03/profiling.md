@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week03
+---
 # Week03 Nsight Compute Profiling
 
 > 配合 [[CUDA Week 3 Transpose 项目解析]]。仓库 `docs/profiling.md` 目前是**空模板**，本文给出方法论、该看哪些指标、预期定性结论，以及与仓库一致的**待填表格**——真实数字请在你的 GPU 上实测后回填，不要照抄预测值。

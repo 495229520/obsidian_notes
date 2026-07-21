@@ -2,11 +2,8 @@
 title: 分布式存储阅读专题 - JuiceFS 与 3FS
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 分布式
-  - 面试
-roadmap_week: "阶段 2（S-Week 19 启动泛读，S-Week 21 落成对比笔记；配菜阅读线）"
+  - 高性能存储/存储方向专题清单
+roadmap_week: 阶段 2（S-Week 19 启动泛读，S-Week 21 落成对比笔记；配菜阅读线）
 sort_order: "04.00"
 status: active
 ---

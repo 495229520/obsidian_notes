@@ -2,9 +2,7 @@
 title: S-Week 15 - 前置知识 - group commit 与多线程写入
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/计划
 aliases:
   - 存储 Week 15 前置知识
   - group commit 前置知识

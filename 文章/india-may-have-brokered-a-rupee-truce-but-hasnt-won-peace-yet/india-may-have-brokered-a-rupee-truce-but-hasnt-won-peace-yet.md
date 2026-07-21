@@ -1,6 +1,8 @@
 ---
-title: "India may have brokered a rupee truce, but hasn't won peace yet"
+title: India may have brokered a rupee truce, but hasn't won peace yet
 source: https://economictimes.indiatimes.com/news/economy/policy/india-has-brokered-a-rupee-truce-not-won-peace/articleshow/131599424.cms
+tags:
+  - 文章/资讯
 ---
 
 # India may have brokered a rupee truce, but hasn't won peace yet

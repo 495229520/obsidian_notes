@@ -1,6 +1,8 @@
 ---
 title: "Oil Price Today (June 8): Crude oil jumps 3% as Israel attacks Lebanon in latest escalation. Where are prices headed?"
 source: https://economictimes.indiatimes.com/markets/commodities/news/oil-price-today-june-8-crude-oil-jumps-2-israel-attacks-lebanon-in-latest-escalation-where-are-prices-headed/articleshow/131576560.cms
+tags:
+  - 文章/资讯
 ---
 
 # Oil Price Today (June 8): Crude oil jumps 3% as Israel attacks Lebanon in latest escalation. Where are prices headed?

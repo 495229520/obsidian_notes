@@ -1,3 +1,7 @@
+---
+tags:
+  - LLM应用
+---
 # Model Context Protocol (MCP) 深入笔记
 
 > **作者说明：** 这份笔记是站在系统 / 后端工程师的视角来写的，文中会频繁使用 IPC、TCP 和 Unix 进程管理的类比。

@@ -1,6 +1,8 @@
 ---
 title: "$6 billion double dhamaka coming: Jio and NSE likely to file for India's biggest IPOs this week"
 source: https://economictimes.indiatimes.com/markets/ipos/fpos/6-billion-ipo-double-dhamaka-coming-jio-and-nse-likely-to-file-for-indias-biggest-ipos-this-week/articleshow/131787548.cms
+tags:
+  - 文章/资讯
 ---
 
 # $6 billion double dhamaka coming: Jio and NSE likely to file for India's biggest IPOs this week

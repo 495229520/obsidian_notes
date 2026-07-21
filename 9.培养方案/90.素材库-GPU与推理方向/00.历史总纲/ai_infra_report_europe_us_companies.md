@@ -2,9 +2,7 @@
 title: AI Infra 职业赛道与公司调研
 updated: 2026-07-21
 tags:
-  - infra
-  - 职业调研
-  - 参考资料
+  - AI-infra/素材库-GPU与推理方向/历史总纲
 status: reference
 ---
 

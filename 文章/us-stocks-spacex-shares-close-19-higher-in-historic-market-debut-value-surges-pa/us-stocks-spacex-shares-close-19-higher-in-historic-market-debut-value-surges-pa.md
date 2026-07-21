@@ -1,6 +1,8 @@
 ---
 title: "US stocks: SpaceX shares close 19% higher in historic market debut, value surges past $2 trillion"
 source: https://economictimes.indiatimes.com/markets/us-stocks/news/us-stocks-spacex-value-surges-past-2-trillion-in-historic-ipo-debut/articleshow/131693464.cms
+tags:
+  - 文章/资讯
 ---
 
 # US stocks: SpaceX shares close 19% higher in historic market debut, value surges past $2 trillion

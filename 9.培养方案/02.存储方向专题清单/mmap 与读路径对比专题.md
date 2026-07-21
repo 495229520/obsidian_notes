@@ -2,11 +2,8 @@
 title: mmap 与读路径对比专题
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - Linux
-  - 面试
-roadmap_week: "阶段 0-1（S-Week 4 主线；S-Week 11 全路径图复用）"
+  - 高性能存储/存储方向专题清单
+roadmap_week: 阶段 0-1（S-Week 4 主线；S-Week 11 全路径图复用）
 sort_order: "01.30"
 status: active
 ---

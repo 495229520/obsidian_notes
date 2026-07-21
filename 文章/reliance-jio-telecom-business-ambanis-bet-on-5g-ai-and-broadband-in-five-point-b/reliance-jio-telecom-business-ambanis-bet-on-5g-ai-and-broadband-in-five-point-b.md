@@ -1,6 +1,8 @@
 ---
 title: "Reliance Jio Telecom Business: Ambanis bet on 5G, AI and broadband in five-point blueprint for Jio's next chapter"
 source: https://economictimes.indiatimes.com/industry/telecom/telecom-news/reliance-jio-telecom-business-5g-expansion-subscriber-growth-tariff-plans-agm-updates-india-telecom-market/articleshow/131851869.cms
+tags:
+  - 文章/资讯
 ---
 
 # Reliance Jio Telecom Business: Ambanis bet on 5G, AI and broadband in five-point blueprint for Jio's next chapter

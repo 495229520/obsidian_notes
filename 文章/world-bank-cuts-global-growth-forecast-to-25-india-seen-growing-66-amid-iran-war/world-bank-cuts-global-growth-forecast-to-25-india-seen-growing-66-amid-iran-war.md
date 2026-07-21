@@ -1,6 +1,8 @@
 ---
-title: "World Bank cuts global growth forecast to 2.5%; India seen growing 6.6% amid Iran war"
+title: World Bank cuts global growth forecast to 2.5%; India seen growing 6.6% amid Iran war
 source: https://economictimes.indiatimes.com/news/international/world-news/citing-fallout-from-iran-war-world-bank-cuts-forecast-for-global-economic-growth/articleshow/131661194.cms
+tags:
+  - 文章/资讯
 ---
 
 # World Bank cuts global growth forecast to 2.5%; India seen growing 6.6% amid Iran war

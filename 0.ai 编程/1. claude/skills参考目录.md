@@ -1,3 +1,7 @@
+---
+tags:
+  - AI编程/claude
+---
 name: note-creator
 
 description: |

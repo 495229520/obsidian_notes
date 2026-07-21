@@ -3,9 +3,7 @@ title: AI Infra 存储与 GPU 数据路径系统工程师培养方案
 date: 2026-07-08
 updated: 2026-07-21
 tags:
-  - infra
-  - 存储
-  - 总纲
+  - AI-infra/素材库-GPU与推理方向/历史总纲
 status: reference
 ---
 

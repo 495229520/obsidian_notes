@@ -1,6 +1,8 @@
 ---
 title: "Ahead of Market: 10 things that will decide stock market action on Monday"
 source: https://economictimes.indiatimes.com/markets/stocks/news/ahead-of-market-10-things-that-will-decide-stock-market-action-on-monday/articleshow/131720157.cms
+tags:
+  - 文章/资讯
 ---
 
 # Ahead of Market: 10 things that will decide stock market action on Monday

@@ -2,11 +2,8 @@
 title: 存储面试问题清单 - AI 数据路径
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - GPU
-  - 面试
-roadmap_week: "求职全程（阶段 3 S4 逐题补实测证据；机制与口算答案现在就能用）"
+  - 高性能存储/存储方向专题清单/清单
+roadmap_week: 求职全程（阶段 3 S4 逐题补实测证据；机制与口算答案现在就能用）
 sort_order: "99.40"
 status: active
 ---

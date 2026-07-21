@@ -1,6 +1,8 @@
 ---
-title: "Reliance Jio eyes India's own satellite broadband network"
+title: Reliance Jio eyes India's own satellite broadband network
 source: https://economictimes.indiatimes.com/industry/telecom/telecom-news/reliance-jio-eyes-indias-own-satellite-broadband-network-akash-ambani/articleshow/131851853.cms
+tags:
+  - 文章/资讯
 ---
 
 # Reliance Jio eyes India's own satellite broadband network

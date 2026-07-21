@@ -1,6 +1,8 @@
 ---
-title: "Basmati rice, tea exports to West Asia come to a grinding halt"
+title: Basmati rice, tea exports to West Asia come to a grinding halt
 source: https://economictimes.indiatimes.com/news/economy/foreign-trade/basmati-rice-tea-exports-to-west-asia-come-to-a-grinding-halt/articleshow/131728464.cms
+tags:
+  - 文章/资讯
 ---
 
 # Basmati rice, tea exports to West Asia come to a grinding halt

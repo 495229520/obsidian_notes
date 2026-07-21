@@ -1,6 +1,8 @@
 ---
 title: "RIL AGM: Reliance Industries shares fall 2% amid Mukesh Ambani's big announcements at 49th AGM"
 source: https://economictimes.indiatimes.com/markets/stocks/news/reliance-industries-shares-in-focus-ahead-of-49th-agm-what-are-shareholders-expecting-from-mukesh-ambani/articleshow/131845679.cms
+tags:
+  - 文章/资讯
 ---
 
 # RIL AGM: Reliance Industries shares fall 2% amid Mukesh Ambani's big announcements at 49th AGM

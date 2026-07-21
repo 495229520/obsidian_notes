@@ -1,6 +1,8 @@
 ---
 title: "Vedanta listing: Why its aluminium business is the undisputed crown jewel of the mega 4-way demerger"
 source: https://economictimes.indiatimes.com/markets/stocks/news/vedanta-listing-why-its-aluminium-business-is-the-undisputed-crown-jewel-of-the-mega-4-way-demerger/articleshow/131715966.cms
+tags:
+  - 文章/资讯
 ---
 
 # Vedanta listing: Why its aluminium business is the undisputed crown jewel of the mega 4-way demerger

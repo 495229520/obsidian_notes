@@ -2,9 +2,7 @@
 title: S-Week 6 - MVP 收口与报告
 date: 2026-07-08
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/总结
 status: active
 ---
 

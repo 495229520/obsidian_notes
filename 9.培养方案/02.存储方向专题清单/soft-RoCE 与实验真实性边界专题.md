@@ -2,12 +2,8 @@
 title: soft-RoCE 与实验真实性边界专题
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - RDMA
-  - 方法论
-  - 面试
-roadmap_week: "阶段 2（S-Week 20-22 全程纪律；S-Week 22 收口时成文）"
+  - 高性能存储/存储方向专题清单
+roadmap_week: 阶段 2（S-Week 20-22 全程纪律；S-Week 22 收口时成文）
 sort_order: "02.40"
 status: active
 ---

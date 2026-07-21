@@ -1,6 +1,8 @@
 ---
-title: "RBI seen in no rush to press rate hike pedal, decision may get deferred to second half of FY27"
+title: RBI seen in no rush to press rate hike pedal, decision may get deferred to second half of FY27
 source: https://economictimes.indiatimes.com/news/economy/policy/rbi-seen-in-no-rush-to-press-rate-hike-pedal-decision-may-get-deferred-to-second-half-of-fy27/articleshow/131918991.cms
+tags:
+  - 文章/资讯
 ---
 
 # RBI seen in no rush to press rate hike pedal, decision may get deferred to second half of FY27

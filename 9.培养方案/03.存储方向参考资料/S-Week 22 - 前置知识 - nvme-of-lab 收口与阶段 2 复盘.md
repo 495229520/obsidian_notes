@@ -2,9 +2,7 @@
 title: S-Week 22 - 前置知识 - nvme-of-lab 收口与阶段 2 复盘
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/总结
 aliases:
   - 存储 Week 22 前置知识
   - 阶段 2 收口前置知识

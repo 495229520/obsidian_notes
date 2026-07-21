@@ -1,6 +1,8 @@
 ---
-title: "Why Asia's oil lifeline can't survive on US crude alone"
+title: Why Asia's oil lifeline can't survive on US crude alone
 source: https://economictimes.indiatimes.com/industry/energy/oil-gas/why-asias-oil-lifeline-cant-survive-on-us-crude-alone/articleshow/131455947.cms
+tags:
+  - 文章/资讯
 ---
 
 # Why Asia's oil lifeline can't survive on US crude alone

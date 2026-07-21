@@ -2,9 +2,7 @@
 title: S-Week 23 - GDS 环境与直读对照
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/计划
 status: active
 ---
 

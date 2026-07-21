@@ -1,6 +1,8 @@
 ---
-title: "IHG eyes deeper Adani partnership, more hotels at airports across India"
+title: IHG eyes deeper Adani partnership, more hotels at airports across India
 source: https://economictimes.indiatimes.com/industry/transportation/airlines-/-aviation/ihg-eyes-deeper-adani-partnership-more-hotels-at-airports-across-india/articleshow/131866284.cms
+tags:
+  - 文章/资讯
 ---
 
 # IHG eyes deeper Adani partnership, more hotels at airports across India

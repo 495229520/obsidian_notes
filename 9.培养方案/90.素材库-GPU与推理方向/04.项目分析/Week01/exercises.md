@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week01
+---
 # Week01 渐进式练习
 
 > 配合 [[CUDA Week 1 Hello World 项目解析]] 使用。答案基于仓库源码推理；凡涉及实测时间/带宽数字之处，给出**预期方向**，真实数值请在你的 GPU 上 `make bench` 后回填到 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/profiling|profiling]]。

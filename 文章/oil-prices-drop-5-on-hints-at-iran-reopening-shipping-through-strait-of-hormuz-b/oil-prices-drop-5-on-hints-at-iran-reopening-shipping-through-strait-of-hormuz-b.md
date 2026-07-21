@@ -1,6 +1,8 @@
 ---
-title: "Oil prices drop 5% on hints at Iran reopening shipping through Strait of Hormuz; Brent below $95"
+title: Oil prices drop 5% on hints at Iran reopening shipping through Strait of Hormuz; Brent below $95
 source: https://economictimes.indiatimes.com/markets/commodities/news/oil-prices-drop-5-on-hints-at-iran-reopening-shipping-through-strait-of-hormuz-brent-below-95/articleshow/131351747.cms?from=mdr
+tags:
+  - 文章/资讯
 ---
 
 # Oil prices drop 5% on hints at Iran reopening shipping through Strait of Hormuz; Brent below $95

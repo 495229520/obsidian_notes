@@ -2,9 +2,7 @@
 title: S-Week 12 - mini-kv-engine v0 与 bitcask 模型
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 阶段计划
+  - 高性能存储/存储方向阶段计划/计划
 status: active
 ---
 

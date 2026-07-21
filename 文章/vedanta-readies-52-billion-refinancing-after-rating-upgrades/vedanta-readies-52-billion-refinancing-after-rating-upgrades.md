@@ -1,6 +1,8 @@
 ---
-title: "Vedanta readies $5.2 billion refinancing after rating upgrades"
+title: Vedanta readies $5.2 billion refinancing after rating upgrades
 source: https://economictimes.indiatimes.com/industry/indl-goods/svs/metals-mining/vedanta-readies-5-2-billion-refinancing-after-rating-upgrades/articleshow/131603667.cms
+tags:
+  - 文章/资讯
 ---
 
 # Vedanta readies $5.2 billion refinancing after rating upgrades

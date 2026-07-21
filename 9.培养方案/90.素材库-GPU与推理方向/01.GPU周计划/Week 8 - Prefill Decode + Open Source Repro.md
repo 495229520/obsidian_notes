@@ -2,9 +2,7 @@
 title: Week 8 - Prefill Decode + Open Source Repro
 date: 2026-05-14
 tags:
-  - infra
-  - Reasoning
-  - 阶段计划
+  - AI-infra/素材库-GPU与推理方向/GPU周计划/计划
 status: active
 ---
 

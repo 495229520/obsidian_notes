@@ -1,8 +1,7 @@
 ---
 tags:
-  - 项目/远控系统
-  - debug
-git: "8d2e3c3"
+  - 项目/远控系统/Debug日志
+git: 8d2e3c3
 ---
 
 # Debug-020 单击目录一次后重复解析同一FILEINFO导致日志刷屏

@@ -1,6 +1,8 @@
 ---
-title: "Strait path laid for crude prices to travel downward"
+title: Strait path laid for crude prices to travel downward
 source: https://economictimes.indiatimes.com/industry/energy/oil-gas/strait-path-laid-for-crude-prices-to-travel-downward/articleshow/131753521.cms
+tags:
+  - 文章/资讯
 ---
 
 # Strait path laid for crude prices to travel downward

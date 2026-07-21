@@ -1,6 +1,8 @@
 ---
-title: "Shares worth $26 billion can soon hit market as IPO lock-ins end"
+title: Shares worth $26 billion can soon hit market as IPO lock-ins end
 source: https://economictimes.indiatimes.com/markets/ipos/fpos/shares-worth-26-billion-can-soon-hit-market-as-ipo-lock-ins-end/articleshow/131814886.cms
+tags:
+  - 文章/资讯
 ---
 
 # Shares worth $26 billion can soon hit market as IPO lock-ins end

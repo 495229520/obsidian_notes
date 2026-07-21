@@ -2,13 +2,11 @@
 title: AI Infra 与 LLM 推理数学基础
 date: 2026-05-12
 tags:
-  - infra
-  - Reasoning
-  - 专题清单
+  - AI-infra/素材库-GPU与推理方向/推理专题清单
 aliases:
   - LLM 推理数学基础
   - AI Infra 数学基础
-roadmap_week: "Week 4-8"
+roadmap_week: Week 4-8
 sort_order: "04.00"
 status: active
 ---

@@ -1,6 +1,8 @@
 ---
-title: "Anthropic shuts down new AI models after US export order"
+title: Anthropic shuts down new AI models after US export order
 source: https://economictimes.indiatimes.com/tech/artificial-intelligence/anthropic-shuts-down-new-ai-models-after-us-export-order/articleshow/131696190.cms
+tags:
+  - 文章/资讯
 ---
 
 # Anthropic shuts down new AI models after US export order

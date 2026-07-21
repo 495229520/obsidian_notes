@@ -1,6 +1,8 @@
 ---
-title: "Goldman Sachs cuts India's 2026 CAD forecast to 1.3% of GDP"
+title: Goldman Sachs cuts India's 2026 CAD forecast to 1.3% of GDP
 source: https://economictimes.indiatimes.com/news/economy/indicators/goldman-sachs-cuts-indias-2026-cad-forecast-to-1-3-of-gdp/articleshow/131754015.cms
+tags:
+  - 文章/资讯
 ---
 
 # Goldman Sachs cuts India's 2026 CAD forecast to 1.3% of GDP

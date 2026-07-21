@@ -1,6 +1,8 @@
 ---
-title: "Defence stocks fire up! Paras Defence, BEL, GRSE, other stocks surge up to 24% in 2 days. What's powering the rally?"
+title: Defence stocks fire up! Paras Defence, BEL, GRSE, other stocks surge up to 24% in 2 days. What's powering the rally?
 source: https://economictimes.indiatimes.com/markets/stocks/news/defence-stocks-fire-up-paras-defence-bel-grse-other-stocks-surge-up-to-24-in-2-days-whats-powering-the-rally/articleshow/131818181.cms
+tags:
+  - 文章/资讯
 ---
 
 # Defence stocks fire up! Paras Defence, BEL, GRSE, other stocks surge up to 24% in 2 days. What's powering the rally?

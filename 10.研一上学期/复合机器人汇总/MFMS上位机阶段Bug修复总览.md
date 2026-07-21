@@ -2,11 +2,7 @@
 title: MFMS 上位机阶段 Bug 修复总览
 date: 2026-07-16
 tags:
-  - MFMS
-  - 复合机器人
-  - debug
-  - ROS2
-  - Qt
+  - 研一上学期/复合机器人汇总/索引
 status: 已完成
 ---
 

@@ -1,6 +1,8 @@
 ---
-title: "US Stock Market Today"
+title: US Stock Market Today
 source: https://economictimes.indiatimes.com/markets/us-stocks/news/us-stock-market-live-dow-jones-sp-500-nasdaq-trump-iran-ceasefire-brent-oil-hormuz-inflation-fed-rate-outlook-dell-hpe-smci-netapp-okta-gap-ai-rally-tech-earnings-ai-chip-stocks-news/liveblog/131390427.cms
+tags:
+  - 文章/资讯
 ---
 
 # US Stock Market Today

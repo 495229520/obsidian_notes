@@ -1,6 +1,8 @@
 ---
-title: "AI Stock Market Leaders Thumped As SpaceX Takes Traders On Wild Ride; Three Strong Sell Rules To Use Now"
+title: AI Stock Market Leaders Thumped As SpaceX Takes Traders On Wild Ride; Three Strong Sell Rules To Use Now
 source: https://www.investors.com/market-trend/the-big-picture/ai-stock-market-leaders-thumped-spacex-wild-ride-three-strong-sell-rules-to-use-now/
+tags:
+  - 文章/资讯
 ---
 
 # AI Stock Market Leaders Thumped As SpaceX Takes Traders On Wild Ride; Three Strong Sell Rules To Use Now

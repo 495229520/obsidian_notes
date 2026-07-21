@@ -2,9 +2,7 @@
 title: Week 14 - cuBLASLt + Advanced GEMM Baselines
 date: 2026-05-17
 tags:
-  - infra
-  - CUDA
-  - 阶段计划
+  - AI-infra/素材库-GPU与推理方向/GPU周计划/计划
 aliases:
   - 阶段二 Week 14
   - cuBLASLt

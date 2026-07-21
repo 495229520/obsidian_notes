@@ -1,6 +1,8 @@
 ---
-title: "Oil tankers u-turn, head back to Middle East as Hormuz reopening nears"
+title: Oil tankers u-turn, head back to Middle East as Hormuz reopening nears
 source: https://economictimes.indiatimes.com/news/international/business/oil-tankers-strait-of-hormuz-reopening-middle-east-crude-shipping-iran-israel-us-war-gulf-tensions/articleshow/131786655.cms
+tags:
+  - 文章/资讯
 ---
 
 # Oil tankers u-turn, head back to Middle East as Hormuz reopening nears

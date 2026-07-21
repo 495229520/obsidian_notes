@@ -2,11 +2,8 @@
 title: 存储性能分析专题 - fio 与 benchmark matrix
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - Linux
-  - 面试
-roadmap_week: "阶段 0-1（S-Week 3 主线；之后所有 benchmark 沿用）"
+  - 高性能存储/存储方向专题清单
+roadmap_week: 阶段 0-1（S-Week 3 主线；之后所有 benchmark 沿用）
 sort_order: "05.00"
 status: active
 ---

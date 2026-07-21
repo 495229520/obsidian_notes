@@ -1,6 +1,6 @@
 ---
 tags:
-  - LLM
+  - LLM应用/Agent-Infra/Week-1
 ---
 
 # 逐 Token 生成与响应速度

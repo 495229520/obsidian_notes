@@ -1,8 +1,7 @@
 ---
 tags:
-  - 项目/远控系统
-  - debug
-git: "8d2e3c3"
+  - 项目/远控系统/Debug日志
+git: 8d2e3c3
 ---
 
 # Debug-018 CWatchDialog ACK 条件误判与 isFull 状态断链

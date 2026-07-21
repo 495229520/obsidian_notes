@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week04
+---
 # Week04 渐进式练习
 
 > 配合 [[CUDA Week 4 MatMul v0 项目解析]] 使用。答案基于仓库源码与本卡（GTX 1660 SUPER, sm_75）实测推理。涉及具体 TFLOPS/Nsight 数字处给出**本卡实测值或预期方向**，换卡请在你的 GPU 上 `make bench` / `make profile-*` 后回填到 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week04/profiling|profiling]]。

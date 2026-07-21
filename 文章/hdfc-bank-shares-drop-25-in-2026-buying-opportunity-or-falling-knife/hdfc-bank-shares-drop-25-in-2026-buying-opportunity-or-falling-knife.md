@@ -1,6 +1,8 @@
 ---
-title: "HDFC Bank shares drop 25% in 2026. Buying opportunity or falling knife?"
+title: HDFC Bank shares drop 25% in 2026. Buying opportunity or falling knife?
 source: https://economictimes.indiatimes.com/markets/stocks/news/hdfc-bank-shares-drop-25-in-2026-buying-opportunity-or-falling-knife/articleshow/131454062.cms
+tags:
+  - 文章/资讯
 ---
 
 # HDFC Bank shares drop 25% in 2026. Buying opportunity or falling knife?

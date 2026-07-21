@@ -1,6 +1,8 @@
 ---
-title: "Tata Motors chairman N Chandrasekaran sets target high for TaMo's PV business"
+title: Tata Motors chairman N Chandrasekaran sets target high for TaMo's PV business
 source: https://economictimes.indiatimes.com/industry/auto/auto-news/tata-motors-chairman-n-chandrasekaran-sets-target-high-for-tamos-pv-business/articleshow/131515763.cms
+tags:
+  - 文章/资讯
 ---
 
 # Tata Motors chairman N Chandrasekaran sets target high for TaMo's PV business

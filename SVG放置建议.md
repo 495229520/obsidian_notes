@@ -1,3 +1,7 @@
+---
+tags:
+  - 工作区/图表规范
+---
 # CUDA Week 2 SVG 放置建议
 
 - `CUDA Week 2 Parallel Reduction 项目解析-01.svg`：替换现有 `![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-01.svg|1002]]`；放在 ## 1. 项目定位 的 note 后。Obsidian：`![[图片/SVG/CUDA Week 2 Parallel Reduction 项目解析-01.svg|1000]]`

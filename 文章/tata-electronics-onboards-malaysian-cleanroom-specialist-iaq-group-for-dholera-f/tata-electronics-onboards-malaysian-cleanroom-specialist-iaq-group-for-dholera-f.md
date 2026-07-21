@@ -1,6 +1,8 @@
 ---
-title: "Tata Electronics onboards Malaysian cleanroom specialist IAQ Group for Dholera fab"
+title: Tata Electronics onboards Malaysian cleanroom specialist IAQ Group for Dholera fab
 source: https://economictimes.indiatimes.com/tech/technology/tata-electronics-onboards-malaysian-cleanroom-specialist-iaq-group-for-dholera-fab/articleshow/131806291.cms
+tags:
+  - 文章/资讯
 ---
 
 # Tata Electronics onboards Malaysian cleanroom specialist IAQ Group for Dholera fab

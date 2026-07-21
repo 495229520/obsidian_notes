@@ -1,3 +1,7 @@
+---
+tags:
+  - AI-infra/素材库-GPU与推理方向/项目分析/Week01
+---
 # Week01 Benchmark & Profiling
 
 > 配合 [[CUDA Week 1 Hello World 项目解析]]。本文给出方法论、该看哪些指标、预期定性结论，以及与仓库一致的**待填表格**——真实数字请在你的 GPU 上实测后回填，不要照抄预测值。

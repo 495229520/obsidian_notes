@@ -1,6 +1,8 @@
 ---
-title: "India’s consumer demand remains resilient despite Iran war, inflation pressures; FMCG firms stay cautiously optimistic"
+title: India’s consumer demand remains resilient despite Iran war, inflation pressures; FMCG firms stay cautiously optimistic
 source: https://economictimes.indiatimes.com/industry/cons-products/fmcg/indias-consumer-demand-remains-resilient-despite-iran-war-inflation-pressures-fmcg-firms-stay-cautiously-optimistic/articleshow/131572489.cms
+tags:
+  - 文章/资讯
 ---
 
 # India’s consumer demand remains resilient despite Iran war, inflation pressures; FMCG firms stay cautiously optimistic

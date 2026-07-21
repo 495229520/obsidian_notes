@@ -2,9 +2,7 @@
 title: S-Week 21 - 前置知识 - NVMe-oF RDMA 与 SPDK
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - 参考资料
+  - 高性能存储/存储方向参考资料/计划
 aliases:
   - 存储 Week 21 前置知识
   - SPDK 前置知识

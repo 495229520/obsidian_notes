@@ -1,7 +1,8 @@
 ---
-tags: [Remote Control System, debug, cpp, windows, IOCP, thread, memory, lifetime]
+tags:
+  - 项目/远控系统/Debug日志
 created: 2026-04-09
-git: "7c646042"
+git: 7c646042
 ---
 
 # Debug-026 IOCP实验内存生命周期与队列增长

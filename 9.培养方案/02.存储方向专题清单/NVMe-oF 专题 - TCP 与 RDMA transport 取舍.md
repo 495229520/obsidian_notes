@@ -2,12 +2,8 @@
 title: NVMe-oF 专题 - TCP 与 RDMA transport 取舍
 date: 2026-07-12
 tags:
-  - infra
-  - 存储
-  - NVMe
-  - RDMA
-  - 面试
-roadmap_week: "阶段 2（S-Week 19 TCP、S-Week 21 RDMA，S-Week 22 收口）"
+  - 高性能存储/存储方向专题清单
+roadmap_week: 阶段 2（S-Week 19 TCP、S-Week 21 RDMA，S-Week 22 收口）
 sort_order: "02.10"
 status: active
 ---
