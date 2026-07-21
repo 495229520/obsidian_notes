@@ -1,6 +1,6 @@
 # Week04 渐进式练习
 
-> 配合 [[CUDA Week 4 MatMul v0 项目解析]] 使用。答案基于仓库源码与本卡（GTX 1660 SUPER, sm_75）实测推理。涉及具体 TFLOPS/Nsight 数字处给出**本卡实测值或预期方向**，换卡请在你的 GPU 上 `make bench` / `make profile-*` 后回填到 [[9.培养方案/04.项目分析/Week04/profiling|profiling]]。
+> 配合 [[CUDA Week 4 MatMul v0 项目解析]] 使用。答案基于仓库源码与本卡（GTX 1660 SUPER, sm_75）实测推理。涉及具体 TFLOPS/Nsight 数字处给出**本卡实测值或预期方向**，换卡请在你的 GPU 上 `make bench` / `make profile-*` 后回填到 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week04/profiling|profiling]]。
 
 > [!note] 运行说明
 > ```bash
@@ -205,7 +205,7 @@ cuBLAS 是 column-major，项目是 row-major。项目用什么恒等式零转�
 - naive：occ 拉满却卡 global memory queue → 低复用 memory-bound，增线程无用，必须提复用。
 - tiled：shared tiling 把每元素复用 16 次，stall 从"等 DRAM"转到"等 shared/同步"，瓶颈后移一层。
 - register：寄存器复用把计算/访存比抬到 2:1，有效算术强度过 ridge point，roofline 升到 26%；代价是 reg pressure 拉低 occupancy，但复用收益盖过损失。
-- 主线：**提复用 → 抬算术强度 → 把瓶颈从带宽换到算力**。结果回填 [[9.培养方案/04.项目分析/Week04/profiling|profiling]]。
+- 主线：**提复用 → 抬算术强度 → 把瓶颈从带宽换到算力**。结果回填 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week04/profiling|profiling]]。
 
 ### 练习 5.6：为什么打不过 cuBLAS 不算失败
 

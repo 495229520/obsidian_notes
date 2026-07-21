@@ -1,6 +1,6 @@
 # Week01 渐进式练习
 
-> 配合 [[CUDA Week 1 Hello World 项目解析]] 使用。答案基于仓库源码推理；凡涉及实测时间/带宽数字之处，给出**预期方向**，真实数值请在你的 GPU 上 `make bench` 后回填到 [[9.培养方案/04.项目分析/Week01/profiling|profiling]]。
+> 配合 [[CUDA Week 1 Hello World 项目解析]] 使用。答案基于仓库源码推理；凡涉及实测时间/带宽数字之处，给出**预期方向**，真实数值请在你的 GPU 上 `make bench` 后回填到 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/profiling|profiling]]。
 
 > [!note] 运行说明
 > 建议按你的架构构建，例如 GTX 1660 Super：
@@ -181,7 +181,7 @@ H2D/D2H 拷贝走 PCIe，带宽和性质都与 kernel 执行无关。若计入�
 
 **答案：**
 
-看算术强度（arithmetic intensity）= 计算量 / 访存量。这里 3 次访存（12B）只对应 1 次加法 FLOP，强度极低 → **memory-bound**。预期实测带宽会接近 GPU 显存带宽上限，而 FLOPS 远未跑满。实测请回填 [[9.培养方案/04.项目分析/Week01/profiling|profiling]]。
+看算术强度（arithmetic intensity）= 计算量 / 访存量。这里 3 次访存（12B）只对应 1 次加法 FLOP，强度极低 → **memory-bound**。预期实测带宽会接近 GPU 显存带宽上限，而 FLOPS 远未跑满。实测请回填 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/profiling|profiling]]。
 
 ### 练习 5.5：cudaGetLastError 与 cudaDeviceSynchronize 分工
 

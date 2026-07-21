@@ -18,7 +18,7 @@ status: active
 项目地址：[CUDA_learning/week03/Transpose](https://github.com/hosendovebelva-boop/CUDA_learning/tree/main/week03/Transpose)
 
 阶段计划：[[Week 3 - Transpose + Memory Coalescing]]
-配套文件：[[9.培养方案/04.项目分析/Week03/exercises|渐进式练习]] · [[9.培养方案/04.项目分析/Week03/profiling|profiling 方法论]] · [[9.培养方案/04.项目分析/Week03/questions|必答题]]
+配套文件：[[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/exercises|渐进式练习]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/profiling|profiling 方法论]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/questions|必答题]]
 
 ---
 
@@ -353,7 +353,7 @@ bank = (row*33 + c) % 32 = (row + c) % 32      ← 33 % 32 = 1
 推理链：naive 因 uncoalesced 写而垫底；tiled 修好 global 访存、但 shared 端 32-way conflict 吃掉一部分收益；padded 同时摆平 global coalescing 和 shared bank conflict，最接近纯搬运的 copy 上界。
 
 > [!note] 这是定性预测，不是实测
-> 仓库 `docs/profiling.md` 目前是空模板。真实数字需在你的 GPU 上 `make bench` / Nsight 实测后回填，见 [[9.培养方案/04.项目分析/Week03/profiling|profiling]]。
+> 仓库 `docs/profiling.md` 目前是空模板。真实数字需在你的 GPU 上 `make bench` / Nsight 实测后回填，见 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/profiling|profiling]]。
 
 ---
 
@@ -441,7 +441,7 @@ dim3 grid((width + TILE_DIM - 1) / TILE_DIM,
 - **padding 为什么有效？** 行距 32→33，`33%32=1`，同列元素逐行错开一个 bank。
 - **transpose 是 memory-bound 还是 compute-bound？** memory-bound，只有读写没有算术。
 
-完整问答见 [[9.培养方案/04.项目分析/Week03/questions|questions]]。
+完整问答见 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/questions|questions]]。
 
 ---
 
@@ -452,4 +452,4 @@ dim3 grid((width + TILE_DIM - 1) / TILE_DIM,
 - [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]]
 - [[CUDA Week 2 Parallel Reduction 项目解析]] —— 上一周：block 内协作与同步
 - [[CUDA Week 4 MatMul v0 项目解析]] —— 下一周：tiled MatMul 复用同一套 shared memory tiling
-- 本目录：[[9.培养方案/04.项目分析/Week03/exercises|exercises]] · [[9.培养方案/04.项目分析/Week03/profiling|profiling]] · [[9.培养方案/04.项目分析/Week03/questions|questions]]
+- 本目录：[[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/exercises|exercises]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/profiling|profiling]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/questions|questions]]

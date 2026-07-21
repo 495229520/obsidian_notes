@@ -1,6 +1,6 @@
 # Week03 渐进式练习
 
-> 配合 [[CUDA Week 3 Transpose 项目解析]] 使用。答案基于仓库源码推理；凡涉及实测带宽/Nsight 数字之处，给出**预期方向**，真实数值请在你的 GPU 上 `make bench` / Nsight 后回填到 [[9.培养方案/04.项目分析/Week03/profiling|profiling]]。
+> 配合 [[CUDA Week 3 Transpose 项目解析]] 使用。答案基于仓库源码推理；凡涉及实测带宽/Nsight 数字之处，给出**预期方向**，真实数值请在你的 GPU 上 `make bench` / Nsight 后回填到 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/profiling|profiling]]。
 
 > [!note] 运行说明
 > 本目录暂未附实测结果（仓库 `docs/profiling.md` 为空模板）。建议按你的架构构建，例如 GTX 1660 Super：
@@ -158,7 +158,7 @@ benchmark 在计时之外，每个版本还跑一次逐元素比对、输出 `Ch
 
 **答案：**
 
-对比两者的 shared memory bank conflict 相关指标（如 shared load/store 的 conflict 次数或 `l1tex` 相关计数器）：tiled 应有大量 conflict，padded 应趋近 0。同时 global load/store efficiency 两者都应接近满（都已 coalesced），从而把"差异只来自 shared bank"这件事坐实。结果回填到 [[9.培养方案/04.项目分析/Week03/profiling|profiling]]。
+对比两者的 shared memory bank conflict 相关指标（如 shared load/store 的 conflict 次数或 `l1tex` 相关计数器）：tiled 应有大量 conflict，padded 应趋近 0。同时 global load/store efficiency 两者都应接近满（都已 coalesced），从而把"差异只来自 shared bank"这件事坐实。结果回填到 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week03/profiling|profiling]]。
 
 ### 练习 5.4：测试形状的覆盖意图
 

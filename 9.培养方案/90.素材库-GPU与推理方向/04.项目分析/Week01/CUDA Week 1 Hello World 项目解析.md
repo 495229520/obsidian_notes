@@ -18,7 +18,7 @@ status: active
 项目地址：[CUDA_learning/week01](https://github.com/hosendovebelva-boop/CUDA_learning/tree/main/week01)
 
 阶段计划：[[Week 1 - CUDA + Agent workflow]]
-配套文件：[[9.培养方案/04.项目分析/Week01/exercises|渐进式练习]] · [[9.培养方案/04.项目分析/Week01/profiling|profiling 方法论]] · [[9.培养方案/04.项目分析/Week01/questions|必答题]]
+配套文件：[[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/exercises|渐进式练习]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/profiling|profiling 方法论]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/questions|必答题]]
 
 ---
 
@@ -293,7 +293,7 @@ const double bytes = 3.0 * n * sizeof(float);            // 读 a + 读 b + 写 
 const double bandwidth_gbs = bytes / (kernel_ms / 1000.0) / 1e9;   // GB/s
 ```
 
-因为算术只有一次加法、访存却有三次，`vector add` 是典型 **memory-bound**：有效带宽（而非 FLOPS）才是衡量它的指标。输出列为 `N | Kernel(ms) | Bandwidth(GB/s) | Check`，正好对应 Week 1 的 benchmark 验收。具体方法论与待填表格见 [[9.培养方案/04.项目分析/Week01/profiling|profiling]]。
+因为算术只有一次加法、访存却有三次，`vector add` 是典型 **memory-bound**：有效带宽（而非 FLOPS）才是衡量它的指标。输出列为 `N | Kernel(ms) | Bandwidth(GB/s) | Check`，正好对应 Week 1 的 benchmark 验收。具体方法论与待填表格见 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/profiling|profiling]]。
 
 ---
 
@@ -327,7 +327,7 @@ const double bandwidth_gbs = bytes / (kernel_ms / 1000.0) / 1e9;   // GB/s
 - **benchmark 为什么要 warm-up、为什么只测 kernel？** 排除 context 初始化等一次性开销；排除 H2D/D2H 拷贝才能公平反映 kernel 本身。
 - **`cudaGetLastError` 和 `cudaDeviceSynchronize` 区别？** 前者抓 launch 配置错误，后者抓 kernel 执行期错误。
 
-完整问答见 [[9.培养方案/04.项目分析/Week01/questions|questions]]。
+完整问答见 [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/questions|questions]]。
 
 ---
 
@@ -353,7 +353,7 @@ const double bandwidth_gbs = bytes / (kernel_ms / 1000.0) / 1e9;   // GB/s
 - [[14.3 CMake基础]] —— 理解 CUDA 项目的 CMake 构建
 - [[3.2 CUDA Runtime 进阶|CUDA Runtime 进阶]] —— event、stream、pinned memory 与 Runtime API
 - [[3.4 CUDA Nsight Compute 指标速查|CUDA Nsight Compute 指标速查]] —— 后续解释 kernel 性能瓶颈
-- 本目录：[[9.培养方案/04.项目分析/Week01/exercises|exercises]] · [[9.培养方案/04.项目分析/Week01/profiling|profiling]] · [[9.培养方案/04.项目分析/Week01/questions|questions]]
+- 本目录：[[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/exercises|exercises]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/profiling|profiling]] · [[9.培养方案/90.素材库-GPU与推理方向/04.项目分析/Week01/questions|questions]]
 
 ---
 
