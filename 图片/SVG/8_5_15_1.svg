@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>自定义 bdev 模块：注册路径与一次 IO 的旅程</title>
+  <desc>左面板为控制面：模块经 SPDK_BDEV_MODULE_REGISTER、module_init、spdk_io_device_register、spdk_bdev_register 进入框架；右面板为数据面：一次 spdk_bdev_read 经通用层进入模块 submit_request，后端完成后经 spdk_bdev_io_complete 回到用户回调。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">自定义 bdev 模块：一次注册（控制面） + 一条 IO 旅程（数据面）</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">写模块 = 填一张函数表（fn_table）交给框架；框架负责名字表、io_channel 分发与 bdev_io 生命周期，你只负责 submit_request 里“怎么干活”</text>
+
+  <!-- 面板 A：控制面 -->
+  <rect x="56" y="108" width="520" height="600" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="76" y="138" font-size="13" font-weight="700" fill="#4A473F">A · 控制面：模块怎么进入框架（每个进程一次）</text>
+
+  <rect x="80" y="156" width="472" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="96" y="180" font-size="11.5" font-weight="700" fill="#2C4460">SPDK_BDEV_MODULE_REGISTER(&amp;my_module)</text>
+  <text x="96" y="200" font-size="10.5" fill="#2C4460">main() 之前：静态构造把模块挂进全局链表（链接进来即生效）</text>
+
+  <line x1="316" y1="222" x2="316" y2="244" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <rect x="80" y="248" width="472" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="96" y="272" font-size="11.5" font-weight="700" fill="#2C4460">module_init()　框架启动时逐个回调</text>
+  <text x="96" y="292" font-size="10.5" fill="#2C4460">在这里创建你的 bdev 实例（或等 RPC 再创建）</text>
+
+  <line x1="316" y1="314" x2="316" y2="336" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <rect x="80" y="340" width="472" height="84" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="96" y="364" font-size="11.5" font-weight="700" fill="#6B4E28">spdk_io_device_register(dev, create_cb, destroy_cb, size)</text>
+  <text x="96" y="384" font-size="10.5" fill="#6B4E28">登记“每线程私有上下文”的制造方法：某线程第一次要 channel 时，</text>
+  <text x="96" y="402" font-size="10.5" fill="#6B4E28">框架在“那个线程上”调 create_cb —— 无锁模型的落点（5.12）</text>
+
+  <line x1="316" y1="424" x2="316" y2="446" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <rect x="80" y="450" width="472" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="96" y="474" font-size="11.5" font-weight="700" fill="#24473F">spdk_bdev_register(&amp;bdev)　进入全局名字表</text>
+  <text x="96" y="494" font-size="10.5" fill="#24473F">从此 bdevperf / bdev_get_bdevs / 上层 vbdev 都能按名字打开它</text>
+
+  <!-- struct 卡片 -->
+  <rect x="80" y="544" width="220" height="140" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="96" y="568" font-size="11.5" font-weight="700" fill="#4A473F">spdk_bdev（实例）</text>
+  <text x="96" y="590" font-size="10.5" fill="#4A473F">name = "mymalloc0"</text>
+  <text x="96" y="608" font-size="10.5" fill="#4A473F">blocklen = 512</text>
+  <text x="96" y="626" font-size="10.5" fill="#4A473F">blockcnt = 262144</text>
+  <text x="96" y="644" font-size="10.5" fill="#4A473F">fn_table ─────────▶</text>
+  <text x="96" y="668" font-size="9.5" fill="#6B675C">几何 + 行为，两样就够</text>
+
+  <rect x="332" y="544" width="220" height="140" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="348" y="568" font-size="11.5" font-weight="700" fill="#6B5B95">fn_table（行为表）</text>
+  <text x="348" y="590" font-size="10.5" fill="#4A473F">submit_request ← 热路径</text>
+  <text x="348" y="608" font-size="10.5" fill="#4A473F">io_type_supported</text>
+  <text x="348" y="626" font-size="10.5" fill="#4A473F">get_io_channel</text>
+  <text x="348" y="644" font-size="10.5" fill="#4A473F">destruct</text>
+  <text x="348" y="668" font-size="9.5" fill="#6B675C">≈ 一张手写虚函数表（C 版多态）</text>
+
+  <!-- 面板 B：数据面 -->
+  <rect x="600" y="108" width="584" height="600" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="620" y="138" font-size="13" font-weight="700" fill="#4A473F">B · 数据面：一次 spdk_bdev_read 的旅程（每笔 IO 一次）</text>
+
+  <rect x="624" y="156" width="320" height="62" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="640" y="180" font-size="11.5" font-weight="700" fill="#2C4460">① 应用：open + get_io_channel</text>
+  <text x="640" y="200" font-size="10.5" fill="#2C4460">desc 全局一份；channel 每线程各一份</text>
+
+  <line x1="784" y1="218" x2="784" y2="240" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <rect x="624" y="244" width="320" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="640" y="268" font-size="11.5" font-weight="700" fill="#2C4460">② 通用层：spdk_bdev_read()</text>
+  <text x="640" y="288" font-size="10.5" fill="#2C4460">从池里分配 bdev_io，检查边界、按需切分</text>
+  <text x="640" y="306" font-size="10.5" fill="#6B675C">池耗尽 → -ENOMEM（显式背压，5.6 §5）</text>
+
+  <line x1="784" y1="324" x2="784" y2="346" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <rect x="624" y="350" width="320" height="80" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="640" y="374" font-size="11.5" font-weight="700" fill="#6B5B95">③ 分发：fn_table-&gt;submit_request(ch, io)</text>
+  <text x="640" y="394" font-size="10.5" fill="#4A473F">从这行起进入你的代码；ch 是本线程私有</text>
+  <text x="640" y="412" font-size="10.5" fill="#4A473F">上下文 —— 不加锁的依据</text>
+
+  <line x1="784" y1="430" x2="784" y2="452" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <rect x="624" y="456" width="320" height="96" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="640" y="480" font-size="11.5" font-weight="700" fill="#6B4E28">④ 你的后端干活（同步或异步）</text>
+  <text x="640" y="500" font-size="10.5" fill="#6B4E28">memcpy（Malloc 型）/ 转发给下层 bdev（虚</text>
+  <text x="640" y="518" font-size="10.5" fill="#6B4E28">拟型）/ 发 NVMe 命令（真盘型，5.13）</text>
+  <text x="640" y="538" font-size="10.5" fill="#733428">契约：此函数不许阻塞，必须立即返回</text>
+
+  <line x1="784" y1="552" x2="784" y2="574" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+
+  <rect x="624" y="578" width="320" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="640" y="602" font-size="11.5" font-weight="700" fill="#24473F">⑤ spdk_bdev_io_complete(io, status)</text>
+  <text x="640" y="622" font-size="10.5" fill="#24473F">干完时（可在任意后续轮询圈）宣布结果</text>
+
+  <line x1="784" y1="640" x2="784" y2="662" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+
+  <rect x="624" y="666" width="320" height="34" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="640" y="688" font-size="11.5" font-weight="700" fill="#24473F">⑥ 用户回调（同一线程，run-to-completion）</text>
+
+  <!-- 侧注：堆叠 -->
+  <rect x="968" y="244" width="200" height="308" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="984" y="268" font-size="11.5" font-weight="700" fill="#4A473F">堆叠（vbdev）</text>
+  <text x="984" y="292" font-size="10.5" fill="#4A473F">把 ④ 换成“再调一次</text>
+  <text x="984" y="310" font-size="10.5" fill="#4A473F">spdk_bdev_read 到下层</text>
+  <text x="984" y="328" font-size="10.5" fill="#4A473F">bdev”，就得到 passthru；</text>
+  <text x="984" y="352" font-size="10.5" fill="#4A473F">在转发前后加逻辑，就是</text>
+  <text x="984" y="370" font-size="10.5" fill="#4A473F">crypto / delay / QoS——</text>
+  <text x="984" y="394" font-size="10.5" fill="#6B675C">与内核 device-mapper</text>
+  <text x="984" y="412" font-size="10.5" fill="#6B675C">同构（5.8 §1）</text>
+  <text x="984" y="440" font-size="10.5" fill="#4A473F">同一 fn_table 契约，</text>
+  <text x="984" y="458" font-size="10.5" fill="#4A473F">上层不知道也不关心</text>
+  <text x="984" y="476" font-size="10.5" fill="#4A473F">下面是真盘还是内存</text>
+  <text x="984" y="500" font-size="10.5" fill="#6B675C">= 运行期多态屏蔽</text>
+  <text x="984" y="518" font-size="10.5" fill="#6B675C">后端差异</text>
+
+  <!-- 底部契约条 -->
+  <rect x="56" y="732" width="1128" height="96" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="758" font-size="11.5" font-weight="700" fill="#4A473F">三条继承来的契约（框架不检查，违反 = 整核冻结或数据竞争）：</text>
+  <text x="72" y="780" font-size="11" fill="#4A473F">1. submit_request 在提交线程上被调、不许阻塞；完成可以异步宣布。　2. 每线程一份 io_channel 上下文，通道内状态免锁；跨线程状态走 send_msg。</text>
+  <text x="72" y="800" font-size="11" fill="#4A473F">3. bdev_io 归框架所有：完成即失效，不得留存引用；读方向的数据要在 complete 之前写进 io 的缓冲。</text>
+  <text x="72" y="820" font-size="10.5" fill="#6B675C">这三条就是 5.11/5.12 线程模型在模块作者视角下的投影 —— 写 bdev 模块 = 在别人的事件循环里做客。</text>
+</svg>

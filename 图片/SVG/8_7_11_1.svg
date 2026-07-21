@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Multi-Raft 分片架构</title>
+  <desc>3 节点 × 4 个 Raft 组的分片矩阵：leader 打散、写路径复制、心跳按节点合并，以及与 Primary-Backup 的对照。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Multi-Raft：数据切分片，每个分片一个独立的 Raft 组</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">判断准则：leader 是否打散决定写负载是否均衡；心跳/连接是否按节点合并决定万级分片是否可行</text>
+
+  <!-- ===== A · 分片 × 节点矩阵 ===== -->
+  <text x="56" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 分片 × 节点矩阵（3 节点 · 4 个 Raft 组 · 每组 3 副本）</text>
+
+  <!-- 节点表头 -->
+  <rect x="250" y="122" width="290" height="34" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="395" y="144" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">节点 1（存储服务器）</text>
+  <rect x="555" y="122" width="290" height="34" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="700" y="144" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">节点 2（存储服务器）</text>
+  <rect x="860" y="122" width="290" height="34" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1005" y="144" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">节点 3（存储服务器）</text>
+
+  <!-- 行标签 -->
+  <text x="60" y="192" font-size="12" font-weight="700" fill="#4A473F">Raft 组 1</text>
+  <text x="60" y="209" font-size="10.5" fill="#6B675C">key ∈ [a, g)</text>
+  <text x="60" y="268" font-size="12" font-weight="700" fill="#4A473F">Raft 组 2</text>
+  <text x="60" y="285" font-size="10.5" fill="#6B675C">key ∈ [g, n)</text>
+  <text x="60" y="344" font-size="12" font-weight="700" fill="#4A473F">Raft 组 3</text>
+  <text x="60" y="361" font-size="10.5" fill="#6B675C">key ∈ [n, t)</text>
+  <text x="60" y="420" font-size="12" font-weight="700" fill="#4A473F">Raft 组 4</text>
+  <text x="60" y="437" font-size="10.5" fill="#6B675C">key ∈ [t, z]</text>
+
+  <!-- 行 1：G1 leader 在 N1 -->
+  <rect x="260" y="166" width="270" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="395" y="189" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Leader · term 7</text>
+  <text x="395" y="207" font-size="10.5" fill="#6B4E28" text-anchor="middle">本组唯一写入口：定序 + 复制</text>
+  <rect x="565" y="166" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="700" y="197" font-size="12" fill="#4A473F" text-anchor="middle">Follower</text>
+  <rect x="870" y="166" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1005" y="197" font-size="12" fill="#4A473F" text-anchor="middle">Follower</text>
+
+  <!-- 行 2：G2 leader 在 N2，画写路径 -->
+  <rect x="260" y="242" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="395" y="266" font-size="12" fill="#4A473F" text-anchor="middle">Follower</text>
+  <text x="395" y="283" font-size="10.5" fill="#6B675C" text-anchor="middle">确认 = 日志落盘（fsync）后回 ACK</text>
+  <rect x="565" y="242" width="270" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="700" y="265" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Leader · term 12</text>
+  <text x="700" y="283" font-size="10.5" fill="#6B4E28" text-anchor="middle">① 追加本地日志 + fsync</text>
+  <rect x="870" y="242" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1005" y="266" font-size="12" fill="#4A473F" text-anchor="middle">Follower（慢副本）</text>
+  <text x="1005" y="283" font-size="10.5" fill="#6B675C" text-anchor="middle">落后不拖累提交 → 7.19</text>
+
+  <line x1="561" y1="270" x2="534" y2="270" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="839" y1="270" x2="866" y2="270" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="547" y="260" font-size="9.5" fill="#4A473F" text-anchor="middle">②</text>
+  <text x="852" y="260" font-size="9.5" fill="#4A473F" text-anchor="middle">②</text>
+
+  <!-- 行 3：G3 leader 在 N3 -->
+  <rect x="260" y="318" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="395" y="349" font-size="12" fill="#4A473F" text-anchor="middle">Follower</text>
+  <rect x="565" y="318" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="700" y="349" font-size="12" fill="#4A473F" text-anchor="middle">Follower</text>
+  <rect x="870" y="318" width="270" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="1005" y="341" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Leader · term 4</text>
+  <text x="1005" y="359" font-size="10.5" fill="#6B4E28" text-anchor="middle">各组独立选举、独立提交</text>
+
+  <!-- 行 4：G4 leader 也在 N1（热点示意） -->
+  <rect x="260" y="394" width="270" height="56" rx="7" fill="#F3E8D3" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="395" y="417" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">Leader · term 9（热点！）</text>
+  <text x="395" y="435" font-size="10.5" fill="#733428" text-anchor="middle">节点 1 已有 2 个 leader → 待迁走</text>
+  <rect x="565" y="394" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="700" y="425" font-size="12" fill="#4A473F" text-anchor="middle">Follower</text>
+  <rect x="870" y="394" width="270" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1005" y="425" font-size="12" fill="#4A473F" text-anchor="middle">Follower</text>
+
+  <text x="56" y="478" font-size="11.5" fill="#4A473F">写路径（组 2）：① leader 追加日志并 fsync → ② 并行发两个 follower → ③ 任一确认（连自己 2/3 多数）即提交、apply、回客户端 —— 最慢副本不在关键路径上</text>
+  <text x="56" y="497" font-size="11" fill="#A64B3C">调度器（PD/Master）监控每节点 leader 数与流量，用 leader transfer 把组 4 的 leader 迁离节点 1 —— leader 分布 = 写负载分布</text>
+
+  <!-- ===== B · 心跳与连接按节点合并 ===== -->
+  <text x="56" y="533" font-size="13" font-weight="700" fill="#4A473F">B · 心跳与连接按节点合并 —— 万级分片不炸 CPU 的前提</text>
+
+  <rect x="120" y="546" width="200" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="220" y="568" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">节点 1</text>
+  <text x="220" y="586" font-size="10.5" fill="#24473F" text-anchor="middle">承载组 1/2/3/4 的副本</text>
+  <rect x="520" y="546" width="200" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="620" y="568" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">节点 2</text>
+  <text x="620" y="586" font-size="10.5" fill="#24473F" text-anchor="middle">承载组 1/2/3/4 的副本</text>
+  <rect x="920" y="546" width="200" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1020" y="568" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">节点 3</text>
+  <text x="1020" y="586" font-size="10.5" fill="#24473F" text-anchor="middle">承载组 1/2/3/4 的副本</text>
+
+  <line x1="324" y1="572" x2="516" y2="572" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <line x1="724" y1="572" x2="916" y2="572" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <text x="420" y="562" font-size="10.5" fill="#4A473F" text-anchor="middle">1 条 TCP/gRPC 连接</text>
+  <text x="820" y="562" font-size="10.5" fill="#4A473F" text-anchor="middle">1 条 TCP/gRPC 连接</text>
+
+  <text x="56" y="626" font-size="11.5" fill="#4A473F">所有组发往同一对端节点的心跳/日志消息，攒进同一条连接批量发送；组间心跳合并成节点级心跳 —— 消息数、连接数、软中断次数随节点数增长，而不是随组数增长</text>
+
+  <!-- ===== C · 与 Primary-Backup 对照 ===== -->
+  <text x="56" y="662" font-size="13" font-weight="700" fill="#4A473F">C · 两种复制骨架的分工（同一套系统里往往同时存在）</text>
+
+  <rect x="56" y="676" width="555" height="150" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="76" y="702" font-size="12.5" font-weight="700" fill="#2C4460">Primary-Backup —— 数据面常用（GFS/3FS chunk、HDFS block）</text>
+  <text x="76" y="726" font-size="11" fill="#2C4460">· 主由外部裁判任命：协调者授 lease，判死也靠 lease（→ 7.12）</text>
+  <text x="76" y="748" font-size="11" fill="#2C4460">· 全部副本确认才成功（W = N）→ 最慢副本坐在关键路径上</text>
+  <text x="76" y="770" font-size="11" fill="#2C4460">· 数据不过共识日志：大块流式复制，无「日志 + 数据」双写放大</text>
+  <text x="76" y="792" font-size="11" fill="#2C4460">· 副本挂掉 → 先把它踢出副本组（版本号++）才能继续写</text>
+  <text x="76" y="814" font-size="11" font-weight="700" fill="#2C4460">适合：大、吞吐敏感、可用性要求可容忍秒级切换的数据体</text>
+
+  <rect x="629" y="676" width="555" height="150" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="649" y="702" font-size="12.5" font-weight="700" fill="#24473F">Multi-Raft —— 元数据面常用（TiKV Region、etcd、Meta 分片）</text>
+  <text x="649" y="726" font-size="11" fill="#24473F">· 组内多数派投票自选主，不需要外部裁判</text>
+  <text x="649" y="748" font-size="11" fill="#24473F">· 多数派确认即提交（3 副本 W = 2）→ 慢副本不拖尾延迟</text>
+  <text x="649" y="770" font-size="11" fill="#24473F">· 一切写先进复制日志、再 apply 到状态机 → 双写放大</text>
+  <text x="649" y="792" font-size="11" fill="#24473F">· 切主 = 组内自动选举（百 ms 量级），无须等裁判判死</text>
+  <text x="649" y="814" font-size="11" font-weight="700" fill="#24473F">适合：小、关键、要求强一致与快速自愈的元数据</text>
+
+  <rect x="56" y="844" width="1128" height="34" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="620" y="866" font-size="11.5" fill="#6B4E28" text-anchor="middle">口径（3 副本）：客户端每写 1 字节，leader/主的网卡要发出 2 字节 —— 复制放大 ×(N−1)；leader 扎堆的节点，网卡与 fsync 队列最先饱和</text>
+</svg>

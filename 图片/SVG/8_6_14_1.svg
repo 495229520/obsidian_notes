@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Write Stall：三个水位、两档刹车</title>
+  <desc>immutable 数、L0 文件数、pending compaction bytes 三个水位，slowdown/stop 状态机与治理顺序</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Write Stall：三个水位、两档刹车</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">stall 不是故障，是有界缓冲的背压安全阀 —— 但根因永远在消费端：flush / compaction 跟不上前台写</text>
+
+  <!-- Panel A：三个水位 -->
+  <rect x="56" y="104" width="1128" height="310" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="126" font-size="13" font-weight="700" fill="#4A473F">A · 三个水位（任一越线即触发对应档位，回落即解除）—— 括号内为 RocksDB 参数</text>
+
+  <!-- G1 immutable -->
+  <text x="90" y="156" font-size="12.5" font-weight="700" fill="#2B2A26">immutable memtable 数</text>
+  <text x="90" y="174" font-size="9.5" fill="#6B675C">（max_write_buffer_number，默认 2 含 active）</text>
+  <rect x="110" y="190" width="64" height="180" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="110" y="280" width="64" height="90" fill="#E3EAF4" stroke="none"/>
+  <rect x="110" y="190" width="64" height="180" rx="4" fill="none" stroke="#9B968A" stroke-width="1.2"/>
+  <line x1="104" y1="202" x2="180" y2="202" stroke="#A64B3C" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="188" y="206" font-size="9.5" font-weight="700" fill="#733428">队列满 = 停写，等 flush</text>
+  <text x="188" y="222" font-size="9.5" fill="#6B675C">（6.11 §3 的有界队列）</text>
+  <text x="90" y="394" font-size="9.5" fill="#4A473F">水位下降的唯一途径：flush 完成</text>
+
+  <!-- G2 L0 -->
+  <text x="470" y="156" font-size="12.5" font-weight="700" fill="#2B2A26">L0 文件数</text>
+  <text x="470" y="174" font-size="9.5" fill="#6B675C">（level0_slowdown / stop_writes_trigger）</text>
+  <rect x="490" y="190" width="64" height="180" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="490" y="250" width="64" height="120" fill="#E3EAF4" stroke="none"/>
+  <rect x="490" y="190" width="64" height="180" rx="4" fill="none" stroke="#9B968A" stroke-width="1.2"/>
+  <line x1="484" y1="205" x2="560" y2="205" stroke="#A64B3C" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="568" y="209" font-size="9.5" font-weight="700" fill="#733428">36：stop（默认）</text>
+  <line x1="484" y1="262" x2="560" y2="262" stroke="#B07D2B" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="568" y="266" font-size="9.5" font-weight="700" fill="#6B4E28">20：slowdown（默认）</text>
+  <line x1="484" y1="330" x2="560" y2="330" stroke="#2F6B5E" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="568" y="334" font-size="9.5" fill="#24473F">4：触发 L0→L1 compaction</text>
+  <text x="470" y="394" font-size="9.5" fill="#4A473F">每个 L0 文件读都要探：水位 = 读放大</text>
+
+  <!-- G3 pending bytes -->
+  <text x="850" y="156" font-size="12.5" font-weight="700" fill="#2B2A26">未消化的 compaction 字节</text>
+  <text x="850" y="174" font-size="9.5" fill="#6B675C">（soft / hard_pending_compaction_bytes_limit）</text>
+  <rect x="870" y="190" width="64" height="180" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="870" y="300" width="64" height="70" fill="#E3EAF4" stroke="none"/>
+  <rect x="870" y="190" width="64" height="180" rx="4" fill="none" stroke="#9B968A" stroke-width="1.2"/>
+  <line x1="864" y1="205" x2="940" y2="205" stroke="#A64B3C" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="948" y="209" font-size="9.5" font-weight="700" fill="#733428">hard 256 GiB：stop（默认）</text>
+  <line x1="864" y1="272" x2="940" y2="272" stroke="#B07D2B" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="948" y="276" font-size="9.5" font-weight="700" fill="#6B4E28">soft 64 GiB：slowdown（默认）</text>
+  <text x="850" y="394" font-size="9.5" fill="#4A473F">水位 = 已欠下的搬运债（6.7）</text>
+
+  <!-- Panel B：状态机 -->
+  <rect x="56" y="434" width="1128" height="160" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="456" font-size="13" font-weight="700" fill="#3D5A80">B · 三态状态机 —— 等待发生在 DB::Put 内部：应用线程被钉住，背压由此传给上游</text>
+
+  <rect x="90" y="478" width="270" height="76" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="104" y="502" font-size="12.5" font-weight="700" fill="#24473F">正常：全速写</text>
+  <text x="104" y="522" font-size="10" fill="#24473F">WAL 追加 + memtable 插入</text>
+  <text x="104" y="538" font-size="10" fill="#24473F">写延迟 ~μs 级（6.9 §2）</text>
+
+  <rect x="460" y="478" width="320" height="76" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="474" y="502" font-size="12.5" font-weight="700" fill="#6B4E28">slowdown：限速写</text>
+  <text x="474" y="522" font-size="10" fill="#6B4E28">写前补 sleep，按 delayed_write_rate 放行</text>
+  <text x="474" y="538" font-size="10" fill="#6B4E28">（默认 16 MiB/s，随水位动态上下调）</text>
+
+  <rect x="880" y="478" width="280" height="76" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="894" y="502" font-size="12.5" font-weight="700" fill="#733428">stop：停写</text>
+  <text x="894" y="522" font-size="10" fill="#733428">写线程睡在条件变量上</text>
+  <text x="894" y="538" font-size="10" fill="#733428">直到水位回落被唤醒</text>
+
+  <line x1="364" y1="505" x2="456" y2="505" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="410" y="496" font-size="9" fill="#4A473F" text-anchor="middle">越过 slowdown 线</text>
+  <line x1="784" y1="505" x2="876" y2="505" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="830" y="496" font-size="9" fill="#4A473F" text-anchor="middle">越过 stop 线</text>
+
+  <line x1="560" y1="568" x2="300" y2="568" stroke="#5A564B" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+  <text x="430" y="584" font-size="9.5" fill="#4A473F" text-anchor="middle">水位回落 → 恢复全速</text>
+  <line x1="980" y1="568" x2="700" y2="568" stroke="#5A564B" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+  <text x="840" y="584" font-size="9.5" fill="#4A473F" text-anchor="middle">回到 stop 线下 → 转 slowdown</text>
+
+  <!-- Panel C：治理顺序 -->
+  <rect x="56" y="614" width="1128" height="122" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="636" font-size="13" font-weight="700" fill="#4A473F">C · 治理顺序：先扩消费端，再平滑生产端，最后才动阈值</text>
+
+  <rect x="76" y="650" width="260" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="90" y="672" font-size="11" font-weight="700" fill="#24473F">① 扩消费</text>
+  <text x="90" y="692" font-size="9.5" fill="#24473F">后台线程数、盘带宽</text>
+  <text x="90" y="708" font-size="9.5" fill="#24473F">放宽 rate limiter（6.16）</text>
+
+  <rect x="356" y="650" width="260" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="370" y="672" font-size="11" font-weight="700" fill="#2C4460">② 平滑生产</text>
+  <text x="370" y="692" font-size="9.5" fill="#2C4460">应用侧攒批（WriteBatch）</text>
+  <text x="370" y="708" font-size="9.5" fill="#2C4460">削峰、限流放在入口做</text>
+
+  <rect x="636" y="650" width="260" height="70" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="650" y="672" font-size="11" font-weight="700" fill="#6B4E28">③ 结构性取舍</text>
+  <text x="650" y="692" font-size="9.5" fill="#6B4E28">改 compaction 流派 / 参数（6.7）</text>
+  <text x="650" y="708" font-size="9.5" fill="#6B4E28">拿读放大或空间换写吞吐</text>
+
+  <rect x="916" y="650" width="260" height="70" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="930" y="672" font-size="11" font-weight="700" fill="#733428">④ 调水位 = 只买时间</text>
+  <text x="930" y="692" font-size="9.5" fill="#733428">债更深、L0 更厚、恢复更久</text>
+  <text x="930" y="708" font-size="9.5" fill="#733428">越推迟，悬崖越陡</text>
+
+  <line x1="336" y1="685" x2="352" y2="685" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="616" y1="685" x2="632" y2="685" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="896" y1="685" x2="912" y2="685" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+</svg>

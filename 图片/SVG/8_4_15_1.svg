@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 840" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>signaled/unsignaled：CQE 是 SQ 槽位的回收凭证</title>
+  <desc>三帧 SQ 快照展示 unsignaled WQE 的槽位如何随下一个 signaled CQE 批量归还，以及全 unsignaled 导致的槽位泄漏；下方为槽位账与 buffer 账两本账，底部为 signaled 间隔 N 的取舍准则。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="840" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">signaled / unsignaled：CQE 是 SQ 槽位的回收凭证</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">unsignaled WR 完成后不写 CQE；它占的槽位与 buffer，要等它后面第一个 signaled CQE 被收割才批量归还</text>
+
+  <!-- A · 三帧快照 -->
+  <text x="48" y="126" font-size="14" font-weight="700" fill="#2B2A26">A · SQ 三帧快照（深度 = 8，每 4 个 WR 标一个 signaled）</text>
+
+  <!-- 帧 1 -->
+  <text x="64" y="168" font-size="11.5" fill="#4A473F">① 连发 8 个 WR</text>
+  <text x="64" y="186" font-size="10" fill="#6B675C">#3、#7 带 SIG 标记</text>
+  <rect x="236" y="150" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="282" y="170" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#0</text>
+  <text x="282" y="186" font-size="9.5" fill="#8A6A3A" text-anchor="middle">unsig</text>
+  <rect x="336" y="150" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="382" y="170" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#1</text>
+  <text x="382" y="186" font-size="9.5" fill="#8A6A3A" text-anchor="middle">unsig</text>
+  <rect x="436" y="150" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="482" y="170" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#2</text>
+  <text x="482" y="186" font-size="9.5" fill="#8A6A3A" text-anchor="middle">unsig</text>
+  <rect x="536" y="150" width="92" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="2"/>
+  <text x="582" y="170" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">WQE#3</text>
+  <text x="582" y="186" font-size="9.5" font-weight="700" fill="#3D5A80" text-anchor="middle">SIG</text>
+  <rect x="636" y="150" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="682" y="170" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#4</text>
+  <text x="682" y="186" font-size="9.5" fill="#8A6A3A" text-anchor="middle">unsig</text>
+  <rect x="736" y="150" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="782" y="170" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#5</text>
+  <text x="782" y="186" font-size="9.5" fill="#8A6A3A" text-anchor="middle">unsig</text>
+  <rect x="836" y="150" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="882" y="170" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#6</text>
+  <text x="882" y="186" font-size="9.5" fill="#8A6A3A" text-anchor="middle">unsig</text>
+  <rect x="936" y="150" width="92" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="2"/>
+  <text x="982" y="170" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">WQE#7</text>
+  <text x="982" y="186" font-size="9.5" font-weight="700" fill="#3D5A80" text-anchor="middle">SIG</text>
+  <text x="236" y="222" font-size="10.5" fill="#6B675C">8 个槽位全部在途；完成后只有 #3、#7 会写 CQE（send_flags 里带 IBV_SEND_SIGNALED）</text>
+
+  <!-- 帧 2 -->
+  <text x="64" y="270" font-size="11.5" fill="#4A473F">② 收割 CQE#3</text>
+  <text x="64" y="288" font-size="10" fill="#6B675C">poll_cq 拿到 wr_id=3</text>
+  <rect x="236" y="252" width="92" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="282" y="272" font-size="11.5" fill="#24473F" text-anchor="middle">WQE#0</text>
+  <text x="282" y="288" font-size="9.5" fill="#2F6B5E" text-anchor="middle">已归还</text>
+  <rect x="336" y="252" width="92" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="382" y="272" font-size="11.5" fill="#24473F" text-anchor="middle">WQE#1</text>
+  <text x="382" y="288" font-size="9.5" fill="#2F6B5E" text-anchor="middle">已归还</text>
+  <rect x="436" y="252" width="92" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="482" y="272" font-size="11.5" fill="#24473F" text-anchor="middle">WQE#2</text>
+  <text x="482" y="288" font-size="9.5" fill="#2F6B5E" text-anchor="middle">已归还</text>
+  <rect x="536" y="252" width="92" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="582" y="272" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">WQE#3</text>
+  <text x="582" y="288" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">CQE 已收</text>
+  <rect x="636" y="252" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="682" y="272" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#4</text>
+  <text x="682" y="288" font-size="9.5" fill="#8A6A3A" text-anchor="middle">在途</text>
+  <rect x="736" y="252" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="782" y="272" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#5</text>
+  <text x="782" y="288" font-size="9.5" fill="#8A6A3A" text-anchor="middle">在途</text>
+  <rect x="836" y="252" width="92" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="882" y="272" font-size="11.5" fill="#6B4E28" text-anchor="middle">WQE#6</text>
+  <text x="882" y="288" font-size="9.5" fill="#8A6A3A" text-anchor="middle">在途</text>
+  <rect x="936" y="252" width="92" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="2"/>
+  <text x="982" y="272" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">WQE#7</text>
+  <text x="982" y="288" font-size="9.5" font-weight="700" fill="#3D5A80" text-anchor="middle">SIG 在途</text>
+  <text x="236" y="324" font-size="10.5" fill="#6B675C">RC 完成按提交序：CQE#3 证明 #0–#3 全部完成 ⇒ 4 个槽位与 buffer 一次性出账——unsignaled 搭 signaled 的车</text>
+
+  <!-- 帧 3 -->
+  <text x="64" y="372" font-size="11.5" fill="#4A473F">③ 反例：全 unsignaled</text>
+  <text x="64" y="390" font-size="10" fill="#6B675C">没有任何 CQE 可收</text>
+  <rect x="236" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="282" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#0</text>
+  <text x="282" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <rect x="336" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="382" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#1</text>
+  <text x="382" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <rect x="436" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="482" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#2</text>
+  <text x="482" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <rect x="536" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="582" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#3</text>
+  <text x="582" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <rect x="636" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="682" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#4</text>
+  <text x="682" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <rect x="736" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="782" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#5</text>
+  <text x="782" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <rect x="836" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="882" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#6</text>
+  <text x="882" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <rect x="936" y="354" width="92" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="982" y="374" font-size="11.5" fill="#733428" text-anchor="middle">WQE#7</text>
+  <text x="982" y="390" font-size="9.5" fill="#A64B3C" text-anchor="middle">占用中</text>
+  <text x="236" y="426" font-size="10.5" fill="#733428">硬件早已发完，但软件拿不到任何完成凭证 ⇒ 槽位永不归还，攒到 SQ 满：ibv_post_send 返回 ENOMEM</text>
+
+  <!-- B · 两本账 -->
+  <text x="48" y="470" font-size="14" font-weight="700" fill="#2B2A26">B · 两本账：都以「收割到的 CQE」为唯一凭证</text>
+
+  <rect x="48" y="488" width="568" height="168" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="516" font-size="12.5" font-weight="700" fill="#4A473F">槽位账（SQ 还能塞几个）</text>
+  <text x="68" y="544" font-size="11" fill="#4A473F">· post 前检查：in_flight + 1 ≤ SQ 深度，不够先去 poll</text>
+  <text x="68" y="568" font-size="11" fill="#4A473F">· post 成功后：in_flight += 1</text>
+  <text x="68" y="592" font-size="11" fill="#4A473F">· 收割 CQE（wr_id = k）：k 连同它前面的 unsignaled 一起出账</text>
+  <text x="68" y="616" font-size="11" fill="#4A473F">· poll 返回 0 ≠ 没有在途——unsignaled 的完成永远不可见</text>
+
+  <rect x="636" y="488" width="556" height="168" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="656" y="516" font-size="12.5" font-weight="700" fill="#4A473F">buffer 账（何时允许改写 / 释放）</text>
+  <text x="656" y="544" font-size="11" fill="#4A473F">· post 后 buffer 所有权归网卡（4.3 的移交规则）</text>
+  <text x="656" y="568" font-size="11" fill="#4A473F">· unsignaled 的 buffer：等下一个 signaled CQE 才解锁</text>
+  <text x="656" y="592" font-size="11" fill="#4A473F">· IBV_SEND_INLINE：数据已拷进 WQE，post 返回即解锁（4.16）</text>
+  <text x="656" y="616" font-size="11" fill="#4A473F">· 例外：出错的 WR 无论是否 signaled 都会写一条错误 CQE</text>
+
+  <!-- 底部准则条 -->
+  <rect x="48" y="690" width="1144" height="106" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="68" y="718" font-size="12.5" font-weight="700" fill="#6B4E28">判断准则：signaled 间隔 N 是一笔交易</text>
+  <text x="68" y="744" font-size="11" fill="#6B4E28">N ↑ ⇒ CQE 的生成（网卡 DMA 写）与收割（CPU poll）成本 ÷ N；代价：槽位与 buffer 的占用峰值 ↑、回收延迟 ↑</text>
+  <text x="68" y="768" font-size="11" fill="#6B4E28">硬边界：任意时刻至少保有一个在途 signaled，且 N 远小于 SQ 深度；停发前补一个 signaled 把两本账冲平</text>
+</svg>

@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 910" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>设备绑定：把 NVMe 从内核驱动转移到用户态</title>
+  <desc>左侧为默认内核驱动路径，右侧为绑定 vfio-pci 后 SPDK 进程直接持有设备的路径，下方为 uio 与 vfio 两代机制对比。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="910" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">设备绑定：把 NVMe 的"所有权"从内核驱动转移给用户态进程</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">绑定改的只是"谁持有设备"，数据还躺在盘上 · 生产环境用 vfio-pci + IOMMU；uio 是无 IOMMU 时代的妥协</text>
+
+  <!-- ============ A: 绑定前 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 绑定前：内核 nvme 驱动持有设备（默认状态）</text>
+  <rect x="48" y="126" width="520" height="440" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 用户空间 -->
+  <rect x="64" y="142" width="488" height="88" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="162" font-size="11" font-weight="700" fill="#3D5A80">用户空间</text>
+  <rect x="80" y="170" width="200" height="50" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="180" y="190" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">应用程序</text>
+  <text x="180" y="206" font-size="10" fill="#3D5A80" text-anchor="middle">read()/write() → /dev/nvme0n1</text>
+  <text x="300" y="192" font-size="10.5" fill="#6B675C">块设备节点存在，</text>
+  <text x="300" y="207" font-size="10.5" fill="#6B675C">文件系统可挂载</text>
+
+  <!-- syscall boundary -->
+  <line x1="64" y1="244" x2="552" y2="244" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="440" y="240" font-size="10" fill="#6B675C">系统调用边界</text>
+
+  <!-- 内核空间 -->
+  <rect x="64" y="256" width="488" height="174" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="276" font-size="11" font-weight="700" fill="#4A473F">内核空间</text>
+  <rect x="80" y="284" width="200" height="46" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="180" y="303" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">VFS / 文件系统 / 块层</text>
+  <text x="180" y="319" font-size="10" fill="#6B675C" text-anchor="middle">bio → request → blk-mq</text>
+  <rect x="80" y="352" width="200" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="180" y="373" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">nvme 内核驱动</text>
+  <text x="180" y="389" font-size="10" fill="#2F6B5E" text-anchor="middle">队列管理 · DMA 映射</text>
+  <text x="180" y="403" font-size="10" fill="#2F6B5E" text-anchor="middle">中断 ISR 收割完成</text>
+
+  <!-- 成本注记 -->
+  <rect x="316" y="284" width="220" height="130" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="330" y="305" font-size="11" font-weight="700" fill="#6B4E28">每笔 IO 的固定成本</text>
+  <text x="330" y="325" font-size="10.5" fill="#6B4E28">· 系统调用进出 ×2</text>
+  <text x="330" y="342" font-size="10.5" fill="#6B4E28">· 中断 + 唤醒 + 上下文切换</text>
+  <text x="330" y="359" font-size="10.5" fill="#6B4E28">· 通用块层逐层排队</text>
+  <text x="330" y="381" font-size="10.5" font-weight="700" fill="#6B4E28">合计 ~μs 级软件开销，</text>
+  <text x="330" y="397" font-size="10.5" font-weight="700" fill="#6B4E28">盘越快占比越大</text>
+
+  <!-- PCIe boundary -->
+  <line x1="64" y1="446" x2="552" y2="446" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="470" y="442" font-size="10" fill="#6B675C">PCIe</text>
+
+  <rect x="80" y="460" width="380" height="66" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="270" y="486" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">NVMe SSD（PCIe 设备）</text>
+  <text x="270" y="504" font-size="10" fill="#8A6A3A" text-anchor="middle">BAR 门铃寄存器 · SQ/CQ 靠 DMA 读写主机内存</text>
+
+  <!-- A 内部箭头 -->
+  <line x1="180" y1="220" x2="180" y2="281" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <line x1="180" y1="330" x2="180" y2="349" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <line x1="180" y1="414" x2="180" y2="457" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+
+  <!-- ============ 转移箭头 ============ -->
+  <line x1="572" y1="336" x2="666" y2="336" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrb)"/>
+  <text x="620" y="300" font-size="10" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">sysfs</text>
+  <text x="620" y="314" font-size="10" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">unbind</text>
+  <text x="620" y="328" font-size="10" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">→ bind</text>
+  <text x="620" y="356" font-size="10" fill="#6B675C" text-anchor="middle">所有权转移</text>
+  <text x="620" y="370" font-size="9.5" fill="#6B675C" text-anchor="middle">（可回滚）</text>
+
+  <!-- ============ B: 绑定后 ============ -->
+  <text x="672" y="112" font-size="13" font-weight="700" fill="#4A473F">B · 绑定后：vfio-pci 把设备交给 SPDK 进程，IOMMU 负责看门</text>
+  <rect x="672" y="126" width="520" height="440" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- SPDK 进程 -->
+  <rect x="688" y="142" width="488" height="180" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="704" y="162" font-size="11" font-weight="700" fill="#3D5A80">SPDK 进程（用户态）</text>
+  <rect x="704" y="172" width="216" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="812" y="192" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">SPDK 用户态驱动</text>
+  <text x="812" y="208" font-size="10" fill="#3D5A80" text-anchor="middle">构造 SQE · 轮询 CQ · 直写门铃</text>
+  <rect x="940" y="172" width="220" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1050" y="192" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">mmap 进来的 BAR</text>
+  <text x="1050" y="208" font-size="10" fill="#2F6B5E" text-anchor="middle">敲门铃 = 一次普通内存写</text>
+  <rect x="704" y="248" width="216" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="812" y="268" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">HugePage 数据缓冲</text>
+  <text x="812" y="284" font-size="10" fill="#2F6B5E" text-anchor="middle">pinned · 已注册进 IOMMU</text>
+  <rect x="940" y="248" width="220" height="56" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1050" y="266" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">/dev/vfio/&lt;group&gt;</text>
+  <text x="1050" y="282" font-size="10" fill="#6B675C" text-anchor="middle">ioctl 控制面：MAP_DMA、</text>
+  <text x="1050" y="295" font-size="10" fill="#6B675C" text-anchor="middle">取 BAR 信息、配中断</text>
+  <line x1="920" y1="200" x2="937" y2="200" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+
+  <!-- 控制面/数据面分界 -->
+  <line x1="688" y1="340" x2="1176" y2="340" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="812" y="336" font-size="10" fill="#6B675C">系统调用只出现在控制面（初始化时）；数据路径 0 syscall · 0 中断 · 0 拷贝</text>
+
+  <!-- IOMMU -->
+  <rect x="688" y="356" width="488" height="62" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="932" y="380" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">IOMMU —— 设备侧的 MMU</text>
+  <text x="932" y="398" font-size="10.5" fill="#6B4E28" text-anchor="middle">把设备发出的 IOVA 翻译成物理地址；未映射的地址 → DMA 被硬件拦截</text>
+
+  <!-- PCIe boundary -->
+  <line x1="688" y1="436" x2="1176" y2="436" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="1094" y="432" font-size="10" fill="#6B675C">PCIe</text>
+
+  <rect x="688" y="452" width="488" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="932" y="476" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">NVMe SSD —— 已由 SPDK 进程独占</text>
+  <text x="932" y="494" font-size="10" fill="#8A6A3A" text-anchor="middle">/dev/nvme0n1 消失，内核不再认识它；盘上数据原样保留</text>
+
+  <!-- B 内部箭头: DMA 与 MMIO -->
+  <line x1="812" y1="452" x2="812" y2="421" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+  <line x1="812" y1="356" x2="812" y2="307" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+  <text x="700" y="431" font-size="9.5" fill="#24473F">DMA 数据（经 IOMMU）</text>
+  <line x1="1120" y1="228" x2="1120" y2="449" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <text x="1128" y="380" font-size="9.5" fill="#2C4460">MMIO 门铃</text>
+  <text x="1128" y="393" font-size="9.5" fill="#2C4460">(CPU→设备)</text>
+
+  <!-- ============ C: uio vs vfio ============ -->
+  <text x="48" y="594" font-size="13" font-weight="700" fill="#4A473F">C · uio_pci_generic vs vfio-pci：同一件事的两代做法</text>
+  <rect x="48" y="606" width="1144" height="272" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="68" y="622" width="540" height="164" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="84" y="646" font-size="12.5" font-weight="700" fill="#733428">uio_pci_generic —— "裸指针"</text>
+  <text x="84" y="668" font-size="11" fill="#733428">· 无 IOMMU：设备可 DMA 到任意物理内存，进程 bug = 全机内存风险</text>
+  <text x="84" y="688" font-size="11" fill="#733428">· 用户态要自己查物理地址（pagemap + 大页），必须 root</text>
+  <text x="84" y="708" font-size="11" fill="#733428">· 只支持 INTx 传统中断，无 MSI-X（SPDK 全轮询时影响小）</text>
+  <text x="84" y="728" font-size="11" fill="#733428">· 适用：无 IOMMU 的老机器 / 某些 VM；能不用就不用</text>
+  <text x="84" y="762" font-size="10.5" font-weight="700" fill="#A64B3C">类比：void* + 手工 reinterpret_cast，出错没有任何护栏</text>
+
+  <rect x="636" y="622" width="536" height="164" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="652" y="646" font-size="12.5" font-weight="700" fill="#24473F">vfio-pci —— "带边界检查的句柄"（生产默认）</text>
+  <text x="652" y="668" font-size="11" fill="#24473F">· IOMMU 隔离：只能访问显式 MAP_DMA 过的 IOVA，越界被硬件拦下</text>
+  <text x="652" y="688" font-size="11" fill="#24473F">· 用 IOVA 不碰物理地址；设备文件加 ACL 后可不必 root 运行</text>
+  <text x="652" y="708" font-size="11" fill="#24473F">· 完整 MSI-X / eventfd 中断支持，也是虚拟机设备直通的基础</text>
+  <text x="652" y="728" font-size="11" fill="#24473F">· 需要 BIOS 开 VT-d/AMD-Vi + 内核 iommu 参数</text>
+  <text x="652" y="762" font-size="10.5" font-weight="700" fill="#2F6B5E">类比：unique_ptr + span 边界检查，越界立即被抓</text>
+
+  <text x="68" y="814" font-size="11" font-weight="700" fill="#4A473F">IOMMU group：硬件能保证互相隔离的最小设备集合（由 PCIe 拓扑与 ACS 决定）——同组设备必须一起交给 vfio，不能只交一个。</text>
+  <text x="68" y="838" font-size="11" fill="#6B675C">无 IOMMU 环境的逃生口：vfio noiommu 模式（enable_unsafe_noiommu_mode）——保留 vfio 接口但失去全部保护，等价于 uio 的安全水平。</text>
+  <text x="68" y="860" font-size="11" fill="#6B675C">回滚：从 vfio-pci unbind → 重新 bind 回 nvme 驱动，/dev/nvme0n1 重新出现（SPDK 提供 setup.sh reset 一键还原）。</text>
+</svg>

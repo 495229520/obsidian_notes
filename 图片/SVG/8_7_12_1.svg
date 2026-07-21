@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Lease 到期与旧主复活时序</title>
+  <desc>四条泳道展示：协调者授租约给主 A，主 A 发生 STW 停顿，租约超时后协调者授租约给主 B，旧主 A 苏醒后携带旧 token 写入被存储节点的 fencing 校验拒绝。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Lease 到期与旧主复活：fencing token 是最后一道闸</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">判断准则：lease 靠时钟假设「大概率」防双主；正确性要靠最终写入点的单调 token 校验兜底</text>
+
+  <line x1="240" y1="108" x2="1160" y2="108" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="1168" y="112" font-size="11" fill="#6B675C">时间</text>
+
+  <!-- 泳道 -->
+  <rect x="56" y="122" width="1128" height="108" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="144" font-size="12" font-weight="700" fill="#3D5A80">协调者（授 lease：etcd / PD / Master）</text>
+  <rect x="56" y="240" width="1128" height="128" rx="8" fill="#F3EDE0" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="262" font-size="12" font-weight="700" fill="#8A6A3A">主 A（旧主）· 持 token=33</text>
+  <rect x="56" y="378" width="1128" height="108" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="400" font-size="12" font-weight="700" fill="#2F6B5E">主 B（新主）· 持 token=34</text>
+  <rect x="56" y="496" width="1128" height="138" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="518" font-size="12" font-weight="700" fill="#6B5B95">存储节点（最终写入点 · 持久化 max_token）</text>
+
+  <!-- 协调者事件 -->
+  <rect x="250" y="154" width="170" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="335" y="177" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">t0 · 授 lease 给 A</text>
+  <text x="335" y="195" font-size="10.5" fill="#2C4460" text-anchor="middle">token=33 · TTL=10s</text>
+
+  <rect x="580" y="154" width="250" height="56" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="705" y="177" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">续约断了 → 判 A 疑似死亡</text>
+  <text x="705" y="195" font-size="10" fill="#4A473F" text-anchor="middle">再等 TTL + 漂移余量 ε：宁可慢，不可双主</text>
+
+  <rect x="862" y="154" width="150" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="937" y="177" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">t2 · 授 lease 给 B</text>
+  <text x="937" y="195" font-size="10.5" fill="#24473F" text-anchor="middle">token=34（单调 +1）</text>
+
+  <!-- 主 A 事件 -->
+  <rect x="250" y="288" width="200" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="350" y="311" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">持有 lease，正常服务</text>
+  <text x="350" y="329" font-size="10.5" fill="#6B4E28" text-anchor="middle">写请求带 token=33</text>
+
+  <rect x="560" y="274" width="280" height="86" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="700" y="300" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">STW/GC 停顿 或 网络分区</text>
+  <text x="700" y="320" font-size="10.5" fill="#733428" text-anchor="middle">线程全部冻结，续约发不出去</text>
+  <text x="700" y="338" font-size="10.5" fill="#733428" text-anchor="middle">A 感知不到时间已流逝</text>
+
+  <rect x="1000" y="288" width="180" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="1090" y="311" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">苏醒：仍自认是主</text>
+  <text x="1090" y="329" font-size="10.5" fill="#733428" text-anchor="middle">带 token=33 继续写</text>
+
+  <!-- 主 B 事件 -->
+  <rect x="862" y="410" width="180" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="952" y="433" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">成为新主，开始服务</text>
+  <text x="952" y="451" font-size="10.5" fill="#24473F" text-anchor="middle">写请求带 token=34</text>
+
+  <!-- 存储事件 -->
+  <rect x="264" y="536" width="180" height="72" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="354" y="558" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">WRITE · token=33</text>
+  <text x="354" y="576" font-size="10.5" fill="#4A473F" text-anchor="middle">33 ≥ max(–) ✓ 放行</text>
+  <text x="354" y="594" font-size="10.5" fill="#4A473F" text-anchor="middle">max_token ← 33（持久化）</text>
+
+  <rect x="866" y="536" width="180" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="956" y="558" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">WRITE · token=34</text>
+  <text x="956" y="576" font-size="10.5" fill="#24473F" text-anchor="middle">34 ≥ max(33) ✓ 放行</text>
+  <text x="956" y="594" font-size="10.5" fill="#24473F" text-anchor="middle">max_token ← 34（持久化）</text>
+
+  <rect x="1058" y="536" width="122" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="1119" y="558" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">WRITE · token=33</text>
+  <text x="1119" y="576" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">33 &lt; 34 ✗ 拒绝</text>
+  <text x="1119" y="594" font-size="10.5" fill="#733428" text-anchor="middle">旧主被挡在门外</text>
+
+  <!-- 连接箭头 -->
+  <line x1="335" y1="214" x2="335" y2="284" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="354" y1="348" x2="354" y2="532" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="475" y1="284" x2="475" y2="216" stroke="#5A564B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <text x="475" y="252" font-size="9.5" fill="#4A473F" text-anchor="middle">续约心跳</text>
+  <line x1="937" y1="214" x2="937" y2="406" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="956" y1="470" x2="956" y2="532" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1100" y1="348" x2="1112" y2="532" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrRed)"/>
+  <text x="1152" y="470" font-size="9.5" fill="#A64B3C" text-anchor="middle">迟到的写</text>
+
+  <!-- 时钟假设三卡 -->
+  <text x="56" y="668" font-size="13" font-weight="700" fill="#4A473F">时钟假设与代价 —— lease 的正确性建立在这三条之上</text>
+
+  <rect x="56" y="682" width="356" height="118" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="74" y="706" font-size="12" font-weight="700" fill="#2C4460">① 用单调时钟，不用墙钟</text>
+  <text x="74" y="728" font-size="10.5" fill="#4A473F">剩余有效期按 CLOCK_MONOTONIC 计算；</text>
+  <text x="74" y="746" font-size="10.5" fill="#4A473F">CLOCK_REALTIME 会被 NTP 回拨/跳变，</text>
+  <text x="74" y="764" font-size="10.5" fill="#4A473F">lease 判定会直接失真（提前失效或永不失效）</text>
+  <text x="74" y="786" font-size="10" fill="#6B675C">std::chrono::steady_clock 对应前者</text>
+
+  <rect x="442" y="682" width="356" height="118" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="460" y="706" font-size="12" font-weight="700" fill="#2C4460">② 两端计时不对称</text>
+  <text x="460" y="728" font-size="10.5" fill="#4A473F">持有方：从「发出请求」起计时，提前放弃；</text>
+  <text x="460" y="746" font-size="10.5" fill="#4A473F">授予方：从「收到请求」起计时，多等 ε；</text>
+  <text x="460" y="764" font-size="10.5" fill="#4A473F">两边都假设时钟漂移率有上界</text>
+  <text x="460" y="786" font-size="10" fill="#6B675C">保证「持有方先认为过期」→ 无重叠主权期</text>
+
+  <rect x="828" y="682" width="356" height="118" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="846" y="706" font-size="12" font-weight="700" fill="#2C4460">③ TTL 的取舍</text>
+  <text x="846" y="728" font-size="10.5" fill="#4A473F">TTL 小 → 切换快，但心跳 CPU/网络 ↑、</text>
+  <text x="846" y="746" font-size="10.5" fill="#4A473F">GC/负载毛刺被误判成宕机 → 无谓切换；</text>
+  <text x="846" y="764" font-size="10.5" fill="#4A473F">TTL 大 → 不可写空洞 ≈ TTL + 选举/授租时间</text>
+  <text x="846" y="786" font-size="10" fill="#6B675C">尾延迟里的「秒级平台」多半来自这里</text>
+
+  <rect x="56" y="818" width="1128" height="34" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="620" y="840" font-size="11.5" fill="#6B4E28" text-anchor="middle">token 校验保证的是：一旦新主的 34 落盘，旧主的 33 永远写不进 —— 不是「旧主的一切写都被拒」；B 首写之前 A 的迟到写仍会放行（此时尚无冲突，语义安全）</text>
+</svg>

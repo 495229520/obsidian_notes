@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Quorum 读写：R+W&gt;N 的交叠证明与它保证不了的事</title>
+  <desc>Panel A 用 N=3、W=2、R=2 展示鸽笼原理的交叠证明；Panel B 给出 W=1、R=2 的反例（交集可为空导致旧值读）；Panel C 展示部分写失败导致的读回退，说明 R+W&gt;N 仍不是线性一致；Panel D 是 N=3 的参数拨盘表，列出各 (W,R) 组合的容错、交集保证与延迟特征。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">Quorum 读写：R + W &gt; N 的交叠证明，以及它保证不了的事</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">判断准则：交集只保证「读集合里有最新已确认版本」；部分写失败仍会漏出读回退——Quorum ≠ 线性一致</text>
+
+  <!-- ===== Panel A：交叠证明 ===== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 交叠证明：N=3、W=2、R=2 —— 鸽笼原理</text>
+
+  <!-- 写集合括号（上方） -->
+  <text x="253" y="150" font-size="11" font-weight="700" fill="#8A6A3A" text-anchor="middle">写集合 S_W = {A, B}（收到 W=2 个 ack，v2 已确认）</text>
+  <path d="M78,162 L78,172 M78,166 L428,166 M428,162 L428,172" fill="none" stroke="#B07D2B" stroke-width="1.6"/>
+
+  <rect x="78" y="188" width="160" height="92" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="158" y="214" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">副本 A</text>
+  <text x="158" y="238" font-size="11" fill="#2C4460" text-anchor="middle">version = 2</text>
+  <text x="158" y="258" font-size="10" fill="#2C4460" text-anchor="middle">新值已落</text>
+
+  <rect x="268" y="188" width="160" height="92" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="348" y="214" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">副本 B ·交集</text>
+  <text x="348" y="238" font-size="11" fill="#24473F" text-anchor="middle">version = 2</text>
+  <text x="348" y="258" font-size="10" fill="#24473F" text-anchor="middle">同时被写集合与读集合覆盖</text>
+
+  <rect x="458" y="188" width="160" height="92" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="538" y="214" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">副本 C</text>
+  <text x="538" y="238" font-size="11" fill="#4A473F" text-anchor="middle">version = 1</text>
+  <text x="538" y="258" font-size="10" fill="#4A473F" text-anchor="middle">写没送到（后台补齐中）</text>
+
+  <!-- 读集合括号（下方） -->
+  <path d="M268,296 L268,306 M268,302 L618,302 M618,296 L618,306" fill="none" stroke="#3D5A80" stroke-width="1.6"/>
+  <text x="443" y="326" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">读集合 S_R = {B, C}（收 R=2 个响应）</text>
+
+  <rect x="48" y="348" width="570" height="88" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="64" y="372" font-size="11.5" font-weight="700" fill="#24473F">|S_R ∩ S_W| ≥ R + W − N = 1 → 读集合必含一个持有 v2 的副本</text>
+  <text x="64" y="394" font-size="10.5" fill="#24473F">读端对 R 个响应取版本号最大者 → 返回 v2（副本 B 胜出，副本 C 的 v1 被比下去）</text>
+  <text x="64" y="414" font-size="10.5" fill="#24473F">前提：版本号可比较且单调分配——版本从哪来，本身是另一道难题（协调者 / 时钟）</text>
+
+  <!-- ===== Panel B：反例 ===== -->
+  <text x="660" y="112" font-size="13" font-weight="700" fill="#4A473F">B · 反例：W=1、R=2（R+W=N），交集可为空</text>
+
+  <rect x="672" y="188" width="150" height="92" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="747" y="214" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">副本 A</text>
+  <text x="747" y="238" font-size="11" fill="#6B4E28" text-anchor="middle">version = 2</text>
+  <text x="747" y="258" font-size="10" fill="#6B4E28" text-anchor="middle">唯一收到写的副本</text>
+
+  <rect x="862" y="188" width="150" height="92" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="937" y="214" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">副本 B</text>
+  <text x="937" y="238" font-size="11" fill="#4A473F" text-anchor="middle">version = 1</text>
+
+  <rect x="1042" y="188" width="150" height="92" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="1117" y="214" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">副本 C</text>
+  <text x="1117" y="238" font-size="11" fill="#4A473F" text-anchor="middle">version = 1</text>
+
+  <path d="M862,296 L862,306 M862,302 L1192,302 M1192,296 L1192,306" fill="none" stroke="#3D5A80" stroke-width="1.6"/>
+  <text x="1027" y="326" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">读集合 {B, C} —— 与写集合完全错开</text>
+
+  <rect x="660" y="348" width="532" height="88" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="676" y="372" font-size="11.5" font-weight="700" fill="#733428">两个响应都是 v1 → 返回旧值，且系统毫无察觉</text>
+  <text x="676" y="394" font-size="10.5" fill="#733428">R + W ≤ N 时读写集合可以完全错开——读到什么凭运气</text>
+  <text x="676" y="414" font-size="10.5" fill="#733428">异步复制下的「从库读」就是日常版的 W=1、R=1</text>
+
+  <!-- ===== Panel C：部分写失败 ===== -->
+  <text x="48" y="470" font-size="13" font-weight="700" fill="#4A473F">C · 就算 R + W &gt; N，也还不是线性一致：部分写失败后的读回退</text>
+
+  <rect x="48" y="484" width="352" height="104" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="64" y="508" font-size="11.5" font-weight="700" fill="#733428">① 写 v2 失败在半路</text>
+  <text x="64" y="530" font-size="10.5" fill="#733428">只落到副本 A（w=1 &lt; W=2），</text>
+  <text x="64" y="548" font-size="10.5" fill="#733428">客户端收到超时；没有回滚——</text>
+  <text x="64" y="566" font-size="10.5" fill="#733428">v2 留在 A 上，处于「半生不熟」状态</text>
+
+  <rect x="436" y="484" width="352" height="104" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="452" y="508" font-size="11.5" font-weight="700" fill="#2C4460">② 读者甲：S_R = {A, B}</text>
+  <text x="452" y="530" font-size="10.5" fill="#2C4460">取最大版本 → 读到 v2</text>
+  <text x="452" y="548" font-size="10.5" fill="#2C4460">一个「从未确认成功」的写</text>
+  <text x="452" y="566" font-size="10.5" fill="#2C4460">就这样被读了出来</text>
+
+  <rect x="824" y="484" width="368" height="104" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="840" y="508" font-size="11.5" font-weight="700" fill="#733428">③ 读者乙（时间上更晚）：S_R = {B, C}</text>
+  <text x="840" y="530" font-size="10.5" fill="#733428">取最大版本 → 读到 v1</text>
+  <text x="840" y="548" font-size="10.5" fill="#733428">晚于甲，却读到更旧的值</text>
+  <text x="840" y="566" font-size="10.5" fill="#733428">= 读回退（非单调读）</text>
+
+  <path d="M224,596 L224,616 M612,596 L612,616 M1008,596 L1008,616" fill="none" stroke="#8A8574" stroke-width="1.2"/>
+  <path d="M68,618 L1180,618" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="224" y="638" font-size="10" fill="#6B675C" text-anchor="middle">t1</text>
+  <text x="612" y="638" font-size="10" fill="#6B675C" text-anchor="middle">t2</text>
+  <text x="1008" y="638" font-size="10" fill="#6B675C" text-anchor="middle">t3</text>
+  <text x="1180" y="638" font-size="10" fill="#6B675C" text-anchor="end">时间（t1 &lt; t2 &lt; t3）</text>
+
+  <rect x="48" y="654" width="1144" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="64" y="676" font-size="10.5" font-weight="700" fill="#24473F">封洞的两条路：读到最大版本后，先同步写回 W 份再返回（ABD / 前置读修复）；或直接走共识协议（Raft，见 7.11）</text>
+  <text x="64" y="696" font-size="10.5" fill="#24473F">两条都用额外一跳延迟换单调性与线性一致——「读也要写」是 Quorum 世界的隐藏账单</text>
+
+  <!-- ===== Panel D：参数拨盘 ===== -->
+  <text x="48" y="742" font-size="13" font-weight="700" fill="#4A473F">D · N=3 的参数拨盘：容错与延迟怎么换</text>
+
+  <rect x="48" y="754" width="1144" height="116" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="778" font-size="10.5" font-weight="700" fill="#4A473F">(W, R)</text>
+  <text x="200" y="778" font-size="10.5" font-weight="700" fill="#4A473F">写还可用吗</text>
+  <text x="420" y="778" font-size="10.5" font-weight="700" fill="#4A473F">读还可用吗</text>
+  <text x="640" y="778" font-size="10.5" font-weight="700" fill="#4A473F">交集保证</text>
+  <text x="760" y="778" font-size="10.5" font-weight="700" fill="#4A473F">特征</text>
+  <line x1="68" y1="786" x2="1172" y2="786" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="68" y="806" font-size="10" fill="#4A473F">W=2, R=2</text>
+  <text x="200" y="806" font-size="10" fill="#4A473F">容忍 1 台失联</text>
+  <text x="420" y="806" font-size="10" fill="#4A473F">容忍 1 台失联</text>
+  <text x="640" y="806" font-size="10" font-weight="700" fill="#2F6B5E">有</text>
+  <text x="760" y="806" font-size="10" fill="#4A473F">默认均衡；每跳只等第 2 快副本，顺带吸掉最慢者（尾延迟红利）</text>
+
+  <text x="68" y="824" font-size="10" fill="#4A473F">W=3, R=1</text>
+  <text x="200" y="824" font-size="10" fill="#733428">任 1 台失联即不可写</text>
+  <text x="420" y="824" font-size="10" fill="#4A473F">容忍 2 台失联</text>
+  <text x="640" y="824" font-size="10" font-weight="700" fill="#2F6B5E">有</text>
+  <text x="760" y="824" font-size="10" fill="#4A473F">读快写脆；写延迟由最慢副本决定</text>
+
+  <text x="68" y="842" font-size="10" fill="#4A473F">W=1, R=3</text>
+  <text x="200" y="842" font-size="10" fill="#4A473F">容忍 2 台失联</text>
+  <text x="420" y="842" font-size="10" fill="#733428">任 1 台失联即不可读</text>
+  <text x="640" y="842" font-size="10" font-weight="700" fill="#2F6B5E">有</text>
+  <text x="760" y="842" font-size="10" fill="#4A473F">写快读贵；W=1 时唯一落写副本损毁 = 丢已确认数据</text>
+
+  <text x="68" y="860" font-size="10" fill="#4A473F">W=1, R=1</text>
+  <text x="200" y="860" font-size="10" fill="#4A473F">容忍 2 台失联</text>
+  <text x="420" y="860" font-size="10" fill="#4A473F">容忍 2 台失联</text>
+  <text x="640" y="860" font-size="10" font-weight="700" fill="#A64B3C">无</text>
+  <text x="760" y="860" font-size="10" fill="#4A473F">最快；等价于异步复制的随缘读</text>
+</svg>

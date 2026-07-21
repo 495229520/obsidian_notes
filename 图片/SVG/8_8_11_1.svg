@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>cudaMemcpyAsync 与多 stream 重叠时间线</title>
+  <desc>上半部分为串行基线（同步 cudaMemcpy + 默认 stream），中部为双 stream 流水线在 H2D 引擎、SM、D2H 引擎三条硬件泳道上的重叠时间线，底部为重叠成立的三个前提卡片。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">cudaMemcpyAsync + 多 stream：把拷贝藏进计算的时间线</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">stream 内 FIFO 串行、stream 间无序并行 —— 重叠把总时间从 Σ(拷贝+计算) 压到 ≈ max(单段) × N + 灌满/排空</text>
+
+  <!-- A 串行基线 -->
+  <text x="64" y="130" font-size="14" font-weight="700" fill="#2B2A26">A · 串行基线：同步 cudaMemcpy + 默认 stream（一格 = 一段等长耗时）</text>
+  <rect x="230" y="148" width="140" height="44" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="300" y="167" font-size="12" font-weight="700" fill="#7A5518" text-anchor="middle">H2D batch0</text>
+  <text x="300" y="183" font-size="10.5" fill="#7A5518" text-anchor="middle">CPU 阻塞在调用里</text>
+  <rect x="370" y="148" width="140" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="440" y="167" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Kernel batch0</text>
+  <text x="440" y="183" font-size="10.5" fill="#24473F" text-anchor="middle">拷贝引擎闲着</text>
+  <rect x="510" y="148" width="140" height="44" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="580" y="167" font-size="12" font-weight="700" fill="#7A5518" text-anchor="middle">D2H batch0</text>
+  <text x="580" y="183" font-size="10.5" fill="#7A5518" text-anchor="middle">SM 闲着</text>
+  <rect x="650" y="148" width="140" height="44" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="720" y="167" font-size="12" font-weight="700" fill="#7A5518" text-anchor="middle">H2D batch1</text>
+  <rect x="790" y="148" width="140" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="860" y="167" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Kernel batch1</text>
+  <rect x="930" y="148" width="140" height="44" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="1000" y="167" font-size="12" font-weight="700" fill="#7A5518" text-anchor="middle">D2H batch1</text>
+  <text x="1085" y="175" font-size="13" fill="#6B675C">…</text>
+  <text x="230" y="216" font-size="11" fill="#6B675C">任意时刻只有一类资源在干活：2 个 batch 花 6 格；N 个 batch 花 3N 格</text>
+
+  <!-- B 流水线 -->
+  <text x="64" y="268" font-size="14" font-weight="700" fill="#2B2A26">B · 双 stream 流水线：泳道是硬件资源，颜色是 stream</text>
+  <rect x="700" y="252" width="14" height="14" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="720" y="264" font-size="11" fill="#4A473F">stream A</text>
+  <rect x="796" y="252" width="14" height="14" rx="3" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="816" y="264" font-size="11" fill="#4A473F">stream B</text>
+
+  <text x="64" y="316" font-size="12" font-weight="700" fill="#7A5518">H2D 拷贝引擎（DMA）</text>
+  <text x="64" y="376" font-size="12" font-weight="700" fill="#2F6B5E">SM · Kernel 计算</text>
+  <text x="64" y="436" font-size="12" font-weight="700" fill="#7A5518">D2H 拷贝引擎（DMA）</text>
+
+  <!-- H2D 行 -->
+  <rect x="230" y="290" width="140" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="300" y="315" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">H2D A0</text>
+  <rect x="370" y="290" width="140" height="40" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="440" y="315" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">H2D B0</text>
+  <rect x="510" y="290" width="140" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="580" y="315" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">H2D A1</text>
+  <rect x="650" y="290" width="140" height="40" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="720" y="315" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">H2D B1</text>
+
+  <!-- SM 行 -->
+  <rect x="370" y="350" width="140" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="440" y="375" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Kernel A0</text>
+  <rect x="510" y="350" width="140" height="40" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="580" y="375" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">Kernel B0</text>
+  <rect x="650" y="350" width="140" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="720" y="375" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Kernel A1</text>
+  <rect x="790" y="350" width="140" height="40" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="860" y="375" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">Kernel B1</text>
+
+  <!-- D2H 行 -->
+  <rect x="510" y="410" width="140" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="580" y="435" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">D2H A0</text>
+  <rect x="650" y="410" width="140" height="40" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="720" y="435" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">D2H B0</text>
+  <rect x="790" y="410" width="140" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="860" y="435" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">D2H A1</text>
+  <rect x="930" y="410" width="140" height="40" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="1000" y="435" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">D2H B1</text>
+
+  <!-- 同 stream FIFO 箭头 -->
+  <path d="M320,334 C332,342 342,348 354,352" fill="none" stroke="#2F6B5E" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arrg)"/>
+  <path d="M460,394 C472,402 482,408 494,412" fill="none" stroke="#2F6B5E" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arrg)"/>
+  <text x="236" y="366" font-size="10.5" fill="#2F6B5E">同 stream 内 FIFO 串行</text>
+  <text x="236" y="382" font-size="10.5" fill="#2F6B5E">顺序自动保证，无需 event</text>
+
+  <!-- 时间轴 -->
+  <line x1="230" y1="480" x2="1180" y2="480" stroke="#8A8574" stroke-width="1.3" marker-end="url(#arr)"/>
+  <text x="1128" y="501" font-size="11.5" fill="#6B675C">时间 →</text>
+  <text x="230" y="516" font-size="11.5" fill="#4A473F">同样 2 个 batch：串行 6 格 → 流水 5 格；batch 越多越接近极限 —— 稳态每格完成一个段，总时间 ≈ max(H2D, K, D2H) × N + 灌满/排空</text>
+
+  <!-- C 前提卡片 -->
+  <text x="64" y="572" font-size="14" font-weight="700" fill="#2B2A26">C · 重叠成立的三个前提 —— 缺一个，时间线退回 A</text>
+
+  <rect x="64" y="592" width="352" height="128" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="86" y="620" font-size="13" font-weight="700" fill="#7A5518">前提 ① pinned host 内存</text>
+  <text x="86" y="646" font-size="11.5" fill="#7A5518">pageable 会退化成驱动分段暂存拷贝，</text>
+  <text x="86" y="666" font-size="11.5" fill="#7A5518">"异步"调用悄悄变同步（8.10）——</text>
+  <text x="86" y="686" font-size="11.5" fill="#7A5518">这是最常见的"为什么没重叠"根因</text>
+
+  <rect x="444" y="592" width="352" height="128" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="466" y="620" font-size="13" font-weight="700" fill="#2C4460">前提 ② 避开隐式同步点</text>
+  <text x="466" y="646" font-size="11.5" fill="#2C4460">legacy 默认 stream 与所有 stream 互相同步；</text>
+  <text x="466" y="666" font-size="11.5" fill="#2C4460">循环里的 cudaMalloc/cudaFree、同步 memcpy、</text>
+  <text x="466" y="686" font-size="11.5" fill="#2C4460">cudaDeviceSynchronize 都会把流水线切断</text>
+
+  <rect x="824" y="592" width="352" height="128" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+  <text x="846" y="620" font-size="13" font-weight="700" fill="#2B2A26">前提 ③ 硬件引擎按方向计数</text>
+  <text x="846" y="646" font-size="11.5" fill="#4A473F">H2D / D2H 拷贝引擎各自独立于 SM——</text>
+  <text x="846" y="666" font-size="11.5" fill="#4A473F">三类资源才能各干各的；同方向的多个</text>
+  <text x="846" y="686" font-size="11.5" fill="#4A473F">拷贝只是排队，多开 stream 不会更快</text>
+
+  <text x="64" y="764" font-size="11.5" fill="#4A473F">收益上限一句话：重叠只能藏掉 min(拷贝, 计算)，藏不掉 max —— 拷贝比计算长时，PCIe 仍是硬瓶颈，该上 pinned/GDS/压缩，而不是再多开 stream。</text>
+  <text x="64" y="788" font-size="11.5" fill="#4A473F">验证重叠是否真的发生：nsys 时间线看三行是否叠起来 —— 只看总耗时不看时间线，重叠与否全靠猜。</text>
+</svg>

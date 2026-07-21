@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 920" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>PRP 与 SGL：NVMe 命令如何描述主机内存缓冲区</title>
+  <desc>上半部分展示 PRP1/PRP2 与 PRP List 的整页格子表结构，下半部分展示 SGL 段式描述符清单，底部给出两者的取舍对照。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="920" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">PRP 与 SGL：64 B 命令怎么描述几 MiB 的缓冲区</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">判断准则：PRP 按整页填格子表、仅首项可带页内偏移；SGL 按（地址 + 长度）写自由清单——PCIe 盘必会 PRP，NVMe-oF 强制 SGL</text>
+
+  <!-- ================= Part A : PRP ================= -->
+  <rect x="40" y="104" width="1160" height="372" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="64" y="134" font-size="13" font-weight="700" fill="#4A473F">A · PRP：按页格子填表 —— 例：16 KiB 读，首地址不在页边界上</text>
+
+  <!-- SQE card -->
+  <rect x="64" y="156" width="196" height="180" rx="7" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1.4"/>
+  <rect x="64" y="156" width="196" height="30" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="162" y="175" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">SQE（64 B）</text>
+  <text x="74" y="205" font-size="10.5" fill="#4A473F">opcode = 02h（Read）</text>
+  <line x1="66" y1="216" x2="258" y2="216" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="74" y="235" font-size="10.5" fill="#4A473F">NSID · SLBA · NLB（定长度）</text>
+  <line x1="66" y1="246" x2="258" y2="246" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="68" y="250" width="188" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="74" y="267" font-size="10.5" font-weight="700" fill="#2C4460">PRP1 = 页 A 地址 + 偏移</text>
+  <rect x="68" y="280" width="188" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="74" y="297" font-size="10.5" font-weight="700" fill="#2C4460">PRP2 = PRP List 的地址</text>
+  <text x="74" y="326" font-size="10.5" fill="#6B675C">…其余字段</text>
+
+  <text x="64" y="360" font-size="10.5" fill="#733428">规则【事实】：只有 PRP1 允许页内偏移；</text>
+  <text x="64" y="376" font-size="10.5" fill="#733428">其余所有表项必须页对齐、整页粒度</text>
+
+  <!-- PRP List box -->
+  <rect x="520" y="196" width="250" height="178" rx="7" fill="#FFFFFF" stroke="#8A6A3A" stroke-width="1.4"/>
+  <rect x="520" y="196" width="250" height="28" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="645" y="214" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">PRP List（自身占一页，每项 8 B）</text>
+  <text x="532" y="243" font-size="10.5" fill="#4A473F">entry #2 → 页 F 地址</text>
+  <line x1="522" y1="254" x2="768" y2="254" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="532" y="273" font-size="10.5" fill="#4A473F">entry #3 → 页 C 地址</text>
+  <line x1="522" y1="284" x2="768" y2="284" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="532" y="303" font-size="10.5" fill="#4A473F">entry #4 → 页 K 地址</text>
+  <line x1="522" y1="314" x2="768" y2="314" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="532" y="333" font-size="10" fill="#6B675C">…（4 KiB 页可容 512 项）</text>
+  <rect x="524" y="342" width="242" height="26" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="532" y="359" font-size="10" fill="#733428">IO 更大时：末项 = 下一张 List 的地址（成链）</text>
+
+  <!-- Host DRAM pages -->
+  <text x="930" y="146" font-size="11.5" font-weight="700" fill="#4A473F">主机 DRAM（物理页离散）</text>
+  <rect x="930" y="156" width="230" height="40" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <rect x="930" y="156" width="56" height="40" rx="5" fill="#F1EFE8" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="958" y="180" font-size="9.5" fill="#6B675C" text-anchor="middle">偏移</text>
+  <text x="1076" y="180" font-size="10.5" fill="#24473F" text-anchor="middle">页 A（首页，从偏移起）</text>
+  <rect x="930" y="216" width="230" height="40" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1045" y="240" font-size="10.5" fill="#24473F" text-anchor="middle">页 F（整页 4 KiB）</text>
+  <rect x="930" y="276" width="230" height="40" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1045" y="300" font-size="10.5" fill="#24473F" text-anchor="middle">页 C（整页 4 KiB）</text>
+  <rect x="930" y="336" width="230" height="40" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1045" y="360" font-size="10.5" fill="#24473F" text-anchor="middle">页 K（整页 4 KiB）</text>
+
+  <!-- Arrows: PRP1 -> Page A ; PRP2 -> PRP List ; entries -> pages -->
+  <path d="M260,263 L330,263 L330,176 L921,176" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+  <path d="M260,293 L511,293" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+  <path d="M770,239 L880,239 L880,236 L921,236" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M770,269 L880,269 L880,296 L921,296" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M770,299 L868,299 L868,356 L921,356" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Rule strip -->
+  <rect x="64" y="400" width="1112" height="60" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="80" y="424" font-size="11" fill="#2B2A26">取表规则【事实】：len ≤ 1 页 → 只用 PRP1；≤ 2 页 → PRP2 = 第 2 页地址；&gt; 2 页 → PRP2 指向 PRP List；List 装满 → 末项链接下一张 List。</text>
+  <text x="80" y="446" font-size="11" fill="#2B2A26">表项只有 8 B 地址、没有长度字段——长度由命令的 NLB 推出。这正是「整页粒度、必须页对齐」限制的来源。</text>
+
+  <!-- ================= Part B : SGL ================= -->
+  <rect x="40" y="492" width="1160" height="226" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="64" y="522" font-size="13" font-weight="700" fill="#4A473F">B · SGL：按（地址, 长度）写清单 —— 例：7 KiB + 512 B 两段离散数据</text>
+
+  <!-- SQE card (SGL) -->
+  <rect x="64" y="544" width="196" height="118" rx="7" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1.4"/>
+  <rect x="64" y="544" width="196" height="28" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="162" y="562" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">SQE（64 B）</text>
+  <rect x="68" y="578" width="188" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="74" y="595" font-size="10.5" font-weight="700" fill="#2C4460">SGL1 描述符（16 B）</text>
+  <text x="74" y="625" font-size="10.5" fill="#4A473F">类型 = Segment：指向段</text>
+  <text x="74" y="648" font-size="10" fill="#6B675C">（小 IO 可直接内嵌 Data Block）</text>
+
+  <!-- SGL segment -->
+  <rect x="420" y="544" width="320" height="146" rx="7" fill="#FFFFFF" stroke="#8A6A3A" stroke-width="1.4"/>
+  <rect x="420" y="544" width="320" height="28" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="580" y="562" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">SGL Segment（描述符数组，每项 16 B）</text>
+  <text x="432" y="592" font-size="10.5" fill="#4A473F">Data Block：addr = X，len = 7168 B</text>
+  <line x1="422" y1="602" x2="738" y2="602" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="432" y="622" font-size="10.5" fill="#4A473F">Data Block：addr = Y，len = 512 B</text>
+  <line x1="422" y1="632" x2="738" y2="632" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="432" y="652" font-size="10" fill="#6B675C">Last Segment：指向末段（段与段成链）</text>
+  <text x="432" y="678" font-size="10" fill="#6B675C">其他类型：Bit Bucket（丢弃）· Keyed Data Block</text>
+
+  <!-- data chunks -->
+  <rect x="850" y="562" width="280" height="38" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="990" y="585" font-size="10.5" fill="#24473F" text-anchor="middle">7 KiB @ 任意字节地址（可跨页）</text>
+  <rect x="850" y="622" width="110" height="38" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="905" y="645" font-size="10.5" fill="#24473F" text-anchor="middle">512 B</text>
+  <text x="850" y="690" font-size="10.5" fill="#6B675C">长度与对齐都自由——描述离散缓冲区时表项更少</text>
+
+  <path d="M260,591 L411,591" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+  <path d="M740,588 L800,588 L800,581 L841,581" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M740,618 L800,618 L800,641 L841,641" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <text x="64" y="705" font-size="10.5" fill="#733428">NVMe-oF：数据指针强制用 SGL；RDMA 传输用 Keyed Data Block（带 rkey，让 Target 网卡直接远程读写 Host 内存）</text>
+
+  <!-- ================= Part C : 取舍 ================= -->
+  <rect x="40" y="734" width="1160" height="156" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="64" y="764" font-size="13" font-weight="700" fill="#4A473F">C · 怎么选【取舍】</text>
+
+  <rect x="64" y="778" width="262" height="94" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="78" y="800" font-size="11.5" font-weight="700" fill="#2C4460">描述能力</text>
+  <text x="78" y="820" font-size="10" fill="#2C4460">PRP：整页格子，首项外必须页对齐</text>
+  <text x="78" y="838" font-size="10" fill="#2C4460">SGL：任意地址 + 任意字节长度</text>
+  <text x="78" y="856" font-size="10" fill="#2C4460">离散/不对齐缓冲区 SGL 占优</text>
+
+  <rect x="352" y="778" width="262" height="94" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="366" y="800" font-size="11.5" font-weight="700" fill="#24473F">表项开销</text>
+  <text x="366" y="820" font-size="10" fill="#24473F">PRP：8 B / 页，128 KiB ≈ 32 项</text>
+  <text x="366" y="838" font-size="10" fill="#24473F">SGL：16 B / 段，连续大段只需 1 项</text>
+  <text x="366" y="856" font-size="10" fill="#24473F">4 KiB 小 IO：PRP1 一项搞定，最省</text>
+
+  <rect x="640" y="778" width="262" height="94" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="654" y="800" font-size="11.5" font-weight="700" fill="#6B4E28">协议地位</text>
+  <text x="654" y="820" font-size="10" fill="#6B4E28">PCIe 盘：PRP 必选，SGL 可选</text>
+  <text x="654" y="838" font-size="10" fill="#6B4E28">（Identify Controller 的 SGLS 字段）</text>
+  <text x="654" y="856" font-size="10" fill="#6B4E28">NVMe-oF：SGL 强制，PRP 不存在</text>
+
+  <rect x="928" y="778" width="262" height="94" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.3"/>
+  <text x="942" y="800" font-size="11.5" font-weight="700" fill="#4A473F">Linux 驱动策略【实现】</text>
+  <text x="942" y="820" font-size="10" fill="#4A473F">两者都支持时按 IO 特征选：</text>
+  <text x="942" y="838" font-size="10" fill="#4A473F">平均段长超 nvme.sgl_threshold</text>
+  <text x="942" y="856" font-size="10" fill="#4A473F">（默认 32 KiB）才用 SGL，否则 PRP</text>
+</svg>

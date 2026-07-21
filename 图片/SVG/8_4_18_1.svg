@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；蓝 #E3EAF4/#3D5A80/#2C4460；绿 #DCE9E3/#2F6B5E/#24473F；
+       琥珀 #F3E8D3/#B07D2B/#6B4E28；红 #F0E0DB/#A64B3C/#733428；中性 #F1EFE8/#D8D5C8/#4A473F -->
+  <title>多线程下 QP 使用模型：三种归属方案对比</title>
+  <desc>对比三种多线程使用 QP 的模型：A 共享 QP 加互斥锁（锁竞争、doorbell 串行、CQE 二次分发）；B 每线程 QP 共享 CQ（发送无锁但收割归属不清）；C 每线程 QP 加每线程 CQ 的 thread-per-core 模型（全路径无锁，扇入交给网卡）。底部给出 QP 上下文缓存压力、NUMA 绑定与选型顺序。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">多线程下的 QP 使用模型：归属决定锁，锁决定尾延迟</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">判断准则：QP/CQ 不是线程安全的公共黑板，而是要指定归属的私有信箱——谁拥有、谁投递、谁收割，三问同源</text>
+
+  <!-- ============ Panel A ============ -->
+  <text x="52" y="112" font-size="13" font-weight="700" fill="#733428">A · 共享 QP + 互斥锁（能跑，别上生产热路径）</text>
+  <rect x="48" y="124" width="368" height="486" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="72" y="144" width="94" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="119" y="163" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 T0</text>
+  <text x="119" y="179" font-size="9.5" fill="#2C4460" text-anchor="middle">core 0</text>
+  <rect x="185" y="144" width="94" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="232" y="163" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 T1</text>
+  <text x="232" y="179" font-size="9.5" fill="#2C4460" text-anchor="middle">core 1</text>
+  <rect x="298" y="144" width="94" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="345" y="163" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 T2</text>
+  <text x="345" y="179" font-size="9.5" fill="#2C4460" text-anchor="middle">core 2</text>
+
+  <path d="M119,188 L200,232" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrr)"/>
+  <path d="M232,188 L232,232" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrr)"/>
+  <path d="M345,188 L264,232" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrr)"/>
+
+  <rect x="132" y="236" width="200" height="46" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="232" y="255" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">mutex / spinlock</text>
+  <text x="232" y="272" font-size="9.5" fill="#733428" text-anchor="middle">post_send 前必须拿锁 → 等待点①</text>
+
+  <path d="M232,282 L232,306" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+
+  <rect x="122" y="310" width="220" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="232" y="331" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">共享 QP（唯一 SQ）</text>
+  <text x="232" y="348" font-size="9.5" fill="#2C4460" text-anchor="middle">SQ 尾指针 + doorbell 都是独木桥</text>
+  <text x="232" y="361" font-size="9.5" fill="#733428" text-anchor="middle">cache line 在 core 间弹跳 → 等待点②</text>
+
+  <path d="M232,368 L232,392" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+
+  <rect x="122" y="396" width="220" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="232" y="414" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">NIC：DMA 读 WQE 并发包</text>
+  <text x="232" y="430" font-size="9.5" fill="#4A473F" text-anchor="middle">硬件视角只认一个 QP，无并发可言</text>
+
+  <path d="M232,440 L232,464" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrr)"/>
+
+  <rect x="122" y="468" width="220" height="46" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="232" y="487" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">CQE 归属：还得二次分发</text>
+  <text x="232" y="503" font-size="9.5" fill="#733428" text-anchor="middle">谁 poll 到 T1 的完成 → 转发/唤醒 T1</text>
+
+  <text x="70" y="540" font-size="10.5" fill="#733428">✕ 吞吐随线程数不升反降（锁 + 弹跳）</text>
+  <text x="70" y="560" font-size="10.5" fill="#733428">✕ 临界区里做慢事 → 全体线程排队</text>
+  <text x="70" y="580" font-size="10.5" fill="#6B675C">✓ 仅适合：连接数受限、低频控制面消息</text>
+
+  <!-- ============ Panel B ============ -->
+  <text x="440" y="112" font-size="13" font-weight="700" fill="#6B4E28">B · 每线程 QP + 共享 CQ（发送无锁，收割归属不清）</text>
+  <rect x="436" y="124" width="368" height="486" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="466" y="144" width="140" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="536" y="163" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 T0 · core 0</text>
+  <text x="536" y="179" font-size="9.5" fill="#2C4460" text-anchor="middle">post 只碰自己的 QP</text>
+  <rect x="634" y="144" width="140" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="704" y="163" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 T1 · core 1</text>
+  <text x="704" y="179" font-size="9.5" fill="#2C4460" text-anchor="middle">post 只碰自己的 QP</text>
+
+  <path d="M536,188 L536,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <path d="M704,188 L704,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+
+  <rect x="466" y="216" width="140" height="50" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="536" y="237" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">QP0</text>
+  <text x="536" y="253" font-size="9.5" fill="#24473F" text-anchor="middle">私有 SQ，无锁提交</text>
+  <rect x="634" y="216" width="140" height="50" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="704" y="237" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">QP1</text>
+  <text x="704" y="253" font-size="9.5" fill="#24473F" text-anchor="middle">私有 SQ，无锁提交</text>
+
+  <path d="M536,266 L590,306" fill="none" stroke="#B07D2B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M704,266 L650,306" fill="none" stroke="#B07D2B" stroke-width="1.5" marker-end="url(#arrn)"/>
+
+  <rect x="510" y="310" width="220" height="58" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="620" y="331" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">共享 CQ（两个 QP 的完成混流）</text>
+  <text x="620" y="348" font-size="9.5" fill="#6B4E28" text-anchor="middle">ibv_poll_cq 本身不许并发裸调</text>
+  <text x="620" y="361" font-size="9.5" fill="#6B4E28" text-anchor="middle">要么锁保护，要么专职收割线程</text>
+
+  <path d="M620,368 L620,392" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+
+  <rect x="510" y="396" width="220" height="58" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="620" y="417" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">收割者：专职线程或抢到锁的人</text>
+  <text x="620" y="433" font-size="9.5" fill="#4A473F" text-anchor="middle">poll 到 wr_id 属于 T1 的 CQE</text>
+  <text x="620" y="447" font-size="9.5" fill="#6B4E28" text-anchor="middle">→ 队列转发 / futex 唤醒 → 等待点③</text>
+
+  <path d="M620,454 L620,478" fill="none" stroke="#B07D2B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <rect x="510" y="482" width="220" height="34" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="620" y="503" font-size="10" fill="#6B4E28" text-anchor="middle">完成事件跨核搬运：唤醒 + cache miss</text>
+
+  <text x="458" y="540" font-size="10.5" fill="#24473F">✓ 提交路径无锁：热路径的大头已解决</text>
+  <text x="458" y="560" font-size="10.5" fill="#6B4E28">△ 完成路径多一跳跨核转发，长尾抬升</text>
+  <text x="458" y="580" font-size="10.5" fill="#6B675C">✓ 适合：QP 很多但完成事件稀疏的场景</text>
+
+  <!-- ============ Panel C ============ -->
+  <text x="828" y="112" font-size="13" font-weight="700" fill="#24473F">C · 每线程 QP + 每线程 CQ（thread-per-core，推荐）</text>
+  <rect x="824" y="124" width="368" height="486" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <!-- T0 chain -->
+  <rect x="854" y="144" width="140" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="924" y="163" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 T0 · core 0</text>
+  <text x="924" y="179" font-size="9.5" fill="#2C4460" text-anchor="middle">pin 在 NIC 同 NUMA node</text>
+  <path d="M924,188 L924,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <rect x="854" y="216" width="140" height="50" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="924" y="237" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">QP0</text>
+  <text x="924" y="253" font-size="9.5" fill="#24473F" text-anchor="middle">提交：无锁</text>
+  <path d="M924,266 L924,290" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <rect x="854" y="294" width="140" height="50" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="924" y="315" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">CQ0</text>
+  <text x="924" y="331" font-size="9.5" fill="#24473F" text-anchor="middle">T0 自产自收，cache 全热</text>
+
+  <!-- T1 chain -->
+  <rect x="1022" y="144" width="140" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="1092" y="163" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">线程 T1 · core 1</text>
+  <text x="1092" y="179" font-size="9.5" fill="#2C4460" text-anchor="middle">pin 在 NIC 同 NUMA node</text>
+  <path d="M1092,188 L1092,212" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <rect x="1022" y="216" width="140" height="50" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1092" y="237" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">QP1</text>
+  <text x="1092" y="253" font-size="9.5" fill="#24473F" text-anchor="middle">提交：无锁</text>
+  <path d="M1092,266 L1092,290" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <rect x="1022" y="294" width="140" height="50" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1092" y="315" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">CQ1</text>
+  <text x="1092" y="331" font-size="9.5" fill="#24473F" text-anchor="middle">T1 自产自收，cache 全热</text>
+
+  <path d="M924,344 L980,392" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <path d="M1092,344 L1036,392" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+
+  <rect x="898" y="396" width="220" height="58" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1008" y="417" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">NIC：真正的扇入点</text>
+  <text x="1008" y="433" font-size="9.5" fill="#4A473F" text-anchor="middle">多 QP 并发调度是硬件本职</text>
+  <text x="1008" y="447" font-size="9.5" fill="#4A473F" text-anchor="middle">软件把「合并」外包给了网卡</text>
+
+  <text x="846" y="486" font-size="10.5" fill="#24473F">✓ 提交、收割、内存全线程私有：零锁零共享</text>
+  <text x="846" y="506" font-size="10.5" fill="#24473F">✓ 完成落在提交核上：无跨核唤醒</text>
+  <text x="846" y="526" font-size="10.5" fill="#6B4E28">△ 代价：QP 数 = 线程数 × 对端数，随规模膨胀</text>
+  <text x="846" y="546" font-size="10.5" fill="#6B4E28">△ 跨线程「替别人发」要走消息传递，不许直接 post</text>
+  <text x="846" y="566" font-size="10.5" fill="#6B675C">✓ SPDK / 现代 RDMA 服务的默认答案</text>
+
+  <!-- ============ 底部：代价与边界 ============ -->
+  <text x="48" y="648" font-size="13" font-weight="700" fill="#4A473F">代价与边界 · 模型 C 不是免费的</text>
+
+  <rect x="48" y="662" width="368" height="118" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="232" y="686" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">QP 上下文是网卡上的稀缺缓存</text>
+  <text x="66" y="708" font-size="10" fill="#733428">QP 状态存在网卡缓存（ICM），放不下就去主机</text>
+  <text x="66" y="724" font-size="10" fill="#733428">内存取——多一次 PCIe 往返，直接写进长尾</text>
+  <text x="66" y="740" font-size="10" fill="#733428">量级：几千 QP 后 per-QP 性能开始滑坡（需实测）</text>
+  <text x="66" y="762" font-size="10" font-weight="700" fill="#733428">线程数 × 对端数爆炸时：退回 B 或共享出口</text>
+
+  <rect x="436" y="662" width="368" height="118" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="620" y="686" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">NUMA：归属还要落到正确的插槽</text>
+  <text x="454" y="708" font-size="10" fill="#2C4460">QP/CQ 环、注册内存 → 分配在 NIC 所在 node</text>
+  <text x="454" y="724" font-size="10" fill="#2C4460">线程 → pin 在同 node 的 core 上</text>
+  <text x="454" y="740" font-size="10" fill="#2C4460">跨 node：每次 doorbell/DMA 多走一跳互连</text>
+  <text x="454" y="762" font-size="10" font-weight="700" fill="#2C4460">吞吐看不出，p99 看得出（0.5 的结论重演）</text>
+
+  <rect x="824" y="662" width="368" height="118" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1008" y="686" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">反模式速查</text>
+  <text x="842" y="708" font-size="10" fill="#733428">✕ 以为并发 post 同一 QP 免费：驱动内锁在排队</text>
+  <text x="842" y="724" font-size="10" fill="#733428">✕ 「每连接一线程」+ 千级连接：QP 与线程双爆炸</text>
+  <text x="842" y="740" font-size="10" fill="#733428">✕ 收割线程与提交线程隔 NUMA node 相望</text>
+  <text x="842" y="762" font-size="10" fill="#733428">✕ 拿一把大锁包住 post+poll：A 的所有病一起犯</text>
+
+  <!-- 底部流程条 -->
+  <rect x="48" y="804" width="1144" height="52" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="835" font-size="11.5" font-weight="700" fill="#4A473F">选型顺序：</text>
+  <text x="150" y="835" font-size="11" fill="#2C4460">① 先定线程模型（几个核跑数据面）</text>
+  <path d="M392,830 L416,830" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <text x="424" y="835" font-size="11" fill="#2C4460">② QP 归属跟线程走</text>
+  <path d="M568,830 L592,830" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <text x="600" y="835" font-size="11" fill="#2C4460">③ CQ 跟 QP 归属走</text>
+  <path d="M736,830 L760,830" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <text x="768" y="835" font-size="11" fill="#2C4460">④ 内存与中断跟 NUMA 走</text>
+  <path d="M948,830 L972,830" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrn)"/>
+  <text x="980" y="835" font-size="11" fill="#24473F">⑤ 用 QP 规模上限反向校验</text>
+</svg>

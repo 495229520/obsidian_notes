@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 840" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>一次 spdk_nvme_ns_cmd_read 的解剖</title>
+  <desc>提交与完成路径涉及的三块主机内存（tracker 池、SQ 环、数据缓冲与 PRP、CQ 环）、一段 MMIO doorbell 与 NVMe 控制器的 DMA 动作，全程零 syscall。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="840" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">一次 spdk_nvme_ns_cmd_read 的解剖：三块内存 + 一次 MMIO 写</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">提交 = 写自己进程里的内存 + 敲一次 doorbell；完成 = 盘 DMA 写回内存、host 轮询 phase bit —— 全程零 syscall、零中断、零上下文切换</text>
+
+  <!-- ③ doorbell 顶部走线 -->
+  <path d="M 211 190 L 211 128 L 1032 128 L 1032 190" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrRed)"/>
+  <text x="620" y="120" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">③ MMIO 写 SQ tail doorbell（唯一一次“贵”操作，~百 ns）</text>
+
+  <!-- 左列：CPU -->
+  <rect x="56" y="190" width="310" height="158" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="72" y="216" font-size="13" font-weight="700" fill="#2C4460">提交侧 · 调用线程（reactor 上）</text>
+  <text x="72" y="242" font-size="11.5" fill="#2C4460">① 取空闲 tracker，在 SQ tail 填 64B SQE</text>
+  <text x="72" y="264" font-size="11.5" fill="#2C4460">② 写屏障：SQE 内容必须先于 doorbell 可见</text>
+  <text x="72" y="286" font-size="11.5" fill="#2C4460">③ 写 SQ tail doorbell（MMIO）</text>
+  <text x="72" y="312" font-size="10.5" fill="#6B675C">随即返回 0 —— 不等完成；队列满则返回</text>
+  <text x="72" y="330" font-size="10.5" fill="#6B675C">-ENOMEM，命令根本没发出（显式背压）</text>
+
+  <rect x="56" y="382" width="310" height="96" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="72" y="408" font-size="11.5" font-weight="700" fill="#4A473F">同一核、同一 qpair、无锁</text>
+  <text x="72" y="430" font-size="10.5" fill="#4A473F">提交与完成都在这个 reactor 上发生：</text>
+  <text x="72" y="448" font-size="10.5" fill="#4A473F">qpair 不是线程安全的，跨核共享 = 数据竞争</text>
+  <text x="72" y="466" font-size="10.5" fill="#4A473F">（run-to-completion，见 5.12）</text>
+
+  <rect x="56" y="512" width="310" height="168" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="72" y="538" font-size="13" font-weight="700" fill="#24473F">完成侧 · 同核下一圈循环</text>
+  <text x="72" y="564" font-size="11.5" fill="#24473F">⑦ process_completions()：读 CQ 下一槽位</text>
+  <text x="72" y="586" font-size="11.5" fill="#24473F">　 的 phase bit，翻转 = 有新完成</text>
+  <text x="72" y="608" font-size="11.5" fill="#24473F">⑧ 按 CQE.cid 查 tracker → 调用户回调</text>
+  <text x="72" y="630" font-size="11.5" fill="#24473F">⑨ 写 CQ head doorbell，归还槽位</text>
+  <text x="72" y="656" font-size="10.5" fill="#6B675C">没有中断、没有唤醒 —— “等”被“下一圈再看一眼”取代</text>
+
+  <!-- 中列：主机内存 -->
+  <rect x="430" y="150" width="390" height="560" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="450" y="178" font-size="13" font-weight="700" fill="#4A473F">主机内存（hugepage · 常驻 · 已注册 IOMMU）</text>
+
+  <rect x="450" y="196" width="350" height="72" rx="7" fill="#EDEBE3" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="466" y="220" font-size="11.5" font-weight="700" fill="#4A473F">tracker 池（每 qpair 预分配）</text>
+  <text x="466" y="240" font-size="10.5" fill="#4A473F">cid ↔ { 用户回调, ctx, PRP 表 } 的映射</text>
+  <text x="466" y="258" font-size="10.5" fill="#6B675C">数量 = 队列深度；用尽 → 提交返回 -ENOMEM</text>
+
+  <rect x="450" y="288" width="350" height="112" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="466" y="312" font-size="11.5" font-weight="700" fill="#2C4460">SQ 提交队列环（64B/槽）</text>
+  <rect x="466" y="324" width="44" height="28" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <rect x="510" y="324" width="44" height="28" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <rect x="554" y="324" width="44" height="28" fill="#C9D8EC" stroke="#3D5A80" stroke-width="1.5"/>
+  <rect x="598" y="324" width="44" height="28" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <rect x="642" y="324" width="44" height="28" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <text x="576" y="343" font-size="9.5" fill="#2C4460" text-anchor="middle">tail</text>
+  <text x="466" y="372" font-size="10.5" fill="#2C4460">SQE：opc=Read · cid · SLBA · NLB · PRP1/PRP2</text>
+  <text x="466" y="390" font-size="10.5" fill="#6B675C">tail 由 host 推进，head 由盘取走命令后推进</text>
+
+  <rect x="450" y="420" width="350" height="84" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="466" y="444" font-size="11.5" font-weight="700" fill="#6B4E28">数据缓冲 + PRP 表</text>
+  <text x="466" y="464" font-size="10.5" fill="#6B4E28">spdk_dma_malloc 分配：虚实映射固定、可 DMA</text>
+  <text x="466" y="482" font-size="10.5" fill="#6B675C">PRP = 按页列出的物理地址表，告诉盘“数据放哪”</text>
+
+  <rect x="450" y="524" width="350" height="160" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="466" y="548" font-size="11.5" font-weight="700" fill="#24473F">CQ 完成队列环（16B/槽）</text>
+  <rect x="466" y="560" width="44" height="28" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <rect x="510" y="560" width="44" height="28" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <rect x="554" y="560" width="44" height="28" fill="#BFDACE" stroke="#2F6B5E" stroke-width="1.5"/>
+  <rect x="598" y="560" width="44" height="28" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <rect x="642" y="560" width="44" height="28" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="488" y="579" font-size="9.5" fill="#24473F" text-anchor="middle">P=1</text>
+  <text x="532" y="579" font-size="9.5" fill="#24473F" text-anchor="middle">P=1</text>
+  <text x="576" y="579" font-size="9.5" fill="#24473F" text-anchor="middle">P=0</text>
+  <text x="620" y="579" font-size="9.5" fill="#24473F" text-anchor="middle">P=0</text>
+  <text x="662" y="579" font-size="9.5" fill="#24473F" text-anchor="middle">…</text>
+  <text x="466" y="608" font-size="10.5" fill="#24473F">CQE：cid · status · SQ head · phase bit</text>
+  <text x="466" y="628" font-size="10.5" fill="#24473F">phase bit 是“发布标志”：盘最后才翻它，</text>
+  <text x="466" y="646" font-size="10.5" fill="#24473F">host 看到翻转才允许读该 CQE 其余字段</text>
+  <text x="466" y="668" font-size="10.5" fill="#6B675C">host 只读不写；每绕环一圈，期望的 phase 取反</text>
+
+  <!-- 右列：BAR0 + 控制器 -->
+  <rect x="880" y="190" width="304" height="72" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="896" y="216" font-size="12" font-weight="700" fill="#6B4E28">BAR0 doorbell 寄存器</text>
+  <text x="896" y="236" font-size="10.5" fill="#6B4E28">经 VFIO 被 mmap 进本进程地址空间：</text>
+  <text x="896" y="252" font-size="10.5" fill="#6B4E28">写它 = 普通内存写指令，不经过内核</text>
+
+  <rect x="880" y="290" width="304" height="394" rx="8" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="896" y="316" font-size="13" font-weight="700" fill="#733428">NVMe 控制器（DMA 引擎）</text>
+
+  <rect x="898" y="332" width="268" height="66" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="912" y="356" font-size="11.5" font-weight="700" fill="#733428">④ 取命令</text>
+  <text x="912" y="376" font-size="10.5" fill="#733428">从 SQ head 处 DMA 读 64B SQE</text>
+
+  <rect x="898" y="428" width="268" height="66" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="912" y="452" font-size="11.5" font-weight="700" fill="#733428">⑤ 搬数据</text>
+  <text x="912" y="472" font-size="10.5" fill="#733428">按 PRP 把读到的块 DMA 写进数据缓冲</text>
+
+  <rect x="898" y="532" width="268" height="106" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="912" y="556" font-size="11.5" font-weight="700" fill="#733428">⑥ 报完成</text>
+  <text x="912" y="576" font-size="10.5" fill="#733428">DMA 写 16B CQE，最后翻 phase bit</text>
+  <text x="912" y="596" font-size="10.5" fill="#6B675C">内核驱动到这里会发 MSI-X 中断；</text>
+  <text x="912" y="614" font-size="10.5" fill="#6B675C">SPDK 不注册中断 —— 这一步不存在</text>
+
+  <text x="896" y="668" font-size="10.5" fill="#6B675C">对盘而言，④⑤⑥ 全是“读写主机内存”</text>
+
+  <!-- 横向箭头 -->
+  <line x1="366" y1="230" x2="450" y2="230" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="408" y="220" font-size="10" fill="#4A473F" text-anchor="middle">①</text>
+  <line x1="366" y1="320" x2="450" y2="320" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="408" y="310" font-size="10" fill="#4A473F" text-anchor="middle">① 写 SQE</text>
+
+  <line x1="1032" y1="262" x2="1032" y2="332" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrRed)"/>
+  <text x="1044" y="302" font-size="10" fill="#733428">通知取命令</text>
+
+  <line x1="898" y1="365" x2="800" y2="344" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrRed)"/>
+  <text x="852" y="342" font-size="10" fill="#733428" text-anchor="middle">④ DMA 读</text>
+  <line x1="898" y1="461" x2="800" y2="461" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrRed)"/>
+  <text x="850" y="451" font-size="10" fill="#733428" text-anchor="middle">⑤ DMA 写</text>
+  <line x1="898" y1="580" x2="800" y2="580" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrRed)"/>
+  <text x="850" y="570" font-size="10" fill="#733428" text-anchor="middle">⑥ DMA 写</text>
+
+  <line x1="450" y1="600" x2="366" y2="600" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="408" y="590" font-size="10" fill="#24473F" text-anchor="middle">⑦ 轮询</text>
+
+  <!-- 底部对账条 -->
+  <rect x="56" y="732" width="1128" height="76" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="758" font-size="11.5" font-weight="700" fill="#4A473F">对账（5.6 §4 的 SPSC 无锁环）：</text>
+  <text x="72" y="780" font-size="11" fill="#4A473F">提交侧 ①→②→③ 就是 push()：槽位数据写全，再 release 发布（doorbell）；完成侧 ⑥→⑦ 就是 pop()：acquire 看到发布标志（phase bit）才读数据。</text>
+  <text x="72" y="800" font-size="11" fill="#6B675C">同一对内存序语义，只是对端从“另一个线程”换成了“盘上的 DMA 引擎”。</text>
+</svg>

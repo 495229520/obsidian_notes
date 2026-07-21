@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>MemTable、Immutable MemTable 与 SST 的生命周期</title>
+  <desc>上部为对象生命周期主干：active memtable 冻结为 immutable，flush 成 L0 SST，compaction 下沉，旧文件变 obsolete 后按引用计数删除；中部为 WAL 段与 memtable 的绑定关系及删除点；底部为读路径探测顺序与引用持有者。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBad" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">一条写入的一生：MemTable → Immutable → SST 的对象生命周期</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">全库只有一个对象可写（active memtable），其余全部只读 —— 状态只前进不回退，读端因此可以无锁共享快照</text>
+
+  <!-- Band A: lifecycle -->
+  <rect x="56" y="106" width="1128" height="292" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="134" font-size="13" font-weight="700" fill="#4A473F">A · 生命周期主干：每个箭头都是一次不可逆的状态迁移</text>
+
+  <rect x="76" y="168" width="96" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="124" y="194" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">Put(k,v)</text>
+  <text x="124" y="212" font-size="10.5" fill="#2C4460" text-anchor="middle">WAL 先落盘</text>
+
+  <rect x="212" y="160" width="184" height="80" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="304" y="184" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Active MemTable</text>
+  <text x="304" y="202" font-size="10.5" fill="#24473F" text-anchor="middle">内存跳表 · 全库唯一可写</text>
+  <text x="304" y="218" font-size="10.5" fill="#24473F" text-anchor="middle">插入 O(log n)，不改旧节点</text>
+
+  <rect x="482" y="160" width="184" height="80" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="574" y="184" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Immutable MemTable</text>
+  <text x="574" y="202" font-size="10.5" fill="#6B4E28" text-anchor="middle">同一跳表 · 从此只读</text>
+  <text x="574" y="218" font-size="10.5" fill="#6B4E28" text-anchor="middle">排队等后台 flush</text>
+
+  <rect x="752" y="160" width="150" height="80" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="827" y="184" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">L0 SSTable</text>
+  <text x="827" y="202" font-size="10.5" fill="#4A3F68" text-anchor="middle">盘上不可变文件</text>
+  <text x="827" y="218" font-size="10.5" fill="#4A3F68" text-anchor="middle">文件间 key 可重叠</text>
+
+  <rect x="988" y="160" width="176" height="80" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.5"/>
+  <text x="1076" y="184" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">L1 … Ln SSTable</text>
+  <text x="1076" y="202" font-size="10.5" fill="#4A473F" text-anchor="middle">层内全局有序不重叠</text>
+  <text x="1076" y="218" font-size="10.5" fill="#4A473F" text-anchor="middle">绝大部分数据在底层</text>
+
+  <line x1="172" y1="200" x2="208" y2="200" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="396" y1="200" x2="478" y2="200" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="437" y="182" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">冻结</text>
+  <text x="437" y="256" font-size="10" fill="#4A473F" text-anchor="middle">写满 write_buffer_size</text>
+  <text x="437" y="271" font-size="10" fill="#4A473F" text-anchor="middle">→ 换指针，O(1) 不拷贝</text>
+  <line x1="666" y1="200" x2="748" y2="200" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="707" y="182" font-size="10.5" font-weight="700" fill="#4A3F68" text-anchor="middle">flush</text>
+  <text x="707" y="256" font-size="10" fill="#4A473F" text-anchor="middle">后台线程顺序写盘</text>
+  <text x="707" y="271" font-size="10" fill="#4A473F" text-anchor="middle">跳表已有序 → 直接铺文件</text>
+  <line x1="902" y1="200" x2="984" y2="200" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="943" y="182" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">compaction</text>
+  <text x="943" y="256" font-size="10" fill="#4A473F" text-anchor="middle">多路归并重写</text>
+  <text x="943" y="271" font-size="10" fill="#4A473F" text-anchor="middle">逐层下沉</text>
+
+  <rect x="752" y="296" width="220" height="64" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="862" y="320" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">obsolete 文件</text>
+  <text x="862" y="338" font-size="10.5" fill="#733428" text-anchor="middle">被 compaction 输出替代，逻辑上已死</text>
+
+  <rect x="1036" y="296" width="128" height="64" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="1100" y="320" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">unlink 删除</text>
+  <text x="1100" y="338" font-size="10.5" fill="#4A473F" text-anchor="middle">磁盘空间归还</text>
+
+  <line x1="860" y1="240" x2="860" y2="292" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrBad)"/>
+  <line x1="1046" y1="240" x2="920" y2="294" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrBad)"/>
+  <text x="700" y="330" font-size="10" fill="#733428" text-anchor="end">compaction 的输入文件</text>
+  <line x1="976" y1="328" x2="1032" y2="328" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="1004" y="316" font-size="10" fill="#4A473F" text-anchor="middle">引用归零</text>
+
+  <text x="76" y="382" font-size="11.5" fill="#4A473F">内存里最多同时存在：1 个 active + 若干 immutable（RocksDB 由 max_write_buffer_number 限制，默认 2）；攒满还没 flush 完 → 写入被掐住（write stall）</text>
+
+  <!-- Band B: WAL coupling -->
+  <rect x="56" y="410" width="1128" height="224" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="438" font-size="13" font-weight="700" fill="#4A473F">B · WAL 与 MemTable 同生共死：flush 完成才是 WAL 的死期</text>
+
+  <rect x="96" y="458" width="200" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="196" y="481" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">Immutable MemTable</text>
+  <text x="196" y="499" font-size="10.5" fill="#6B4E28" text-anchor="middle">内容 = WAL #6 的全部记录</text>
+
+  <rect x="356" y="458" width="200" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="456" y="481" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Active MemTable</text>
+  <text x="456" y="499" font-size="10.5" fill="#24473F" text-anchor="middle">内容 = WAL #7 的全部记录</text>
+
+  <rect x="96" y="536" width="200" height="40" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="196" y="561" font-size="11.5" fill="#4A473F" text-anchor="middle">WAL #6（冻结时切段）</text>
+  <rect x="356" y="536" width="200" height="40" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="456" y="561" font-size="11.5" fill="#4A473F" text-anchor="middle">WAL #7（正在追加）</text>
+
+  <line x1="196" y1="536" x2="196" y2="518" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="456" y1="536" x2="456" y2="518" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="640" y="458" width="240" height="118" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="760" y="482" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">WAL #6 的删除条件（全部满足）</text>
+  <text x="658" y="506" font-size="10.5" fill="#2C4460">① 对应 memtable flush 成 SST 完成</text>
+  <text x="658" y="524" font-size="10.5" fill="#2C4460">② 新 SST 已记入 MANIFEST 并 fsync</text>
+  <text x="658" y="542" font-size="10.5" fill="#2C4460">③ 无更旧的 memtable 还依赖它</text>
+  <text x="658" y="564" font-size="10.5" font-weight="700" fill="#2C4460">此前删 = 崩溃后丢数据</text>
+
+  <rect x="920" y="458" width="244" height="118" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1042" y="482" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">崩溃恢复视角</text>
+  <text x="938" y="506" font-size="10.5" fill="#733428">active + immutable 全部蒸发，</text>
+  <text x="938" y="524" font-size="10.5" fill="#733428">SST 完好 —— 重放尚存的 WAL 段</text>
+  <text x="938" y="542" font-size="10.5" fill="#733428">按序重建两级 memtable，</text>
+  <text x="938" y="564" font-size="10.5" font-weight="700" fill="#733428">恢复到崩溃前最后一次 fsync 点</text>
+
+  <text x="76" y="616" font-size="11.5" fill="#4A473F">冻结的原子动作 = 「换 memtable 指针 + 切新 WAL 段」一起做 —— WAL 段边界与 memtable 边界对齐，恢复时才能整段重放、整段丢弃</text>
+
+  <!-- Band C: readers & refs -->
+  <rect x="56" y="646" width="1128" height="196" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="674" font-size="13" font-weight="700" fill="#4A473F">C · 谁在引用这些只读对象：删除靠引用计数，不靠时钟</text>
+
+  <text x="96" y="704" font-size="11.5" font-weight="700" fill="#2B2A26">点查探测顺序（新 → 旧，命中即停）：</text>
+  <rect x="96" y="716" width="130" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="161" y="737" font-size="10.5" fill="#24473F" text-anchor="middle">active memtable</text>
+  <rect x="258" y="716" width="130" height="34" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="323" y="737" font-size="10.5" fill="#6B4E28" text-anchor="middle">immutable（逐个）</text>
+  <rect x="420" y="716" width="150" height="34" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="495" y="737" font-size="10.5" fill="#4A3F68" text-anchor="middle">L0 每个文件都要查</text>
+  <rect x="602" y="716" width="150" height="34" rx="6" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="677" y="737" font-size="10.5" fill="#4A473F" text-anchor="middle">L1…Ln 每层一个文件</text>
+  <line x1="226" y1="733" x2="254" y2="733" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="388" y1="733" x2="416" y2="733" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="570" y1="733" x2="598" y2="733" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="800" y="700" width="364" height="120" rx="7" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="818" y="724" font-size="11.5" font-weight="700" fill="#2C4460">引用持有者（shared_ptr 语义）</text>
+  <text x="818" y="746" font-size="10.5" fill="#2C4460">· 当前 Version：持有「现在有效」的 SST 集合</text>
+  <text x="818" y="764" font-size="10.5" fill="#2C4460">· 进行中的迭代器 / 快照：钉住打开瞬间的旧集合</text>
+  <text x="818" y="782" font-size="10.5" fill="#2C4460">· 正在读它的 flush / compaction 任务</text>
+  <text x="818" y="806" font-size="10.5" font-weight="700" fill="#2C4460">obsolete 但仍被引用 → 文件先留着，引用归零才删</text>
+
+  <text x="96" y="778" font-size="11.5" fill="#4A473F">长驻迭代器 / 快照 = 长期钉住旧 SST 与旧 memtable：</text>
+  <text x="96" y="796" font-size="11.5" fill="#4A473F">空间放大上涨、compaction 白做 —— 与长命 shared_ptr</text>
+  <text x="96" y="814" font-size="11.5" fill="#4A473F">拖住大对象析构是同一个事故形状</text>
+
+  <text x="56" y="874" font-size="11.5" fill="#4A473F">C++ 对照：active memtable 是唯一的可变对象（单写者）；冻结 = 把它变成 shared_ptr&lt;const T&gt;；SST 文件 = 落盘的不可变快照 —— 「修改」永远是重建新对象，「删除」永远是引用归零后的析构。</text>
+</svg>

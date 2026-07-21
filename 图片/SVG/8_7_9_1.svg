@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>一致性模型谱系与客户端可观察异常</title>
+  <desc>左侧为四级模型阶梯（线性一致、顺序一致、因果一致、最终一致），从上到下语义变弱、延迟更低；右侧为异常与模型的对照矩阵（读到旧值、读回退、读不到自己的写、因果倒置），以及三个最常见误读；底部用 C++ 内存模型（seq_cst / acquire-release / relaxed）建立单机类比，并给出 CAP/PACELC 的边界提示。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">一致性模型：系统与客户端之间关于「能读到什么」的契约</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">判断准则：先问客户端可能观察到哪些异常，再问为排除这些异常付了多少延迟与可用性</text>
+
+  <!-- ===== Panel A：模型阶梯 ===== -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 模型谱系：从上到下，承诺变弱、速度变快</text>
+
+  <!-- 线性一致 -->
+  <rect x="48" y="124" width="596" height="96" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="64" y="148" font-size="12.5" font-weight="700" fill="#24473F">线性一致 Linearizability ——「像只有一份数据」</text>
+  <text x="64" y="168" font-size="10.5" fill="#24473F">保证：每个操作在「调用→返回」之间某一瞬间原子生效，全体共享含实时序的唯一历史</text>
+  <text x="64" y="186" font-size="10.5" fill="#24473F">排除：一切旧值 / 回退 / 读不到己写——写一返回，任何人立刻可见</text>
+  <text x="64" y="204" font-size="10" fill="#24473F">例：etcd / ZooKeeper 写路径、S3（2020-12 起）；代价：协调进读写关键路径（RTT）</text>
+
+  <!-- 顺序一致 -->
+  <rect x="48" y="234" width="596" height="96" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="64" y="258" font-size="12.5" font-weight="700" fill="#2C4460">顺序一致 Sequential ——「全体口径一致，但不管墙上时钟」</text>
+  <text x="64" y="278" font-size="10.5" fill="#2C4460">保证：存在全体认可的同一全序，且不违反每个客户端自己的程序序；不承诺实时性</text>
+  <text x="64" y="296" font-size="10.5" fill="#2C4460">允许：读到旧值（写已返回、别人暂时看不到），只要所有人看到的顺序相同</text>
+  <text x="64" y="314" font-size="10" fill="#2C4460">例：教科书 CPU 模型；分布式产品少单独提供——比线性省不了多少，多为理论坐标</text>
+
+  <!-- 因果一致 -->
+  <rect x="48" y="344" width="596" height="96" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="64" y="368" font-size="12.5" font-weight="700" fill="#6B4E28">因果一致 Causal ——「有因果的按序，没因果的随意」</text>
+  <text x="64" y="388" font-size="10.5" fill="#6B4E28">保证：有因果链的操作（读到过、回复过）全体按因果序可见</text>
+  <text x="64" y="406" font-size="10.5" fill="#6B4E28">允许：并发写在不同客户端以不同顺序被看到</text>
+  <text x="64" y="424" font-size="10" fill="#6B4E28">例：会话保证（读己写 / 单调读 / 单调写 / 写随读）的组合，工程最常用的中间档</text>
+
+  <!-- 最终一致 -->
+  <rect x="48" y="454" width="596" height="96" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="64" y="478" font-size="12.5" font-weight="700" fill="#733428">最终一致 Eventual ——「只承诺收敛，不承诺过程」</text>
+  <text x="64" y="498" font-size="10.5" fill="#733428">保证：仅「停止写入后，所有副本终将收敛到相同值」；没有时间上界</text>
+  <text x="64" y="516" font-size="10.5" fill="#733428">允许：旧值、读回退、读不到自己的写、因果倒置——期间一切皆有可能</text>
+  <text x="64" y="534" font-size="10" fill="#733428">例：DNS、跨地域异步复制的从库读、S3 的旧语义</text>
+
+  <path d="M664,140 L664,536" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="684" y="338" font-size="11" fill="#6B675C" text-anchor="middle" transform="rotate(-90 684 338)">语义更弱 → 延迟更低、可用性更高</text>
+
+  <!-- ===== Panel B：异常 × 模型 ===== -->
+  <text x="700" y="112" font-size="13" font-weight="700" fill="#4A473F">B · 客户端可观察异常 × 模型：谁排除、谁放行</text>
+
+  <rect x="700" y="124" width="492" height="236" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="716" y="152" font-size="10.5" font-weight="700" fill="#4A473F">客户端可观察异常</text>
+  <text x="936" y="152" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">线性</text>
+  <text x="1002" y="152" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">顺序</text>
+  <text x="1068" y="152" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">因果</text>
+  <text x="1134" y="152" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">最终</text>
+  <line x1="716" y1="162" x2="1176" y2="162" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="716" y="188" font-size="10.5" fill="#4A473F">读到旧值（stale read）</text>
+  <text x="936" y="188" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1002" y="188" font-size="10.5" fill="#A64B3C" text-anchor="middle">允许</text>
+  <text x="1068" y="188" font-size="10.5" fill="#A64B3C" text-anchor="middle">允许</text>
+  <text x="1134" y="188" font-size="10.5" fill="#A64B3C" text-anchor="middle">允许</text>
+
+  <text x="716" y="218" font-size="10.5" fill="#4A473F">读回退（单调读被破坏）</text>
+  <text x="936" y="218" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1002" y="218" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1068" y="218" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除*</text>
+  <text x="1134" y="218" font-size="10.5" fill="#A64B3C" text-anchor="middle">允许</text>
+
+  <text x="716" y="248" font-size="10.5" fill="#4A473F">读不到自己的写</text>
+  <text x="936" y="248" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1002" y="248" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1068" y="248" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除*</text>
+  <text x="1134" y="248" font-size="10.5" fill="#A64B3C" text-anchor="middle">允许</text>
+
+  <text x="716" y="278" font-size="10.5" fill="#4A473F">因果倒置（先见答案后见问题）</text>
+  <text x="936" y="278" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1002" y="278" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1068" y="278" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">排除</text>
+  <text x="1134" y="278" font-size="10.5" fill="#A64B3C" text-anchor="middle">允许</text>
+
+  <line x1="716" y1="294" x2="1176" y2="294" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="716" y="316" font-size="9.5" fill="#6B675C">* 按同一会话的因果链计；工程上以 session guarantees（读己写、单调读…）落地</text>
+  <text x="716" y="336" font-size="9.5" fill="#6B675C">排除 = 该模型下不可能观察到；允许 = 可能发生且不算 bug</text>
+
+  <!-- 误读盒 -->
+  <rect x="700" y="376" width="492" height="174" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="716" y="400" font-size="11.5" font-weight="700" fill="#4A473F">最常被误读的三件事</text>
+  <text x="716" y="424" font-size="10.5" fill="#4A473F">① CAP 的 C = 线性一致，不是 ACID 的 C（完整性约束）；</text>
+  <text x="716" y="442" font-size="10.5" fill="#4A473F">　 且只在分区真的发生时，才被迫在 C 与 A 之间二选一</text>
+  <text x="716" y="466" font-size="10.5" fill="#4A473F">② 「最终一致」没有时间上界——「最终」可以是毫秒也可以是小时；</text>
+  <text x="716" y="484" font-size="10.5" fill="#4A473F">　 收敛快慢是工程属性，不是模型承诺</text>
+  <text x="716" y="508" font-size="10.5" fill="#4A473F">③ 线性一致 ≠ 可串行化：前者管单对象单操作的实时性，</text>
+  <text x="716" y="526" font-size="10.5" fill="#4A473F">　 后者管多操作事务的隔离；两者都要 = 严格可串行化</text>
+
+  <!-- ===== Panel C：C++ 类比 ===== -->
+  <text x="48" y="584" font-size="13" font-weight="700" fill="#4A473F">C · C++ 工程师的锚点：内存模型就是单机版的一致性模型（核 ≈ 副本，store buffer ≈ 复制延迟）</text>
+
+  <rect x="48" y="596" width="368" height="88" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="64" y="620" font-size="11.5" font-weight="700" fill="#24473F">memory_order_seq_cst ↔ 线性 / 顺序一致</text>
+  <text x="64" y="642" font-size="10.5" fill="#24473F">所有线程认可同一份操作全序</text>
+  <text x="64" y="662" font-size="10.5" fill="#24473F">代价：最强屏障，最慢</text>
+
+  <rect x="436" y="596" width="368" height="88" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="452" y="620" font-size="11.5" font-weight="700" fill="#6B4E28">acquire / release ↔ 因果一致</text>
+  <text x="452" y="642" font-size="10.5" fill="#6B4E28">只给有依赖的操作建立 happens-before</text>
+  <text x="452" y="662" font-size="10.5" fill="#6B4E28">无关操作可乱序，换来性能</text>
+
+  <rect x="824" y="596" width="368" height="88" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="840" y="620" font-size="11.5" font-weight="700" fill="#733428">relaxed ↔ 最终一致</text>
+  <text x="840" y="642" font-size="10.5" fill="#733428">仅保证单个变量自身的修改序（≈按键收敛）</text>
+  <text x="840" y="662" font-size="10.5" fill="#733428">跨变量的观察顺序不作任何承诺</text>
+
+  <rect x="48" y="700" width="1144" height="52" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="64" y="722" font-size="10.5" fill="#4A473F">类比只借直觉，不是等同：分布式比多核多出「节点会宕机、网络会分区、消息会丢」这一整个维度——</text>
+  <text x="64" y="740" font-size="10.5" fill="#4A473F">无分区时在延迟与一致之间选（PACELC 的 ELC），分区时在可用与一致之间选（CAP）；单机内存模型没有这道题</text>
+</svg>

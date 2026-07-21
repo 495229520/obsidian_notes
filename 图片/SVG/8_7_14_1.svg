@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 810" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Split Brain：分区、双主与两道防线</title>
+  <desc>左侧展示 5 节点集群被网络分区切成 2|3 两个岛后，少数侧旧主与多数侧新主同时接受写造成数据分叉；右侧展示多数派裁决与 fencing 两道防线；底部为三种分区形态与对称性陷阱。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="810" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Split Brain：分区把集群切成互相看不见的岛</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">判断准则：无法阻止「两个自认的主」出现，只能让少数派的写必然失败——多数派裁决在前，写入终点 fencing 兜底</text>
+
+  <!-- Panel A -->
+  <rect x="56" y="104" width="560" height="436" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="74" y="130" font-size="13" font-weight="700" fill="#4A473F">A · 分区如何制造双主（5 节点，2|3 分区）</text>
+
+  <!-- left island (minority) -->
+  <rect x="76" y="148" width="212" height="248" rx="8" fill="#F5EBE4" stroke="#C8A79E" stroke-width="1.2"/>
+  <text x="90" y="168" font-size="11" font-weight="700" fill="#733428">少数岛（2/5）</text>
+  <rect x="92" y="180" width="150" height="40" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="167" y="204" font-size="11.5" fill="#4A473F" text-anchor="middle">N2</text>
+  <rect x="92" y="232" width="150" height="48" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="167" y="252" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">N1 · 旧主</text>
+  <text x="167" y="269" font-size="10" fill="#6B4E28" text-anchor="middle">term=33 · 仍在服务</text>
+  <text x="90" y="312" font-size="9.5" fill="#733428">N1 看不到 N3–N5：</text>
+  <text x="90" y="328" font-size="9.5" fill="#733428">无法区分「他们死了」</text>
+  <text x="90" y="344" font-size="9.5" fill="#733428">和「网断了」</text>
+  <text x="90" y="360" font-size="9.5" fill="#733428">→ 若不自查多数，就继续当主</text>
+
+  <!-- right island (majority) -->
+  <rect x="352" y="148" width="244" height="248" rx="8" fill="#E6EFEA" stroke="#9DBBAD" stroke-width="1.2"/>
+  <text x="366" y="168" font-size="11" font-weight="700" fill="#24473F">多数岛（3/5）</text>
+  <rect x="368" y="180" width="130" height="38" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="433" y="203" font-size="11.5" fill="#4A473F" text-anchor="middle">N3</text>
+  <rect x="368" y="228" width="130" height="38" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="433" y="251" font-size="11.5" fill="#4A473F" text-anchor="middle">N5</text>
+  <rect x="368" y="278" width="130" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="433" y="298" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">N4 · 新主</text>
+  <text x="433" y="315" font-size="10" fill="#24473F" text-anchor="middle">term=34</text>
+  <text x="508" y="196" font-size="9.5" fill="#24473F">心跳超时判 N1 死</text>
+  <text x="508" y="212" font-size="9.5" fill="#24473F">→ 发起选举</text>
+  <text x="508" y="228" font-size="9.5" fill="#24473F">→ 3/5 票 = 多数 ✓</text>
+  <text x="508" y="296" font-size="9.5" fill="#24473F">此后写要 3 份 ack，</text>
+  <text x="508" y="312" font-size="9.5" fill="#24473F">多数岛内可凑齐</text>
+
+  <!-- partition line -->
+  <line x1="320" y1="142" x2="320" y2="490" stroke="#A64B3C" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <text x="320" y="508" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle">网络分区（互相不可达，节点都活着）</text>
+
+  <!-- clients -->
+  <rect x="76" y="412" width="212" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="182" y="431" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">客户端 甲（困在少数侧）</text>
+  <text x="182" y="448" font-size="10" fill="#2C4460" text-anchor="middle">写 x=1 → N1 受理并 ack</text>
+  <line x1="167" y1="408" x2="167" y2="286" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+
+  <rect x="352" y="412" width="244" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="474" y="431" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">客户端 乙（在多数侧）</text>
+  <text x="474" y="448" font-size="10" fill="#2C4460" text-anchor="middle">写 x=2 → N4 多数派 ack ✓</text>
+  <line x1="433" y1="408" x2="433" y2="332" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrGreen)"/>
+
+  <text x="336" y="480" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">同一键 x 出现两条互不知晓的历史（x=1 与 x=2）——静默分叉，合并时必有一方丢失</text>
+
+  <!-- Panel B -->
+  <rect x="644" y="104" width="540" height="436" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="662" y="130" font-size="13" font-weight="700" fill="#4A473F">B · 两道防线：让少数派的写必然失败</text>
+
+  <rect x="662" y="144" width="504" height="106" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="678" y="166" font-size="12" font-weight="700" fill="#24473F">防线一 · 多数派裁决（quorum）——两侧最多一侧能继续</text>
+  <text x="678" y="188" font-size="10.5" fill="#24473F">选主需要 &gt; N/2 票；提交写需要 &gt; N/2 ack（W &gt; N/2）</text>
+  <text x="678" y="206" font-size="10.5" fill="#24473F">少数岛：既选不出主，也提交不了写 → 降级只读或拒绝服务</text>
+  <text x="678" y="224" font-size="10.5" fill="#24473F">旧主自查：心跳/续约凑不齐多数 → 主动 step down</text>
+  <text x="678" y="242" font-size="9.5" fill="#2F6B5E">但 step down 依赖本地时钟与线程调度——可能迟到（STW 冻结）</text>
+
+  <rect x="662" y="262" width="504" height="90" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="678" y="284" font-size="12" font-weight="700" fill="#2C4460">防线二 · Fencing——step down 迟到时的兜底</text>
+  <text x="678" y="306" font-size="10.5" fill="#2C4460">旧主可能在停顿后带旧 term 复活，绕过一切「自觉」</text>
+  <text x="678" y="324" font-size="10.5" fill="#2C4460">存储/日志的最终写入点校验单调 term：新主（34）首写落盘后，</text>
+  <text x="678" y="342" font-size="10.5" fill="#2C4460">term=33 的一切写被无条件拒绝——正确性不依赖时钟</text>
+
+  <rect x="662" y="366" width="242" height="156" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="678" y="388" font-size="11.5" font-weight="700" fill="#6B4E28">偶数节点与两副本</text>
+  <text x="678" y="410" font-size="10" fill="#6B4E28">2 节点没有「多数」可言：</text>
+  <text x="678" y="427" font-size="10" fill="#6B4E28">任何分区两侧各 1 票，全体停摆</text>
+  <text x="678" y="449" font-size="10" fill="#6B4E28">解法：2+1 仲裁者（witness），</text>
+  <text x="678" y="466" font-size="10" fill="#6B4E28">只投票不存数据</text>
+  <text x="678" y="488" font-size="10" fill="#6B4E28">双机房对称部署 → witness</text>
+  <text x="678" y="505" font-size="10" fill="#6B4E28">必须放在第三个故障域</text>
+
+  <rect x="920" y="366" width="246" height="156" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="936" y="388" font-size="11.5" font-weight="700" fill="#733428">反面教材</text>
+  <text x="936" y="410" font-size="10" fill="#733428">旧版 Elasticsearch（&lt; 7.0）：</text>
+  <text x="936" y="427" font-size="10" fill="#733428">minimum_master_nodes 配小于</text>
+  <text x="936" y="444" font-size="10" fill="#733428">多数 → 分区两侧各选 master，</text>
+  <text x="936" y="461" font-size="10" fill="#733428">各自接受索引写</text>
+  <text x="936" y="483" font-size="10" fill="#733428">分区愈合后一侧的写被整体</text>
+  <text x="936" y="500" font-size="10" fill="#733428">覆盖——用户看来是静默丢数据</text>
+
+  <!-- Panel C: partition morphology -->
+  <text x="56" y="580" font-size="13" font-weight="700" fill="#4A473F">C · 分区的三种形态——每种骗过不同的检测器</text>
+
+  <rect x="56" y="594" width="356" height="122" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="74" y="618" font-size="12" font-weight="700" fill="#2C4460">① 对称分区</text>
+  <text x="74" y="640" font-size="10.5" fill="#4A473F">一刀两半，两侧互不可达；最「良性」，</text>
+  <text x="74" y="658" font-size="10.5" fill="#4A473F">多数派裁决直接生效</text>
+  <text x="74" y="680" font-size="10" fill="#6B675C">诱因：核心交换机故障、机房间链路中断、</text>
+  <text x="74" y="697" font-size="10" fill="#6B675C">整段防火墙规则误下发</text>
+
+  <rect x="442" y="594" width="356" height="122" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="460" y="618" font-size="12" font-weight="700" fill="#2C4460">② 单向可达（半开连接）</text>
+  <text x="460" y="640" font-size="10.5" fill="#4A473F">A 发得出去，B 的回包丢；A 判 B 死、</text>
+  <text x="460" y="658" font-size="10.5" fill="#4A473F">B 觉得一切正常；TCP 仍显示 ESTABLISHED</text>
+  <text x="460" y="680" font-size="10" fill="#6B675C">诱因：网卡半死、单向 ACL、NAT 表项超时；</text>
+  <text x="460" y="697" font-size="10" fill="#6B675C">检测必须要求「双向应答」而非「发出即算」</text>
+
+  <rect x="828" y="594" width="356" height="122" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="846" y="618" font-size="12" font-weight="700" fill="#2C4460">③ 非传递分区</text>
+  <text x="846" y="640" font-size="10.5" fill="#4A473F">A↔B 通、B↔C 通、A↔C 不通；</text>
+  <text x="846" y="658" font-size="10.5" fill="#4A473F">假设「连通有传递性」的检测全部失灵</text>
+  <text x="846" y="680" font-size="10" fill="#6B675C">对策：间接探测（SWIM 让第三方代问）；</text>
+  <text x="846" y="697" font-size="10" fill="#6B675C">见 Membership 与故障检测</text>
+
+  <rect x="56" y="736" width="1128" height="40" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="620" y="753" font-size="11.5" fill="#6B4E28" text-anchor="middle">对称性陷阱：「我看不到他们」这条证据在分区两侧完全对称，推不出任何一方已死——</text>
+  <text x="620" y="770" font-size="11.5" fill="#6B4E28" text-anchor="middle">唯一可靠的判据是「我这一侧是否握有多数」；答案为否时，正确动作是停止服务，而不是继续当主</text>
+</svg>

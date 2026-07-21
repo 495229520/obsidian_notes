@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>写数据→写旗标：七环可见性链</title>
+  <desc>从发起端 CPU 到对端 CPU 的七个可见性环节、各环的负责机制与归属，以及断环后的症状对照</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="820" fill="#F5F4ED"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">写数据 → 写旗标：从发起端 CPU 到对端 CPU 的七环可见性链</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">②⑤⑥ 由驱动与硬件兜底，④ 由协议保证（前提归你），①③⑦ 归应用 —— 事故全出在归你的环上</text>
+
+  <!-- 图例 -->
+  <g font-size="10.5">
+    <rect x="56" y="100" width="14" height="14" rx="3" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+    <text x="76" y="111" fill="#6B4E28">归应用（你）</text>
+    <rect x="170" y="100" width="14" height="14" rx="3" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+    <text x="190" y="111" fill="#2C4460">归驱动</text>
+    <rect x="256" y="100" width="14" height="14" rx="3" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="276" y="111" fill="#24473F">归硬件</text>
+    <rect x="342" y="100" width="14" height="14" rx="3" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+    <text x="362" y="111" fill="#6B5B95">归协议（前提你满足）</text>
+  </g>
+
+  <!-- 第一行：① ② ③ ④ -->
+  <rect x="56" y="132" width="248" height="122" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="180" y="156" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">① 填 buffer 先于 post</text>
+  <text x="180" y="177" font-size="10.5" fill="#6B4E28" text-anchor="middle">同线程：程序序即可</text>
+  <text x="180" y="194" font-size="10.5" fill="#6B4E28" text-anchor="middle">跨线程：mutex / atomic 交接</text>
+  <text x="180" y="211" font-size="10.5" fill="#6B4E28" text-anchor="middle">（post_send 不是同步原语）</text>
+  <text x="180" y="238" font-size="10" font-weight="700" fill="#8A6A3A" text-anchor="middle">归你</text>
+
+  <rect x="352" y="132" width="248" height="122" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="476" y="156" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② WQE 先于门铃可见</text>
+  <text x="476" y="177" font-size="10.5" fill="#2C4460" text-anchor="middle">驱动写屏障 + doorbell MMIO</text>
+  <text x="476" y="194" font-size="10.5" fill="#2C4460" text-anchor="middle">doorbell ≈ release 发布（4.3）</text>
+  <text x="476" y="238" font-size="10" font-weight="700" fill="#3D5A80" text-anchor="middle">归驱动</text>
+
+  <rect x="648" y="132" width="248" height="122" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="772" y="156" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">③ gather 读到新内容</text>
+  <text x="772" y="177" font-size="10.5" fill="#6B4E28" text-anchor="middle">DMA 缓存一致性：硬件兜底</text>
+  <text x="772" y="194" font-size="10.5" fill="#6B4E28" text-anchor="middle">但若依赖在途 READ 的结果：</text>
+  <text x="772" y="211" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">必须 IBV_SEND_FENCE（R3 的洞）</text>
+  <text x="772" y="238" font-size="10" font-weight="700" fill="#8A6A3A" text-anchor="middle">硬件 + 你补 fence</text>
+
+  <rect x="944" y="132" width="248" height="122" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1068" y="156" font-size="12.5" font-weight="700" fill="#6B5B95" text-anchor="middle">④ 数据消息先于旗标消息</text>
+  <text x="1068" y="177" font-size="10.5" fill="#6B5B95" text-anchor="middle">RC 按 PSN 有序交付 +</text>
+  <text x="1068" y="194" font-size="10.5" fill="#6B5B95" text-anchor="middle">responder 按消息序执行（R4）</text>
+  <text x="1068" y="211" font-size="10.5" font-weight="700" fill="#6B5B95" text-anchor="middle">前提：同一 QP · 独立旗标 WRITE</text>
+  <text x="1068" y="238" font-size="10" font-weight="700" fill="#6B5B95" text-anchor="middle">归协议（前提归你）</text>
+
+  <line x1="304" y1="193" x2="346" y2="193" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="600" y1="193" x2="642" y2="193" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="896" y1="193" x2="938" y2="193" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 折返箭头 ④ → ⑤ -->
+  <line x1="1068" y1="254" x2="1068" y2="292" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 第二行（右→左）：⑤ ⑥ ⑦ -->
+  <rect x="944" y="298" width="248" height="122" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1068" y="322" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑤ 消息数据有序落内存</text>
+  <text x="1068" y="343" font-size="10.5" fill="#24473F" text-anchor="middle">对端网卡按消息序发起写</text>
+  <text x="1068" y="360" font-size="10.5" fill="#24473F" text-anchor="middle">PCIe posted write 同通道有序</text>
+  <text x="1068" y="404" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">归硬件</text>
+
+  <rect x="648" y="298" width="248" height="122" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="772" y="322" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑥ 对端缓存观察到 DMA 写</text>
+  <text x="772" y="343" font-size="10.5" fill="#24473F" text-anchor="middle">服务器平台 DMA 缓存一致性</text>
+  <text x="772" y="360" font-size="10.5" fill="#24473F" text-anchor="middle">无需手动刷缓存</text>
+  <text x="772" y="404" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">归硬件</text>
+
+  <rect x="352" y="298" width="248" height="122" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="476" y="322" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">⑦ 先旗标后数据地"真读"</text>
+  <text x="476" y="343" font-size="10.5" fill="#6B4E28" text-anchor="middle">std::atomic_ref + acquire 读旗标</text>
+  <text x="476" y="360" font-size="10.5" fill="#6B4E28" text-anchor="middle">拦编译器缓存读 + CPU 读重排</text>
+  <text x="476" y="377" font-size="10.5" fill="#6B4E28" text-anchor="middle">（x86 掩盖读重排，ARM 必爆）</text>
+  <text x="476" y="404" font-size="10" font-weight="700" fill="#8A6A3A" text-anchor="middle">归你</text>
+
+  <line x1="938" y1="359" x2="902" y2="359" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="642" y1="359" x2="606" y2="359" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 终点标签 -->
+  <rect x="86" y="322" width="218" height="74" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="195" y="352" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">对端程序安全读到新数据</text>
+  <text x="195" y="372" font-size="10" fill="#6B675C" text-anchor="middle">七环全部成立，缺一即静默脏读</text>
+  <line x1="346" y1="359" x2="310" y2="359" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 断环症状表 -->
+  <text x="56" y="466" font-size="13" font-weight="700" fill="#4A473F">断环症状对照：环号 → 典型破坏方式 → 症状</text>
+
+  <g font-size="11">
+    <rect x="56" y="482" width="1144" height="40" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+    <text x="80" y="507" font-weight="700" fill="#8A6A3A">环 ①</text>
+    <text x="150" y="507" fill="#4A473F">填 buffer 线程与 post 线程之间没有 happens-before</text>
+    <text x="700" y="507" fill="#733428">对端偶发收到半旧内容，负载越高越频繁</text>
+
+    <rect x="56" y="530" width="1144" height="40" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+    <text x="80" y="555" font-weight="700" fill="#8A6A3A">环 ③</text>
+    <text x="150" y="555" fill="#4A473F">READ 结果被同 QP 后续 WQE 直接消费，未加 fence</text>
+    <text x="700" y="555" fill="#733428">转发 / 回写出去的内容偶发是旧数据，零错误码</text>
+
+    <rect x="56" y="578" width="1144" height="40" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+    <text x="80" y="603" font-weight="700" fill="#6B5B95">环 ④</text>
+    <text x="150" y="603" fill="#4A473F">旗标走另一条 QP；或旗标混在数据消息里轮询尾字节</text>
+    <text x="700" y="603" fill="#733428">旗标为真、数据是旧的；换网卡换代后才爆发</text>
+
+    <rect x="56" y="626" width="1144" height="40" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+    <text x="80" y="651" font-weight="700" fill="#8A6A3A">环 ⑦</text>
+    <text x="150" y="651" fill="#4A473F">旗标是普通变量：编译器提读出循环 / ARM 读重排</text>
+    <text x="700" y="651" fill="#733428">轮询死循环；或仅 ARM 平台偶发脏读</text>
+  </g>
+
+  <!-- 底部准则条 -->
+  <rect x="56" y="694" width="1144" height="56" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="628" y="717" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">判读法：遇到脏数据 bug，对七环逐环问"这一环的保证从哪里来"</text>
+  <text x="628" y="737" font-size="11" fill="#6B675C" text-anchor="middle">凡是回答"一直没出过问题"的环，就是凶手 —— 顺序正确性来自规则推导，不来自实验侥幸</text>
+</svg>

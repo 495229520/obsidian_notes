@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Command Timeout 升级阶梯与 Controller Reset</title>
+  <desc>命令超时后的升级阶梯（超时→Abort→Reset）、Linux nvme 控制器状态机的原子迁移，以及复位期间队列冻结造成的全盘背压时间线。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">命令超时的升级阶梯：从等一条命令，到复位整个控制器</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">超时是主机单方面的判断（慢 ≠ 死）；复位是 stop-the-world —— 一条命令的故障，由整块盘的所有 IO 共同支付</text>
+
+  <!-- A · 升级阶梯 -->
+  <text x="48" y="104" font-size="13" font-weight="700" fill="#2B2A26">A · 升级阶梯：代价逐级放大</text>
+
+  <rect x="56" y="118" width="530" height="76" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="74" y="142" font-size="12.5" font-weight="700" fill="#24473F">① 正常路径：CQE 在 μs~ms 内回来</text>
+  <text x="74" y="162" font-size="10.5" fill="#24473F">blk-mq 每请求定时器静默解除 · 波及范围：无</text>
+  <text x="74" y="180" font-size="10.5" fill="#24473F">99.999…% 的命令止步于此</text>
+
+  <line x1="321" y1="194" x2="321" y2="216" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <text x="335" y="210" font-size="10" fill="#A64B3C">30 s 无回执</text>
+
+  <rect x="56" y="220" width="530" height="76" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="74" y="244" font-size="12.5" font-weight="700" fill="#6B4E28">② 超时到期：nvme_core.io_timeout（默认 30 s，可调）</text>
+  <text x="74" y="264" font-size="10.5" fill="#6B4E28">admin 命令默认 60 s · 波及范围：仍只是这一条命令</text>
+  <text x="74" y="282" font-size="10.5" fill="#6B4E28">这是主机的猜测，不是设备的状态：命令可能真在执行</text>
+
+  <line x1="321" y1="296" x2="321" y2="318" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+
+  <rect x="56" y="322" width="530" height="76" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="74" y="346" font-size="12.5" font-weight="700" fill="#6B4E28">③ Abort（admin opcode 08h）：请设备丢弃该命令</text>
+  <text x="74" y="366" font-size="10.5" fill="#6B4E28">best effort：设备可以不理；在途 Abort 数受 ACL 限制</text>
+  <text x="74" y="384" font-size="10.5" fill="#6B4E28">波及范围：一条命令 —— 但成功率低，常直接进入下一级</text>
+
+  <line x1="321" y1="398" x2="321" y2="420" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <text x="335" y="414" font-size="10" fill="#A64B3C">仍无回执</text>
+
+  <rect x="56" y="424" width="530" height="86" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="74" y="448" font-size="12.5" font-weight="700" fill="#733428">④ Controller Reset：重跑 3.3 的自举序列</text>
+  <text x="74" y="468" font-size="10.5" fill="#733428">CC.EN 0→1 · 重建 Admin QP → Identify → 重建全部 IO 队列</text>
+  <text x="74" y="486" font-size="10.5" fill="#733428">波及范围：全盘所有队列、所有在途命令 · 秒级 stop-the-world</text>
+  <text x="74" y="504" font-size="10.5" font-weight="700" fill="#733428">复位也救不回 → DEAD：全部 IO 以 EIO 完成</text>
+
+  <!-- B · 状态机 -->
+  <text x="616" y="104" font-size="13" font-weight="700" fill="#2B2A26">B · Linux 控制器状态机：原子迁移，只允许一个触发者</text>
+
+  <rect x="616" y="118" width="568" height="392" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="672" y="140" width="150" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="747" y="162" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">LIVE</text>
+  <text x="747" y="180" font-size="10" fill="#24473F" text-anchor="middle">正常收发命令</text>
+
+  <line x1="747" y1="192" x2="747" y2="238" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <text x="840" y="212" font-size="10" fill="#733428">超时处理判定需复位：</text>
+  <text x="840" y="228" font-size="10" fill="#733428">冻结队列入口 + 取消全部在途命令</text>
+
+  <rect x="672" y="242" width="150" height="52" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="747" y="264" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">RESETTING</text>
+  <text x="747" y="282" font-size="10" fill="#733428" text-anchor="middle">拆除旧队列</text>
+
+  <line x1="747" y1="294" x2="747" y2="340" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="840" y="314" font-size="10" fill="#4A473F">CC.EN 0→1，等 CSTS.RDY</text>
+  <text x="840" y="330" font-size="10" fill="#4A473F">重建 Admin QP（寄存器直配）</text>
+
+  <rect x="672" y="344" width="150" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="747" y="366" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">CONNECTING</text>
+  <text x="747" y="384" font-size="10" fill="#6B4E28" text-anchor="middle">Identify · 重建 IO 队列</text>
+
+  <path d="M 668 370 L 640 370 L 640 166 L 668 166" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrGreen)"/>
+  <text x="628" y="278" font-size="10" fill="#24473F" text-anchor="end" transform="rotate(-90 628 278)">解冻：排队 IO 放行 + 被取消的重发</text>
+
+  <line x1="826" y1="370" x2="1000" y2="370" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <text x="913" y="360" font-size="10" fill="#733428" text-anchor="middle">复位失败 / 设备消失</text>
+
+  <rect x="1004" y="344" width="130" height="52" rx="7" fill="#EDEBE3" stroke="#5F5E5A" stroke-width="1.5"/>
+  <text x="1069" y="366" font-size="13" font-weight="700" fill="#444441" text-anchor="middle">DEAD</text>
+  <text x="1069" y="384" font-size="10" fill="#444441" text-anchor="middle">所有 IO 以 EIO 完成</text>
+
+  <rect x="636" y="424" width="528" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="652" y="446" font-size="10.5" font-weight="700" fill="#2C4460">state 是共享变量，迁移用原子 CAS ≈ compare_exchange_strong：</text>
+  <text x="652" y="464" font-size="10.5" fill="#2C4460">多条命令同时超时 → 多个触发者竞争，只有一个赢家执行 reset，</text>
+  <text x="652" y="482" font-size="10.5" fill="#2C4460">其余看到已处于 RESETTING 就直接返回 —— 幂等的恢复入口</text>
+
+  <!-- C · 冻结窗口时间线 -->
+  <text x="48" y="546" font-size="13" font-weight="700" fill="#2B2A26">C · 队列冻结窗口：背压如何把一条命令的故障变成全盘的尾延迟</text>
+
+  <rect x="56" y="560" width="1128" height="240" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <line x1="110" y1="676" x2="1150" y2="676" stroke="#9B968A" stroke-width="1.4"/>
+
+  <rect x="140" y="658" width="440" height="36" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="360" y="680" font-size="10.5" fill="#24473F" text-anchor="middle">其他 IO 正常完成；命令 X 无回执，占着一个 tag</text>
+
+  <line x1="580" y1="640" x2="580" y2="700" stroke="#A64B3C" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="580" y="632" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">t = 30 s 定时器到期</text>
+
+  <rect x="580" y="658" width="240" height="36" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="700" y="680" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">Abort → Reset → 重建（秒级）</text>
+
+  <rect x="820" y="658" width="330" height="36" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="985" y="680" font-size="10.5" fill="#6B4E28" text-anchor="middle">解冻放行：积压涌入，短暂排队尖峰后恢复</text>
+
+  <text x="140" y="620" font-size="10.5" fill="#4A473F">t = 0：命令 X 发出</text>
+  <line x1="700" y1="608" x2="700" y2="654" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="700" y="600" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">冻结窗口内：新 IO 阻塞在入口（排队，不报错）</text>
+
+  <text x="140" y="726" font-size="10.5" fill="#4A473F">在途 IO 全部取消，复位后重新排队 —— 一条写是否已落盘，主机不知道；正确性靠块层重试语义兜底</text>
+  <text x="140" y="748" font-size="10.5" fill="#4A473F">上层视角：这 30+ 秒里没有任何报错，只有一部分 IO「无限慢」—— p99.99 尖峰与超时级联的典型来源（9.5）</text>
+  <text x="140" y="770" font-size="10.5" font-weight="700" fill="#733428">监控要盯 dmesg 的 timeout / reset 记录，而不是等应用报 EIO —— 报错是最后一级，冻结不报错</text>
+
+  <rect x="56" y="820" width="1128" height="52" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="76" y="842" font-size="11.5" font-weight="700" fill="#2B2A26">参数是取舍：调小 io_timeout 能更快发现真故障，也更容易把「慢」误判成「死」——</text>
+  <text x="76" y="862" font-size="11.5" fill="#4A473F">误杀一条慢命令的代价是全盘 stop-the-world；反复误杀 = reset 风暴，比慢更糟</text>
+</svg>

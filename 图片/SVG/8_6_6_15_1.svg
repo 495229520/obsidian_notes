@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 740" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Sequence Number 多版本可见性与快照回收边界</title>
+  <desc>一个 key 的三个版本在 seq 轴上的分布，两个快照与一次当前读各自看见哪个版本，oldest snapshot 如何决定回收边界，以及与 C++ 并发模型的对应。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="740" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Sequence Number 多版本：谁能看见哪个版本</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">可见性规则：在 seq ≤ snapshot 的版本里取最新的一条；若那条是墓碑，则 key 不存在</text>
+
+  <!-- A · 版本轴 -->
+  <rect x="56" y="104" width="1128" height="252" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="128" font-size="13" font-weight="700" fill="#4A473F">A · 一个 key 的版本轴：三次写、两个快照、一次当前读</text>
+
+  <!-- 快照切线（先画，压在版本框之下） -->
+  <line x1="670" y1="152" x2="670" y2="308" stroke="#B07D2B" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text x="670" y="146" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Snapshot A · seq=8</text>
+  <line x1="880" y1="152" x2="880" y2="308" stroke="#B07D2B" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text x="880" y="146" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Snapshot B · seq=11</text>
+  <line x1="1090" y1="152" x2="1090" y2="308" stroke="#3D5A80" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text x="1090" y="146" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">当前读 last_seq=14</text>
+
+  <!-- 版本框 -->
+  <rect x="400" y="196" width="120" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="460" y="218" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">(k1, seq=5, Put)</text>
+  <text x="460" y="237" font-size="10.5" fill="#24473F" text-anchor="middle">值 = v1</text>
+  <line x1="460" y1="250" x2="460" y2="296" stroke="#9B968A" stroke-width="1"/>
+
+  <rect x="680" y="196" width="120" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="740" y="218" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">(k1, seq=9, Put)</text>
+  <text x="740" y="237" font-size="10.5" fill="#2C4460" text-anchor="middle">值 = v2</text>
+  <line x1="740" y1="250" x2="740" y2="296" stroke="#9B968A" stroke-width="1"/>
+
+  <rect x="890" y="196" width="120" height="54" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="950" y="218" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">(k1, seq=12, Del)</text>
+  <text x="950" y="237" font-size="10.5" fill="#733428" text-anchor="middle">墓碑 tombstone</text>
+  <line x1="950" y1="250" x2="950" y2="296" stroke="#9B968A" stroke-width="1"/>
+
+  <!-- seq 轴 -->
+  <line x1="110" y1="300" x2="1150" y2="300" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="1156" y="288" font-size="11" fill="#4A473F">seq</text>
+  <line x1="180" y1="296" x2="180" y2="304" stroke="#9B968A" stroke-width="1"/>
+  <line x1="320" y1="296" x2="320" y2="304" stroke="#9B968A" stroke-width="1"/>
+  <line x1="460" y1="296" x2="460" y2="304" stroke="#5A564B" stroke-width="1.4"/>
+  <line x1="600" y1="296" x2="600" y2="304" stroke="#9B968A" stroke-width="1"/>
+  <line x1="670" y1="296" x2="670" y2="304" stroke="#B07D2B" stroke-width="1.4"/>
+  <line x1="740" y1="296" x2="740" y2="304" stroke="#5A564B" stroke-width="1.4"/>
+  <line x1="880" y1="296" x2="880" y2="304" stroke="#B07D2B" stroke-width="1.4"/>
+  <line x1="950" y1="296" x2="950" y2="304" stroke="#5A564B" stroke-width="1.4"/>
+  <line x1="1090" y1="296" x2="1090" y2="304" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="180" y="320" font-size="10" fill="#6B675C" text-anchor="middle">1</text>
+  <text x="320" y="320" font-size="10" fill="#6B675C" text-anchor="middle">3</text>
+  <text x="460" y="320" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">5</text>
+  <text x="670" y="320" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">8</text>
+  <text x="740" y="320" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">9</text>
+  <text x="880" y="320" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">11</text>
+  <text x="950" y="320" font-size="10" font-weight="700" fill="#733428" text-anchor="middle">12</text>
+  <text x="1090" y="320" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">14</text>
+
+  <!-- 可见结果 -->
+  <text x="670" y="340" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">→ 看见 v1（seq5）</text>
+  <text x="880" y="340" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">→ 看见 v2（seq9）</text>
+  <text x="1090" y="340" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">→ NotFound（墓碑）</text>
+
+  <!-- B · 一次 seek 定位 -->
+  <rect x="56" y="372" width="552" height="192" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="396" font-size="13" font-weight="700" fill="#4A473F">B · 引擎内的排序：一次 seek 就定位</text>
+
+  <rect x="336" y="408" width="230" height="32" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="451" y="428" font-size="11" fill="#733428" text-anchor="middle">(k1, 12, Delete)</text>
+  <rect x="336" y="450" width="230" height="32" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="451" y="470" font-size="11" fill="#2C4460" text-anchor="middle">(k1, 9, Put) → v2</text>
+  <rect x="336" y="492" width="230" height="32" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="451" y="512" font-size="11" fill="#24473F" text-anchor="middle">(k1, 5, Put) → v1</text>
+
+  <text x="84" y="428" font-size="11" fill="#4A473F">Get(k1, 当前=14)</text>
+  <line x1="252" y1="424" x2="330" y2="424" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="84" y="470" font-size="11" fill="#4A473F">Get(k1, B=11)</text>
+  <line x1="252" y1="466" x2="330" y2="466" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="84" y="512" font-size="11" fill="#4A473F">Get(k1, A=8)</text>
+  <line x1="252" y1="508" x2="330" y2="508" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <text x="70" y="548" font-size="10.5" fill="#6B675C">user_key 升序、seq 降序 → seek(k1, snap) 命中的第一条就是该快照下的最新可见版本</text>
+
+  <!-- C · 回收边界 -->
+  <rect x="632" y="372" width="552" height="192" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="646" y="396" font-size="13" font-weight="700" fill="#4A473F">C · 回收边界：oldest snapshot 决定谁能删</text>
+
+  <rect x="650" y="408" width="518" height="38" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="662" y="431" font-size="11" fill="#24473F">oldest = 8（A 存活）：v1@seq5 必须保留 —— A 仍要读它</text>
+  <rect x="650" y="454" width="518" height="38" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="662" y="477" font-size="11" fill="#6B4E28">释放 A → oldest = 11：seq 5 与 9 之间已无快照 → v1 可回收</text>
+  <rect x="650" y="500" width="518" height="38" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="662" y="523" font-size="11" fill="#733428">墓碑@seq12：还要沉到最底层、确认下层无同 key 旧值，才能消失</text>
+
+  <text x="646" y="548" font-size="10.5" fill="#6B675C">compaction 只在"无任何快照落在两版本之间"时丢弃旧版本 —— 长快照 = 永远删不掉</text>
+
+  <!-- D · C++ 对应 -->
+  <text x="68" y="596" font-size="14" font-weight="700" fill="#2B2A26">D · 对应到 C++ 并发模型</text>
+
+  <rect x="56" y="608" width="356" height="100" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="70" y="632" font-size="12" font-weight="700" fill="#2C4460">发布水位 = release / acquire</text>
+  <text x="70" y="654" font-size="10.5" fill="#2C4460">插完 memtable 才 store(last_seq, release)</text>
+  <text x="70" y="672" font-size="10.5" fill="#2C4460">读者 acquire 取水位 → 水位之下必完整可见</text>
+  <text x="70" y="690" font-size="10.5" fill="#2C4460">无锁 memtable 下这是可见性的唯一保证</text>
+
+  <rect x="442" y="608" width="356" height="100" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="456" y="632" font-size="12" font-weight="700" fill="#24473F">拍快照 = 注册 epoch</text>
+  <text x="456" y="654" font-size="10.5" fill="#24473F">记下一个号 + 挂进活跃链表：O(1)、零拷贝</text>
+  <text x="456" y="672" font-size="10.5" fill="#24473F">iterator 隐式持有快照 —— 长迭代器 = 长快照</text>
+  <text x="456" y="690" font-size="10.5" fill="#24473F">快照不持久化，进程退出即失效</text>
+
+  <rect x="828" y="608" width="356" height="100" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="842" y="632" font-size="12" font-weight="700" fill="#6B4E28">回收 = epoch reclamation</text>
+  <text x="842" y="654" font-size="10.5" fill="#6B4E28">最老活跃快照 = grace period 边界</text>
+  <text x="842" y="672" font-size="10.5" fill="#6B4E28">忘记 ReleaseSnapshot ↔ shared_ptr 泄漏</text>
+  <text x="842" y="690" font-size="10.5" fill="#6B4E28">症状三联：空间涨 · 删除不生效 · 扫描变慢</text>
+</svg>

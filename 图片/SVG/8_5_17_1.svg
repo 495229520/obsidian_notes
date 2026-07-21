@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 892" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>NVMe-oF 导出对象模型：port、subsystem、namespace 与访问控制</title>
+  <desc>左侧是 Target 上 configfs 的三类对象（port 监听点、subsystem 导出与权限单位、namespace 容量单位）及 ln -s 导出关系；中间是 connect 时按 host 动态创建的 controller 实例与被 allowed_hosts 拒绝的连接；右侧是两台 host 各自看到的设备名与 NGUID 身份；底部是 subsystem 切分粒度决定连接数、内存与故障域的对账。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="892" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">NVMe-oF 导出对象模型：port → subsystem → namespace，以及谁能看见什么</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">判断准则：subsystem 是权限与连接的单位，namespace 是容量的单位——切分粒度决定连接数、内存与故障域</text>
+
+  <!-- ============ Panel A：Target 侧对象树 ============ -->
+  <text x="48" y="114" font-size="13" font-weight="700" fill="#4A473F">A · Target 侧对象树（configfs 里的三类对象）</text>
+
+  <!-- ports -->
+  <rect x="76" y="136" width="250" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="201" y="160" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">ports/1 · 监听点</text>
+  <text x="201" y="180" font-size="10.5" fill="#2C4460" text-anchor="middle">trtype=rdma · 192.168.1.10:4420</text>
+
+  <rect x="344" y="136" width="266" height="60" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="477" y="160" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">ports/2 · trtype=tcp :4421</text>
+  <text x="477" y="180" font-size="10.5" fill="#6B675C" text-anchor="middle">未软链 subsystem → discovery 里不可见</text>
+
+  <!-- port -> subsystem arrows -->
+  <path d="M180,196 L180,242" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="192" y="226" font-size="10" fill="#6B675C">ln -s = 在此端口导出</text>
+  <path d="M96,196 L96,214 L66,214 L66,474 L72,474" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- subsystem tenantA -->
+  <rect x="76" y="246" width="534" height="150" rx="8" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="90" y="268" font-size="12.5" font-weight="700" fill="#2C4460">subsystems/nqn.2026-07.io.lab:tenantA　（导出与权限单位）</text>
+
+  <rect x="90" y="280" width="150" height="104" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="165" y="302" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">allowed_hosts</text>
+  <text x="165" y="324" font-size="10.5" fill="#6B4E28" text-anchor="middle">nqn.…:hostA</text>
+  <text x="165" y="344" font-size="10" fill="#6B4E28" text-anchor="middle">Fabrics Connect</text>
+  <text x="165" y="360" font-size="10" fill="#6B4E28" text-anchor="middle">时查这张表</text>
+
+  <rect x="254" y="280" width="168" height="104" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="338" y="302" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">namespaces/1</text>
+  <text x="338" y="324" font-size="10.5" fill="#24473F" text-anchor="middle">NSID=1 · NGUID …a1</text>
+  <text x="338" y="344" font-size="10.5" fill="#24473F" text-anchor="middle">device_path=/dev/nvme0n1</text>
+  <text x="338" y="362" font-size="10" fill="#24473F" text-anchor="middle">（bdev 后端，整盘透传）</text>
+
+  <rect x="436" y="280" width="162" height="104" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="517" y="302" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">namespaces/2</text>
+  <text x="517" y="324" font-size="10.5" fill="#24473F" text-anchor="middle">NSID=2 · NGUID …a2</text>
+  <text x="517" y="344" font-size="10.5" fill="#24473F" text-anchor="middle">LVM 卷（切卷灵活）</text>
+  <text x="517" y="362" font-size="10" fill="#24473F" text-anchor="middle">容量单位，无权限属性</text>
+
+  <!-- subsystem tenantB -->
+  <rect x="76" y="412" width="534" height="124" rx="8" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="90" y="434" font-size="12.5" font-weight="700" fill="#2C4460">subsystems/nqn.2026-07.io.lab:tenantB</text>
+
+  <rect x="90" y="446" width="150" height="78" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="165" y="468" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">allowed_hosts</text>
+  <text x="165" y="490" font-size="10.5" fill="#6B4E28" text-anchor="middle">nqn.…:hostB</text>
+
+  <rect x="254" y="446" width="168" height="78" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="338" y="468" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">namespaces/1</text>
+  <text x="338" y="490" font-size="10.5" fill="#24473F" text-anchor="middle">NSID=1 · NGUID …b7</text>
+  <text x="338" y="508" font-size="10.5" fill="#24473F" text-anchor="middle">device_path=/dev/nvme1n1</text>
+
+  <rect x="436" y="446" width="162" height="78" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="517" y="466" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">两个 NSID=1 互不相干</text>
+  <text x="517" y="486" font-size="10" fill="#4A473F" text-anchor="middle">NSID 是 subsystem 内编号</text>
+  <text x="517" y="504" font-size="10" fill="#4A473F" text-anchor="middle">跨路径身份认 NGUID</text>
+
+  <!-- Panel A bottom note -->
+  <rect x="76" y="552" width="534" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="343" y="574" font-size="10.5" fill="#4A473F" text-anchor="middle">configfs 三步：mkdir subsystem → mkdir namespace（device_path + enable）→ ln -s 到 port</text>
+  <text x="343" y="594" font-size="10.5" fill="#4A473F" text-anchor="middle">权限挂在 subsystem，容量挂在 namespace，地址挂在 port——三者正交</text>
+
+  <!-- ============ Panel B：动态 controller ============ -->
+  <text x="640" y="114" font-size="13" font-weight="700" fill="#4A473F">B · connect 时动态创建的 controller</text>
+
+  <rect x="640" y="136" width="280" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="780" y="158" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">host B → tenantA：Connect 被拒</text>
+  <text x="780" y="178" font-size="10.5" fill="#733428" text-anchor="middle">hostnqn 不在 allowed_hosts</text>
+  <text x="780" y="196" font-size="10.5" fill="#733428" text-anchor="middle">返回失败状态，连接随即关闭</text>
+
+  <rect x="640" y="246" width="280" height="100" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="780" y="268" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Controller · cntlid=1（tenantA 内）</text>
+  <text x="780" y="290" font-size="10.5" fill="#2C4460" text-anchor="middle">host A 每次 connect 得到一个实例</text>
+  <text x="780" y="308" font-size="10.5" fill="#2C4460" text-anchor="middle">Admin + N 条 IO 队列</text>
+  <text x="780" y="326" font-size="10.5" fill="#2C4460" text-anchor="middle">每条队列独占一条 QP/TCP 连接</text>
+
+  <rect x="640" y="412" width="280" height="96" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="780" y="434" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Controller · cntlid=7（tenantB 内）</text>
+  <text x="780" y="456" font-size="10.5" fill="#2C4460" text-anchor="middle">host B connect 时创建</text>
+  <text x="780" y="474" font-size="10.5" fill="#2C4460" text-anchor="middle">另一套完全独立的队列</text>
+
+  <rect x="640" y="524" width="280" height="84" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="780" y="546" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">队列属于 controller（3.10 同款事实）</text>
+  <text x="780" y="566" font-size="10" fill="#4A473F" text-anchor="middle">fabric 上每 host 独享 controller 与队列</text>
+  <text x="780" y="584" font-size="10" fill="#4A473F" text-anchor="middle">但盘的 FTL/GC 共享——隔离止于队列层</text>
+
+  <!-- subsystem -> controller arrows -->
+  <path d="M610,296 L634,296" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <path d="M610,460 L634,460" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ============ Panel C：Host 视图 ============ -->
+  <text x="950" y="114" font-size="13" font-weight="700" fill="#4A473F">C · Host 侧看到什么</text>
+
+  <rect x="950" y="246" width="242" height="150" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1071" y="270" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Host A（nqn.…:hostA）</text>
+  <text x="1071" y="294" font-size="10.5" fill="#24473F" text-anchor="middle">/dev/nvme1n1 ← NGUID …a1</text>
+  <text x="1071" y="314" font-size="10.5" fill="#24473F" text-anchor="middle">/dev/nvme1n2 ← NGUID …a2</text>
+  <text x="1071" y="336" font-size="10" fill="#24473F" text-anchor="middle">nvme list 每行 = 一个 namespace</text>
+  <text x="1071" y="356" font-size="10" fill="#24473F" text-anchor="middle">tenantB 的卷完全不可见</text>
+
+  <rect x="950" y="412" width="242" height="124" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1071" y="436" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Host B（nqn.…:hostB）</text>
+  <text x="1071" y="460" font-size="10.5" fill="#24473F" text-anchor="middle">/dev/nvme1n1 ← NGUID …b7</text>
+  <text x="1071" y="482" font-size="10" fill="#24473F" text-anchor="middle">与 Host A 的 nvme1n1 同名</text>
+  <text x="1071" y="500" font-size="10" fill="#24473F" text-anchor="middle">但不是同一块盘</text>
+
+  <rect x="950" y="552" width="242" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="1071" y="574" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">挂载与脚本认 /dev/disk/by-id</text>
+  <text x="1071" y="594" font-size="10" fill="#6B4E28" text-anchor="middle">（NGUID/UUID）——设备名会漂</text>
+
+  <!-- controller -> host arrows -->
+  <path d="M920,296 L944,296" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <path d="M920,460 L944,460" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+
+  <!-- ============ Panel D：切分粒度对账 ============ -->
+  <text x="48" y="648" font-size="13" font-weight="700" fill="#4A473F">D · 切分粒度的账：subsystem 怎么切，决定连接数、内存与故障域</text>
+
+  <rect x="48" y="662" width="1144" height="40" rx="7" fill="#EDEBE3" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="620" y="687" font-size="11.5" font-weight="700" fill="#2B2A26" text-anchor="middle">连接数 ≈ host 数 × 每 host 可见 subsystem 数 × (1 + 每 subsystem IO 队列数)　——　64 host × 4 subsystem × (1+8) = 2304 条连接 / QP</text>
+
+  <rect x="48" y="716" width="560" height="130" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="64" y="740" font-size="12.5" font-weight="700" fill="#6B4E28">切粗：一个大 subsystem 装全部 namespace</text>
+  <text x="64" y="764" font-size="10.5" fill="#6B4E28">+ 连接/QP 少，target 每连接缓冲内存省，QP cache 不抖</text>
+  <text x="64" y="784" font-size="10.5" fill="#6B4E28">− ACL 只能整包授予：host 连上即可见该 subsystem 全部卷</text>
+  <text x="64" y="804" font-size="10.5" fill="#6B4E28">− 同 controller 的卷共享队列：一个卷的写洪峰挤压其余卷的 p99</text>
+  <text x="64" y="824" font-size="10.5" fill="#6B4E28">− 故障域大：subsystem 级操作（如下线）波及全部卷</text>
+
+  <rect x="632" y="716" width="560" height="130" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="648" y="740" font-size="12.5" font-weight="700" fill="#2C4460">切细：每租户（甚至每卷）一个 subsystem</text>
+  <text x="648" y="764" font-size="10.5" fill="#2C4460">+ ACL 与故障域精确到租户/卷；队列按 subsystem 独立，互不挤压</text>
+  <text x="648" y="784" font-size="10.5" fill="#2C4460">− 连接数成倍放大 → target 内存 + RDMA QP cache 压力 → 尾延迟上行</text>
+  <text x="648" y="804" font-size="10.5" fill="#2C4460">缓解：connect 时用 nr_io_queues 收敛每 subsystem 的队列数</text>
+  <text x="648" y="824" font-size="10.5" fill="#2C4460">口径：性能隔离仍止于队列层——盘上 FTL/GC 的噪声照传</text>
+</svg>

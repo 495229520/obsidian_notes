@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>NVMe-oF Target 亲和性：对齐与错位对比</title>
+  <desc>左侧为 NIC、CPU、HugePage、SSD 全部落在 NUMA node0 的对齐拓扑，数据路径 0 次穿越 UPI；右侧为 reactor 与内存落在 node1 的错位拓扑，同一笔写 IO 两次横穿 UPI；底部为对齐四步清单。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBad" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">NVMe-oF Target 亲和性：让 NIC、CPU、内存、SSD 落在同一个 NUMA 节点</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">判断准则：一笔 IO 的数据（不是控制流）横穿 CPU 互联（UPI）的次数 = 0 才算对齐 —— 每多穿一次，带宽上限与 p99 各挨一刀</text>
+
+  <!-- Panel A: aligned -->
+  <rect x="56" y="106" width="552" height="452" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="134" font-size="13" font-weight="700" fill="#2F6B5E">A · 对齐：一笔写 IO 全程本地，UPI 穿越 0 次</text>
+
+  <rect x="76" y="150" width="512" height="322" rx="8" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="92" y="172" font-size="12" font-weight="700" fill="#3D5A80">NUMA node 0</text>
+
+  <rect x="100" y="188" width="160" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="180" y="212" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">NIC（mlx5_0）</text>
+  <text x="180" y="231" font-size="10.5" fill="#2C4460" text-anchor="middle">numa_node = 0</text>
+
+  <rect x="330" y="188" width="230" height="60" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="445" y="212" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Reactor 核（node0 的核）</text>
+  <text x="445" y="231" font-size="10.5" fill="#24473F" text-anchor="middle">spdk -m 掩码只圈 node0 CPU</text>
+
+  <rect x="100" y="300" width="200" height="60" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="200" y="324" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">HugePage 数据缓冲</text>
+  <text x="200" y="343" font-size="10.5" fill="#6B4E28" text-anchor="middle">按节点预留在 node0 内存</text>
+
+  <rect x="360" y="300" width="200" height="60" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="460" y="324" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">NVMe SSD（nvme0）</text>
+  <text x="460" y="343" font-size="10.5" fill="#4A3F68" text-anchor="middle">numa_node = 0</text>
+
+  <line x1="180" y1="248" x2="196" y2="296" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="118" y="278" font-size="10.5" fill="#4A473F">① 网卡 DMA 写入</text>
+  <line x1="330" y1="234" x2="252" y2="302" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="286" y="284" font-size="10.5" fill="#4A473F">② CPU 本地访存</text>
+  <line x1="304" y1="330" x2="356" y2="330" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="330" y="318" font-size="10.5" fill="#4A473F" text-anchor="middle">③ SSD DMA 读走</text>
+
+  <rect x="100" y="386" width="460" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="118" y="410" font-size="11" fill="#24473F">数据从网口进来 DMA 进本节点内存，reactor 核本地读写，</text>
+  <text x="118" y="428" font-size="11" fill="#24473F">SSD 再从本地内存 DMA 落盘 —— 互联流量为 0，</text>
+  <text x="118" y="444" font-size="11" font-weight="700" fill="#24473F">内存带宽与延迟都是本地口径</text>
+
+  <text x="76" y="540" font-size="11.5" fill="#4A473F">另一半盘挂在 node1？给 node1 的核起第二组 reactor，</text>
+  <text x="76" y="556" font-size="11.5" fill="#4A473F">各管各的盘 —— 两个「岛」互不串门</text>
+
+  <!-- Panel B: misaligned -->
+  <rect x="632" y="106" width="552" height="452" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="652" y="134" font-size="13" font-weight="700" fill="#A64B3C">B · 错位：reactor 与内存在 node1，同一笔 IO 两次过 UPI</text>
+
+  <rect x="652" y="150" width="228" height="322" rx="8" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="668" y="172" font-size="12" font-weight="700" fill="#3D5A80">NUMA node 0</text>
+
+  <rect x="672" y="188" width="188" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="766" y="212" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">NIC（mlx5_0）</text>
+  <text x="766" y="231" font-size="10.5" fill="#2C4460" text-anchor="middle">numa_node = 0</text>
+
+  <rect x="672" y="300" width="188" height="60" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="766" y="324" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">NVMe SSD（nvme0）</text>
+  <text x="766" y="343" font-size="10.5" fill="#4A3F68" text-anchor="middle">numa_node = 0</text>
+
+  <rect x="936" y="150" width="228" height="322" rx="8" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="952" y="172" font-size="12" font-weight="700" fill="#A64B3C">NUMA node 1</text>
+
+  <rect x="956" y="188" width="188" height="60" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1050" y="212" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">Reactor 核（node1）</text>
+  <text x="1050" y="231" font-size="10.5" fill="#733428" text-anchor="middle">掩码圈错了节点</text>
+
+  <rect x="956" y="300" width="188" height="60" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1050" y="324" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">HugePage 缓冲</text>
+  <text x="1050" y="343" font-size="10.5" fill="#733428" text-anchor="middle">首触碰在 node1 → 页在 node1</text>
+
+  <!-- UPI link -->
+  <rect x="884" y="240" width="48" height="140" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="908" y="316" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle" transform="rotate(-90 908 316)">UPI 互联</text>
+
+  <line x1="836" y1="222" x2="972" y2="298" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrBad)"/>
+  <text x="860" y="266" font-size="10.5" font-weight="700" fill="#A64B3C">① 网卡 DMA 跨节点写内存</text>
+  <line x1="956" y1="344" x2="844" y2="344" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrBad)"/>
+  <text x="900" y="366" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">② SSD 跨节点读内存</text>
+
+  <rect x="672" y="386" width="472" height="66" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="690" y="410" font-size="11" fill="#733428">同一笔数据两次横穿 UPI，reactor 每次访存都是远端；</text>
+  <text x="690" y="428" font-size="11" fill="#733428">互联带宽成为整机上限，且与其他流量共享 ——</text>
+  <text x="690" y="444" font-size="11" font-weight="700" fill="#733428">平均延迟 +几百 ns/次访存，p99 随互联拥塞抖动</text>
+
+  <text x="652" y="540" font-size="11.5" fill="#4A473F">最隐蔽的一种错位：掩码对了，但 HugePage 在错误节点上</text>
+  <text x="652" y="556" font-size="11.5" fill="#4A473F">首触碰 —— CPU 户口对，内存户口错，症状完全相同</text>
+
+  <!-- Bottom checklist -->
+  <text x="56" y="600" font-size="14" font-weight="700" fill="#2B2A26">对齐四步<tspan font-size="11.5" fill="#6B675C" font-weight="400">（先查户口，再绑资源，最后用对照实验验证 —— 顺序不能反）</tspan></text>
+
+  <rect x="56" y="618" width="250" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="181" y="642" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① 查设备户口</text>
+  <text x="181" y="660" font-size="10.5" fill="#2C4460" text-anchor="middle">cat /sys/…/device/numa_node</text>
+  <text x="181" y="676" font-size="10.5" fill="#2C4460" text-anchor="middle">NIC 与 SSD 各查一遍</text>
+
+  <rect x="346" y="618" width="250" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="471" y="642" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">② 圈同节点的核</text>
+  <text x="471" y="660" font-size="10.5" fill="#24473F" text-anchor="middle">spdk_tgt -m 0xFC（reactor 掩码）</text>
+  <text x="471" y="676" font-size="10.5" fill="#24473F" text-anchor="middle">避开 core 0 与中断核</text>
+
+  <rect x="636" y="618" width="250" height="70" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="761" y="642" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 内存按节点预留</text>
+  <text x="761" y="660" font-size="10.5" fill="#6B4E28" text-anchor="middle">node0/hugepages/…/nr_hugepages</text>
+  <text x="761" y="676" font-size="10.5" fill="#6B4E28" text-anchor="middle">别用不分节点的全局参数</text>
+
+  <rect x="926" y="618" width="250" height="70" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1051" y="642" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">④ 对照实验验证</text>
+  <text x="1051" y="660" font-size="10.5" fill="#4A3F68" text-anchor="middle">同负载跑「对齐 / 故意错位」两遍</text>
+  <text x="1051" y="676" font-size="10.5" fill="#4A3F68" text-anchor="middle">对比带宽上限与 p99</text>
+
+  <line x1="310" y1="653" x2="342" y2="653" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="600" y1="653" x2="632" y2="653" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="890" y1="653" x2="922" y2="653" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <text x="56" y="726" font-size="11.5" fill="#4A473F">NIC 与 SSD 不同节点、又只想起一组 reactor 时：跟着 NIC 走 —— 网络数据要经内存中转两次（收包 + 落盘），盘侧只过一次，</text>
+  <text x="56" y="746" font-size="11.5" fill="#4A473F">把便宜的那次穿越留给 UPI。这是取舍不是定理：RDMA 直读直写时账会变，先画数据路径再决定。</text>
+</svg>

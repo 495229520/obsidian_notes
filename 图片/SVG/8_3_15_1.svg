@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>TRIM/Discard 跨层路径</title>
+  <desc>一次删除如何从用户态穿过文件系统、块层到达 FTL：三个入口、两种下发时机、L2P 失效与 GC 受益，底部为有无 TRIM 的 GC 账本对照。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">TRIM / Discard：一句"这段 LBA 我不要了"如何穿过四层</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">删除文件只改文件系统的账本——消息不传到设备，FTL 就永远以为旧数据还活着，GC 白白搬运</text>
+
+  <!-- L1 用户态 -->
+  <rect x="56" y="106" width="1128" height="118" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="128" font-size="12" font-weight="700" fill="#3D5A80">用户态 · 三个入口</text>
+
+  <rect x="80" y="142" width="250" height="62" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="205" y="165" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① rm / unlink / truncate</text>
+  <text x="205" y="183" font-size="10.5" fill="#2C4460" text-anchor="middle">日常路径：删文件、缩文件</text>
+  <text x="205" y="197" font-size="10.5" fill="#2C4460" text-anchor="middle">fallocate(PUNCH_HOLE) 同类</text>
+
+  <rect x="420" y="142" width="250" height="62" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="545" y="165" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② fstrim（批量补发）</text>
+  <text x="545" y="183" font-size="10.5" fill="#2C4460" text-anchor="middle">扫描整个已挂载文件系统的空闲块</text>
+  <text x="545" y="197" font-size="10.5" fill="#2C4460" text-anchor="middle">发行版默认 fstrim.timer 每周一次</text>
+
+  <rect x="760" y="142" width="250" height="62" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="885" y="165" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">③ blkdiscard（整设备）</text>
+  <text x="885" y="183" font-size="10.5" fill="#733428" text-anchor="middle">绕过文件系统直接对块设备下发</text>
+  <text x="885" y="197" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">毁灭性：等价逻辑清盘</text>
+
+  <!-- L2 文件系统 -->
+  <rect x="56" y="234" width="1128" height="130" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="256" font-size="12" font-weight="700" fill="#2F6B5E">内核 · 文件系统（ext4 / XFS）</text>
+
+  <rect x="80" y="272" width="250" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="205" y="295" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">块标回空闲：只改位图/元数据</text>
+  <text x="205" y="313" font-size="10.5" fill="#24473F" text-anchor="middle">数据块内容原封不动</text>
+  <text x="205" y="327" font-size="10.5" fill="#24473F" text-anchor="middle">设备侧对此一无所知</text>
+
+  <rect x="420" y="272" width="250" height="62" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="545" y="291" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">下发时机二选一</text>
+  <text x="545" y="309" font-size="10.5" fill="#6B4E28" text-anchor="middle">-o discard：每次释放实时发（碎、频繁）</text>
+  <text x="545" y="325" font-size="10.5" fill="#6B4E28" text-anchor="middle">默认：先不发，攒给 fstrim 批量发（大、整）</text>
+
+  <rect x="760" y="272" width="250" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="885" y="295" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">fstrim：FITRIM ioctl</text>
+  <text x="885" y="313" font-size="10.5" fill="#24473F" text-anchor="middle">文件系统把"当前空闲"的 LBA 段</text>
+  <text x="885" y="327" font-size="10.5" fill="#24473F" text-anchor="middle">整段整段交给块层</text>
+
+  <!-- L3 块层 -->
+  <rect x="56" y="374" width="1128" height="118" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="396" font-size="12" font-weight="700" fill="#6B5B95">内核 · 块层 blk-mq</text>
+
+  <rect x="250" y="410" width="290" height="62" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="395" y="433" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">REQ_OP_DISCARD bio</text>
+  <text x="395" y="451" font-size="10.5" fill="#4A3F68" text-anchor="middle">与读写同一条下发管道，但只带范围不带数据</text>
+  <text x="395" y="465" font-size="10.5" fill="#4A3F68" text-anchor="middle">按 discard_granularity / max_bytes 拆分对齐</text>
+
+  <rect x="640" y="410" width="290" height="62" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="785" y="433" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">堆叠层逐层透传</text>
+  <text x="785" y="451" font-size="10.5" fill="#4A3F68" text-anchor="middle">LVM / dm-crypt / md 任一层不支持或未开启</text>
+  <text x="785" y="465" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">discard 就在这里静默消失（lsblk -D 排查）</text>
+
+  <!-- L4 设备 -->
+  <rect x="56" y="502" width="1128" height="150" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="524" font-size="12" font-weight="700" fill="#A64B3C">硬件 · NVMe 控制器 + FTL</text>
+
+  <rect x="110" y="540" width="290" height="62" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="255" y="563" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">DSM Deallocate 命令</text>
+  <text x="255" y="581" font-size="10.5" fill="#733428" text-anchor="middle">一条命令最多携带 256 个 LBA 范围</text>
+  <text x="255" y="595" font-size="10.5" fill="#733428" text-anchor="middle">SATA 叫 TRIM，SCSI 叫 UNMAP，语义同类</text>
+
+  <rect x="470" y="540" width="290" height="62" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="2"/>
+  <text x="615" y="563" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">FTL：L2P 表项标失效</text>
+  <text x="615" y="581" font-size="10.5" fill="#733428" text-anchor="middle">只改映射表，不擦 NAND——擦除由 GC 延后做</text>
+  <text x="615" y="595" font-size="10.5" fill="#733428" text-anchor="middle">再读该 LBA：查表即返回（DLFEAT 定返回值）</text>
+
+  <rect x="830" y="540" width="290" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="975" y="563" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">GC 受益（异步兑现）</text>
+  <text x="975" y="581" font-size="10.5" fill="#24473F" text-anchor="middle">牺牲块里的有效页变少（u 下降）</text>
+  <text x="975" y="595" font-size="10.5" fill="#24473F" text-anchor="middle">搬运减少 → WAF 下降、稳态 IOPS 回升</text>
+
+  <!-- 连接箭头 -->
+  <line x1="205" y1="208" x2="205" y2="268" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="545" y1="208" x2="885" y2="268" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="334" y1="303" x2="416" y2="303" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="545" y1="338" x2="420" y2="406" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="885" y1="338" x2="480" y2="406" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="885" y1="208" x2="500" y2="406" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="544" y1="441" x2="636" y2="441" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="785" y1="476" x2="270" y2="536" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="404" y1="571" x2="466" y2="571" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="764" y1="571" x2="826" y2="571" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 底部：GC 账本对照 -->
+  <text x="64" y="694" font-size="14" font-weight="700" fill="#2B2A26">同一次删除，GC 眼里的两本账<tspan font-size="11.5" fill="#6B675C" font-weight="400">（对照 3.5：WAF = 1/(1−u)，u = 牺牲块有效页占比）</tspan></text>
+
+  <rect x="80" y="712" width="520" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="96" y="736" font-size="12" font-weight="700" fill="#733428">无 TRIM：删掉的数据仍被 FTL 记为有效</text>
+  <text x="96" y="756" font-size="10.5" fill="#733428">文件系统的"空闲"与 FTL 的"有效"两本账脱节，</text>
+  <text x="96" y="772" font-size="10.5" fill="#733428">GC 忠实搬运死数据：u 虚高 → WAF 高 → 稳态写慢、寿命耗损快</text>
+
+  <rect x="640" y="712" width="520" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="656" y="736" font-size="12" font-weight="700" fill="#24473F">有 TRIM：两本账重新对齐</text>
+  <text x="656" y="756" font-size="10.5" fill="#24473F">失效信息传达到 L2P，死数据不再被搬运：u 回落 → WAF 下降，</text>
+  <text x="656" y="772" font-size="10.5" fill="#24473F">效果上等价于临时多出一块 OP（3.5 的容量余量逻辑）</text>
+
+  <text x="80" y="822" font-size="11.5" fill="#4A473F">口径提醒：TRIM 是提示（hint）而非指令——设备可以延迟、合并甚至忽略它；它既不立即擦除 NAND，也不是安全擦除。</text>
+  <text x="80" y="842" font-size="11.5" fill="#4A473F">需要"读回必为零"的语义要看 id-ns 的 DLFEAT，或改用 Write Zeroes / Format NVM。</text>
+</svg>

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Rate Limiter 与前后台资源隔离</title>
+  <desc>前台 IO 直达共享设备队列，Flush 与 Compaction 先经令牌桶取配额；下方展示限太松与限太紧两种失衡如何都打到前台延迟。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Rate Limiter：后台限速，前台让路</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">限速必须发生在 IO 进队列之前 —— 已经下发的 IO，谁也撤不回来</text>
+
+  <!-- A · 全景 -->
+  <rect x="56" y="104" width="1128" height="414" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="128" font-size="13" font-weight="700" fill="#4A473F">A · 一块盘、一条共享队列、两种待遇</text>
+
+  <!-- 发起方 -->
+  <rect x="76" y="150" width="240" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="196" y="174" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">前台用户线程</text>
+  <text x="196" y="194" font-size="10.5" fill="#2C4460" text-anchor="middle">WAL 追加：KB 级 + fsync</text>
+  <text x="196" y="211" font-size="10.5" fill="#2C4460" text-anchor="middle">读未命中：4KB～几十 KB</text>
+
+  <rect x="76" y="280" width="240" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="196" y="303" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">后台 HIGH 池 · Flush</text>
+  <text x="196" y="322" font-size="10.5" fill="#24473F" text-anchor="middle">MemTable → SST</text>
+  <text x="196" y="339" font-size="10.5" fill="#24473F" text-anchor="middle">几十 MB 顺序写</text>
+
+  <rect x="76" y="390" width="240" height="72" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="196" y="413" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">后台 LOW 池 · Compaction</text>
+  <text x="196" y="432" font-size="10.5" fill="#6B4E28" text-anchor="middle">归并多层 SST</text>
+  <text x="196" y="449" font-size="10.5" fill="#6B4E28" text-anchor="middle">GB 级持续读 + 写</text>
+
+  <!-- 令牌桶 -->
+  <rect x="440" y="260" width="330" height="232" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="605" y="286" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">GenericRateLimiter · 令牌桶</text>
+  <text x="605" y="306" font-size="10.5" fill="#6B4E28" text-anchor="middle">每 100ms 补一次配额（bytes_per_second）</text>
+
+  <rect x="456" y="320" width="142" height="44" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="527" y="338" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">HIGH 等待队列</text>
+  <text x="527" y="355" font-size="9.5" fill="#24473F" text-anchor="middle">Flush 线程睡这里</text>
+  <rect x="612" y="320" width="142" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="683" y="338" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">LOW 等待队列</text>
+  <text x="683" y="355" font-size="9.5" fill="#4A473F" text-anchor="middle">Compaction 线程睡这里</text>
+
+  <text x="605" y="392" font-size="10.5" fill="#6B4E28" text-anchor="middle">配额不足 → 挂队列，睡在 condition_variable 上</text>
+  <text x="605" y="412" font-size="10.5" fill="#6B4E28" text-anchor="middle">HIGH 优先；LOW 以 1/fairness 概率插队，防饿死</text>
+  <text x="605" y="432" font-size="10.5" fill="#6B4E28" text-anchor="middle">大 IO 拆成 ≤ 单周期配额的块，逐次申请</text>
+  <text x="605" y="462" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">背压：盘消化不动 → 后台线程被这里拦下睡觉</text>
+
+  <!-- 设备队列 -->
+  <rect x="880" y="150" width="290" height="342" rx="8" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="1025" y="176" font-size="13" font-weight="700" fill="#2B2A26" text-anchor="middle">设备队列（共享）</text>
+  <text x="1025" y="195" font-size="10" fill="#6B675C" text-anchor="middle">blk-mq → NVMe SQ → 盘内调度</text>
+
+  <text x="900" y="222" font-size="10" fill="#6B675C">队头（正在服务）↓</text>
+  <rect x="900" y="230" width="250" height="30" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1025" y="249" font-size="10.5" fill="#733428" text-anchor="middle">1MB 写 · compaction</text>
+  <rect x="900" y="266" width="250" height="30" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1025" y="285" font-size="10.5" fill="#733428" text-anchor="middle">1MB 写 · compaction</text>
+  <rect x="900" y="302" width="250" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1025" y="321" font-size="10.5" fill="#24473F" text-anchor="middle">flush 顺序写</text>
+  <rect x="900" y="338" width="250" height="30" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="2"/>
+  <text x="1025" y="357" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">4KB 读 · 前台（在等！）</text>
+
+  <text x="900" y="396" font-size="10.5" font-weight="700" fill="#733428">队头阻塞：小读排在大写之后</text>
+  <text x="900" y="414" font-size="10.5" fill="#4A473F">空载 ~百 μs → 压队时 ms 级</text>
+  <text x="900" y="432" font-size="10.5" fill="#4A473F">SSD 内部 GC 再放大一层</text>
+  <text x="900" y="462" font-size="10.5" font-weight="700" fill="#2B2A26">入队后无法撤回</text>
+  <text x="900" y="479" font-size="10.5" fill="#6B675C">→ 所以限速长在引擎用户态</text>
+
+  <!-- 连线 -->
+  <line x1="316" y1="190" x2="876" y2="190" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="596" y="182" font-size="10.5" fill="#2C4460" text-anchor="middle">不经过限速（前台自己的闸门是 write stall → 6.14）</text>
+
+  <line x1="316" y1="316" x2="436" y2="330" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="376" y="308" font-size="9.5" fill="#4A473F" text-anchor="middle">Request(bytes, IO_HIGH)</text>
+  <line x1="316" y1="426" x2="436" y2="412" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="376" y="446" font-size="9.5" fill="#4A473F" text-anchor="middle">Request(bytes, IO_LOW)</text>
+
+  <line x1="770" y1="376" x2="876" y2="376" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="823" y="366" font-size="10" fill="#4A473F" text-anchor="middle">取到令牌才下发</text>
+
+  <!-- B · 两种失衡 -->
+  <text x="68" y="556" font-size="14" font-weight="700" fill="#2B2A26">B · 两种失衡，殊途同归打到前台延迟</text>
+
+  <rect x="56" y="568" width="536" height="150" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="592" font-size="12.5" font-weight="700" fill="#733428">太松 → 设备排队，即刻打 p99</text>
+  <rect x="76" y="606" width="140" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="146" y="632" font-size="10.5" fill="#6B4E28" text-anchor="middle">compaction 全速</text>
+  <line x1="216" y1="628" x2="248" y2="628" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <rect x="252" y="606" width="150" height="44" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="327" y="626" font-size="10.5" fill="#733428" text-anchor="middle">共享队列被</text>
+  <text x="327" y="642" font-size="10.5" fill="#733428" text-anchor="middle">大块写占满</text>
+  <line x1="402" y1="628" x2="434" y2="628" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <rect x="438" y="606" width="140" height="44" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="508" y="632" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">前台 p99 毛刺</text>
+  <text x="76" y="678" font-size="10.5" fill="#6B675C">特征：aqu-sz 高；读延迟曲线与 compaction 流量同相位（9.5）</text>
+  <text x="76" y="698" font-size="10.5" fill="#6B675C">时间尺度：即刻兑现</text>
+
+  <rect x="648" y="568" width="536" height="150" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="668" y="592" font-size="12.5" font-weight="700" fill="#6B4E28">太紧 → 债务堆积，延迟引爆</text>
+  <rect x="668" y="606" width="140" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="738" y="632" font-size="10.5" fill="#6B4E28" text-anchor="middle">compaction 落后</text>
+  <line x1="808" y1="628" x2="840" y2="628" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <rect x="844" y="606" width="150" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="919" y="626" font-size="10.5" fill="#6B4E28" text-anchor="middle">L0 文件数 /</text>
+  <text x="919" y="642" font-size="10.5" fill="#6B4E28" text-anchor="middle">pending bytes 上涨</text>
+  <line x1="994" y1="628" x2="1026" y2="628" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <rect x="1030" y="606" width="140" height="44" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1100" y="626" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">Write Stall</text>
+  <text x="1100" y="642" font-size="10.5" fill="#733428" text-anchor="middle">前台写被降速（6.14）</text>
+  <text x="668" y="678" font-size="10.5" fill="#6B675C">特征：前期一切平滑，rocksdb.stall.micros 随后陡增</text>
+  <text x="668" y="698" font-size="10.5" fill="#6B675C">时间尺度：滞后引爆</text>
+
+  <rect x="56" y="734" width="1128" height="40" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="620" y="759" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">合适区间：债务（pending_compaction_bytes）有界且不趋势上涨的前提下，取最低限速 —— 盯 p99 与队列深度，不看均值</text>
+</svg>

@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>数据放置与 Rebalance：从 hash 取模到一致性哈希，以及迁移的代价</title>
+  <desc>面板 A 展示 hash 取模在节点数变化时导致约八成 key 重新映射；面板 B 用一致性哈希环展示加入新节点只迁移相邻区间；面板 C 展示 rebalance 的触发、迁移集计算、节流执行与路由切换流程及量级估算。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">数据放置：位置是函数的输出，搬多少数据由函数形状决定</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">判断准则：好的放置函数要同时买三样——均衡、跨故障域、成员变化时最小搬迁；hash % N 三样全输</text>
+
+  <!-- Panel A -->
+  <rect x="56" y="104" width="368" height="326" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="74" y="130" font-size="13" font-weight="700" fill="#4A473F">A · hash % N：换分母 = 全局洗牌</text>
+
+  <text x="74" y="158" font-size="10.5" fill="#4A473F">20 个 key（按 hash 值 0–19），4 节点 → 5 节点：</text>
+
+  <text x="74" y="184" font-size="10" fill="#6B675C">hash % 4</text>
+  <!-- row1: owner = h%4 -->
+  <g font-size="8.5" text-anchor="middle" fill="#4A473F">
+    <rect x="150" y="170" width="12" height="18" fill="#E3EAF4" stroke="#9B968A" stroke-width="0.6"/><text x="156" y="183">0</text>
+    <rect x="163" y="170" width="12" height="18" fill="#DCE9E3" stroke="#9B968A" stroke-width="0.6"/><text x="169" y="183">1</text>
+    <rect x="176" y="170" width="12" height="18" fill="#F3E8D3" stroke="#9B968A" stroke-width="0.6"/><text x="182" y="183">2</text>
+    <rect x="189" y="170" width="12" height="18" fill="#EDEAF3" stroke="#9B968A" stroke-width="0.6"/><text x="195" y="183">3</text>
+    <rect x="202" y="170" width="12" height="18" fill="#E3EAF4" stroke="#9B968A" stroke-width="0.6"/><text x="208" y="183">0</text>
+    <rect x="215" y="170" width="12" height="18" fill="#DCE9E3" stroke="#9B968A" stroke-width="0.6"/><text x="221" y="183">1</text>
+    <rect x="228" y="170" width="12" height="18" fill="#F3E8D3" stroke="#9B968A" stroke-width="0.6"/><text x="234" y="183">2</text>
+    <rect x="241" y="170" width="12" height="18" fill="#EDEAF3" stroke="#9B968A" stroke-width="0.6"/><text x="247" y="183">3</text>
+    <rect x="254" y="170" width="12" height="18" fill="#E3EAF4" stroke="#9B968A" stroke-width="0.6"/><text x="260" y="183">0</text>
+    <rect x="267" y="170" width="12" height="18" fill="#DCE9E3" stroke="#9B968A" stroke-width="0.6"/><text x="273" y="183">1</text>
+    <rect x="280" y="170" width="12" height="18" fill="#F3E8D3" stroke="#9B968A" stroke-width="0.6"/><text x="286" y="183">2</text>
+    <rect x="293" y="170" width="12" height="18" fill="#EDEAF3" stroke="#9B968A" stroke-width="0.6"/><text x="299" y="183">3</text>
+    <rect x="306" y="170" width="12" height="18" fill="#E3EAF4" stroke="#9B968A" stroke-width="0.6"/><text x="312" y="183">0</text>
+    <rect x="319" y="170" width="12" height="18" fill="#DCE9E3" stroke="#9B968A" stroke-width="0.6"/><text x="325" y="183">1</text>
+    <rect x="332" y="170" width="12" height="18" fill="#F3E8D3" stroke="#9B968A" stroke-width="0.6"/><text x="338" y="183">2</text>
+    <rect x="345" y="170" width="12" height="18" fill="#EDEAF3" stroke="#9B968A" stroke-width="0.6"/><text x="351" y="183">3</text>
+    <rect x="358" y="170" width="12" height="18" fill="#E3EAF4" stroke="#9B968A" stroke-width="0.6"/><text x="364" y="183">0</text>
+    <rect x="371" y="170" width="12" height="18" fill="#DCE9E3" stroke="#9B968A" stroke-width="0.6"/><text x="377" y="183">1</text>
+    <rect x="384" y="170" width="12" height="18" fill="#F3E8D3" stroke="#9B968A" stroke-width="0.6"/><text x="390" y="183">2</text>
+    <rect x="397" y="170" width="12" height="18" fill="#EDEAF3" stroke="#9B968A" stroke-width="0.6"/><text x="403" y="183">3</text>
+  </g>
+
+  <text x="74" y="216" font-size="10" fill="#6B675C">hash % 5</text>
+  <!-- row2: owner = h%5, changed cells get red stroke -->
+  <g font-size="8.5" text-anchor="middle" fill="#4A473F">
+    <rect x="150" y="202" width="12" height="18" fill="#E3EAF4" stroke="#9B968A" stroke-width="0.6"/><text x="156" y="215">0</text>
+    <rect x="163" y="202" width="12" height="18" fill="#DCE9E3" stroke="#9B968A" stroke-width="0.6"/><text x="169" y="215">1</text>
+    <rect x="176" y="202" width="12" height="18" fill="#F3E8D3" stroke="#9B968A" stroke-width="0.6"/><text x="182" y="215">2</text>
+    <rect x="189" y="202" width="12" height="18" fill="#EDEAF3" stroke="#9B968A" stroke-width="0.6"/><text x="195" y="215">3</text>
+    <rect x="202" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="208" y="215">4</text>
+    <rect x="215" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="221" y="215">0</text>
+    <rect x="228" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="234" y="215">1</text>
+    <rect x="241" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="247" y="215">2</text>
+    <rect x="254" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="260" y="215">3</text>
+    <rect x="267" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="273" y="215">4</text>
+    <rect x="280" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="286" y="215">0</text>
+    <rect x="293" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="299" y="215">1</text>
+    <rect x="306" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="312" y="215">2</text>
+    <rect x="319" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="325" y="215">3</text>
+    <rect x="332" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="338" y="215">4</text>
+    <rect x="345" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="351" y="215">0</text>
+    <rect x="358" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="364" y="215">1</text>
+    <rect x="371" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="377" y="215">2</text>
+    <rect x="384" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="390" y="215">3</text>
+    <rect x="397" y="202" width="12" height="18" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/><text x="403" y="215">4</text>
+  </g>
+
+  <text x="74" y="252" font-size="10.5" font-weight="700" fill="#733428">红框 = 归属改变：16/20 = 80% 的 key 要搬</text>
+  <text x="74" y="274" font-size="10.5" fill="#4A473F">原因：模数一变，几乎每个 hash 值的余数都变，</text>
+  <text x="74" y="291" font-size="10.5" fill="#4A473F">映射函数没有任何「局部性」可言</text>
+  <text x="74" y="315" font-size="10" fill="#6B675C">一般规律：N → N+1 时约 N/(N+1) 的 key 换主</text>
+  <text x="74" y="332" font-size="10" fill="#6B675C">（20 个 hash 值里只有 0–3 满足 h%4 == h%5）</text>
+  <text x="74" y="360" font-size="10.5" fill="#4A473F">range 分片（按 key 区间切）可最小搬迁，</text>
+  <text x="74" y="377" font-size="10.5" fill="#4A473F">但顺序写全砸在尾部区间 = 热点，</text>
+  <text x="74" y="394" font-size="10.5" fill="#4A473F">且需要目录服务记录区间 → 节点映射</text>
+
+  <!-- Panel B -->
+  <rect x="448" y="104" width="736" height="326" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="466" y="130" font-size="13" font-weight="700" fill="#4A473F">B · 一致性哈希环：加节点只动它的邻接区间（≈ 1/N）</text>
+
+  <!-- ring -->
+  <circle cx="610" cy="278" r="108" fill="none" stroke="#9B968A" stroke-width="2"/>
+  <!-- moved arc: from B(90°) to X(135°) -->
+  <path d="M 718,278 A 108,108 0 0 1 686.4,354.4" fill="none" stroke="#B07D2B" stroke-width="10" opacity="0.75"/>
+
+  <!-- key dots -->
+  <circle cx="664" cy="184.5" r="4" fill="#5A564B"/>
+  <circle cx="703.5" cy="224" r="4" fill="#5A564B"/>
+  <circle cx="711.5" cy="314.9" r="4" fill="#B07D2B" stroke="#8A6A3A" stroke-width="1"/>
+  <circle cx="698.5" cy="340" r="4" fill="#B07D2B" stroke="#8A6A3A" stroke-width="1"/>
+  <circle cx="646.9" cy="379.5" r="4" fill="#5A564B"/>
+  <circle cx="573" cy="379.5" r="4" fill="#5A564B"/>
+  <circle cx="516.5" cy="332" r="4" fill="#5A564B"/>
+  <circle cx="516.5" cy="224" r="4" fill="#5A564B"/>
+  <circle cx="556" cy="184.5" r="4" fill="#5A564B"/>
+
+  <!-- nodes on ring -->
+  <circle cx="610" cy="170" r="14" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.6"/>
+  <text x="610" y="174" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">A</text>
+  <circle cx="718" cy="278" r="14" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="718" y="282" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">B</text>
+  <circle cx="686.4" cy="354.4" r="14" fill="#F3E8D3" stroke="#B07D2B" stroke-width="2"/>
+  <text x="686.4" y="358.4" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">X</text>
+  <circle cx="610" cy="386" r="14" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.6"/>
+  <text x="610" y="390" font-size="10" font-weight="700" fill="#6B5B95" text-anchor="middle">C</text>
+  <circle cx="502" cy="278" r="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.6"/>
+  <text x="502" y="282" font-size="10" font-weight="700" fill="#444441" text-anchor="middle">D</text>
+
+  <text x="686.4" y="382" font-size="9.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">新加入</text>
+  <line x1="762" y1="330" x2="732" y2="330" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arr)"/>
+  <text x="742" y="352" font-size="9.5" fill="#8A6A3A">(B, X] 区间的 key</text>
+  <text x="742" y="367" font-size="9.5" fill="#8A6A3A">归属：C → X</text>
+
+  <!-- annotations right -->
+  <text x="852" y="168" font-size="11" font-weight="700" fill="#4A473F">归属规则</text>
+  <text x="852" y="186" font-size="10.5" fill="#4A473F">key 与节点各自 hash 到环上；</text>
+  <text x="852" y="203" font-size="10.5" fill="#4A473F">key 顺时针遇到的第一个节点即其归属</text>
+
+  <text x="852" y="231" font-size="11" font-weight="700" fill="#4A473F">加入 X 之后</text>
+  <text x="852" y="249" font-size="10.5" fill="#4A473F">只有 (B, X] 区间换主（琥珀弧段），</text>
+  <text x="852" y="266" font-size="10.5" fill="#4A473F">其余 key 纹丝不动——期望搬迁量 ≈ K/N</text>
+
+  <text x="852" y="294" font-size="11" font-weight="700" fill="#4A473F">虚拟节点（vnode）</text>
+  <text x="852" y="312" font-size="10.5" fill="#4A473F">每个物理节点在环上撒 100+ 个点：</text>
+  <text x="852" y="329" font-size="10.5" fill="#4A473F">① 抹平随机方差（单点位置的运气）</text>
+  <text x="852" y="346" font-size="10.5" fill="#4A473F">② 权重 = 点数 → 支持异构容量</text>
+  <text x="852" y="363" font-size="10.5" fill="#4A473F">③ 一台故障，其区间分摊给全环而非单一邻居</text>
+
+  <text x="852" y="391" font-size="11" font-weight="700" fill="#4A473F">CRUSH 是同一目标的层级版</text>
+  <text x="852" y="409" font-size="10.5" fill="#4A473F">先选机架再选主机——故障域约束</text>
+  <text x="466" y="416" font-size="9.5" fill="#6B675C">环上小点 = key 的 hash 位置</text>
+
+  <!-- Panel C -->
+  <rect x="56" y="454" width="1128" height="316" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="74" y="480" font-size="13" font-weight="700" fill="#4A473F">C · Rebalance：迁移是后台流量，前台 p99 是代价</text>
+
+  <rect x="74" y="498" width="256" height="128" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="90" y="520" font-size="11.5" font-weight="700" fill="#6B4E28">① 触发</text>
+  <text x="90" y="541" font-size="10" fill="#6B4E28">扩容 / 缩容（成员变更）</text>
+  <text x="90" y="558" font-size="10" fill="#6B4E28">容量倾斜超阈值、盘将满</text>
+  <text x="90" y="575" font-size="10" fill="#6B4E28">权重 / 故障域拓扑调整</text>
+  <text x="90" y="599" font-size="9.5" fill="#8A6A3A">注意：盘坏触发的是 recovery——</text>
+  <text x="90" y="615" font-size="9.5" fill="#8A6A3A">冗余缺失，优先级高于 rebalance</text>
+
+  <rect x="358" y="498" width="256" height="128" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="374" y="520" font-size="11.5" font-weight="700" fill="#2C4460">② 计算迁移集</text>
+  <text x="374" y="541" font-size="10" fill="#2C4460">迁移集 = diff(旧映射, 新映射)</text>
+  <text x="374" y="558" font-size="10" fill="#2C4460">按分片（shard/PG）为单位，</text>
+  <text x="374" y="575" font-size="10" fill="#2C4460">不是按对象逐个算</text>
+  <text x="374" y="599" font-size="9.5" fill="#3D5A80">「受控搬迁」在此兑现：</text>
+  <text x="374" y="615" font-size="9.5" fill="#3D5A80">搬迁量 ≈ 容量变化占比，非全量</text>
+
+  <rect x="642" y="498" width="256" height="128" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="658" y="520" font-size="11.5" font-weight="700" fill="#733428">③ 节流执行</text>
+  <text x="658" y="541" font-size="10" fill="#733428">迁移读源盘、写目标盘、占网络，</text>
+  <text x="658" y="558" font-size="10" fill="#733428">与前台抢同一批资源</text>
+  <text x="658" y="575" font-size="10" fill="#733428">不节流 = 前台 p99 先死</text>
+  <text x="658" y="599" font-size="9.5" fill="#A64B3C">旋钮：带宽上限、并发迁移分片数、</text>
+  <text x="658" y="615" font-size="9.5" fill="#A64B3C">低峰窗口、按前台压力自适应退让</text>
+
+  <rect x="926" y="498" width="240" height="128" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="942" y="520" font-size="11.5" font-weight="700" fill="#24473F">④ 切换路由</text>
+  <text x="942" y="541" font-size="10" fill="#24473F">源节点持续服务 + 增量追赶</text>
+  <text x="942" y="558" font-size="10" fill="#24473F">→ 尾部短暂封禁写（毫秒级）</text>
+  <text x="942" y="575" font-size="10" fill="#24473F">→ epoch+1 发布新映射</text>
+  <text x="942" y="599" font-size="9.5" fill="#2F6B5E">拿旧地图的请求被版本校正后</text>
+  <text x="942" y="615" font-size="9.5" fill="#2F6B5E">重试——一致性不靠全员同步更新</text>
+
+  <line x1="330" y1="562" x2="354" y2="562" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="614" y1="562" x2="638" y2="562" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="898" y1="562" x2="922" y2="562" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="74" y="644" width="1092" height="38" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="620" y="667" font-size="11" fill="#4A473F" text-anchor="middle">量级感：搬空一台 10 TB 节点，限速 500 MB/s ≈ 5.8 小时；限速砍半，窗口翻倍——节流强度与暴露窗口是同一根跷跷板的两端</text>
+
+  <rect x="74" y="694" width="1092" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="620" y="717" font-size="11.5" fill="#6B4E28" text-anchor="middle">三目标不可兼得：均衡拉满 → 每次小扰动都触发搬迁；搬迁最少 → 必须容忍一定倾斜；故障域约束 → 均衡的自由度下降</text>
+  <text x="620" y="738" font-size="11.5" fill="#6B4E28" text-anchor="middle">放置策略没有「最优解」，只有三者的显式权重——先写下你愿意付哪一样</text>
+
+  <text x="56" y="800" font-size="10" fill="#6B675C">口径提醒：均衡有两种——容量均衡（每盘存多少）与负载均衡（每盘多热）；放置函数只保证前者的期望值，热点 key 属于后者，需要缓存/切分另行处理</text>
+</svg>

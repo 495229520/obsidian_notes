@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>KV 块的一生：分层副本与状态机</title>
+  <desc>左侧为 KV Cache 的四层存储层次（HBM、CPU DRAM、本地 NVMe、远端池），层间是复制而非移动；右侧为单个 KV 块的状态机：空闲、填充中、就绪、使用中、下沉中、下层副本、取回中、已逐出，每条转移标注执行者与并发控制手段；底部为背压链条。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1240" height="900" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="42" font-size="22" font-weight="700" fill="#2B2A26">KV 块的一生：分层副本 + 状态机 + 谁在哪条线程上动它</text>
+  <text x="48" y="66" font-size="13" fill="#6B675C">判断准则：发布后不可变（immutable）——一切并发与一致性问题都被「只有填充中可写」这一条不变量简化</text>
+
+  <!-- A · 分层 -->
+  <text x="48" y="102" font-size="13" font-weight="700" fill="#4A473F">A · 四层存储：层间是「复制」不是「移动」</text>
+  <g>
+    <rect x="48" y="118" width="330" height="92" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+    <text x="213" y="144" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">L0 · GPU HBM（工作副本）</text>
+    <text x="213" y="164" font-size="10.5" fill="#2C4460" text-anchor="middle">数 TB/s · 几十 GB（与权重争容量）</text>
+    <text x="213" y="182" font-size="10" fill="#6B675C" text-anchor="middle">attention kernel 只认这一层</text>
+
+    <rect x="48" y="252" width="330" height="92" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+    <text x="213" y="278" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">L1 · CPU DRAM（温副本）</text>
+    <text x="213" y="298" font-size="10.5" fill="#24473F" text-anchor="middle">经 PCIe ~25 GB/s · 数百 GB</text>
+    <text x="213" y="316" font-size="10" fill="#6B675C" text-anchor="middle">pinned 中转池也住在这层</text>
+
+    <rect x="48" y="386" width="330" height="92" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.4"/>
+    <text x="213" y="412" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">L2 · 本地 NVMe（冷副本）</text>
+    <text x="213" y="432" font-size="10.5" fill="#6B4E28" text-anchor="middle">几 GB/s · TB 级</text>
+    <text x="213" y="450" font-size="10" fill="#6B675C" text-anchor="middle">固定开销大：只收长段才划算</text>
+
+    <rect x="48" y="520" width="330" height="92" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+    <text x="213" y="546" font-size="12.5" font-weight="700" fill="#6B5B95" text-anchor="middle">L3 · 远端集群池（共享副本）</text>
+    <text x="213" y="566" font-size="10.5" fill="#6B5B95" text-anchor="middle">RDMA ~25 GB/s · 集群级容量</text>
+    <text x="213" y="584" font-size="10" fill="#6B675C" text-anchor="middle">跨实例命中靠这层（8.5）</text>
+  </g>
+  <!-- 层间箭头 -->
+  <line x1="150" y1="210" x2="150" y2="250" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="150" y1="344" x2="150" y2="384" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="150" y1="478" x2="150" y2="518" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="160" y="234" font-size="10" fill="#4A473F">offload 下沉（写）</text>
+  <line x1="280" y1="250" x2="280" y2="210" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <line x1="280" y1="384" x2="280" y2="344" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <line x1="280" y1="518" x2="280" y2="478" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="290" y="372" font-size="10" fill="#2C4460">onload 取回（读）</text>
+  <rect x="48" y="632" width="330" height="52" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="213" y="653" font-size="10" fill="#4A473F" text-anchor="middle">同一块可同时在多层有副本——因为块不可变，</text>
+  <text x="213" y="669" font-size="10" fill="#4A473F" text-anchor="middle">副本间不存在「谁新谁旧」的一致性问题</text>
+
+  <!-- B · 状态机 -->
+  <text x="430" y="102" font-size="13" font-weight="700" fill="#4A473F">B · 单个块的状态机（箭头标注：动作 · 执行者 · 并发控制手段）</text>
+
+  <!-- 状态框 -->
+  <g>
+    <rect x="446" y="128" width="160" height="70" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+    <text x="526" y="156" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">空闲 Free</text>
+    <text x="526" y="176" font-size="10" fill="#6B675C" text-anchor="middle">HBM 块池里待借出</text>
+
+    <rect x="700" y="128" width="180" height="70" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.6"/>
+    <text x="790" y="152" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">填充中 Filling</text>
+    <text x="790" y="170" font-size="10" fill="#6B4E28" text-anchor="middle">唯一可写状态</text>
+    <text x="790" y="185" font-size="10" fill="#6B4E28" text-anchor="middle">prefill kernel / 传输线程写</text>
+
+    <rect x="984" y="128" width="180" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+    <text x="1074" y="152" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">就绪 Ready</text>
+    <text x="1074" y="170" font-size="10" fill="#24473F" text-anchor="middle">已发布 · 不可变</text>
+    <text x="1074" y="185" font-size="10" fill="#24473F" text-anchor="middle">refcount == 0 时可下沉/逐出</text>
+
+    <rect x="984" y="300" width="180" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+    <text x="1074" y="324" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">使用中 InUse</text>
+    <text x="1074" y="342" font-size="10" fill="#2C4460" text-anchor="middle">refcount 大于 0</text>
+    <text x="1074" y="357" font-size="10" fill="#2C4460" text-anchor="middle">decode kernel 只读</text>
+
+    <rect x="700" y="300" width="180" height="70" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+    <text x="790" y="324" font-size="12.5" font-weight="700" fill="#6B5B95" text-anchor="middle">下沉中 Offloading</text>
+    <text x="790" y="342" font-size="10" fill="#6B5B95" text-anchor="middle">传输线程 D2H DMA</text>
+    <text x="790" y="357" font-size="10" fill="#6B5B95" text-anchor="middle">期间块仍可读（不可变）</text>
+
+    <rect x="700" y="472" width="180" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+    <text x="790" y="496" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">下层副本 Ready(L1+)</text>
+    <text x="790" y="514" font-size="10" fill="#24473F" text-anchor="middle">DRAM / NVMe / 远端池</text>
+    <text x="790" y="529" font-size="10" fill="#24473F" text-anchor="middle">索引记录「块在哪层」</text>
+
+    <rect x="984" y="472" width="180" height="70" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+    <text x="1074" y="496" font-size="12.5" font-weight="700" fill="#6B5B95" text-anchor="middle">取回中 Onloading</text>
+    <text x="1074" y="514" font-size="10" fill="#6B5B95" text-anchor="middle">传输线程 H2D DMA</text>
+    <text x="1074" y="529" font-size="10" fill="#6B5B95" text-anchor="middle">经 pinned 池 · 逐层流水</text>
+
+    <rect x="446" y="472" width="160" height="70" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+    <text x="526" y="496" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">已逐出 Evicted</text>
+    <text x="526" y="514" font-size="10" fill="#733428" text-anchor="middle">索引删除 · 空间回收</text>
+    <text x="526" y="529" font-size="10" fill="#733428" text-anchor="middle">再来只能重算</text>
+  </g>
+
+  <!-- 转移箭头 -->
+  <!-- Free -> Filling -->
+  <line x1="606" y1="163" x2="698" y2="163" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="652" y="152" font-size="9.5" fill="#4A473F" text-anchor="middle">alloc · 调度线程</text>
+  <text x="652" y="212" font-size="9.5" fill="#4A473F" text-anchor="middle">池借出（有界池 = 背压点）</text>
+  <!-- Filling -> Ready -->
+  <line x1="880" y1="163" x2="982" y2="163" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="931" y="152" font-size="9.5" fill="#4A473F" text-anchor="middle">publish · 填充者</text>
+  <text x="931" y="212" font-size="9.5" fill="#4A473F" text-anchor="middle">索引原子插入 ≈ release 发布</text>
+  <!-- Ready <-> InUse -->
+  <line x1="1044" y1="198" x2="1044" y2="298" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="1036" y="242" font-size="9.5" fill="#2C4460" text-anchor="end">pin · worker</text>
+  <text x="1036" y="256" font-size="9.5" fill="#2C4460" text-anchor="end">refcount++</text>
+  <line x1="1104" y1="298" x2="1104" y2="198" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="1112" y="242" font-size="9.5" fill="#2C4460">unpin</text>
+  <text x="1112" y="256" font-size="9.5" fill="#2C4460">refcount 减到 0</text>
+  <!-- Ready -> Offloading -->
+  <line x1="982" y1="335" x2="882" y2="335" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="932" y="324" font-size="9.5" fill="#4A473F" text-anchor="middle">LRU 选中 · 逐出线程</text>
+  <text x="932" y="384" font-size="9.5" fill="#4A473F" text-anchor="middle">前提 refcount == 0</text>
+  <!-- Offloading -> 下层副本 -->
+  <line x1="790" y1="370" x2="790" y2="470" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="782" y="414" font-size="9.5" fill="#4A473F" text-anchor="end">DMA 完成</text>
+  <text x="782" y="428" font-size="9.5" fill="#4A473F" text-anchor="end">索引改指下层</text>
+  <!-- Offloading -> Free（HBM 副本归还） -->
+  <path d="M 700 320 L 526 320 L 526 200" fill="none" stroke="#5A564B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <text x="613" y="309" font-size="9.5" fill="#6B675C" text-anchor="middle">HBM 副本归还池</text>
+  <!-- 下层副本 -> Onloading -->
+  <line x1="882" y1="507" x2="982" y2="507" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="932" y="496" font-size="9.5" fill="#2C4460" text-anchor="middle">前缀命中 · 调度线程</text>
+  <text x="932" y="556" font-size="9.5" fill="#2C4460" text-anchor="middle">发起 fetch</text>
+  <!-- Onloading -> Ready -->
+  <line x1="1144" y1="472" x2="1144" y2="200" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="1152" y="410" font-size="9.5" fill="#2C4460">H2D 完成</text>
+  <text x="1152" y="424" font-size="9.5" fill="#2C4460">重新发布</text>
+  <!-- 下层副本 -> Evicted -->
+  <line x1="698" y1="507" x2="608" y2="507" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <text x="653" y="496" font-size="9.5" fill="#733428" text-anchor="middle">容量压力 · 逐出线程</text>
+  <text x="653" y="556" font-size="9.5" fill="#733428" text-anchor="middle">先删索引再回收空间</text>
+
+  <!-- 不变量卡 -->
+  <rect x="446" y="580" width="718" height="104" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="462" y="604" font-size="12" font-weight="700" fill="#4A473F">三条不变量（并发正确性全靠它们）</text>
+  <text x="462" y="626" font-size="10.5" fill="#4A473F">① 只有「填充中」可写；发布之后块内容永不改动——更新 = 写一个新块，不是改旧块</text>
+  <text x="462" y="646" font-size="10.5" fill="#4A473F">② 发布 = 索引原子插入（release）；读者查到索引（acquire）后才拿得到块——与 C++ 发布-订阅同构</text>
+  <text x="462" y="666" font-size="10.5" fill="#4A473F">③ refcount 大于 0 期间禁逐出、禁覆盖——与 shared_ptr 的「引用未清零不析构」同一条规矩</text>
+
+  <!-- C · 背压链 -->
+  <text x="48" y="726" font-size="13" font-weight="700" fill="#4A473F">C · 背压链：块池借空时，压力怎么一路传回请求入口</text>
+  <g>
+    <rect x="48" y="742" width="250" height="76" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+    <text x="173" y="768" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">HBM 块池借空</text>
+    <text x="173" y="788" font-size="10" fill="#733428" text-anchor="middle">新块 alloc 失败 / 触发逐出风暴</text>
+
+    <rect x="346" y="742" width="250" height="76" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+    <text x="471" y="768" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">请求在调度器排队</text>
+    <text x="471" y="788" font-size="10" fill="#6B4E28" text-anchor="middle">有界等待 · 排队时间是首选信号</text>
+
+    <rect x="644" y="742" width="250" height="76" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+    <text x="769" y="768" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">准入控制生效</text>
+    <text x="769" y="788" font-size="10" fill="#2C4460" text-anchor="middle">超预算请求快速拒绝，不做死工作</text>
+
+    <rect x="942" y="742" width="250" height="76" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+    <text x="1067" y="768" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">用户侧表现</text>
+    <text x="1067" y="788" font-size="10" fill="#4A473F" text-anchor="middle">TTFT 上涨或明确拒绝——绝不 OOM</text>
+  </g>
+  <line x1="298" y1="780" x2="344" y2="780" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="596" y1="780" x2="642" y2="780" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="894" y1="780" x2="940" y2="780" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="620" y="852" font-size="10" fill="#6B675C" text-anchor="middle">口径提醒：evict 与 fetch 共用同一条 PCIe——下沉风暴期间取回变慢（8.4 §3 的 W1 隐藏等待点）；无界队列不是接纳负载，是把过载变成 OOM（7.18）</text>
+</svg>

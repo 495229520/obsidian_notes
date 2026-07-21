@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 920" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>NVMe-oF RDMA Transport 数据路径</title>
+  <desc>对象映射、4 KiB 读路径九步泳道、写路径四步与零拷贝对账：命令走 SEND，数据由 target 发起单边操作，两端 CPU 不搬数据字节</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="920" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">NVMe-oF RDMA Transport 数据路径：命令走 SEND，数据由 target 发起单边搬运</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">判断准则：一笔 IO 里 host CPU 只出场两次（提交、完成）——中间每一个数据字节都由两端网卡 DMA 搬运</text>
+
+  <!-- A 对象映射 -->
+  <text x="48" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 对象映射：NVMe 队列概念 ↔ Verbs 对象</text>
+  <rect x="56" y="130" width="266" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="189" y="152" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">NVMe SQ/CQ ↔ RC QP + CQ</text>
+  <text x="189" y="170" font-size="10.5" fill="#2C4460" text-anchor="middle">每条 NVMe 队列独占一条 QP</text>
+  <text x="189" y="186" font-size="10.5" fill="#2C4460" text-anchor="middle">深度在 CM 建连时预告（5.18）</text>
+  <rect x="338" y="130" width="266" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="471" y="152" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">capsule ↔ SEND/RECV 双边</text>
+  <text x="471" y="170" font-size="10.5" fill="#2C4460" text-anchor="middle">命令 64B、完成 16B 走消息语义</text>
+  <text x="471" y="186" font-size="10.5" fill="#2C4460" text-anchor="middle">target 按队列深度预挂满 RECV</text>
+  <rect x="620" y="130" width="266" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="753" y="152" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">数据缓冲 ↔ MR + rkey</text>
+  <text x="753" y="170" font-size="10.5" fill="#24473F" text-anchor="middle">FRWR 每 IO 现场注册 bio 页</text>
+  <text x="753" y="186" font-size="10.5" fill="#24473F" text-anchor="middle">rkey 随命令装进 keyed SGL（4.4）</text>
+  <rect x="902" y="130" width="266" height="66" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="1035" y="152" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">doorbell ↔ （无）</text>
+  <text x="1035" y="170" font-size="10.5" fill="#4A473F" text-anchor="middle">网络两端没有共享寄存器可敲</text>
+  <text x="1035" y="186" font-size="10.5" fill="#4A473F" text-anchor="middle">SEND 到达本身就是提交通知</text>
+
+  <!-- B 读路径泳道 -->
+  <text x="48" y="226" font-size="13" font-weight="700" fill="#4A473F">B · 读路径：一笔 4 KiB 随机读的九步（时间从左到右）</text>
+
+  <rect x="56" y="238" width="1128" height="116" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="258" font-size="12" font-weight="700" fill="#3D5A80">host 软件（nvme-rdma 驱动）</text>
+  <rect x="56" y="362" width="1128" height="100" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="382" font-size="12" font-weight="700" fill="#6B5B95">host RNIC（RDMA 网卡）</text>
+  <rect x="56" y="470" width="1128" height="100" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="490" font-size="12" font-weight="700" fill="#6B5B95">target RNIC</text>
+  <rect x="56" y="578" width="1128" height="120" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="598" font-size="12" font-weight="700" fill="#A64B3C">target 软件（nvmet-rdma + 本地盘）</text>
+
+  <!-- lane1 -->
+  <rect x="80" y="268" width="190" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="175" y="288" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① bio → capsule（SQE）</text>
+  <text x="175" y="305" font-size="10.5" fill="#2C4460" text-anchor="middle">FRWR 注册 bio 页 → rkey</text>
+  <text x="175" y="320" font-size="10.5" fill="#2C4460" text-anchor="middle">rkey 装进 keyed SGL</text>
+
+  <rect x="310" y="283" width="600" height="30" rx="6" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="610" y="303" font-size="11.5" fill="#4A473F" text-anchor="middle">② 之后 host CPU 退场——数据搬运期间两端 CPU 都不碰数据字节</text>
+
+  <rect x="950" y="268" width="200" height="60" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1050" y="288" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑨ 收割 CQE → 完成 bio</text>
+  <text x="1050" y="305" font-size="10.5" fill="#2C4460" text-anchor="middle">确认 rkey 已失效 → 唤醒应用</text>
+  <text x="1050" y="320" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">host 数据面 CPU 拷贝：0 次</text>
+
+  <!-- lane2 -->
+  <rect x="80" y="390" width="190" height="60" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="175" y="410" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">② SEND：capsule 上线</text>
+  <text x="175" y="427" font-size="10.5" fill="#4A3F68" text-anchor="middle">网卡 DMA 读 WQE 与 capsule</text>
+  <text x="175" y="442" font-size="10.5" fill="#4A3F68" text-anchor="middle">CPU 提交后不再参与</text>
+
+  <rect x="700" y="390" width="210" height="60" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="805" y="410" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑦ 数据直写 host bio 页</text>
+  <text x="805" y="427" font-size="10.5" fill="#24473F" text-anchor="middle">rkey 校验 → DMA 落位</text>
+  <text x="805" y="442" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">零拷贝：不经 host CPU</text>
+
+  <rect x="950" y="390" width="200" height="60" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1050" y="410" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">⑧ response → CQE</text>
+  <text x="1050" y="427" font-size="10.5" fill="#4A3F68" text-anchor="middle">SEND with Invalidate</text>
+  <text x="1050" y="442" font-size="10.5" fill="#4A3F68" text-anchor="middle">顺带远程失效 rkey（4.12）</text>
+
+  <!-- lane3 -->
+  <rect x="300" y="498" width="200" height="60" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="400" y="518" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">③ RECV 匹配 → CQE</text>
+  <text x="400" y="535" font-size="10.5" fill="#4A3F68" text-anchor="middle">capsule 直落预挂缓冲</text>
+  <text x="400" y="550" font-size="10.5" fill="#4A3F68" text-anchor="middle">RQ 空则 RNR（深度即信用）</text>
+
+  <rect x="700" y="498" width="210" height="60" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="805" y="518" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">⑥ WRITE→SEND 依序上线</text>
+  <text x="805" y="535" font-size="10.5" fill="#4A3F68" text-anchor="middle">同 QP 保序：response 到达时</text>
+  <text x="805" y="550" font-size="10.5" fill="#4A3F68" text-anchor="middle">数据必已写完（4.13）</text>
+
+  <!-- lane4 -->
+  <rect x="300" y="606" width="200" height="64" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="2"/>
+  <text x="400" y="626" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">④ 解析 → 提交本地盘</text>
+  <text x="400" y="643" font-size="10.5" fill="#733428" text-anchor="middle">nvmet 查表 → bdev → blk-mq</text>
+  <text x="400" y="658" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">盘 DMA 进 target 缓冲：延迟大头</text>
+
+  <rect x="540" y="606" width="220" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="650" y="626" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑤ post：RDMA WRITE + SEND</text>
+  <text x="650" y="643" font-size="10.5" fill="#2C4460" text-anchor="middle">WRITE 落点 = capsule 里的 raddr+rkey</text>
+  <text x="650" y="658" font-size="10.5" fill="#2C4460" text-anchor="middle">target CPU 只发命令，不搬字节</text>
+
+  <!-- arrows -->
+  <line x1="175" y1="332" x2="175" y2="386" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="272" y1="435" x2="298" y2="510" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="400" y1="562" x2="400" y2="602" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="504" y1="638" x2="536" y2="638" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="662" y1="602" x2="742" y2="562" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="805" y1="494" x2="805" y2="454" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="914" y1="420" x2="946" y2="420" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1050" y1="386" x2="1050" y2="332" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- C 写路径 -->
+  <text x="48" y="726" font-size="13" font-weight="700" fill="#4A473F">C · 写路径：无 R2T 软件往返——「发数据的许可」内化为 target 自主拉取</text>
+  <rect x="56" y="738" width="250" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="181" y="758" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① CapsuleCmd（SEND）</text>
+  <text x="181" y="774" font-size="10.5" fill="#2C4460" text-anchor="middle">keyed SGL 携带数据区 rkey</text>
+  <text x="181" y="789" font-size="10.5" fill="#2C4460" text-anchor="middle">数据留在 host 内存原地</text>
+  <rect x="346" y="738" width="270" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="481" y="758" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">② target 发 RDMA READ 拉数据</text>
+  <text x="481" y="774" font-size="10.5" fill="#24473F" text-anchor="middle">时机由缓冲与盘节奏决定（4.5）</text>
+  <text x="481" y="789" font-size="10.5" fill="#24473F" text-anchor="middle">在途 READ 受 rd_atomic 闸门</text>
+  <rect x="656" y="738" width="250" height="58" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="781" y="758" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 落盘</text>
+  <text x="781" y="774" font-size="10.5" fill="#6B4E28" text-anchor="middle">bdev → 本地 blk-mq → 盘</text>
+  <text x="781" y="789" font-size="10.5" fill="#6B4E28" text-anchor="middle">持久化语义看 Flush/FUA（3.11）</text>
+  <rect x="946" y="738" width="238" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="1065" y="758" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">④ CapsuleResp（SEND）</text>
+  <text x="1065" y="774" font-size="10.5" fill="#2C4460" text-anchor="middle">host 收 CQE → 完成写</text>
+  <text x="1065" y="789" font-size="10.5" fill="#2C4460" text-anchor="middle">全程仍是两端零拷贝</text>
+  <line x1="310" y1="767" x2="342" y2="767" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="620" y1="767" x2="652" y2="767" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="910" y1="767" x2="942" y2="767" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- D 对账 -->
+  <text x="48" y="830" font-size="13" font-weight="700" fill="#4A473F">D · 对账：快在哪、还会在哪变慢</text>
+  <rect x="56" y="842" width="360" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="236" y="862" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">数据面 CPU 拷贝：两端 0 次</text>
+  <text x="236" y="880" font-size="10.5" fill="#24473F" text-anchor="middle">代价移到控制面：每 IO 一次注册 + 一次失效</text>
+  <rect x="432" y="842" width="380" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="622" y="862" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">每 IO verbs 成本：1 FRWR + 2 SEND + 1 单边</text>
+  <text x="622" y="880" font-size="10.5" fill="#2C4460" text-anchor="middle">注册/失效速率是高 IOPS 下的隐形瓶颈（4.4 预注册池）</text>
+  <rect x="828" y="842" width="356" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="1006" y="862" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">增量延迟设计目标 ~10 μs 内</text>
+  <text x="1006" y="880" font-size="10.5" fill="#6B4E28" text-anchor="middle">变慢候选：CQ 收割方式、rd_atomic、网络拥塞（5.4 量）</text>
+</svg>

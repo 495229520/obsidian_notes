@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 910" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>SPDK Reactor / spdk_thread / Poller 事件循环</title>
+  <desc>每个核一个永不睡眠的 reactor 循环：收消息、跑定时 poller、跑普通 poller；跨核只通过无锁消息环通信；底部与 epoll 事件循环对照。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="910" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">Reactor / spdk_thread / Poller：每个核一个永不睡眠的事件循环</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">完成不是"被通知"的，是被 poller 每一圈"问"出来的 · 跨核不共享数据，只投递消息</text>
+
+  <!-- ============ A: Core 0 ============ -->
+  <text x="48" y="112" font-size="13" font-weight="700" fill="#4A473F">A · 一个核 = 一个 reactor（绑核的 pthread）；上面挂若干 spdk_thread（逻辑线程）</text>
+  <rect x="48" y="126" width="656" height="440" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="152" font-size="12.5" font-weight="700" fill="#3D5A80">Core 0 · reactor（pinned pthread，死循环）</text>
+
+  <!-- 消息环 -->
+  <text x="68" y="184" font-size="11" font-weight="700" fill="#4A473F">消息环（无锁 MPSC ring，别的核往里投）</text>
+  <rect x="330" y="168" width="44" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="374" y="168" width="44" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="418" y="168" width="44" height="30" fill="#FBFAF5" stroke="#C7C2B2" stroke-width="1.1"/>
+  <rect x="462" y="168" width="44" height="30" fill="#FBFAF5" stroke="#C7C2B2" stroke-width="1.1"/>
+  <text x="352" y="187" font-size="9" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">msg</text>
+  <text x="396" y="187" font-size="9" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">msg</text>
+
+  <!-- spdk_thread A -->
+  <rect x="68" y="214" width="436" height="224" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="84" y="236" font-size="11.5" font-weight="700" fill="#3D5A80">spdk_thread A（逻辑线程 · 数据的"户口所在地"）</text>
+  <rect x="84" y="248" width="404" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="98" y="267" font-size="11" font-weight="700" fill="#24473F">poller：NVMe CQ 收割 — spdk_nvme_qpair_process_completions()</text>
+  <text x="98" y="284" font-size="10" fill="#2F6B5E">period=0 · 每圈必跑 —— 这就是"谁推进 IO 完成"的答案</text>
+  <rect x="84" y="304" width="404" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="98" y="323" font-size="11" font-weight="700" fill="#2C4460">定时 poller：超时检查 / 统计上报</text>
+  <text x="98" y="340" font-size="10" fill="#3D5A80">period=50μs · 到期才跑（按 TSC 时间轮询，不用内核定时器）</text>
+  <rect x="84" y="360" width="404" height="46" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="98" y="379" font-size="11" font-weight="700" fill="#4A473F">poller：网络 transport 轮询（如 NVMe-oF TCP 的 socket 组）</text>
+  <text x="98" y="396" font-size="10" fill="#6B675C">连 epoll 都不用等——非阻塞批量收，空转就返回 IDLE</text>
+  <text x="84" y="428" font-size="10" fill="#6B675C">poller = "每圈都问一遍"的回调；返回 BUSY/IDLE 供 spdk_top 统计真实负载</text>
+
+  <!-- 循环流程 -->
+  <rect x="524" y="214" width="164" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="606" y="234" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">① 收消息</text>
+  <text x="606" y="250" font-size="9.5" fill="#3D5A80" text-anchor="middle">从消息环批量取出执行</text>
+  <rect x="524" y="290" width="164" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="606" y="310" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">② 跑到期的定时 poller</text>
+  <text x="606" y="326" font-size="9.5" fill="#3D5A80" text-anchor="middle">读 TSC 判断到期</text>
+  <rect x="524" y="366" width="164" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="606" y="386" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">③ 依次跑普通 poller</text>
+  <text x="606" y="402" font-size="9.5" fill="#3D5A80" text-anchor="middle">CQ 收割就发生在这里</text>
+  <line x1="606" y1="262" x2="606" y2="287" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+  <line x1="606" y1="338" x2="606" y2="363" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+  <path d="M 606 414 L 606 434 L 700 434 L 700 238 L 691 238" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrb)"/>
+  <text x="608" y="452" font-size="10" font-weight="700" fill="#2C4460">永不睡眠 · 一圈亚 μs 级</text>
+
+  <!-- send_msg chip -->
+  <rect x="68" y="486" width="436" height="60" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="84" y="508" font-size="11" font-weight="700" fill="#24473F">跨核请求：spdk_thread_send_msg(thread_B, fn, ctx)</text>
+  <text x="84" y="526" font-size="10" fill="#2F6B5E">把"函数指针 + 上下文"投进对方消息环——不加锁、不打断对方、</text>
+  <text x="84" y="540" font-size="10" fill="#2F6B5E">不需要唤醒（对方本来就每圈来收）</text>
+
+  <!-- ============ B: Core 1 ============ -->
+  <text x="736" y="112" font-size="13" font-weight="700" fill="#4A473F">B · 跨核只走消息：投进对方的环，由所有者执行</text>
+  <rect x="736" y="126" width="456" height="440" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="756" y="152" font-size="12.5" font-weight="700" fill="#3D5A80">Core 1 · reactor（同样的死循环）</text>
+
+  <text x="756" y="184" font-size="11" font-weight="700" fill="#4A473F">消息环</text>
+  <rect x="836" y="168" width="44" height="30" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <rect x="880" y="168" width="44" height="30" fill="#FBFAF5" stroke="#C7C2B2" stroke-width="1.1"/>
+  <rect x="924" y="168" width="44" height="30" fill="#FBFAF5" stroke="#C7C2B2" stroke-width="1.1"/>
+  <rect x="968" y="168" width="44" height="30" fill="#FBFAF5" stroke="#C7C2B2" stroke-width="1.1"/>
+  <text x="858" y="187" font-size="9" font-family="'SF Mono',Menlo,Consolas,monospace" fill="#24473F" text-anchor="middle">fn,ctx</text>
+  <text x="1020" y="187" font-size="9.5" fill="#2F6B5E">← 刚投进来的消息</text>
+
+  <rect x="756" y="214" width="416" height="150" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="772" y="236" font-size="11.5" font-weight="700" fill="#3D5A80">spdk_thread B（拥有自己的 qpair / io_channel）</text>
+  <rect x="772" y="248" width="384" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="786" y="266" font-size="11" font-weight="700" fill="#24473F">poller：本核 NVMe CQ 收割</text>
+  <text x="786" y="283" font-size="10" fill="#2F6B5E">B 的 qpair 只有 B 碰——不需要任何锁</text>
+  <rect x="772" y="302" width="384" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="786" y="320" font-size="11" font-weight="700" fill="#2C4460">收到的消息在这里执行</text>
+  <text x="786" y="337" font-size="10" fill="#3D5A80">fn(ctx) 跑在 B 的循环里 → 数据始终单线程访问</text>
+
+  <rect x="756" y="384" width="416" height="72" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="772" y="406" font-size="11" font-weight="700" fill="#6B4E28">为什么不用条件变量唤醒？</text>
+  <text x="772" y="424" font-size="10" fill="#6B4E28">对方永不睡眠，每圈都来收——省掉 notify/futex/调度整条唤醒链，</text>
+  <text x="772" y="440" font-size="10" fill="#6B4E28">消息延迟 = 对方循环一圈的时间（亚 μs），且无抖动</text>
+
+  <rect x="756" y="472" width="416" height="74" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="772" y="494" font-size="11" font-weight="700" fill="#4A473F">muduo 对照</text>
+  <text x="772" y="512" font-size="10" fill="#4A473F">spdk_thread_send_msg ≈ EventLoop::runInLoop（转投任务到属主线程）</text>
+  <text x="772" y="528" font-size="10" fill="#4A473F">同一纪律：one loop per thread，回调里绝不阻塞</text>
+
+  <!-- 跨核箭头: chip → Core1 ring -->
+  <path d="M 504 516 L 720 516 L 720 183 L 833 183" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+  <text x="712" y="346" font-size="9.5" fill="#24473F" transform="rotate(-90 712 346)">唯一的跨核通道</text>
+
+  <!-- ============ C: epoll 对照 ============ -->
+  <text x="48" y="594" font-size="13" font-weight="700" fill="#4A473F">C · 与 epoll 事件循环对照：同叫 Reactor，"等事件"的方式完全不同</text>
+  <rect x="48" y="606" width="1144" height="272" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="68" y="622" width="160" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="228" y="622" width="450" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="678" y="622" width="494" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="84" y="644" font-size="11.5" font-weight="700" fill="#4A473F">维度</text>
+  <text x="244" y="644" font-size="11.5" font-weight="700" fill="#4A473F">epoll 事件循环（muduo EventLoop）</text>
+  <text x="694" y="644" font-size="11.5" font-weight="700" fill="#4A473F">SPDK reactor</text>
+
+  <rect x="68" y="656" width="160" height="40" fill="#FBFBF6" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="228" y="656" width="450" height="40" fill="#FBFBF6" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="678" y="656" width="494" height="40" fill="#FBFBF6" stroke="#E4E1D6" stroke-width="1"/>
+  <text x="84" y="680" font-size="11" fill="#4A473F">等事件的方式</text>
+  <text x="244" y="680" font-size="11" fill="#4A473F">epoll_wait() 系统调用里睡眠，就绪才被唤醒</text>
+  <text x="694" y="680" font-size="11" fill="#4A473F">永不睡眠，每圈主动查（轮询）</text>
+
+  <rect x="68" y="696" width="160" height="40" fill="#F5F4ED" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="228" y="696" width="450" height="40" fill="#F5F4ED" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="678" y="696" width="494" height="40" fill="#F5F4ED" stroke="#E4E1D6" stroke-width="1"/>
+  <text x="84" y="720" font-size="11" fill="#4A473F">事件来源</text>
+  <text x="244" y="720" font-size="11" fill="#4A473F">内核通知"fd 就绪"（中断驱动）</text>
+  <text x="694" y="720" font-size="11" fill="#4A473F">自己读设备 DMA 到主机内存的 CQ（相位位）</text>
+
+  <rect x="68" y="736" width="160" height="40" fill="#FBFBF6" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="228" y="736" width="450" height="40" fill="#FBFBF6" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="678" y="736" width="494" height="40" fill="#FBFBF6" stroke="#E4E1D6" stroke-width="1"/>
+  <text x="84" y="760" font-size="11" fill="#4A473F">单次发现成本</text>
+  <text x="244" y="760" font-size="11" fill="#4A473F">系统调用 + 唤醒 + 调度：~μs 且抖动大</text>
+  <text x="694" y="760" font-size="11" fill="#4A473F">一次内存读：亚 μs 且稳定（p99 友好）</text>
+
+  <rect x="68" y="776" width="160" height="40" fill="#F5F4ED" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="228" y="776" width="450" height="40" fill="#F5F4ED" stroke="#E4E1D6" stroke-width="1"/>
+  <rect x="678" y="776" width="494" height="40" fill="#F5F4ED" stroke="#E4E1D6" stroke-width="1"/>
+  <text x="84" y="800" font-size="11" fill="#4A473F">空闲时 CPU</text>
+  <text x="244" y="800" font-size="11" fill="#4A473F">≈ 0%（睡着）</text>
+  <text x="694" y="800" font-size="11" fill="#4A473F">100%（烧一整个核换延迟，前提：核可独占）</text>
+
+  <rect x="68" y="816" width="1104" height="40" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="84" y="840" font-size="11" font-weight="700" fill="#24473F">共同纪律：回调 / poller / 消息里绝不阻塞——一个人 sleep 或等锁，整个核上所有连接、所有 qpair 一起卡住</text>
+</svg>
