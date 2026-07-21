@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>定时器、心跳与连接超时动画 · timer queue · timerfd · 心跳 · 安全关闭</title>
+<!-- Visual system: warm paper #F5F4ED, quiet panels #FBFBF6, saturated semantic blue/green/amber/red, 8px rhythm. -->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#625F56;--faint:#918D83;
+  --line:#D8D5C8;--grid:#E4E1D6;--gray:#F0EEE6;
+  --blue:#2467A6;--bluebg:#E1EEF9;--bluetx:#1C4D7A;
+  --green:#087A5C;--greenbg:#DAF0E7;--greentx:#075B45;
+  --amber:#A66408;--amberbg:#F7E9D4;--ambertx:#7C4A05;
+  --danger:#C34935;--dangerbg:#F7DFDA;--dangertx:#913025;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:0;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:10px 16px;cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.14);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.78;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(300px,1fr);gap:28px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:13px;color:var(--muted);margin-bottom:15px;}.vcap b{color:var(--ink);font-weight:700;}
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:18px 20px;min-height:206px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:9px 12px;}
+#stDesc{margin-top:10px;font-size:14px;color:var(--muted);}.blue{color:var(--blue);font-weight:700;}.green{color:var(--green);font-weight:700;}.amber{color:var(--amber);font-weight:700;}.danger{color:var(--danger);font-weight:700;}
+.chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1.5px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.chip.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{align-self:flex-start;width:100%;background:#2E2C27;border-radius:8px;padding:10px 0;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#D8D5CC;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.codebox .cl{min-height:22px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}.codebox .cmt{color:#918D83;}.codebox .kw{color:#E9AC50;}.codebox .type{color:#95C7EF;}.codebox .fn{color:#83C9B2;}.codebox .num{color:#F0BE7E;}.codebox .str{color:#D9CE9F;}
+.codebox .cl.hl-blue{background:rgba(52,122,198,.54);box-shadow:inset 4px 0 0 #91C7F5;color:#F7F4EA;}.codebox .cl.hl-green{background:rgba(22,143,107,.54);box-shadow:inset 4px 0 0 #90DFC2;color:#F7F4EA;}.codebox .cl.hl-amber{background:rgba(185,112,16,.58);box-shadow:inset 4px 0 0 #FFD08A;color:#F7F4EA;}.codebox .cl.hl-danger{background:rgba(198,73,53,.58);box-shadow:inset 4px 0 0 #FFAA98;color:#F7F4EA;}.codebox .cl[class*="hl-"] .cmt{color:#D5D0C1;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:8px 15px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}.btn:hover:not(:disabled){background:var(--gray);border-color:var(--ink);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:86px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector layer: paths and arrow heads stay mounted; endpoints come from live element rectangles. */
+.stage{position:relative;width:100%;height:420px;min-height:420px;margin:0 auto;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;}
+.wire-line{--wc:var(--muted);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}.wire-head{--wc:var(--muted);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wire-port{--wc:var(--muted);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}.wire-line.on,.wire-head.on,.wire-port.on{opacity:1;}.wire-line.hint{stroke-width:2;opacity:.1;}.wire-head.hint,.wire-port.hint{opacity:.1;}.wire-head.drawing{transition-delay:200ms;}.wire-line.blue,.wire-head.blue,.wire-port.blue{--wc:var(--blue);}.wire-line.green,.wire-head.green,.wire-port.green{--wc:var(--green);}.wire-line.amber,.wire-head.amber,.wire-port.amber{--wc:var(--amber);}.wire-line.danger,.wire-head.danger,.wire-port.danger{--wc:var(--danger);}
+
+/* Scene 1: one timerfd wakes the EventLoop, the heap owns all business timers. */
+.heap-stage{display:grid;grid-template-columns:1.02fr .9fr 1.05fr;grid-template-rows:104px 1fr;column-gap:34px;row-gap:34px;height:460px;min-height:460px;align-items:stretch;}
+.loop-card,.fd-card,.heap-card,.callback-card,.wheel-panel,.heart-peer,.close-card{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.loop-card,.fd-card{padding:13px;display:flex;flex-direction:column;justify-content:center;gap:3px;}.loop-card{grid-column:1;grid-row:1;border-color:var(--blue);}.fd-card{grid-column:2;grid-row:1;border-color:var(--amber);}.callback-card{grid-column:3;grid-row:1;padding:11px;display:flex;flex-direction:column;gap:5px;}
+.card-k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.loop-card .card-k{color:var(--blue);}.fd-card .card-k{color:var(--amber);}.callback-card .card-k{color:var(--green);}.card-n{font-size:15px;font-weight:700;}.card-s{font-size:11px;color:var(--muted);}.loop-card.active,.fd-card.active,.heap-card.active,.callback-card.active{box-shadow:0 0 0 2px rgba(43,42,38,.08);transform:scale(1.012);}.loop-card.active{background:var(--bluebg);}.fd-card.active{background:var(--amberbg);}.callback-card.active{border-color:var(--green);background:var(--greenbg);}
+.heap-card{grid-column:1 / span 2;grid-row:2;padding:13px 15px;overflow:hidden;}.heap-card.active{border-color:var(--green);background:#F8FCF9;}.heap-title{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2;}.heap-title .n{font-size:14px;font-weight:700;}.heap-title .s{font-family:var(--mono);font-size:10.5px;color:var(--faint);}.heap-tree{position:relative;height:238px;margin-top:8px;}.heap-link{position:absolute;height:1.5px;background:var(--line);transform-origin:left center;transition:background var(--dur) var(--ease),opacity var(--dur) var(--ease);}.heap-node{position:absolute;width:124px;min-height:57px;border:1.5px solid var(--line);border-radius:7px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.heap-node .id{font-family:var(--mono);font-size:11px;font-weight:700;}.heap-node .when{font-size:10px;color:var(--muted);}.heap-node.top{border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 1px rgba(8,122,92,.14);}.heap-node.pop{opacity:.35;transform:translateY(22px) scale(.92);}.heap-node.next{border-color:var(--blue);background:var(--bluebg);}.heap-node.canceled{border-style:dashed;color:var(--faint);opacity:.52;}
+.cb-row{min-height:31px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);display:flex;align-items:center;justify-content:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);}.cb-row.on{border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateX(2px);}.cb-row.dim{opacity:.32;}
+.heap-status{position:absolute;left:50%;bottom:8px;z-index:3;transform:translateX(-50%);width:max-content;max-width:95%;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 12px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease);white-space:nowrap;}.heap-status.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.heap-status.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.heap-status.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+
+/* Scene 2: a hand moves around the wheel; a refreshed connection moves to a future slot. */
+.wheel-stage{display:grid;grid-template-columns:1.25fr .9fr;gap:18px;align-items:stretch;}
+.wheel-panel{padding:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;}.wheel-panel.active{border-color:var(--amber);background:#FCFAF6;box-shadow:0 0 0 2px rgba(166,100,8,.12);}.wheel-title{position:absolute;left:14px;top:11px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--amber);}.wheel-note{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:max-content;max-width:88%;font-size:10.5px;font-weight:700;color:var(--muted);text-align:center;}.wheel-face{position:relative;width:min(296px,80vw);height:min(296px,80vw);border:1.5px solid var(--line);border-radius:50%;background:var(--panel);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}.wheel-face.active{border-color:var(--amber);background:var(--amberbg);}.wheel-slot{position:absolute;width:60px;height:42px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur) var(--ease);}.wheel-slot.now{border-color:var(--amber);background:var(--amberbg);color:var(--amber);transform:scale(1.08);}.wheel-slot.check{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);transform:scale(1.08);}.wheel-center{position:absolute;left:calc(50% - 46px);top:calc(50% - 27px);width:92px;min-height:54px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}.wheel-center .a{font-family:var(--mono);font-size:10px;color:var(--faint);}.wheel-center .b{font-family:var(--mono);font-size:16px;font-weight:700;}.wheel-hand{position:absolute;left:calc(50% - 1px);top:calc(50% - 96px);width:2px;height:96px;background:var(--amber);border-radius:2px;transform-origin:50% 100%;transition:transform var(--dur) var(--ease),background var(--dur) var(--ease);}.wheel-hand:after{content:"";position:absolute;left:-5px;top:-2px;width:12px;height:12px;border-radius:50%;background:var(--amber);}.wheel-token{position:absolute;z-index:3;min-width:58px;height:27px;border:1.5px solid var(--green);border-radius:6px;background:var(--greenbg);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--greentx);display:flex;align-items:center;justify-content:center;padding:0 6px;opacity:0;transform:translate(-50%,-50%);transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}.wheel-token.on{opacity:1;}.wheel-token.expired{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);transform:translate(-50%,-50%) scale(.94);opacity:.5;}
+.wheel-side{display:flex;flex-direction:column;gap:12px;}.wheel-side-card{flex:1;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:13px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.wheel-side-card.active{border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 2px rgba(8,122,92,.1);}.wheel-side-card.warn{border-color:var(--danger);background:var(--dangerbg);}.side-k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.side-v{margin-top:4px;font-size:14px;font-weight:700;}.side-s{margin-top:4px;font-size:11px;color:var(--muted);}.cost-list{display:grid;gap:7px;margin-top:10px;}.cost-row{border:1.5px solid var(--line);border-radius:6px;background:var(--gray);padding:6px 8px;font-size:10.5px;color:var(--muted);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}.cost-row.on{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);font-weight:700;}
+
+/* Scene 3: protocol packets traverse between two peers, missed count changes one step at a time. */
+.heart-stage{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 86px;gap:14px;}
+.heart-peer{padding:15px;display:flex;flex-direction:column;justify-content:center;gap:4px;}.heart-peer.server{border-color:var(--blue);}.heart-peer.client{border-color:var(--green);}.heart-peer.active.server{background:var(--bluebg);box-shadow:0 0 0 2px rgba(36,103,166,.12);}.heart-peer.active.client{background:var(--greenbg);box-shadow:0 0 0 2px rgba(8,122,92,.12);}.peer-k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.server .peer-k{color:var(--blue);}.client .peer-k{color:var(--green);}.peer-n{font-size:16px;font-weight:700;}.peer-s{font-size:11px;color:var(--muted);}.peer-state{margin-top:12px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);padding:7px 8px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}.peer-state.good{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}.peer-state.warn{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}.peer-state.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.heart-link{position:absolute;left:calc(25% - 8px);right:calc(25% - 8px);top:174px;height:1.5px;background:var(--line);z-index:1;}.heart-link:before,.heart-link:after{content:"";position:absolute;top:-3px;width:7px;height:7px;border-radius:50%;background:var(--panel);border:1.5px solid var(--line);}.heart-link:before{left:-3px;}.heart-link:after{right:-3px;}.packet{position:absolute;z-index:3;left:25%;top:158px;width:74px;height:32px;border:1.5px solid var(--blue);border-radius:6px;background:var(--bluebg);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--bluetx);display:flex;align-items:center;justify-content:center;opacity:0;transform:translateX(-50%) scale(.92);transition:left 700ms var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}.packet.on{opacity:1;transform:translateX(-50%) scale(1);}.packet.pong{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}.packet.lost{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);opacity:.25;transform:translateX(-50%) translateY(-12px) scale(.78);}
+.heart-status{grid-column:1 / span 2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:grid;grid-template-columns:1fr 1.2fr 1fr;align-items:center;padding:10px 14px;gap:10px;position:relative;z-index:2;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}.heart-status.warn{border-color:var(--amber);background:var(--amberbg);}.heart-status.bad{border-color:var(--danger);background:var(--dangerbg);}.status-item{text-align:center;}.status-k{font-family:var(--mono);font-size:10px;color:var(--faint);}.status-v{font-family:var(--mono);font-size:15px;font-weight:700;}.heart-status.warn .status-v{color:var(--amber);}.heart-status.bad .status-v{color:var(--danger);}.miss-bars{display:flex;gap:5px;justify-content:center;margin-top:5px;}.miss-bar{width:35px;height:7px;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),transform var(--dur) var(--ease);}.miss-bar.on{border-color:var(--amber);background:var(--amber);}.miss-bar.bad{border-color:var(--danger);background:var(--danger);transform:scaleX(1.08);}
+
+/* Scene 4: timeout handling returns to the owner EventLoop before it removes the Channel. */
+.close-stage{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:124px 1fr;column-gap:34px;row-gap:34px;height:460px;min-height:460px;}
+.close-card{padding:13px;display:flex;flex-direction:column;justify-content:center;gap:3px;}.close-card.timer{grid-column:1;grid-row:1;border-color:var(--amber);}.close-card.lock{grid-column:2;grid-row:1;border-color:var(--green);}.close-card.loop{grid-column:3;grid-row:1;border-color:var(--blue);}.close-card.active.timer{background:var(--amberbg);box-shadow:0 0 0 2px rgba(166,100,8,.12);}.close-card.active.lock{background:var(--greenbg);box-shadow:0 0 0 2px rgba(8,122,92,.12);}.close-card.active.loop{background:var(--bluebg);box-shadow:0 0 0 2px rgba(36,103,166,.12);}.close-card .n{font-size:14px;font-weight:700;}.close-card .s{font-size:11px;color:var(--muted);}.close-card .k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.timer .k{color:var(--amber);}.lock .k{color:var(--green);}.loop .k{color:var(--blue);}
+.owner-panel{position:relative;grid-column:1 / span 3;grid-row:2;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:42px 14px 58px;display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:12px;align-items:start;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}.owner-panel.active{border-color:var(--blue);background:#F8FBFE;}.owner-title{position:absolute;left:16px;top:10px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--blue);}.owner-box{min-height:112px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);padding:10px;display:flex;flex-direction:column;justify-content:center;gap:4px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}.owner-box .a{font-family:var(--mono);font-size:10.5px;font-weight:700;}.owner-box .b{font-size:11px;color:var(--muted);}.owner-box.active{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);box-shadow:0 0 0 1px rgba(36,103,166,.12);transform:scale(1.015);}.owner-box.done{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}.owner-box.closed{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);opacity:.78;}.close-note{position:absolute;z-index:3;left:50%;bottom:10px;transform:translateX(-50%);width:max-content;max-width:94%;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 12px;font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}.close-note.green{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}.close-note.danger{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+
+@media(max-width:1040px){.layout{grid-template-columns:1fr;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.codebox{grid-column:2;}.desc-card{grid-column:1;grid-row:1 / span 2;}}
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:15px;min-height:0;}.right{display:flex;}.desc-card{min-height:0;padding:16px;}.controls{padding:12px 13px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 138px;}.btn{padding:8px 12px;}.stage{height:auto;min-height:490px;}.heap-stage{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:104px 104px 310px;column-gap:26px;row-gap:24px;height:566px;min-height:566px;}.loop-card{grid-column:1;grid-row:1;}.fd-card{grid-column:2;grid-row:1;}.callback-card{grid-column:1 / span 2;grid-row:2;}.heap-card{grid-column:1 / span 2;grid-row:3;}.heap-tree{height:218px;}.wheel-stage{grid-template-columns:1fr;height:650px;}.wheel-panel{min-height:360px;}.wheel-side{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.heart-stage{height:490px;grid-template-rows:1fr 98px;}.heart-link{top:182px;}.packet{top:166px;width:66px;font-size:9.5px;}.heart-peer{padding:11px;}.peer-n{font-size:14px;}.heart-status{padding:9px 5px;gap:4px;}.status-v{font-size:13px;}.miss-bar{width:24px;}.close-stage{column-gap:26px;row-gap:24px;height:600px;min-height:600px;grid-template-columns:1fr 1fr;grid-template-rows:114px 114px 1fr;}.close-card.timer{grid-column:1;grid-row:1;}.close-card.lock{grid-column:2;grid-row:1;}.close-card.loop{grid-column:1 / span 2;grid-row:2;}.owner-panel{grid-column:1 / span 2;grid-row:3;grid-template-columns:1fr;gap:7px;padding:38px 12px 54px;}.owner-box{min-height:61px;}.close-note{font-size:9.5px;white-space:normal;text-align:center;}.heap-node{width:106px;}.heap-node .when{font-size:9px;}}
+@media(max-width:390px){.heap-stage{height:570px;}.heap-node{width:94px;}.heap-node .id{font-size:10px;}.heap-status{font-size:9.5px;}.wheel-face{transform:scale(.82);}.wheel-panel{min-height:335px;}.wheel-stage{height:625px;}.card-s,.side-s,.peer-s,.close-card .s{font-size:10px;}.heart-status{font-size:9px;}.miss-bar{width:20px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>定时器、心跳与连接超时 · 从 timer queue 到安全关闭</h1>
+    <p>配套笔记《13.9 定时器、心跳与连接超时》 · timerfd 唤醒 · 最小堆 · 时间轮 · 心跳容忍 · closeInLoop　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts?parts[1]:line;
+  const comment=parts&&parts[2]?parts[2]:'';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{strings.push(escapeHtml(value));return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';});
+  code=escapeHtml(code)
+    .replace(/\b(auto|bool|int|void|while|if|return|using)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(timerfd_settime|epoll_wait|read|lock|queueInLoop|closeInLoop|disableAll|removeChannel|erase)\b/g,'<span class="fn">$1</span>')
+    .replace(/\b(heap|timerfd|weakConn|conn|expired|missed)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(0|1|2|3|10|30)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment?'<span class="cmt">'+escapeHtml(comment)+'</span>':'');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="codeLine'+index+'">'+highlightCpp(line||' ')+'</div>').join('');}
+function classes(id,value){const node=el(id);if(node)node.className=value;}
+
+/* A persistent arrow controller: a path, filled triangle, and source port are created once per scene. */
+function createWires(stageId,specs){
+  const stage=el(stageId);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id=stageId+'-svg';svg.classList.add('wire-svg');svg.setAttribute('preserveAspectRatio','none');stage.appendChild(svg);
+  const entries=specs.map(spec=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const head=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const port=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    line.id=stageId+'-'+spec.id;head.id=line.id+'-head';port.id=line.id+'-port';port.setAttribute('r','4');
+    line.classList.add('wire-line',spec.color);head.classList.add('wire-head',spec.color);port.classList.add('wire-port',spec.color);
+    svg.append(line,head,port);return {...spec,line,head,port};
+  });
+  let active=new Set();let timers=[];
+  function geometry(item){
+    const sr=stage.getBoundingClientRect(),source=el(item.from)?.getBoundingClientRect(),target=el(item.to)?.getBoundingClientRect();
+    if(!source||!target)return;
+    const sx=source.left-sr.left,sy=source.top-sr.top,sw=source.width,sh=source.height;
+    const tx=target.left-sr.left,ty=target.top-sr.top,tw=target.width,th=target.height;
+    const scx=sx+sw/2,scy=sy+sh/2,tcx=tx+tw/2,tcy=ty+th/2;
+    const horizontal=Math.abs(tcx-scx)>=Math.abs(tcy-scy);
+    let x1,y1,x2,y2;
+    if(horizontal){const right=tcx>=scx;x1=right?sx+sw:sx;y1=scy;x2=right?tx:tx+tw;y2=tcy;}
+    else{const down=tcy>=scy;x1=scx;y1=down?sy+sh:sy;x2=tcx;y2=down?ty:ty+th;}
+    const dx=x2-x1,dy=y2-y1,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,baseX=x2-ux*9,baseY=y2-uy*9;
+    const d=horizontal?`M ${x1} ${y1} C ${x1+dx*.45} ${y1}, ${baseX-dx*.45} ${baseY}, ${baseX} ${baseY}`:`M ${x1} ${y1} C ${x1} ${y1+dy*.45}, ${baseX} ${baseY-dy*.45}, ${baseX} ${baseY}`;
+    const px=-uy*5,py=ux*5;
+    item.line.setAttribute('d',d);item.head.setAttribute('d',`M ${x2} ${y2} L ${baseX+px} ${baseY+py} L ${baseX-px} ${baseY-py} Z`);item.port.setAttribute('cx',x1);item.port.setAttribute('cy',y1);
+  }
+  function layout(){const rect=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);entries.forEach(geometry);}
+  function draw(item){
+    const length=item.line.getTotalLength();item.line.style.transition='none';item.line.style.strokeDasharray=length;item.line.style.strokeDashoffset=length;void item.line.getBoundingClientRect();item.line.style.transition='';item.line.style.strokeDashoffset='0';
+    const timeout=setTimeout(()=>{item.line.style.strokeDasharray='';item.line.style.strokeDashoffset='';},560);timers.push(timeout);
+  }
+  function setClass(item,state){
+    const suffix=' '+item.color+(state?' '+state:'');item.line.className.baseVal='wire-line'+suffix;item.head.className.baseVal='wire-head'+suffix;item.port.className.baseVal='wire-port'+suffix;
+    if(state==='on')item.head.classList.add('drawing');
+  }
+  function sync(ids){
+    layout();const wanted=new Set(ids),hasAny=wanted.size>0;let stagger=0;
+    entries.forEach(item=>{
+      if(wanted.has(item.id)){setClass(item,'on');if(!active.has(item.id)&&!reducedMotion()){const delay=stagger++*160;timers.push(setTimeout(()=>draw(item),delay));}}
+      else setClass(item,hasAny?'':'hint');
+    });active=wanted;
+  }
+  const observer=new ResizeObserver(layout);observer.observe(stage);window.addEventListener('resize',layout);layout();
+  return {sync,layout,destroy(){observer.disconnect();window.removeEventListener('resize',layout);timers.forEach(clearTimeout);timers=[];}};
+}
+
+const heapScene=(()=>{
+  const code=[
+    'int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);',
+    'auto next = heap.top();                 // nearest expiry',
+    'timerfd_settime(timerfd, next.expire);  // arm one fd',
+    'epoll_wait(epfd, events, -1);',
+    'uint64_t expirations; read(timerfd, &expirations, sizeof expirations);',
+    'while (!heap.empty() && heap.top() <= now)',
+    '  runCallback(heap.pop());              // drain all due',
+    'timerfd_settime(timerfd, heap.top());   // re-arm'
+  ];
+  const steps=[
+    {chip:'初始化',chipC:'cb',title:'timer queue 保存业务定时任务',desc:'一个 EventLoop 只需要一个 <span class="amber">timerfd</span>。连接和请求的到期时间放在 <span class="green">timer queue</span>，最小堆堆顶就是最近任务。',lines:[0,1],hl:'blue',top:'A · 05s',pop:0,loop:0,fd:0,cb:0,wires:['heap-fd'],status:'heap.top() = A · 05s',statusC:'green'},
+    {chip:'arm',chipC:'ca',title:'用堆顶时间重设 timerfd',desc:'设置的是最近到期时间，不是为 A 单独创建 fd。A 到期前，<span class="amber">timerfd</span> 是 epoll 中的一个普通监控 fd。',lines:[1,2],hl:'amber',top:'A · 05s',pop:0,loop:0,fd:1,cb:0,wires:['heap-fd'],status:'timerfd = now + 05s',statusC:'amber'},
+    {chip:'可读',chipC:'ca',title:'timerfd 到期，epoll_wait 返回',desc:'到期让 <span class="amber">timerfd 可读</span>，从而唤醒 EventLoop。先读出 <code>uint64_t expirations</code>，再处理时间队列，避免 fd 一直保持可读。',lines:[3,4],hl:'amber',top:'A · 05s',pop:0,loop:1,fd:1,cb:0,wires:['fd-loop'],status:'timerfd expirations = 1',statusC:'amber'},
+    {chip:'drain',chipC:'cg',title:'取出所有 expireTime <= now 的任务',desc:'timerfd 的 <code>expirations = 1</code> 只说明这只闹钟响了一次，不等于只有一个业务回调。同一刻 A、B 都到期，循环弹出并运行它们。',lines:[5,6],hl:'green',top:'C · 12s',pop:2,loop:1,fd:0,cb:2,wires:['loop-heap','heap-callback'],status:'A, B drained; new top = C · 12s',statusC:'green'},
+    {chip:'re-arm',chipC:'cb',title:'根据新的堆顶再次设置 timerfd',desc:'处理完过期任务后，队列仍有 C。EventLoop 用新的堆顶重设闹钟；新任务变成更早堆顶或取消当前堆顶时，也应重新设置。',lines:[7],hl:'blue',top:'C · 12s',pop:2,loop:0,fd:1,cb:2,wires:['heap-fd'],status:'next alarm = C · 12s',statusC:'blue'}
+  ];
+  let wires,observer;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>最小堆</b> 管业务定时器，<b>timerfd</b> 只负责把最近到期时间变成 EventLoop 的可读事件。</div><div class="stage heap-stage" id="heapStage">'+
+      '<section class="loop-card" id="heapLoop"><span class="card-k">EventLoop</span><span class="card-n">epoll_wait()</span><span class="card-s">等待 socket / eventfd / timerfd</span></section>'+
+      '<section class="fd-card" id="heapFd"><span class="card-k">wake-up fd</span><span class="card-n">timerfd</span><span class="card-s" id="fdText">尚未设置</span></section>'+
+      '<section class="callback-card" id="heapCallback"><span class="card-k">expired callbacks</span><div class="cb-row" id="cbA">A · idle timeout</div><div class="cb-row" id="cbB">B · request timeout</div></section>'+
+      '<section class="heap-card" id="heapCard"><div class="heap-title"><span class="n">timer queue · min heap</span><span class="s">top = earliest</span></div><div class="heap-tree">'+
+        '<i class="heap-link" id="hLink1"></i><i class="heap-link" id="hLink2"></i><i class="heap-link" id="hLink3"></i>'+ 
+        '<div class="heap-node" id="hA"><span class="id">A</span><span class="when">05s · idle</span></div><div class="heap-node" id="hB"><span class="id">B</span><span class="when">05s · request</span></div><div class="heap-node" id="hC"><span class="id">C</span><span class="when">12s · ping</span></div><div class="heap-node" id="hD"><span class="id">D</span><span class="when">18s · cleanup</span></div>'+ 
+      '</div><span class="heap-status" id="heapStatus"></span></section></div>';
+    layoutHeap();observer=new ResizeObserver(layoutHeap);observer.observe(el('heapStage'));wires=createWires('heapStage',[{id:'heap-fd',from:'heapCard',to:'heapFd',color:'amber'},{id:'fd-loop',from:'heapFd',to:'heapLoop',color:'amber'},{id:'loop-heap',from:'heapLoop',to:'heapCard',color:'blue'},{id:'heap-callback',from:'heapCard',to:'heapCallback',color:'green'}]);
+  }
+  function layoutHeap(){
+    const tree=el('hA')?.parentElement;if(!tree)return;const width=tree.clientWidth,positions=[[width/2-62,8],[width*.25-62,98],[width*.75-62,98],[width*.5-62,178]];
+    ['hA','hB','hC','hD'].forEach((id,index)=>{const n=el(id),p=positions[index];n.style.left=Math.max(0,p[0])+'px';n.style.top=p[1]+'px';});
+    const link=(id,from,to)=>{const a=el(from),b=el(to);if(!a||!b)return;const x1=a.offsetLeft+a.offsetWidth/2,y1=a.offsetTop+a.offsetHeight,x2=b.offsetLeft+b.offsetWidth/2,y2=b.offsetTop;const d=Math.hypot(x2-x1,y2-y1);const node=el(id);node.style.width=d+'px';node.style.left=x1+'px';node.style.top=y1+'px';node.style.transform=`rotate(${Math.atan2(y2-y1,x2-x1)}rad)`;};
+    link('hLink1','hA','hB');link('hLink2','hA','hC');link('hLink3','hC','hD');
+  }
+  function paint(s){
+    layoutHeap();classes('heapLoop','loop-card'+(s.loop?' active':''));classes('heapFd','fd-card'+(s.fd?' active':''));classes('heapCard','heap-card'+(s.pop||s.fd?' active':''));classes('heapCallback','callback-card'+(s.cb?' active':''));
+    el('fdText').textContent=s.fd?'armed for '+(s.top==='A · 05s'?'05s':'12s'):'not armed';
+    ['hA','hB','hC','hD'].forEach(id=>classes(id,'heap-node'));classes('hA','heap-node '+(s.pop>=1?'pop':'top'));classes('hB','heap-node '+(s.pop>=2?'pop':'next'));classes('hC','heap-node '+(s.pop>=2?'top':'next'));classes('hD','heap-node '+(s.pop>=2?'next':'canceled'));
+    classes('cbA','cb-row '+(s.cb>=1?'on':'dim'));classes('cbB','cb-row '+(s.cb>=2?'on':'dim'));
+    const status=el('heapStatus');status.textContent=s.status;status.className='heap-status '+s.statusC;wires.sync(s.wires);
+  }
+  return {id:'heap',label:'最小堆 + timerfd',sub:'arm · drain · re-arm',steps,code,mount,paint,destroy(){observer?.disconnect();wires?.destroy();}};
+})();
+
+const wheelScene=(()=>{
+  const code=[
+    'wheel.add(conn, now + idleTimeout);',
+    'onMessage(conn) { wheel.refresh(conn); }',
+    'tick() { currentSlot = (currentSlot + 1) % N; }',
+    'for (auto conn : wheel[currentSlot])',
+    '  if (!conn.refreshed) closeInLoop(conn);',
+    '// coarse seconds are enough for idle cleanup'
+  ];
+  const steps=[
+    {chip:'排槽',chipC:'cb',title:'把未来时间切进固定槽位',desc:'时间轮以秒或几十秒为粒度。连接不需要各自精确到纳秒，只需要被放入一个将来检查的槽位。',lines:[0],hl:'blue',hand:0,slot:0,a:2,b:5,c:null,side:'idle',cost:0,note:'slot = future check time'},
+    {chip:'刷新',chipC:'cg',title:'收到有效数据，把连接移到更远的槽',desc:'A 有业务活动后，不修改一堆堆节点；直接把 A 从 slot 2 移到 slot 6。高连接数下，这种刷新接近 <span class="green">O(1)</span>。',lines:[1],hl:'green',hand:0,slot:0,a:6,b:5,c:2,side:'refresh',cost:1,note:'A: slot 2 -> slot 6'},
+    {chip:'推进',chipC:'ca',title:'指针每秒前进一个槽',desc:'时间轮的指针像秒针。它现在检查 slot 2，A 已被刷新而不在这里；未刷新的 C 留在当前槽等待判定。',lines:[2,3],hl:'amber',hand:2,slot:2,a:6,b:5,c:2,side:'advance',cost:2,note:'now checks slot 2'},
+    {chip:'超时',chipC:'cd',title:'当前槽内未刷新的连接到期',desc:'C 没有新的有效读写，于是被判定空闲超时。时间轮适合这种允许秒级误差的连接清理，不适合要求精确时刻的短任务。',lines:[3,4],hl:'danger',hand:2,slot:2,a:6,b:5,c:2,expired:true,side:'timeout',cost:2,note:'C expired in current slot'},
+    {chip:'取舍',chipC:'ca',title:'用粒度换取大量连接的低成本刷新',desc:'最小堆更适合到期时间分散且精度要求高的任务。时间轮用 <span class="amber">槽位粒度</span> 换来低成本推进，常用于海量空闲连接。',lines:[5],hl:'amber',hand:3,slot:3,a:6,b:5,c:null,side:'summary',cost:3,note:'approximate expiry; cheap refresh'}
+  ];
+  let slots=[],observer;
+  function mount(){
+    let slotHtml='';for(let i=0;i<8;i++)slotHtml+='<div class="wheel-slot" id="slot'+i+'">+'+i+'s</div>';
+    viz.innerHTML='<div class="vcap"><b>时间轮</b> 适合海量连接的空闲超时：活动时刷新到未来槽位，指针到槽才检查。</div><div class="stage wheel-stage" id="wheelStage">'+
+      '<section class="wheel-panel" id="wheelPanel"><span class="wheel-title">one tick = 1s</span><div class="wheel-face" id="wheelFace">'+slotHtml+'<div class="wheel-hand" id="wheelHand"></div><div class="wheel-center"><span class="a">now</span><span class="b" id="wheelNow">slot 0</span></div><div class="wheel-token" id="wheelA">conn A</div><div class="wheel-token" id="wheelB">conn B</div><div class="wheel-token" id="wheelC">conn C</div></div><span class="wheel-note" id="wheelNote"></span></section>'+
+      '<aside class="wheel-side"><section class="wheel-side-card" id="wheelSide"><span class="side-k">current action</span><div class="side-v" id="wheelSideV"></div><div class="side-s" id="wheelSideS"></div></section><section class="wheel-side-card"><span class="side-k">why use a wheel</span><div class="cost-list"><div class="cost-row" id="cost0">固定槽位管理未来检查</div><div class="cost-row" id="cost1">活动连接移到未来槽</div><div class="cost-row" id="cost2">指针到槽才批量检查</div><div class="cost-row" id="cost3">精度受槽宽影响</div></div></section></aside></div>';
+    slots=Array.from({length:8},(_,i)=>el('slot'+i));layoutWheel();observer=new ResizeObserver(layoutWheel);observer.observe(el('wheelStage'));
+  }
+  function slotPoint(index){const face=el('wheelFace'),radius=Math.min(face.clientWidth,face.clientHeight)*.39,angle=(-90+index*45)*Math.PI/180;return {x:face.clientWidth/2+Math.cos(angle)*radius,y:face.clientHeight/2+Math.sin(angle)*radius};}
+  function layoutWheel(){const face=el('wheelFace');if(!face)return;slots.forEach((slot,index)=>{const p=slotPoint(index);slot.style.left=(p.x-30)+'px';slot.style.top=(p.y-21)+'px';});}
+  function token(id,index,show,expired){const n=el(id);if(!show){n.className='wheel-token';return;}const p=slotPoint(index);n.style.left=p.x+'px';n.style.top=p.y+'px';n.className='wheel-token on'+(expired?' expired':'');}
+  function paint(s){
+    layoutWheel();classes('wheelPanel','wheel-panel'+(s.side==='idle'?'':' active'));classes('wheelFace','wheel-face'+(s.side==='advance'||s.side==='timeout'?' active':''));
+    slots.forEach((slot,index)=>slot.className='wheel-slot '+(index===s.slot?(s.expired?'check':'now'):''));el('wheelHand').style.transform='rotate('+(s.hand*45)+'deg)';el('wheelNow').textContent='slot '+s.slot;
+    token('wheelA',s.a,true,false);token('wheelB',s.b,true,false);token('wheelC',s.c,s.c!==null,Boolean(s.expired));
+    const action={idle:['连接等待','A 在 +2s，B 在 +5s'],refresh:['有效业务包','刷新 A 的检查时间'],advance:['tick()','指针抵达当前槽'],timeout:['idle timeout','C 未刷新，投递关闭'],summary:['选型','粒度换取低成本']}[s.side];
+    const side=el('wheelSide');side.className='wheel-side-card '+(s.side==='timeout'?'warn':s.side==='idle'?'':'active');el('wheelSideV').textContent=action[0];el('wheelSideS').textContent=action[1];el('wheelNote').textContent=s.note;for(let i=0;i<4;i++)classes('cost'+i,'cost-row '+(i<s.cost?'on':''));
+  }
+  return {id:'wheel',label:'时间轮',sub:'refresh · tick · expire',steps,code,mount,paint,destroy(){observer?.disconnect();}};
+})();
+
+const heartScene=(()=>{
+  const code=[
+    'every 10s: sendPing(conn);',
+    'onPong(conn) { missed = 0; refresh(conn); }',
+    'if (!pongBeforeDeadline) ++missed;',
+    'if (missed < 3) keep connection;',
+    'if (missed == 3) queueInLoop(closeInLoop);',
+    '// ping / pong is an application protocol message'
+  ];
+  const steps=[
+    {chip:'周期',chipC:'cb',title:'心跳由应用协议定期发起',desc:'应用心跳判断的是对端是否仍按协议工作。它不同于 TCP keepalive，ping 和 pong 应该有明确的协议类型。',lines:[0,5],hl:'blue',packet:null,server:'active',client:'',miss:0,status:'healthy',text:'next ping in 10s'},
+    {chip:'ping',chipC:'cb',title:'服务端发送 ping',desc:'ping 从服务端沿连接发出。此时只是一次探测，尚未把连接判为失活。',lines:[0],hl:'blue',packet:'ping',server:'active',client:'',miss:0,status:'healthy',text:'PING sent; waiting for PONG'},
+    {chip:'pong',chipC:'cg',title:'收到 pong，刷新活跃状态',desc:'客户端响应 pong，服务端将 missed 清零，并把连接的空闲计时重新推到未来。',lines:[1],hl:'green',packet:'pong',server:'active',client:'active',miss:0,status:'healthy',text:'PONG received; lastActive refreshed'},
+    {chip:'丢失 1 次',chipC:'ca',title:'一次超时只增加 missed',desc:'网络短暂抖动会丢包。一次未收到 pong 时，只把 missed 记为 1，连接仍保留。',lines:[2,3],hl:'amber',packet:'lost',server:'active',client:'',miss:1,status:'warn',text:'missed = 1 / 3; keep connection'},
+    {chip:'丢失 2 次',chipC:'ca',title:'在容忍窗口内继续观察',desc:'第二次未响应仍未达到阈值。把“丢一次就断开”改成容忍次数，减少瞬时网络问题造成的误杀。',lines:[2,3],hl:'amber',packet:'lost',server:'active',client:'',miss:2,status:'warn',text:'missed = 2 / 3; keep connection'},
+    {chip:'关闭',chipC:'cd',title:'连续 missedLimit 次后投递关闭',desc:'第三次超时才判定失活。关闭动作不会直接在这里改 Channel，而是投递到连接所属的 EventLoop。',lines:[4],hl:'danger',packet:'lost',server:'active',client:'',miss:3,status:'bad',text:'missed = 3 / 3; queue closeInLoop'}
+  ];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>心跳</b> 是应用层活性检测。未收到一次 pong 只累计 missed，达到阈值才关闭。</div><div class="stage heart-stage" id="heartStage">'+
+      '<section class="heart-peer server" id="heartServer"><span class="peer-k">server</span><span class="peer-n">EventLoop owner</span><span class="peer-s">每 10s 发送 PING</span><span class="peer-state" id="serverState"></span></section>'+
+      '<section class="heart-peer client" id="heartClient"><span class="peer-k">client</span><span class="peer-n">application peer</span><span class="peer-s">收到 PING 后回复 PONG</span><span class="peer-state" id="clientState"></span></section><div class="heart-link"></div><div class="packet" id="heartPacket"></div>'+
+      '<section class="heart-status" id="heartStatus"><div class="status-item"><div class="status-k">interval</div><div class="status-v">10s</div></div><div class="status-item"><div class="status-k">missed / limit</div><div class="status-v" id="missText">0 / 3</div><div class="miss-bars"><i class="miss-bar" id="miss0"></i><i class="miss-bar" id="miss1"></i><i class="miss-bar" id="miss2"></i></div></div><div class="status-item"><div class="status-k">decision</div><div class="status-v" id="heartDecision">keep</div></div></section></div>';
+  }
+  function paint(s){
+    classes('heartServer','heart-peer server '+s.server);classes('heartClient','heart-peer client '+s.client);const packet=el('heartPacket');
+    if(s.packet==='ping'){packet.className='packet on';packet.textContent='PING';packet.style.left='75%';}
+    else if(s.packet==='pong'){packet.className='packet pong on';packet.textContent='PONG';packet.style.left='25%';}
+    else if(s.packet==='lost'){packet.className='packet lost';packet.textContent='PING';packet.style.left='54%';}
+    else {packet.className='packet';packet.textContent='';packet.style.left='25%';}
+    const serverState=el('serverState'),clientState=el('clientState');serverState.className='peer-state '+(s.status==='bad'?'bad':s.status==='warn'?'warn':'good');serverState.textContent=s.text;clientState.className='peer-state '+(s.packet==='pong'?'good':'');clientState.textContent=s.packet==='pong'?'PONG -> protocol reply':'waiting for PING';
+    classes('heartStatus','heart-status '+(s.status==='bad'?'bad':s.status==='warn'?'warn':''));el('missText').textContent=s.miss+' / 3';el('heartDecision').textContent=s.status==='bad'?'close':'keep';for(let i=0;i<3;i++)classes('miss'+i,'miss-bar '+(i<s.miss?(s.status==='bad'?'on bad':'on'):''));
+  }
+  return {id:'heartbeat',label:'心跳容忍',sub:'ping · pong · missedLimit',steps,code,mount,paint,destroy(){}};
+})();
+
+const closeScene=(()=>{
+  const code=[
+    'void onTimeout(std::weak_ptr<Conn> weakConn) {',
+    '  auto conn = weakConn.lock();',
+    '  if (!conn) return;                    // already gone',
+    '  conn->loop()->queueInLoop([conn] {',
+    '    conn->closeInLoop();',
+    '    conn->channel()->disableAll();',
+    '    conn->loop()->removeChannel(conn->channel());',
+    '    connections.erase(conn->name());',
+    '  });                                   // RAII closes fd',
+    '}'
+  ];
+  const steps=[
+    {chip:'超时回调',chipC:'ca',title:'定时器回调先观察连接',desc:'timer callback 只拿 <span class="amber">weak_ptr</span>。它不长期强持有连接，也不在回调线程里直接 close fd。',lines:[0],hl:'amber',timer:1,lock:0,loop:0,owner:0,wires:['timer-lock'],note:'timeout callback: observe, do not close directly',noteC:''},
+    {chip:'lock',chipC:'cg',title:'weak_ptr.lock() 确认对象还活着',desc:'连接可能早已由其他路径关闭。lock 失败就返回；成功才得到短暂的 shared_ptr 用于投递关闭任务。',lines:[1,2],hl:'green',timer:1,lock:1,loop:0,owner:0,wires:['timer-lock'],note:'lock succeeds only while connection still exists',noteC:'green'},
+    {chip:'回投',chipC:'cb',title:'queueInLoop 投递到连接所属线程',desc:'连接的 I/O 状态归属于一个 EventLoop。把 closeInLoop 放入该 loop 的待执行队列，避免与 I/O 回调并发改 Channel。',lines:[3,4],hl:'blue',timer:0,lock:1,loop:1,owner:1,wires:['lock-loop','loop-owner'],note:'the owning EventLoop serializes connection state',noteC:'green'},
+    {chip:'摘除 Channel',chipC:'cb',title:'先 disableAll，再从 poller 移除',desc:'在所属线程内关闭：停止所有关注事件，调用 removeChannel，然后连接不会再作为 epoll 事件目标被分发。',lines:[5,6],hl:'blue',timer:0,lock:0,loop:1,owner:2,wires:['loop-owner'],note:'disableAll() -> removeChannel()',noteC:'green'},
+    {chip:'释放 fd',chipC:'cd',title:'移出连接表，最后由 RAII 关闭 fd',desc:'移除 owner 的 shared_ptr 后，引用计数归零时析构连接对象并关闭 fd。生命周期顺序留在 EventLoop 内，避免悬空 Channel。',lines:[7,8],hl:'danger',timer:0,lock:0,loop:1,owner:3,wires:['loop-owner'],note:'erase owner -> destructor closes fd',noteC:'danger'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>超时关闭</b> 必须回到连接所属 EventLoop：检查对象存在，再摘 Channel、移除 owner、由 RAII 关闭 fd。</div><div class="stage close-stage" id="closeStage">'+
+      '<section class="close-card timer" id="closeTimer"><span class="k">timer callback</span><span class="n">idle timeout</span><span class="s">weak_ptr&lt;Conn&gt;</span></section><section class="close-card lock" id="closeLock"><span class="k">lifetime check</span><span class="n">weak_ptr.lock()</span><span class="s">object alive?</span></section><section class="close-card loop" id="closeLoop"><span class="k">owner thread</span><span class="n">queueInLoop()</span><span class="s">enqueue closeInLoop</span></section>'+
+      '<section class="owner-panel" id="ownerPanel"><span class="owner-title">owning EventLoop</span><div class="owner-box" id="ownerChannel"><span class="a">Channel</span><span class="b">EPOLLIN | EPOLLOUT</span></div><div class="owner-box" id="ownerPoller"><span class="a">Poller</span><span class="b">disableAll / removeChannel</span></div><div class="owner-box" id="ownerConn"><span class="a">connections[name]</span><span class="b">shared_ptr&lt;Conn&gt; · fd 42</span></div></section><span class="close-note" id="closeNote"></span></div>';
+    wires=createWires('closeStage',[{id:'timer-lock',from:'closeTimer',to:'closeLock',color:'green'},{id:'lock-loop',from:'closeLock',to:'closeLoop',color:'blue'},{id:'loop-owner',from:'closeLoop',to:'ownerPanel',color:'blue'}]);
+  }
+  function paint(s){
+    classes('closeTimer','close-card timer '+(s.timer?'active':''));classes('closeLock','close-card lock '+(s.lock?'active':''));classes('closeLoop','close-card loop '+(s.loop?'active':''));classes('ownerPanel','owner-panel '+(s.owner?'active':''));
+    classes('ownerChannel','owner-box '+(s.owner>=2?'done':s.owner===1?'active':''));classes('ownerPoller','owner-box '+(s.owner>=2?'done':''));classes('ownerConn','owner-box '+(s.owner===3?'closed':s.owner>=1?'active':''));
+    const note=el('closeNote');note.textContent=s.note;note.className='close-note '+s.noteC;wires.sync(s.wires);
+  }
+  return {id:'close',label:'超时安全关闭',sub:'weak_ptr · queueInLoop · RAII',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const SCENES=[heapScene,wheelScene,heartScene,closeScene];
+const tabsBox=el('tabs'),stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc'),codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots'),btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);});
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();sceneIndex=index;stepIndex=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));const scene=SCENES[sceneIndex];scene.mount();codeBox.innerHTML=codePanel(scene.code);dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,i)=>{const dot=document.createElement('button');dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);dot.addEventListener('click',()=>{stop();go(i);});dotsBox.appendChild(dot);dotEls.push(dot);});go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;stepIndex=Math.max(0,Math.min(steps.length-1,index));const step=steps[stepIndex];SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.className='cl '+(step.lines.includes(i)?'hl-'+step.hl:''));stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}if(stepIndex===steps.length-1)stop();
+}
+function play(){if(stepIndex===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='暂停';timer=setInterval(()=>{stepIndex<SCENES[sceneIndex].steps.length-1?go(stepIndex+1):stop();},3000);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}});
+const hashScene=location.hash.match(/scene=(\w+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

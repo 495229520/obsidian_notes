@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件锁动画 · flock · fcntl 区域锁 · 建议性锁</title>
+<!-- Visual system: warm paper #F5F4ED, quiet panels #FBFBF6, saturated semantic blue/green/amber/red, 8px rhythm. -->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#625F56;--faint:#918D83;
+  --line:#D8D5C8;--grid:#E4E1D6;--gray:#F0EEE6;
+  --blue:#2467A6;--bluebg:#E1EEF9;--bluetx:#1C4D7A;
+  --green:#087A5C;--greenbg:#DAF0E7;--greentx:#075B45;
+  --amber:#A66408;--amberbg:#F7E9D4;--ambertx:#7C4A05;
+  --danger:#C34935;--dangerbg:#F7DFDA;--dangertx:#913025;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:0;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:10px 16px;cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.14);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.78;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(300px,1fr);gap:28px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:13px;color:var(--muted);margin-bottom:15px;}.vcap b{color:var(--ink);font-weight:700;}
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:18px 20px;min-height:206px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:9px 12px;}
+#stDesc{margin-top:10px;font-size:14px;color:var(--muted);}.blue{color:var(--blue);font-weight:700;}.green{color:var(--green);font-weight:700;}.amber{color:var(--amber);font-weight:700;}.danger{color:var(--danger);font-weight:700;}
+.chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1.5px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.chip.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{align-self:flex-start;width:100%;background:#2E2C27;border-radius:8px;padding:10px 0;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#D8D5CC;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.codebox .cl{min-height:22px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}.codebox .cmt{color:#918D83;}.codebox .kw{color:#E9AC50;}.codebox .type{color:#95C7EF;}.codebox .fn{color:#83C9B2;}.codebox .num{color:#F0BE7E;}.codebox .str{color:#D9CE9F;}
+.codebox .cl.hl-blue{background:rgba(52,122,198,.54);box-shadow:inset 4px 0 0 #91C7F5;color:#F7F4EA;}.codebox .cl.hl-green{background:rgba(22,143,107,.54);box-shadow:inset 4px 0 0 #90DFC2;color:#F7F4EA;}.codebox .cl.hl-amber{background:rgba(185,112,16,.58);box-shadow:inset 4px 0 0 #FFD08A;color:#F7F4EA;}.codebox .cl.hl-danger{background:rgba(198,73,53,.58);box-shadow:inset 4px 0 0 #FFAA98;color:#F7F4EA;}.codebox .cl[class*="hl-"] .cmt{color:#D5D0C1;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:8px 15px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}.btn:hover:not(:disabled){background:var(--gray);border-color:var(--ink);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:86px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector layer: paths and arrow heads stay mounted; endpoints come from live element rectangles. */
+.stage{position:relative;width:100%;height:440px;min-height:440px;margin:0 auto;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;}
+.wire-line{--wc:var(--muted);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}.wire-head{--wc:var(--muted);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wire-port{--wc:var(--muted);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}.wire-line.on,.wire-head.on,.wire-port.on{opacity:1;}.wire-line.hint{stroke-width:2;opacity:.1;}.wire-head.hint,.wire-port.hint{opacity:.1;}.wire-head.drawing{transition-delay:200ms;}.wire-line.blue,.wire-head.blue,.wire-port.blue{--wc:var(--blue);}.wire-line.green,.wire-head.green,.wire-port.green{--wc:var(--green);}.wire-line.amber,.wire-head.amber,.wire-port.amber{--wc:var(--amber);}.wire-line.danger,.wire-head.danger,.wire-port.danger{--wc:var(--danger);}
+
+/* Generic cards, status pill, checklist rows. */
+.gcard{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:12px 13px;display:flex;flex-direction:column;justify-content:center;gap:3px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gcard .k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.gcard .n{font-size:14px;font-weight:700;}.gcard .s{font-size:11px;color:var(--muted);}
+.gcard.blue{border-color:var(--blue);}.gcard.blue .k{color:var(--blue);}
+.gcard.green{border-color:var(--green);}.gcard.green .k{color:var(--green);}
+.gcard.amber{border-color:var(--amber);}.gcard.amber .k{color:var(--amber);}
+.gcard.red{border-color:var(--danger);}.gcard.red .k{color:var(--danger);}
+.gcard.active{transform:scale(1.012);box-shadow:0 0 0 2px rgba(43,42,38,.08);}
+.gcard.blue.active{background:var(--bluebg);}.gcard.green.active{background:var(--greenbg);}.gcard.amber.active{background:var(--amberbg);}.gcard.red.active{background:var(--dangerbg);}
+.gcard.warn{border-color:var(--amber);background:var(--amberbg);}
+.gcard.bad{border-color:var(--danger);background:var(--dangerbg);}
+.gcard.dim{opacity:.42;}
+.pstate{margin-top:7px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);padding:5px 8px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);text-align:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.pstate.good{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.pstate.hold{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.pstate.wait{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.pstate.fail{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.pill{position:absolute;left:50%;bottom:8px;z-index:3;transform:translateX(-50%);width:max-content;max-width:95%;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 12px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.pill.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.pill.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.pill.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.pill.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.rrow{min-height:30px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-size:11px;color:var(--muted);display:flex;align-items:center;padding:4px 10px;gap:8px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.rrow b{font-family:var(--mono);font-size:10.5px;}
+.rrow.on{border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateX(2px);}
+.rrow.warn{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.rrow.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.rrow.dim{opacity:.35;}
+.panel-box{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.panel-title{position:absolute;left:14px;top:9px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}
+
+/* Scene 1: shared readers coexist; the writer waits for the compatibility matrix to allow it. */
+.md-stage{display:grid;grid-template-columns:.96fr 1fr 1.14fr;grid-template-rows:1fr 1fr 1fr;column-gap:30px;row-gap:16px;height:440px;min-height:440px;padding-bottom:34px;}
+.md-file{grid-column:2;grid-row:1 / span 3;padding:14px;display:flex;flex-direction:column;justify-content:center;gap:8px;}
+.md-file .holders{display:flex;flex-direction:column;gap:7px;margin-top:4px;}
+.hbadge{min-height:30px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);display:flex;align-items:center;justify-content:center;opacity:.45;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.hbadge.sh{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateX(2px);}
+.hbadge.ex{opacity:1;border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);transform:translateX(2px);}
+.md-matrix{grid-column:3;grid-row:1 / span 3;padding:34px 14px 16px;display:flex;flex-direction:column;justify-content:center;gap:6px;}
+.mx-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:5px;}
+.mx-cell{min-height:32px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-size:10.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:2px 4px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.mx-cell.head{background:var(--paper);font-family:var(--mono);font-size:10px;color:var(--faint);}
+.mx-cell.ok{color:var(--greentx);}
+.mx-cell.no{color:var(--dangertx);}
+.mx-cell.lit.ok{border-color:var(--green);background:var(--greenbg);transform:scale(1.05);}
+.mx-cell.lit.no{border-color:var(--danger);background:var(--dangerbg);transform:scale(1.05);}
+
+/* Scene 2: lock regions are absolutely-positioned bands over a byte ruler; width/left tween. */
+.rg-stage{display:grid;grid-template-rows:150px 1fr 30px;row-gap:20px;height:440px;min-height:440px;}
+.rg-filebox{padding:30px 18px 14px;}
+.rg-filebox .panel-title{color:var(--blue);}
+.rg-strip{position:relative;height:52px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);margin-top:14px;}
+.rg-region{position:absolute;top:-1.5px;height:calc(100% + 3px);border:1.5px solid transparent;border-radius:7px;opacity:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;transition:left var(--dur) var(--ease),width var(--dur) var(--ease),opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.rg-region.on{opacity:1;}
+.rg-region.w1{border-color:var(--blue);background:rgba(36,103,166,.2);color:var(--bluetx);justify-content:flex-start;padding-left:8px;}
+.rg-region.w2{border-color:var(--amber);background:rgba(166,100,8,.18);color:var(--ambertx);}
+.rg-region.rd{border-color:var(--green);background:rgba(8,122,92,.18);color:var(--greentx);}
+.rg-region.clash{border-color:var(--danger);background:rgba(195,73,53,.3);color:var(--dangertx);}
+.rg-ticks{position:relative;height:16px;margin-top:4px;font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.rg-ticks span{position:absolute;transform:translateX(-50%);}
+.rg-row{display:grid;grid-template-columns:1fr 1fr 1fr 1.14fr;gap:14px;align-items:stretch;}
+.rg-info{padding:30px 12px 10px;display:flex;flex-direction:column;gap:5px;justify-content:center;}
+.rg-info .panel-title{color:var(--amber);}
+.rg-info .iv{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);border:1.5px solid var(--line);border-radius:6px;background:var(--gray);padding:4px 8px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.rg-info .iv.lit{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+
+/* Scene 3: one lane sleeps inside the syscall; the other returns immediately and keeps working. */
+.bk-stage{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:104px 1fr 128px;column-gap:28px;row-gap:22px;height:460px;min-height:460px;}
+.bk-holder{grid-column:1 / span 2;grid-row:1;}
+.bk-lane{padding:34px 13px 12px;display:flex;flex-direction:column;gap:8px;}
+.bk-lane .panel-title{font-size:10.5px;}
+.bk-lane.a .panel-title{color:var(--amber);}
+.bk-lane.b .panel-title{color:var(--blue);}
+.bk-lane.lit-a{border-color:var(--amber);background:#FCFAF6;}
+.bk-lane.lit-b{border-color:var(--blue);background:#F8FBFE;}
+.bk-rows{grid-column:1 / span 2;grid-row:3;display:flex;flex-direction:column;gap:6px;padding:30px 14px 12px;}
+.bk-rows.on{border-color:var(--amber);background:#FCFAF6;}
+.bk-rows .panel-title{color:var(--amber);}
+
+/* Scene 4: the rogue writer walks straight past an advisory lock; closing any fd drops fcntl locks. */
+.ad-stage{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:132px 1fr;column-gap:26px;row-gap:28px;height:440px;min-height:440px;}
+.ad-file{padding:14px;display:flex;flex-direction:column;justify-content:center;gap:7px;}
+.ad-content{border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);padding:7px 9px;text-align:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.ad-content.dirty{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.ad-fdpanel{padding:32px 12px 12px;display:flex;flex-direction:column;gap:7px;justify-content:center;}
+.ad-fdpanel .panel-title{color:var(--blue);}
+.ad-fdpanel.trap{border-color:var(--danger);background:#FDF7F5;}
+
+@media(max-width:1040px){.layout{grid-template-columns:1fr;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.codebox{grid-column:2;}.desc-card{grid-column:1;grid-row:1 / span 2;}}
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:15px;min-height:0;}.right{display:flex;}.desc-card{min-height:0;padding:16px;}.controls{padding:12px 13px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 138px;}.btn{padding:8px 12px;}
+.md-stage{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto auto;height:auto;min-height:620px;column-gap:14px;row-gap:12px;padding-bottom:40px;}.md-stage .gcard:nth-child(1){grid-column:1;grid-row:1;}.md-stage .gcard:nth-child(2){grid-column:2;grid-row:1;}.md-stage .gcard:nth-child(3){grid-column:1;grid-row:2;}.md-file{grid-column:2;grid-row:2;}.md-matrix{grid-column:1 / span 2;grid-row:3;}
+.rg-stage{height:auto;min-height:600px;}.rg-row{grid-template-columns:1fr 1fr;}.rg-info{grid-column:1 / span 2;}
+.bk-stage{grid-template-columns:1fr;grid-template-rows:104px auto auto auto;height:auto;min-height:660px;}.bk-holder{grid-column:1;}.bk-rows{grid-column:1;grid-row:4;}
+.ad-stage{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;height:auto;min-height:620px;column-gap:14px;row-gap:14px;}.ad-stage .gcard:nth-child(3){grid-column:1 / span 2;grid-row:2;}.ad-file{grid-column:1;grid-row:3;}.ad-fdpanel{grid-column:2;grid-row:3;}
+.pill{font-size:9.5px;white-space:normal;text-align:center;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>文件锁 · 从共享/排他到建议性锁的边界</h1>
+    <p>配套笔记《4.3 文件锁》 · flock 整文件锁 · fcntl 区域锁 · 阻塞/非阻塞 · advisory　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightC(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts?parts[1]:line;
+  const comment=parts&&parts[2]?parts[2]:'';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{strings.push(escapeHtml(value));return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';});
+  code=escapeHtml(code)
+    .replace(/\b(int|struct|if|return|short|off_t|pid_t|while)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(open|flock|fcntl|close|write|fork)\b/g,'<span class="fn">$1</span>')
+    .replace(/\b(fd2|fd|fl|LOCK_SH|LOCK_EX|LOCK_UN|LOCK_NB|F_SETLKW|F_SETLK|F_GETLK|F_WRLCK|F_RDLCK|F_UNLCK|SEEK_SET|EWOULDBLOCK|EAGAIN|errno|l_type|l_whence|l_start|l_len|l_pid|O_RDWR|O_RDONLY)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(0|1|50|100|150|200|300)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment?'<span class="cmt">'+escapeHtml(comment)+'</span>':'');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="codeLine'+index+'">'+highlightC(line||' ')+'</div>').join('');}
+function classes(id,value){const node=el(id);if(node)node.className=value;}
+function setPill(id,text,tone){const node=el(id);if(!node)return;node.textContent=text;node.className='pill'+(tone?' '+tone:'');}
+
+/* A persistent arrow controller: a path, filled triangle, and source port are created once per scene. */
+function createWires(stageId,specs){
+  const stage=el(stageId);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id=stageId+'-svg';svg.classList.add('wire-svg');svg.setAttribute('preserveAspectRatio','none');stage.appendChild(svg);
+  const entries=specs.map(spec=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const head=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const port=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    line.id=stageId+'-'+spec.id;head.id=line.id+'-head';port.id=line.id+'-port';port.setAttribute('r','4');
+    line.classList.add('wire-line',spec.color);head.classList.add('wire-head',spec.color);port.classList.add('wire-port',spec.color);
+    svg.append(line,head,port);return {...spec,line,head,port};
+  });
+  let active=new Set();let timers=[];
+  function geometry(item){
+    const sr=stage.getBoundingClientRect(),source=el(item.from)?.getBoundingClientRect(),target=el(item.to)?.getBoundingClientRect();
+    if(!source||!target)return;
+    const sx=source.left-sr.left,sy=source.top-sr.top,sw=source.width,sh=source.height;
+    const tx=target.left-sr.left,ty=target.top-sr.top,tw=target.width,th=target.height;
+    const scx=sx+sw/2,scy=sy+sh/2,tcx=tx+tw/2,tcy=ty+th/2;
+    const horizontal=Math.abs(tcx-scx)>=Math.abs(tcy-scy);
+    let x1,y1,x2,y2;
+    if(horizontal){const right=tcx>=scx;x1=right?sx+sw:sx;y1=scy;x2=right?tx:tx+tw;y2=tcy;}
+    else{const down=tcy>=scy;x1=scx;y1=down?sy+sh:sy;x2=tcx;y2=down?ty:ty+th;}
+    const dx=x2-x1,dy=y2-y1,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,baseX=x2-ux*9,baseY=y2-uy*9;
+    const d=horizontal?`M ${x1} ${y1} C ${x1+dx*.45} ${y1}, ${baseX-dx*.45} ${baseY}, ${baseX} ${baseY}`:`M ${x1} ${y1} C ${x1} ${y1+dy*.45}, ${baseX} ${baseY-dy*.45}, ${baseX} ${baseY}`;
+    const px=-uy*5,py=ux*5;
+    item.line.setAttribute('d',d);item.head.setAttribute('d',`M ${x2} ${y2} L ${baseX+px} ${baseY+py} L ${baseX-px} ${baseY-py} Z`);item.port.setAttribute('cx',x1);item.port.setAttribute('cy',y1);
+  }
+  function layout(){const rect=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);entries.forEach(geometry);}
+  function draw(item){
+    const length=item.line.getTotalLength();item.line.style.transition='none';item.line.style.strokeDasharray=length;item.line.style.strokeDashoffset=length;void item.line.getBoundingClientRect();item.line.style.transition='';item.line.style.strokeDashoffset='0';
+    const timeout=setTimeout(()=>{item.line.style.strokeDasharray='';item.line.style.strokeDashoffset='';},560);timers.push(timeout);
+  }
+  function setClass(item,state){
+    const suffix=' '+item.color+(state?' '+state:'');item.line.className.baseVal='wire-line'+suffix;item.head.className.baseVal='wire-head'+suffix;item.port.className.baseVal='wire-port'+suffix;
+    if(state==='on')item.head.classList.add('drawing');
+  }
+  function sync(ids){
+    layout();const wanted=new Set(ids),hasAny=wanted.size>0;let stagger=0;
+    entries.forEach(item=>{
+      if(wanted.has(item.id)){setClass(item,'on');if(!active.has(item.id)&&!reducedMotion()){const delay=stagger++*160;timers.push(setTimeout(()=>draw(item),delay));}}
+      else setClass(item,hasAny?'':'hint');
+    });active=wanted;
+  }
+  const observer=new ResizeObserver(layout);observer.observe(stage);window.addEventListener('resize',layout);layout();
+  return {sync,layout,destroy(){observer.disconnect();window.removeEventListener('resize',layout);timers.forEach(clearTimeout);timers=[];}};
+}
+
+const modeScene=(()=>{
+  const code=[
+    'int fd = open("data.txt", O_RDWR);',
+    'flock(fd, LOCK_SH);   // P1: shared, granted',
+    'flock(fd, LOCK_SH);   // P2: shared, granted too',
+    'flock(fd, LOCK_EX);   // P3: exclusive, blocks',
+    'flock(fd, LOCK_UN);   // P1 & P2 release',
+    '// now P3 wakes up and holds LOCK_EX',
+    'flock(fd, LOCK_SH);   // P1 again: blocks on EX'
+  ];
+  const steps=[
+    {chip:'共享',chipC:'cg',title:'P1 获取共享锁（读锁）',desc:'此时文件无锁，共享锁直接授予。兼容矩阵第一行：<b>无锁</b>时任何请求都允许。',lines:[0,1],hl:'green',p:[['good','holds LOCK_SH'],['','idle'],['','idle']],badges:['sh','',''],mx:[3],wires:['p1'],pill:'no lock -> SH granted',pillC:'green'},
+    {chip:'共存',chipC:'cg',title:'P2 也获取共享锁：读者共存',desc:'共享锁允许<b>多个进程同时持有</b>并读取文件——这正是“读锁”的含义。矩阵：共享 + 请求共享 = 允许。',lines:[2],hl:'green',p:[['good','holds LOCK_SH'],['good','holds LOCK_SH'],['','idle']],badges:['sh','sh',''],mx:[5],wires:['p1','p2'],pill:'SH + SH coexist',pillC:'green'},
+    {chip:'阻塞',chipC:'ca',title:'P3 请求排他锁：被共享锁挡住',desc:'排他锁要求<b>独占</b>。只要还有任何共享锁在，P3 的 <code>flock(LOCK_EX)</code> 就睡在内核里等待。矩阵：共享 + 请求排他 = 阻塞。',lines:[3],hl:'amber',p:[['good','holds LOCK_SH'],['good','holds LOCK_SH'],['wait','blocked in flock()']],badges:['sh','sh',''],mx:[6],wires:['p3'],pill:'SH held -> EX must wait',pillC:'amber'},
+    {chip:'让位',chipC:'cb',title:'读者全部释放，P3 获得排他锁',desc:'P1、P2 先后 <code>LOCK_UN</code>；最后一个共享锁消失的瞬间，内核唤醒 P3，把排他锁交给它。',lines:[4,5],hl:'blue',p:[['','released'],['','released'],['hold','holds LOCK_EX']],badges:['','','ex'],mx:[],wires:['p3'],pill:'last SH gone -> EX granted',pillC:'blue'},
+    {chip:'独占',chipC:'cd',title:'排他锁期间：任何请求都阻塞',desc:'P1 想再拿共享锁也不行——矩阵最后一行：<b>排他</b>锁在手，共享、排他请求一律阻塞。写者工作时没有读者。',lines:[6],hl:'danger',p:[['wait','blocked in flock()'],['','idle'],['hold','holds LOCK_EX']],badges:['','','ex'],mx:[7,8],wires:['p1'],pill:'EX held -> everyone waits',pillC:'danger'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>共享 / 排他</b>：读者共存、写者独占。兼容矩阵决定谁进得去、谁在门口等。</div><div class="stage md-stage" id="mdStage">'+
+      '<section class="gcard green" id="mdP1"><span class="k">process</span><span class="n">P1 · reader</span><div class="pstate" id="mdT1">idle</div></section>'+
+      '<section class="gcard green" id="mdP2"><span class="k">process</span><span class="n">P2 · reader</span><div class="pstate" id="mdT2">idle</div></section>'+
+      '<section class="gcard blue" id="mdP3"><span class="k">process</span><span class="n">P3 · writer</span><div class="pstate" id="mdT3">idle</div></section>'+
+      '<section class="gcard amber md-file" id="mdFile"><span class="k">file</span><span class="n">data.txt</span><div class="holders"><div class="hbadge" id="mdB1">P1 · LOCK_SH</div><div class="hbadge" id="mdB2">P2 · LOCK_SH</div><div class="hbadge" id="mdB3">P3 · LOCK_EX</div></div></section>'+
+      '<section class="panel-box md-matrix" id="mdMatrix"><span class="panel-title">兼容性矩阵 · 已持有 \\ 请求</span><div class="mx-grid">'+
+        '<div class="mx-cell head">已持有 \\ 请求</div><div class="mx-cell head">共享锁</div><div class="mx-cell head">排他锁</div>'+
+        '<div class="mx-cell head">无锁</div><div class="mx-cell ok" id="mx3">允许</div><div class="mx-cell ok" id="mx4">允许</div>'+
+        '<div class="mx-cell head">共享锁</div><div class="mx-cell ok" id="mx5">允许</div><div class="mx-cell no" id="mx6">阻塞</div>'+
+        '<div class="mx-cell head">排他锁</div><div class="mx-cell no" id="mx7">阻塞</div><div class="mx-cell no" id="mx8">阻塞</div>'+
+      '</div></section>'+
+      '<span class="pill" id="mdPill"></span></div>';
+    wires=createWires('mdStage',[{id:'p1',from:'mdP1',to:'mdFile',color:'green'},{id:'p2',from:'mdP2',to:'mdFile',color:'green'},{id:'p3',from:'mdP3',to:'mdFile',color:'blue'}]);
+  }
+  function paint(s){
+    const cards=['mdP1','mdP2','mdP3'],colors=['green','green','blue'];
+    s.p.forEach((spec,i)=>{
+      const[state,text]=spec;
+      classes(cards[i],'gcard '+colors[i]+(state==='good'||state==='hold'?' active':state==='wait'?' warn':''));
+      const t=el('mdT'+(i+1));t.textContent=text;t.className='pstate '+(state==='good'?'good':state==='hold'?'hold':state==='wait'?'wait':'');
+    });
+    classes('mdB1','hbadge'+(s.badges[0]?' '+s.badges[0]:''));classes('mdB2','hbadge'+(s.badges[1]?' '+s.badges[1]:''));classes('mdB3','hbadge'+(s.badges[2]?' '+s.badges[2]:''));
+    for(let i=3;i<=8;i++){const cell=el('mx'+i);cell.className=cell.className.replace(' lit','');if(s.mx.includes(i))cell.className+=' lit';}
+    setPill('mdPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'mode',label:'共享锁与排他锁',sub:'LOCK_SH · LOCK_EX · matrix',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const regionScene=(()=>{
+  const code=[
+    'struct flock fl;',
+    'fl.l_type   = F_WRLCK;      // write lock',
+    'fl.l_whence = SEEK_SET;',
+    'fl.l_start  = 0;',
+    'fl.l_len    = 100;          // bytes [0, 100)',
+    'fcntl(fd, F_SETLKW, &fl);   // lock the region',
+    'fcntl(fd, F_SETLK,  &fl);   // -1, errno = EAGAIN',
+    'fcntl(fd, F_GETLK,  &fl);   // query: fl.l_pid',
+    'fl.l_type = F_UNLCK;',
+    'fcntl(fd, F_SETLK, &fl);    // unlock [0, 100)'
+  ];
+  const pct=v=>v/300*100;
+  const steps=[
+    {chip:'区域写锁',chipC:'cb',title:'P1 锁定前 100 字节',desc:'<code>struct flock</code> 用 <code>l_start + l_len</code> 描述区域。锁的不是整个文件，只是 <b>[0, 100)</b> 这一段。',lines:[0,1,2,3,4,5],hl:'blue',regions:{rgW1:[0,100,'w1','P1 · F_WRLCK'],rgW2:null,rgRd:null,rgClash:null},p:[['hold','holds [0,100) W'],['','idle'],['','idle']],info:0,pill:'l_start=0, l_len=100',pillC:'blue'},
+    {chip:'并行',chipC:'cg',title:'P2 写锁 [200,300)：区域不重叠',desc:'同一个文件、两把写锁<b>同时成立</b>——因为区域不相交。区域锁把并发粒度从文件降到字节段，数据库类场景因此偏爱 fcntl。',lines:[5],hl:'green',regions:{rgW1:[0,100,'w1','P1 · F_WRLCK'],rgW2:[200,300,'w2','P2 · F_WRLCK'],rgRd:null,rgClash:null},p:[['hold','holds [0,100) W'],['hold','holds [200,300) W'],['','idle']],info:0,pill:'disjoint regions coexist',pillC:'green'},
+    {chip:'冲突',chipC:'cd',title:'P3 读锁 [50,150)：与写锁重叠',desc:'[50,100) 这段撞上了 P1 的写锁。<code>F_SETLK</code> 立即返回 -1（EAGAIN）；换 <code>F_SETLKW</code> 则阻塞等待。',lines:[6],hl:'danger',regions:{rgW1:[0,100,'w1','P1 · F_WRLCK'],rgW2:[200,300,'w2','P2 · F_WRLCK'],rgRd:null,rgClash:[50,100,'clash','overlap!']},p:[['hold','holds [0,100) W'],['hold','holds [200,300) W'],['fail','F_SETLK -> EAGAIN']],info:0,pill:'[50,100) overlaps a write lock',pillC:'danger'},
+    {chip:'查询',chipC:'ca',title:'F_GETLK：看看是谁挡了路',desc:'F_GETLK 不加锁，只探测：若有冲突，内核把<b>冲突锁的信息</b>填回 flock 结构——持有者 pid、锁类型、区域。',lines:[7],hl:'amber',regions:{rgW1:[0,100,'w1','P1 · F_WRLCK'],rgW2:[200,300,'w2','P2 · F_WRLCK'],rgRd:null,rgClash:null},p:[['hold','holds [0,100) W'],['hold','holds [200,300) W'],['wait','F_GETLK probing']],info:1,pill:'conflict: l_pid=P1, F_WRLCK',pillC:'amber'},
+    {chip:'解锁',chipC:'cg',title:'P1 解锁后，P3 拿到读锁 [50,150)',desc:'<code>l_type = F_UNLCK</code> 释放 [0,100)。冲突消失，P3 的读锁区域滑入生效——读锁与 P2 的写锁依旧互不相交。',lines:[8,9],hl:'green',regions:{rgW1:null,rgW2:[200,300,'w2','P2 · F_WRLCK'],rgRd:[50,150,'rd','P3 · F_RDLCK'],rgClash:null},p:[['','released'],['hold','holds [200,300) W'],['good','holds [50,150) R']],info:0,pill:'unlock -> reader admitted',pillC:'green'},
+    {chip:'语义',chipC:'c0',title:'区域锁的三条要点',desc:'① 任意字节范围，<code>l_len=0</code> 表示锁到文件末尾；② 读锁可重叠共存，写锁独占区域；③ 锁属于<b>进程</b>——这条会在第 4 幕变成陷阱。',lines:[4],hl:'blue',regions:{rgW1:null,rgW2:[200,300,'w2','P2 · F_WRLCK'],rgRd:[50,150,'rd','P3 · F_RDLCK'],rgClash:null},p:[['','idle'],['hold','holds [200,300) W'],['good','holds [50,150) R']],info:2,pill:'byte-range · per-process · l_len=0 = to EOF',pillC:'blue'}
+  ];
+  function region(id,spec){
+    const node=el(id);if(!node)return;
+    if(!spec){node.classList.remove('on');return;}
+    const[from,to,tone,label]=spec;
+    node.style.left=pct(from)+'%';node.style.width=pct(to-from)+'%';
+    node.textContent=label;node.className='rg-region on '+tone;
+  }
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>fcntl 记录锁</b>：锁的是字节区域而不是整个文件——不相交就并行，重叠才冲突。</div><div class="stage rg-stage" id="rgStage">'+
+      '<section class="panel-box rg-filebox"><span class="panel-title">data.txt · 300 bytes</span><div class="rg-strip" id="rgStrip">'+
+        '<div class="rg-region" id="rgW1"></div><div class="rg-region" id="rgW2"></div><div class="rg-region" id="rgRd"></div><div class="rg-region" id="rgClash"></div>'+
+      '</div><div class="rg-ticks"><span style="left:0%">0</span><span style="left:33.3%">100</span><span style="left:66.6%">200</span><span style="left:100%">300</span></div></section>'+
+      '<div class="rg-row">'+
+        '<section class="gcard blue" id="rgP1"><span class="k">process</span><span class="n">P1</span><div class="pstate" id="rgT1">idle</div></section>'+
+        '<section class="gcard amber" id="rgP2"><span class="k">process</span><span class="n">P2</span><div class="pstate" id="rgT2">idle</div></section>'+
+        '<section class="gcard green" id="rgP3"><span class="k">process</span><span class="n">P3</span><div class="pstate" id="rgT3">idle</div></section>'+
+        '<section class="panel-box rg-info" id="rgInfo"><span class="panel-title">F_GETLK 返回</span><div class="iv" id="rgI0">l_pid&nbsp;&nbsp;&nbsp;= (P1)</div><div class="iv" id="rgI1">l_type&nbsp;&nbsp;= F_WRLCK</div><div class="iv" id="rgI2">l_start = 0, l_len = 100</div></section>'+
+      '</div>'+
+      '<span class="pill" id="rgPill" style="bottom:2px;"></span></div>';
+  }
+  function paint(s){
+    region('rgW1',s.regions.rgW1);region('rgW2',s.regions.rgW2);region('rgRd',s.regions.rgRd);region('rgClash',s.regions.rgClash);
+    const cards=['rgP1','rgP2','rgP3'],colors=['blue','amber','green'];
+    s.p.forEach((spec,i)=>{
+      const[state,text]=spec;
+      classes(cards[i],'gcard '+colors[i]+(state==='hold'||state==='good'?' active':state==='wait'?' warn':state==='fail'?' bad':''));
+      const t=el('rgT'+(i+1));t.textContent=text;t.className='pstate '+(state==='hold'?'hold':state==='good'?'good':state==='wait'?'wait':state==='fail'?'fail':'');
+    });
+    ['rgI0','rgI1','rgI2'].forEach((id,i)=>classes(id,'iv'+(s.info===1||(s.info===2&&i===2)?' lit':'')));
+    setPill('rgPill',s.pill,s.pillC);
+  }
+  return {id:'region',label:'fcntl 区域锁',sub:'l_start · l_len · F_GETLK',steps,code,mount,paint,destroy(){}};
+})();
+
+const blockScene=(()=>{
+  const code=[
+    'flock(fd, LOCK_EX);            // blocks until free',
+    'if (flock(fd, LOCK_EX | LOCK_NB) == -1)',
+    '  if (errno == EWOULDBLOCK)',
+    '    doOtherWork();             // try again later',
+    'fcntl(fd, F_SETLKW, &fl);      // fcntl: wait',
+    'fcntl(fd, F_SETLK,  &fl);      // fcntl: -1 / EAGAIN'
+  ];
+  const steps=[
+    {chip:'前提',chipC:'cb',title:'P1 已持有排他锁',desc:'两个竞争者 A、B 都想拿写锁。它们的差别只有一个：<b>拿不到时等不等</b>。',lines:[0],hl:'blue',holder:'active',laneA:'',laneB:'',aRows:[['','flock(fd, LOCK_EX)'],['','']],bRows:[['','flock(fd, LOCK_EX | LOCK_NB)'],['','']],strategy:0,pill:'P1 holds LOCK_EX',pillC:'blue'},
+    {chip:'阻塞',chipC:'ca',title:'A：睡在系统调用里',desc:'阻塞模式下进程<b>睡眠在内核</b>，不消耗 CPU，但也做不了任何别的事——直到锁可用才被唤醒返回。',lines:[0],hl:'amber',holder:'active',laneA:'lit-a',laneB:'',aRows:[['wait','卡在 flock() 中，进程睡眠'],['','']],bRows:[['','flock(fd, LOCK_EX | LOCK_NB)'],['','']],strategy:0,pill:'A sleeps inside the syscall',pillC:'amber'},
+    {chip:'非阻塞',chipC:'cd',title:'B：立即返回 -1 / EWOULDBLOCK',desc:'<code>LOCK_NB</code> 把“等待”变成“失败”：立刻拿到答案，进程转身去做别的工作，稍后再来重试。',lines:[1,2,3],hl:'danger',holder:'active',laneA:'lit-a',laneB:'lit-b',aRows:[['wait','卡在 flock() 中，进程睡眠'],['','']],bRows:[['fail','-1, errno = EWOULDBLOCK'],['good','先做其他工作，稍后重试']],strategy:0,pill:'fail fast, keep working',pillC:'danger'},
+    {chip:'释放',chipC:'cg',title:'P1 释放：A 被唤醒获得锁',desc:'锁空出的瞬间内核唤醒 A，<code>flock()</code> 这才返回 0。B 下一轮重试也会成功。两条路殊途同归，代价不同。',lines:[0,3],hl:'green',holder:'',laneA:'lit-a',laneB:'',aRows:[['good','唤醒，flock() 返回 0'],['good','获得 LOCK_EX']],bRows:[['','下次重试将成功'],['','']],strategy:0,pill:'lock free -> A wakes with it',pillC:'green'},
+    {chip:'对照',chipC:'ca',title:'fcntl 的同一对开关 + 防死锁',desc:'<code>F_SETLKW</code>（W = Wait）对应阻塞，<code>F_SETLK</code> 对应非阻塞。非阻塞失败后<b>释放已持锁再重试</b>、按固定顺序加锁、设超时——是拆死锁的三板斧。',lines:[4,5],hl:'amber',holder:'',laneA:'',laneB:'',aRows:[['','flock: 阻塞等待'],['','']],bRows:[['','flock + LOCK_NB: 立即返回'],['','']],strategy:3,pill:'F_SETLKW = wait · F_SETLK = fail fast',pillC:'amber'}
+  ];
+  function laneRows(prefix,rows){
+    rows.forEach((spec,i)=>{
+      const[state,text]=spec;const node=el(prefix+i);if(!node)return;
+      node.textContent=text||' ';
+      node.className='rrow'+(text?'':' dim')+(state==='wait'?' warn':state==='fail'?' bad':state==='good'?' on':'');
+    });
+  }
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>阻塞 vs 非阻塞</b>：同一把锁、两种拿法——睡着等，或立刻拿到“失败”这个答案。</div><div class="stage bk-stage" id="bkStage">'+
+      '<section class="gcard blue bk-holder" id="bkHolder"><span class="k">holder</span><span class="n">P1 · holds LOCK_EX</span><span class="s">正在处理文件，暂不释放</span></section>'+
+      '<section class="panel-box bk-lane a" id="bkLaneA"><span class="panel-title">A · 阻塞模式 flock(fd, LOCK_EX)</span><div class="rrow" id="bkA0"> </div><div class="rrow" id="bkA1"> </div></section>'+
+      '<section class="panel-box bk-lane b" id="bkLaneB"><span class="panel-title">B · 非阻塞 flock(fd, LOCK_EX | LOCK_NB)</span><div class="rrow" id="bkB0"> </div><div class="rrow" id="bkB1"> </div></section>'+
+      '<section class="panel-box bk-rows" id="bkRows"><span class="panel-title">避免死锁的常用策略</span>'+
+        '<div class="rrow" id="bkR0"><b>顺序</b>多把锁按固定顺序获取，破除循环等待</div>'+
+        '<div class="rrow" id="bkR1"><b>重试</b>非阻塞尝试失败时，释放已持有的锁再重来</div>'+
+        '<div class="rrow" id="bkR2"><b>超时</b>为等待设置上限，超时即放弃并报告</div></section>'+
+      '<span class="pill" id="bkPill"></span></div>';
+  }
+  function paint(s){
+    classes('bkHolder','gcard blue bk-holder'+(s.holder?' active':''));
+    classes('bkLaneA','panel-box bk-lane a'+(s.laneA?' '+s.laneA:''));
+    classes('bkLaneB','panel-box bk-lane b'+(s.laneB?' '+s.laneB:''));
+    laneRows('bkA',s.aRows);laneRows('bkB',s.bRows);
+    classes('bkRows','panel-box bk-rows'+(s.strategy?' on':''));
+    ['bkR0','bkR1','bkR2'].forEach((id,i)=>classes(id,'rrow '+(s.strategy===0?'dim':i<s.strategy?'warn':'')));
+    setPill('bkPill',s.pill,s.pillC);
+  }
+  return {id:'block',label:'阻塞与非阻塞',sub:'LOCK_NB · EWOULDBLOCK · F_SETLKW',steps,code,mount,paint,destroy(){}};
+})();
+
+const advisoryScene=(()=>{
+  const code=[
+    'flock(fd, LOCK_EX);        // advisory only',
+    'write(rogue_fd, buf, n);   // rogue write succeeds!',
+    'close(fd);                 // flock: lock released',
+    '// fcntl trap:',
+    'fcntl(fd, F_SETLK, &fl);   // lock via fd',
+    'int fd2 = open("data.txt", O_RDONLY);',
+    'close(fd2);                // ALL fcntl locks lost!'
+  ];
+  const steps=[
+    {chip:'协作',chipC:'cg',title:'守规矩的进程被锁协调',desc:'P1 持排他锁，P2 请求前<b>先检查锁</b>于是阻塞等待——建议性锁在自愿遵守协议的进程之间工作得很好。',lines:[0],hl:'green',p:[['good','holds LOCK_EX'],['wait','flock() blocked'],['','idle']],file:'',content:'data: AAAA',fdp:0,fdRows:[['',''],['','']],wires:['p1','p2'],pill:'cooperating processes: OK',pillC:'green'},
+    {chip:'越过',chipC:'cd',title:'不检查锁的进程直接写入',desc:'P3 根本不调用 flock，直接 <code>write()</code>——内核<b>不会拦截</b>。Linux 默认是建议性锁：锁只约束愿意看它的人。',lines:[1],hl:'danger',p:[['good','holds LOCK_EX'],['wait','flock() blocked'],['fail','write() 直接成功']],file:'bad',content:'data: AAXX ← 被直接改写!',fdp:0,fdRows:[['',''],['','']],wires:['p3'],pill:'advisory: kernel does not stop it',pillC:'danger'},
+    {chip:'flock 释放',chipC:'cb',title:'close(fd)：flock 锁随之释放',desc:'flock 锁与<b>打开的文件描述</b>绑定：close 或进程退出自动解锁。P2 随即被唤醒拿到锁——不怕持有者崩溃死锁。',lines:[2],hl:'blue',p:[['','close(fd) -> 锁释放'],['good','唤醒，holds LOCK_EX'],['','idle']],file:'',content:'data: AAXX',fdp:0,fdRows:[['',''],['','']],wires:['p2'],pill:'flock dies with the fd',pillC:'blue'},
+    {chip:'fcntl 场景',chipC:'ca',title:'P2 用 fcntl 锁区域，又开了第二个 fd',desc:'P2 通过 fd3 锁住 [0,100)；随后又 <code>open()</code> 同一文件得到 fd4 只是想读点东西。此刻锁好好的。',lines:[4,5],hl:'amber',p:[['','idle'],['good','fcntl lock via fd3'],['','idle']],file:'',content:'data: AAXX',fdp:1,fdRows:[['hold','fd3 · 持有 [0,100) 写锁'],['on','fd4 · 同一文件，仅用于读']],wires:['p2'],pill:'two fds, one file, one lock',pillC:'amber'},
+    {chip:'陷阱',chipC:'cd',title:'close(fd4)：所有 fcntl 锁全部消失',desc:'fcntl 锁属于<b>进程</b>：关闭指向该文件的<b>任意一个</b> fd，该进程在此文件上的所有记录锁立即释放——即使加锁用的是另一个 fd。',lines:[6],hl:'danger',p:[['','idle'],['fail','锁没了，自己还不知道'],['','idle']],file:'bad',content:'[0,100) 不再受保护',fdp:2,fdRows:[['fail','fd3 · 锁已被释放!'],['fail','fd4 · close() 触发了释放']],wires:[],pill:'close ANY fd -> locks gone',pillC:'danger'},
+    {chip:'收口',chipC:'c0',title:'flock vs fcntl：归属决定行为',desc:'flock 随<b>文件描述</b>（fork 后父子各自独立、不支持 NFS）；fcntl 随<b>进程</b>（关任一 fd 失锁、支持 NFS、可锁区域）。共享文件的<b>所有</b>进程都必须遵守同一套锁协议。',lines:[0,4],hl:'blue',p:[['','flock: 简单互斥'],['','fcntl: 精细控制'],['fail','不守协议者不受约束']],file:'',content:'data.txt',fdp:0,fdRows:[['',''],['','']],wires:[],pill:'advisory: a contract, not a wall',pillC:'blue'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>建议性锁</b>：锁是君子协定，内核不当保安；锁的存亡还跟 fd 的关闭方式深度绑定。</div><div class="stage ad-stage" id="adStage">'+
+      '<section class="gcard green" id="adP1"><span class="k">process</span><span class="n">P1 · 守协议</span><div class="pstate" id="adT1">idle</div></section>'+
+      '<section class="gcard blue" id="adP2"><span class="k">process</span><span class="n">P2 · 守协议</span><div class="pstate" id="adT2">idle</div></section>'+
+      '<section class="gcard red" id="adP3"><span class="k">process</span><span class="n">P3 · 不检查锁</span><div class="pstate" id="adT3">idle</div></section>'+
+      '<section class="gcard amber ad-file" id="adFile" style="grid-column:1 / span 2;"><span class="k">file</span><span class="n">data.txt</span><div class="ad-content" id="adContent">data: AAAA</div></section>'+
+      '<section class="panel-box ad-fdpanel" id="adFdp"><span class="panel-title">P2 的 fd 表 (fcntl)</span><div class="rrow" id="adF0"> </div><div class="rrow" id="adF1"> </div></section>'+
+      '<span class="pill" id="adPill"></span></div>';
+    wires=createWires('adStage',[{id:'p1',from:'adP1',to:'adFile',color:'green'},{id:'p2',from:'adP2',to:'adFile',color:'blue'},{id:'p3',from:'adP3',to:'adFile',color:'danger'}]);
+  }
+  function paint(s){
+    const cards=['adP1','adP2','adP3'],colors=['green','blue','red'];
+    s.p.forEach((spec,i)=>{
+      const[state,text]=spec;
+      classes(cards[i],'gcard '+colors[i]+(state==='good'?' active':state==='wait'?' warn':state==='fail'?' bad':''));
+      const t=el('adT'+(i+1));t.textContent=text;t.className='pstate '+(state==='good'?'good':state==='wait'?'wait':state==='fail'?'fail':'');
+    });
+    classes('adFile','gcard amber ad-file'+(s.file==='bad'?' bad':''));el('adFile').style.gridColumn='1 / span 2';
+    const content=el('adContent');content.textContent=s.content;content.className='ad-content'+(s.file==='bad'?' dirty':'');
+    classes('adFdp','panel-box ad-fdpanel'+(s.fdp===2?' trap':''));
+    s.fdRows.forEach((spec,i)=>{
+      const[state,text]=spec;const node=el('adF'+i);node.textContent=text||' ';
+      node.className='rrow'+(text?'':' dim')+(state==='hold'||state==='on'?' on':state==='fail'?' bad':'');
+    });
+    setPill('adPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'advisory',label:'建议性锁与关闭 fd',sub:'advisory · close · per-process',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const SCENES=[modeScene,regionScene,blockScene,advisoryScene];
+const tabsBox=el('tabs'),stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc'),codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots'),btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);});
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();sceneIndex=index;stepIndex=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));const scene=SCENES[sceneIndex];scene.mount();codeBox.innerHTML=codePanel(scene.code);dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,i)=>{const dot=document.createElement('button');dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);dot.addEventListener('click',()=>{stop();go(i);});dotsBox.appendChild(dot);dotEls.push(dot);});go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;stepIndex=Math.max(0,Math.min(steps.length-1,index));const step=steps[stepIndex];SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.className='cl '+(step.lines.includes(i)?'hl-'+step.hl:''));stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}if(stepIndex===steps.length-1)stop();
+}
+function play(){if(stepIndex===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='暂停';timer=setInterval(()=>{stepIndex<SCENES[sceneIndex].steps.length-1?go(stepIndex+1):stop();},3000);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}});
+const hashScene=location.hash.match(/scene=(\w+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

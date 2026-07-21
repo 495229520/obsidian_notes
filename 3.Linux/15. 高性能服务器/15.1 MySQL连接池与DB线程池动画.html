@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MySQL 连接池与 DB 线程池动画 · acquire · 有界队列 · 回投</title>
+<!-- Visual system: warm paper #F5F4ED, quiet panels #FBFBF6, saturated semantic blue/green/amber/red, 8px rhythm. -->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#625F56;--faint:#918D83;
+  --line:#D8D5C8;--grid:#E4E1D6;--gray:#F0EEE6;
+  --blue:#2467A6;--bluebg:#E1EEF9;--bluetx:#1C4D7A;
+  --green:#087A5C;--greenbg:#DAF0E7;--greentx:#075B45;
+  --amber:#A66408;--amberbg:#F7E9D4;--ambertx:#7C4A05;
+  --danger:#C34935;--dangerbg:#F7DFDA;--dangertx:#913025;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:0;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:10px 16px;cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.14);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.78;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(300px,1fr);gap:28px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:13px;color:var(--muted);margin-bottom:15px;}.vcap b{color:var(--ink);font-weight:700;}
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:18px 20px;min-height:206px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:9px 12px;}
+#stDesc{margin-top:10px;font-size:14px;color:var(--muted);}.blue{color:var(--blue);font-weight:700;}.green{color:var(--green);font-weight:700;}.amber{color:var(--amber);font-weight:700;}.danger{color:var(--danger);font-weight:700;}
+.chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1.5px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.chip.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{align-self:flex-start;width:100%;background:#2E2C27;border-radius:8px;padding:10px 0;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#D8D5CC;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.codebox .cl{min-height:22px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}.codebox .cmt{color:#918D83;}.codebox .kw{color:#E9AC50;}.codebox .type{color:#95C7EF;}.codebox .fn{color:#83C9B2;}.codebox .num{color:#F0BE7E;}.codebox .str{color:#D9CE9F;}
+.codebox .cl.hl-blue{background:rgba(52,122,198,.54);box-shadow:inset 4px 0 0 #91C7F5;color:#F7F4EA;}.codebox .cl.hl-green{background:rgba(22,143,107,.54);box-shadow:inset 4px 0 0 #90DFC2;color:#F7F4EA;}.codebox .cl.hl-amber{background:rgba(185,112,16,.58);box-shadow:inset 4px 0 0 #FFD08A;color:#F7F4EA;}.codebox .cl.hl-danger{background:rgba(198,73,53,.58);box-shadow:inset 4px 0 0 #FFAA98;color:#F7F4EA;}.codebox .cl[class*="hl-"] .cmt{color:#D5D0C1;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:8px 15px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}.btn:hover:not(:disabled){background:var(--gray);border-color:var(--ink);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:86px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector layer: paths and arrow heads stay mounted; endpoints come from live element rectangles. */
+.stage{position:relative;width:100%;height:440px;min-height:440px;margin:0 auto;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;}
+.wire-line{--wc:var(--muted);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}.wire-head{--wc:var(--muted);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wire-port{--wc:var(--muted);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}.wire-line.on,.wire-head.on,.wire-port.on{opacity:1;}.wire-line.hint{stroke-width:2;opacity:.1;}.wire-head.hint,.wire-port.hint{opacity:.1;}.wire-head.drawing{transition-delay:200ms;}.wire-line.blue,.wire-head.blue,.wire-port.blue{--wc:var(--blue);}.wire-line.green,.wire-head.green,.wire-port.green{--wc:var(--green);}.wire-line.amber,.wire-head.amber,.wire-port.amber{--wc:var(--amber);}.wire-line.danger,.wire-head.danger,.wire-port.danger{--wc:var(--danger);}
+
+/* Generic cards, slots, sliding tokens, status pill, checklist rows. */
+.gcard{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:12px 13px;display:flex;flex-direction:column;justify-content:center;gap:3px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gcard .k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.gcard .n{font-size:14px;font-weight:700;}.gcard .s{font-size:11px;color:var(--muted);}
+.gcard.blue{border-color:var(--blue);}.gcard.blue .k{color:var(--blue);}
+.gcard.green{border-color:var(--green);}.gcard.green .k{color:var(--green);}
+.gcard.amber{border-color:var(--amber);}.gcard.amber .k{color:var(--amber);}
+.gcard.active{transform:scale(1.012);box-shadow:0 0 0 2px rgba(43,42,38,.08);}
+.gcard.blue.active{background:var(--bluebg);}.gcard.green.active{background:var(--greenbg);}.gcard.amber.active{background:var(--amberbg);}
+.gcard.warn{border-color:var(--amber);background:var(--amberbg);}
+.gcard.bad{border-color:var(--danger);background:var(--dangerbg);}
+.gcard.dim{opacity:.42;}
+.slotrow{display:flex;gap:8px;margin-top:7px;}
+.slot{flex:1;height:29px;border:1.5px dashed var(--line);border-radius:6px;background:var(--gray);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:var(--faint);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.slot.want{border-color:var(--amber);background:var(--amberbg);}
+.ctoken{position:absolute;z-index:4;min-width:50px;height:26px;padding:0 8px;border:1.5px solid var(--green);border-radius:6px;background:var(--greenbg);color:var(--greentx);font-family:var(--mono);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:0;transform:translate(-50%,-50%);transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.ctoken.on{opacity:1;}
+.ctoken.task{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.ctoken.stuck{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.pill{position:absolute;left:50%;bottom:8px;z-index:3;transform:translateX(-50%);width:max-content;max-width:95%;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 12px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.pill.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.pill.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.pill.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.pill.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.rrow{min-height:30px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-size:11px;color:var(--muted);display:flex;align-items:center;padding:4px 10px;gap:8px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.rrow b{font-family:var(--mono);font-size:10.5px;}
+.rrow.on{border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateX(2px);}
+.rrow.warn{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.rrow.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.rrow.dim{opacity:.35;}
+.panel-box{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.panel-title{position:absolute;left:14px;top:9px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}
+
+/* Scene 1: one connection is borrowed, used, and returned by the RAII guard. */
+.pool-stage{display:grid;grid-template-columns:1fr 1.16fr 1fr;grid-template-rows:150px 1fr;column-gap:30px;row-gap:30px;height:440px;min-height:440px;}
+.guard-panel{grid-column:1 / span 3;grid-row:2;display:flex;flex-direction:column;gap:8px;padding:36px 14px 48px;}
+.guard-panel.on{border-color:var(--green);background:#F8FCF9;}
+.guard-panel .panel-title{color:var(--green);}
+
+/* Scene 2: three loans drain the pool; the fourth worker sleeps on the condition variable. */
+.ex-stage{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:128px 140px 1fr;column-gap:22px;row-gap:26px;height:490px;min-height:490px;}
+.ex-pool{grid-column:1 / span 4;grid-row:1;}
+.ex-params{grid-column:1 / span 4;grid-row:3;display:flex;flex-direction:column;gap:7px;padding:34px 14px 44px;}
+.ex-params.on{border-color:var(--amber);background:#FCFAF6;}
+.ex-params .panel-title{color:var(--amber);}
+.wstate{margin-top:6px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);padding:4px 7px;font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--muted);text-align:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.wstate.good{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.wstate.wait{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.wstate.fail{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+
+/* Scene 3: bounded queue between the loop and the workers; overflow is refused, not hidden. */
+.q-stage{display:grid;grid-template-columns:1fr 1.08fr 1fr;grid-template-rows:1fr 170px;column-gap:28px;row-gap:26px;height:520px;min-height:520px;}
+.q-left{display:flex;flex-direction:column;gap:12px;justify-content:center;}
+.q-reject{border:1.5px dashed var(--line);border-radius:7px;background:var(--gray);padding:7px 10px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);display:flex;align-items:center;justify-content:space-between;gap:8px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.q-reject .slot{flex:0 0 48px;height:24px;}
+.q-reject.on{border-style:solid;border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.q-panel{padding:34px 14px 40px;display:flex;flex-direction:column;gap:9px;}
+.q-panel.on{border-color:var(--blue);background:#F8FBFE;}
+.q-panel.full{border-color:var(--danger);background:#FDF7F5;}
+.q-panel .panel-title{color:var(--blue);}
+.qslot{height:34px;border:1.5px dashed var(--line);border-radius:6px;background:var(--gray);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.q-count{position:absolute;right:14px;top:9px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);transition:color var(--dur) var(--ease);}
+.q-panel.full .q-count{color:var(--danger);}
+.q-workers{display:flex;flex-direction:column;gap:12px;justify-content:center;}
+.q-warn{grid-column:1 / span 3;grid-row:2;display:flex;flex-direction:column;gap:6px;padding:30px 14px 44px;}
+.q-warn.on{border-color:var(--danger);background:#FDF7F5;}
+.q-warn .panel-title{color:var(--danger);}
+
+/* Scene 4: results ride queueInLoop back to the owner loop; the socket is never touched off-thread. */
+.rs-stage{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:124px 1fr;column-gap:30px;row-gap:32px;height:440px;min-height:440px;}
+.rs-owner{grid-column:1 / span 3;grid-row:2;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:start;padding:40px 14px 56px;}
+.rs-owner.on{border-color:var(--blue);background:#F8FBFE;}
+.rs-owner.bad{border-color:var(--danger);background:#FDF7F5;}
+.rs-owner .panel-title{color:var(--blue);}
+.owner-box{min-height:104px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);padding:10px;display:flex;flex-direction:column;justify-content:center;gap:4px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.owner-box .a{font-family:var(--mono);font-size:10.5px;font-weight:700;}.owner-box .b{font-size:11px;color:var(--muted);}
+.owner-box.active{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);box-shadow:0 0 0 1px rgba(36,103,166,.12);transform:scale(1.015);}
+.owner-box.done{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+
+@media(max-width:1040px){.layout{grid-template-columns:1fr;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.codebox{grid-column:2;}.desc-card{grid-column:1;grid-row:1 / span 2;}}
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:15px;min-height:0;}.right{display:flex;}.desc-card{min-height:0;padding:16px;}.controls{padding:12px 13px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 138px;}.btn{padding:8px 12px;}
+.pool-stage{grid-template-columns:1fr 1fr;grid-template-rows:150px 150px 1fr;height:560px;min-height:560px;column-gap:20px;row-gap:22px;}.pool-stage .gcard:nth-child(2){grid-column:1 / span 2;grid-row:1;}.pool-stage .gcard:nth-child(1){grid-column:1;grid-row:2;}.pool-stage .gcard:nth-child(3){grid-column:2;grid-row:2;}.guard-panel{grid-column:1 / span 2;grid-row:3;}
+.ex-stage{grid-template-columns:1fr 1fr;grid-template-rows:128px 118px 118px 1fr;height:640px;min-height:640px;column-gap:16px;row-gap:18px;}.ex-pool{grid-column:1 / span 2;}.ex-params{grid-column:1 / span 2;grid-row:4;}
+.q-stage{grid-template-columns:1fr 1fr;grid-template-rows:auto auto 130px;height:640px;min-height:640px;column-gap:18px;row-gap:18px;}.q-left{grid-column:1;grid-row:1;}.q-panel{grid-column:2;grid-row:1;}.q-workers{grid-column:1 / span 2;grid-row:2;flex-direction:row;}.q-workers .gcard{flex:1;}.q-warn{grid-column:1 / span 2;grid-row:3;}
+.rs-stage{grid-template-columns:1fr 1fr;grid-template-rows:118px 118px 1fr;height:620px;min-height:620px;column-gap:18px;row-gap:20px;}.rs-stage .gcard:nth-child(1){grid-column:1;grid-row:1;}.rs-stage .gcard:nth-child(2){grid-column:2;grid-row:1;}.rs-stage .gcard:nth-child(3){grid-column:1 / span 2;grid-row:2;}.rs-owner{grid-column:1 / span 2;grid-row:3;grid-template-columns:1fr;gap:7px;padding:34px 12px 50px;}.owner-box{min-height:56px;}
+.pill{font-size:9.5px;white-space:normal;text-align:center;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>MySQL 连接池与 DB 线程池 · 从 acquire 到结果回投</h1>
+    <p>配套笔记《15.1 MySQL连接池与DB线程池》 · 连接借还 · 耗尽等待 · 有界队列 · queueInLoop　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts?parts[1]:line;
+  const comment=parts&&parts[2]?parts[2]:'';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{strings.push(escapeHtml(value));return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';});
+  code=escapeHtml(code)
+    .replace(/\b(auto|void|int|while|if|return|class|std|ConnectionPool|MysqlConn|MysqlConnectionGuard|DbTask|DbWorker|Result|unique_lock|lock_guard|mutex|cv_status)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(acquire|release|query|push_back|push|pop_front|pop|wait_for|notify_one|queueInLoop|lock|send|replyBusy|runDbTask|encode|front|empty|size|onRequest|notFound|run|get)\b/g,'<span class="fn">$1</span>')
+    .replace(/\b(pool_|pool|conn|guard|idle_|cv_|mu_|dbQueue_|task|weak|rows|sql|kMaxQueue|timeout|nullptr|lk|loop|weakConn)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(3|4|500)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment?'<span class="cmt">'+escapeHtml(comment)+'</span>':'');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="codeLine'+index+'">'+highlightCpp(line||' ')+'</div>').join('');}
+function classes(id,value){const node=el(id);if(node)node.className=value;}
+function setPill(id,text,tone){const node=el(id);if(!node)return;node.textContent=text;node.className='pill'+(tone?' '+tone:'');}
+
+/* A persistent arrow controller: a path, filled triangle, and source port are created once per scene. */
+function createWires(stageId,specs){
+  const stage=el(stageId);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id=stageId+'-svg';svg.classList.add('wire-svg');svg.setAttribute('preserveAspectRatio','none');stage.appendChild(svg);
+  const entries=specs.map(spec=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const head=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const port=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    line.id=stageId+'-'+spec.id;head.id=line.id+'-head';port.id=line.id+'-port';port.setAttribute('r','4');
+    line.classList.add('wire-line',spec.color);head.classList.add('wire-head',spec.color);port.classList.add('wire-port',spec.color);
+    svg.append(line,head,port);return {...spec,line,head,port};
+  });
+  let active=new Set();let timers=[];
+  function geometry(item){
+    const sr=stage.getBoundingClientRect(),source=el(item.from)?.getBoundingClientRect(),target=el(item.to)?.getBoundingClientRect();
+    if(!source||!target)return;
+    const sx=source.left-sr.left,sy=source.top-sr.top,sw=source.width,sh=source.height;
+    const tx=target.left-sr.left,ty=target.top-sr.top,tw=target.width,th=target.height;
+    const scx=sx+sw/2,scy=sy+sh/2,tcx=tx+tw/2,tcy=ty+th/2;
+    const horizontal=Math.abs(tcx-scx)>=Math.abs(tcy-scy);
+    let x1,y1,x2,y2;
+    if(horizontal){const right=tcx>=scx;x1=right?sx+sw:sx;y1=scy;x2=right?tx:tx+tw;y2=tcy;}
+    else{const down=tcy>=scy;x1=scx;y1=down?sy+sh:sy;x2=tcx;y2=down?ty:ty+th;}
+    const dx=x2-x1,dy=y2-y1,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,baseX=x2-ux*9,baseY=y2-uy*9;
+    const d=horizontal?`M ${x1} ${y1} C ${x1+dx*.45} ${y1}, ${baseX-dx*.45} ${baseY}, ${baseX} ${baseY}`:`M ${x1} ${y1} C ${x1} ${y1+dy*.45}, ${baseX} ${baseY-dy*.45}, ${baseX} ${baseY}`;
+    const px=-uy*5,py=ux*5;
+    item.line.setAttribute('d',d);item.head.setAttribute('d',`M ${x2} ${y2} L ${baseX+px} ${baseY+py} L ${baseX-px} ${baseY-py} Z`);item.port.setAttribute('cx',x1);item.port.setAttribute('cy',y1);
+  }
+  function layout(){const rect=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);entries.forEach(geometry);}
+  function draw(item){
+    const length=item.line.getTotalLength();item.line.style.transition='none';item.line.style.strokeDasharray=length;item.line.style.strokeDashoffset=length;void item.line.getBoundingClientRect();item.line.style.transition='';item.line.style.strokeDashoffset='0';
+    const timeout=setTimeout(()=>{item.line.style.strokeDasharray='';item.line.style.strokeDashoffset='';},560);timers.push(timeout);
+  }
+  function setClass(item,state){
+    const suffix=' '+item.color+(state?' '+state:'');item.line.className.baseVal='wire-line'+suffix;item.head.className.baseVal='wire-head'+suffix;item.port.className.baseVal='wire-port'+suffix;
+    if(state==='on')item.head.classList.add('drawing');
+  }
+  function sync(ids){
+    layout();const wanted=new Set(ids),hasAny=wanted.size>0;let stagger=0;
+    entries.forEach(item=>{
+      if(wanted.has(item.id)){setClass(item,'on');if(!active.has(item.id)&&!reducedMotion()){const delay=stagger++*160;timers.push(setTimeout(()=>draw(item),delay));}}
+      else setClass(item,hasAny?'':'hint');
+    });active=wanted;
+  }
+  const observer=new ResizeObserver(layout);observer.observe(stage);window.addEventListener('resize',layout);layout();
+  return {sync,layout,destroy(){observer.disconnect();window.removeEventListener('resize',layout);timers.forEach(clearTimeout);timers=[];}};
+}
+
+/* Tokens glide between slots; positions are computed from the live slot rectangles. */
+function makePlacer(stageId){
+  return function place(tokenId,slotId,extra){
+    const token=el(tokenId);if(!token)return;
+    if(!slotId){token.className='ctoken';return;}
+    const stage=el(stageId),slot=el(slotId);if(!stage||!slot)return;
+    const sr=stage.getBoundingClientRect(),r=slot.getBoundingClientRect();
+    token.style.left=(r.left-sr.left+r.width/2)+'px';token.style.top=(r.top-sr.top+r.height/2)+'px';
+    token.className='ctoken on'+(extra?' '+extra:'');
+  };
+}
+
+const poolScene=(()=>{
+  const code=[
+    'ConnectionPool pool(3);                  // pre-connected at startup',
+    'MysqlConn* conn = pool.acquire();        // borrow from idle queue',
+    'MysqlConnectionGuard guard(pool, conn);  // RAII owns the loan',
+    'auto rows = guard.get()->query(sql);     // blocking SQL',
+    'if (rows.empty()) return notFound();     // early return is safe',
+    '// ~MysqlConnectionGuard() -> pool.release(conn)'
+  ];
+  const steps=[
+    {chip:'初始化',chipC:'cb',title:'池中预创建 3 个连接',desc:'建连的成本（TCP 握手、认证、会话初始化）只在启动时支付一次。请求路径上不再出现 <code>mysql_real_connect()</code>。',lines:[0],hl:'blue',tokens:{plC1:'plS1',plC2:'plS2',plC3:'plS3'},idle:'idle 3 · in-use 0',worker:'',poolA:1,my:0,myText:'空闲',guard:-1,wires:[],pill:'pool = { c1, c2, c3 }',pillC:'green'},
+    {chip:'acquire',chipC:'cg',title:'W1 从空闲队列借出 c1',desc:'acquire 在互斥量保护下弹出一个空闲连接，借出的连接立刻交给 <span class="green">RAII guard</span> 托管——归还从此不靠自觉。',lines:[1,2],hl:'green',tokens:{plC1:'plWSlot',plC2:'plS2',plC3:'plS3'},idle:'idle 2 · in-use 1',worker:'active',poolA:1,my:0,myText:'空闲',guard:0,wires:['acq'],pill:'acquire() -> c1',pillC:'green'},
+    {chip:'execute',chipC:'ca',title:'拿着 c1 执行阻塞 SQL',desc:'SQL 可能被磁盘、锁等待、慢查询拖慢——所以这一步永远发生在 <span class="amber">DB worker 线程</span>，而不是 EventLoop（见第 4 幕）。',lines:[3],hl:'amber',tokens:{plC1:'plWSlot',plC2:'plS2',plC3:'plS3'},idle:'idle 2 · in-use 1',worker:'active',poolA:0,my:1,myText:'executing…',guard:1,wires:['exe'],pill:'query(sql) on c1',pillC:'amber'},
+    {chip:'release',chipC:'cb',title:'guard 析构，连接自动归还',desc:'函数返回时 guard 析构调用 <code>release(c1)</code>：连接滑回空闲队列，idle 恢复为 3，下一个请求直接复用。',lines:[5],hl:'blue',tokens:{plC1:'plS1',plC2:'plS2',plC3:'plS3'},idle:'idle 3 · in-use 0',worker:'',poolA:1,my:0,myText:'空闲',guard:2,wires:['rel'],pill:'release(c1) -> idle',pillC:'blue'},
+    {chip:'异常路径',chipC:'cg',title:'early return / 抛异常同样归还',desc:'RAII 的意义：无论从哪条路径离开作用域，析构函数都会执行。“忘记归还”从<b>靠纪律避免</b>变成<b>结构上不可能</b>。',lines:[4,5],hl:'green',tokens:{plC1:'plS1',plC2:'plS2',plC3:'plS3'},idle:'idle 3 · in-use 0',worker:'',poolA:1,my:0,myText:'空闲',guard:2,wires:[],pill:'every exit path -> release',pillC:'green'},
+    {chip:'反例',chipC:'cd',title:'连接长期趴在业务对象里',desc:'把连接塞进 session 或连接对象长期持有：idle 长期缺员，高峰一到池被耗尽，后续请求只能排队或失败——见下一幕。',lines:[2],hl:'danger',tokens:{plC1:'plWSlot',plC2:'plS2',plC3:'plS3'},idle:'idle 2 · in-use 1 (长期占用)',worker:'bad',poolA:0,my:0,myText:'空闲',guard:-1,wires:[],pill:'held forever -> pool starves',pillC:'danger'}
+  ];
+  let wires,observer,current=null;
+  const place=makePlacer('poolStage');
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>连接池借还</b>：acquire 借出、执行 SQL、RAII guard 析构归还——归还这一步交给对象，不交给人。</div><div class="stage pool-stage" id="poolStage">'+
+      '<section class="gcard blue" id="plWorker"><span class="k">DB worker</span><span class="n">W1 · runDbTask()</span><span class="s">需要连接才能执行 SQL</span><div class="slotrow"><div class="slot" id="plWSlot">借入</div></div></section>'+
+      '<section class="gcard green" id="plPool"><span class="k">ConnectionPool</span><span class="n" id="plIdle">idle 3 · in-use 0</span><div class="slotrow"><div class="slot" id="plS1"></div><div class="slot" id="plS2"></div><div class="slot" id="plS3"></div></div></section>'+
+      '<section class="gcard amber" id="plMysql"><span class="k">MySQL server</span><span class="n">mysqld</span><span class="s" id="plMyText">空闲</span></section>'+
+      '<section class="panel-box guard-panel" id="plGuard"><span class="panel-title">MysqlConnectionGuard · RAII</span>'+
+        '<div class="rrow" id="plG0"><b>构造</b>guard(pool, conn) 接管借出的连接</div>'+
+        '<div class="rrow" id="plG1"><b>使用</b>guard.get()-&gt;query(sql)，连接只在作用域内可见</div>'+
+        '<div class="rrow" id="plG2"><b>析构</b>自动 pool.release(conn) —— 正常返回、early return、异常，一律归还</div></section>'+
+      '<span class="pill" id="plPill"></span>'+
+      '<div class="ctoken" id="plC1">c1</div><div class="ctoken" id="plC2">c2</div><div class="ctoken" id="plC3">c3</div></div>';
+    wires=createWires('poolStage',[{id:'acq',from:'plPool',to:'plWorker',color:'green'},{id:'exe',from:'plWorker',to:'plMysql',color:'amber'},{id:'rel',from:'plWorker',to:'plPool',color:'blue'}]);
+    observer=new ResizeObserver(()=>{if(current)placeTokens(current);});observer.observe(el('poolStage'));
+  }
+  function placeTokens(s){place('plC1',s.tokens.plC1,s.worker==='bad'&&s.tokens.plC1==='plWSlot'?'stuck':'');place('plC2',s.tokens.plC2,'');place('plC3',s.tokens.plC3,'');}
+  function paint(s){
+    current=s;
+    classes('plWorker','gcard blue'+(s.worker==='active'?' active':s.worker==='bad'?' bad':''));
+    classes('plPool','gcard green'+(s.poolA?' active':''));
+    classes('plMysql','gcard amber'+(s.my?' active':''));
+    el('plIdle').textContent=s.idle;el('plMyText').textContent=s.myText;
+    classes('plGuard','panel-box guard-panel'+(s.guard>=0?' on':''));
+    ['plG0','plG1','plG2'].forEach((id,i)=>classes(id,'rrow '+(s.guard<0?'dim':i<=s.guard?'on':'')));
+    placeTokens(s);setPill('plPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'pool',label:'连接池借还',sub:'acquire · RAII · release',steps,code,mount,paint,destroy(){observer?.disconnect();wires?.destroy();}};
+})();
+
+const exhaustScene=(()=>{
+  const code=[
+    'MysqlConn* ConnectionPool::acquire() {',
+    '  std::unique_lock<std::mutex> lk(mu_);',
+    '  while (idle_.empty())',
+    '    if (cv_.wait_for(lk, 500ms) == timeout)',
+    '      return nullptr;                  // caller replies busy',
+    '  auto* conn = idle_.front(); idle_.pop_front();',
+    '  return conn;',
+    '}',
+    'void ConnectionPool::release(MysqlConn* conn) {',
+    '  { std::lock_guard g(mu_); idle_.push_back(conn); }',
+    '  cv_.notify_one();                    // wake one waiter',
+    '}'
+  ];
+  const steps=[
+    {chip:'高峰',chipC:'cb',title:'三个 worker 同时借走全部连接',desc:'池的上限是 3：这是保护 MySQL 的<b>限流阀</b>，不是缺陷。此刻 idle 队列已空。',lines:[0,5],hl:'blue',tokens:{exC1:'exWS1',exC2:'exWS2',exC3:'exWS3'},idle:'idle 0 · in-use 3 / 3',w:['good','good','good',''],wText:['执行 SQL (c1)','执行 SQL (c2)','执行 SQL (c3)','就绪'],params:0,wires:[],pill:'idle queue is empty',pillC:'amber',want:0},
+    {chip:'等待',chipC:'ca',title:'W4 acquire：空闲队列为空，进入 cond wait',desc:'W4 不忙等、也绝不擅自新建第 4 个连接。它在<span class="amber">条件变量</span>上睡眠让出 CPU，等 release 唤醒或超时。',lines:[2,3],hl:'amber',tokens:{exC1:'exWS1',exC2:'exWS2',exC3:'exWS3'},idle:'idle 0 · in-use 3 / 3',w:['good','good','good','wait'],wText:['执行 SQL (c1)','执行 SQL (c2)','执行 SQL (c3)','cv_.wait_for(500ms)'],params:0,wires:['ask'],pill:'W4 blocked on acquire',pillC:'amber',want:1},
+    {chip:'唤醒',chipC:'cg',title:'W1 release → notify_one 唤醒 W4',desc:'c1 回到空闲队列的同时唤醒一个等待者；W4 醒来在 <code>while</code> 里<b>重新检查条件</b>，然后拿走 c1。',lines:[8,9,10],hl:'green',tokens:{exC1:'exWS4',exC2:'exWS2',exC3:'exWS3'},idle:'idle 0 · in-use 3 / 3',w:['','good','good','good'],wText:['已归还 c1','执行 SQL (c2)','执行 SQL (c3)','获得 c1，执行 SQL'],params:0,wires:['rel1','wake'],pill:'release(c1) -> W4 acquires',pillC:'green',want:0},
+    {chip:'超时',chipC:'cd',title:'另一种结局：等满 500ms 无人释放',desc:'<code>wait_for</code> 超时返回 nullptr，调用方立刻回复 busy——把失败<b>暴露</b>出来，好过让请求无限排队、把延迟藏进等待里。',lines:[3,4],hl:'danger',tokens:{exC1:'exWS1',exC2:'exWS2',exC3:'exWS3'},idle:'idle 0 · in-use 3 / 3',w:['good','good','good','fail'],wText:['执行 SQL (c1)','执行 SQL (c2)','执行 SQL (c3)','timeout -> reply busy'],params:0,wires:['ask'],pill:'acquire timeout -> fast fail',pillC:'danger',want:1},
+    {chip:'协同',chipC:'ca',title:'worker 数与连接数要一起定',desc:'worker 远多于连接，只是把排队从队列挪到 acquire；连接远多于需求，又可能打满 MySQL。两个容量按<b>压测数据</b>协同设计。',lines:[3],hl:'amber',tokens:{exC1:'exS1',exC2:'exS2',exC3:'exS3'},idle:'idle 3 · in-use 0 / 3',w:['','','',''],wText:['就绪','就绪','就绪','就绪'],params:3,wires:[],pill:'size(workers) ≈ size(pool)',pillC:'amber',want:0}
+  ];
+  let wires,observer,current=null;
+  const place=makePlacer('exStage');
+  function mount(){
+    let workers='';
+    for(let i=1;i<=4;i++)workers+='<section class="gcard blue" id="exW'+i+'"><span class="k">worker</span><span class="n">W'+i+'</span><div class="slotrow"><div class="slot" id="exWS'+i+'">conn</div></div><div class="wstate" id="exT'+i+'">就绪</div></section>';
+    viz.innerHTML='<div class="vcap"><b>耗尽与等待</b>：idle 空时 acquire 在条件变量上睡眠；release 唤醒它，或超时后快速失败。</div><div class="stage ex-stage" id="exStage">'+
+      '<section class="gcard green ex-pool" id="exPool"><span class="k">ConnectionPool · max 3</span><span class="n" id="exIdle">idle 0 · in-use 3 / 3</span><div class="slotrow"><div class="slot" id="exS1"></div><div class="slot" id="exS2"></div><div class="slot" id="exS3"></div></div></section>'+
+      workers+
+      '<section class="panel-box ex-params" id="exParams"><span class="panel-title">容量要协同设计</span>'+
+        '<div class="rrow" id="exR0"><b>规则</b>DB worker 数不应远大于连接池大小</div>'+
+        '<div class="rrow" id="exR1"><b>反例</b>32 worker · 8 连接 → 24 个 worker 常年阻塞在 acquire</div>'+
+        '<div class="rrow" id="exR2"><b>反面</b>连接池过大 → 打满 MySQL，殃及共享它的其他服务</div></section>'+
+      '<span class="pill" id="exPill"></span>'+
+      '<div class="ctoken" id="exC1">c1</div><div class="ctoken" id="exC2">c2</div><div class="ctoken" id="exC3">c3</div></div>';
+    wires=createWires('exStage',[{id:'ask',from:'exW4',to:'exPool',color:'amber'},{id:'rel1',from:'exW1',to:'exPool',color:'blue'},{id:'wake',from:'exPool',to:'exW4',color:'green'}]);
+    observer=new ResizeObserver(()=>{if(current)placeTokens(current);});observer.observe(el('exStage'));
+  }
+  function placeTokens(s){place('exC1',s.tokens.exC1,'');place('exC2',s.tokens.exC2,'');place('exC3',s.tokens.exC3,'');}
+  function paint(s){
+    current=s;
+    el('exIdle').textContent=s.idle;
+    classes('exPool','gcard green ex-pool'+(s.want?'':' active'));
+    for(let i=1;i<=4;i++){
+      const state=s.w[i-1];
+      classes('exW'+i,'gcard blue'+(state==='good'?' active':state==='wait'?' warn':state==='fail'?' bad':''));
+      const t=el('exT'+i);t.textContent=s.wText[i-1];t.className='wstate '+(state==='good'?'good':state==='wait'?'wait':state==='fail'?'fail':'');
+    }
+    classes('exParams','panel-box ex-params'+(s.params?' on':''));
+    ['exR0','exR1','exR2'].forEach((id,i)=>classes(id,'rrow '+(s.params===0?'dim':i<s.params?(i===0?'on':'warn'):'')));
+    placeTokens(s);setPill('exPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'exhaust',label:'耗尽与 worker 等待',sub:'cond wait · timeout · notify',steps,code,mount,paint,destroy(){observer?.disconnect();wires?.destroy();}};
+})();
+
+const queueScene=(()=>{
+  const code=[
+    'void onRequest(DbTask task) {',
+    '  if (dbQueue_.size() >= kMaxQueue) {  // bounded: 4',
+    '    replyBusy(task.conn);              // fast fail',
+    '    return;',
+    '  }',
+    '  dbQueue_.push(std::move(task));      // accept',
+    '}',
+    '// DB worker loop:',
+    'while (auto task = dbQueue_.pop())',
+    '  runDbTask(*task);'
+  ];
+  const steps=[
+    {chip:'入队',chipC:'cb',title:'DBTask 推入有界队列',desc:'EventLoop 只做解析和投递，<b>绝不</b>在本线程执行 SQL——一个慢查询会拖住这个 loop 管理的所有连接。',lines:[5],hl:'blue',tokens:{qT1:['qS0',''],qT2:null,qT3:null,qT4:null,qT5:null,qT6:null},count:'1 / 4',loop:'active',panel:'on',workers:['',''],warn:0,reject:0,wires:['in'],pill:'push(DBTask)',pillC:'blue'},
+    {chip:'消费',chipC:'cg',title:'worker pop 取走任务执行',desc:'W1 弹出 T1 开始执行；新请求 T2、T3 继续入队。队列把<b>突发</b>和<b>处理速度</b>解耦。',lines:[8,9],hl:'green',tokens:{qT1:['qWS1',''],qT2:['qS0',''],qT3:['qS1',''],qT4:null,qT5:null,qT6:null},count:'2 / 4',loop:'active',panel:'on',workers:['active',''],warn:0,reject:0,wires:['in','out1'],pill:'worker pop -> run SQL',pillC:'green'},
+    {chip:'接近满',chipC:'ca',title:'队列 3/4：开始限流',desc:'高水位是<span class="amber">反压信号</span>：降低读取速度、少收新请求，让上游感知“下游快满了”，而不是继续闷头堆积。',lines:[1],hl:'amber',tokens:{qT1:['qWS1',''],qT2:['qS0',''],qT3:['qS1',''],qT4:['qS2',''],qT5:null,qT6:null},count:'3 / 4',loop:'warn',panel:'on',workers:['active',''],warn:0,reject:0,wires:['in'],pill:'high watermark: slow down reads',pillC:'amber'},
+    {chip:'满 → 拒绝',chipC:'cd',title:'队列 4/4：新任务快速失败',desc:'T6 不入队：立刻回复 busy / overload。<b>快速失败</b>把过载暴露给调用方，好过留一条“看似没事”的无界排队路。',lines:[1,2,3],hl:'danger',tokens:{qT1:['qWS1',''],qT2:['qS0',''],qT3:['qS1',''],qT4:['qS2',''],qT5:['qS3',''],qT6:['qRejSlot','stuck']},count:'4 / 4',loop:'bad',panel:'full',workers:['active',''],warn:0,reject:1,wires:[],pill:'queue full -> reply busy',pillC:'danger'},
+    {chip:'无界的代价',chipC:'cd',title:'如果队列没有上限会怎样',desc:'表面没有报错，实际延迟藏进队列、内存随积压增长、过载信号传不到上游——无界队列只是把故障<b>推迟并放大</b>。',lines:[1],hl:'danger',tokens:{qT1:['qWS1',''],qT2:['qS0',''],qT3:['qS1',''],qT4:['qS2',''],qT5:['qS3',''],qT6:['qRejSlot','stuck']},count:'4 / 4',loop:'dim',panel:'full',workers:['dim','dim'],warn:3,reject:1,wires:[],pill:'unbounded queue hides overload',pillC:'danger'},
+    {chip:'恢复',chipC:'cg',title:'worker 消化积压，恢复接收',desc:'W1、W2 各取走一个任务，队列回到 2/4，退出高水位后恢复正常接收。有界 + 拒绝 + 恢复，闭环完成。',lines:[8,9],hl:'green',tokens:{qT1:null,qT2:['qWS1',''],qT3:['qWS2',''],qT4:['qS0',''],qT5:['qS1',''],qT6:null},count:'2 / 4',loop:'active',panel:'on',workers:['active','active'],warn:0,reject:0,wires:['out1','out2','in'],pill:'drain -> accept again',pillC:'green'}
+  ];
+  let wires,observer,current=null;
+  const place=makePlacer('qStage');
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>有界队列</b>：接近满限流，满了快速失败——过载必须被上游看见，而不是藏进队列。</div><div class="stage q-stage" id="qStage">'+
+      '<div class="q-left"><section class="gcard blue" id="qLoop"><span class="k">EventLoop</span><span class="n">onRequest()</span><span class="s">解析协议，构造 DBTask</span></section><div class="q-reject" id="qReject"><span>reply: busy / overload</span><span class="slot" id="qRejSlot"></span></div></div>'+
+      '<section class="panel-box q-panel" id="qPanel"><span class="panel-title">DB task queue</span><span class="q-count" id="qCount">0 / 4</span><div class="qslot" id="qS0"></div><div class="qslot" id="qS1"></div><div class="qslot" id="qS2"></div><div class="qslot" id="qS3"></div></section>'+
+      '<div class="q-workers"><section class="gcard green" id="qW1"><span class="k">DB worker</span><span class="n">W1 · pop()</span><div class="slotrow"><div class="slot" id="qWS1">task</div></div></section><section class="gcard green" id="qW2"><span class="k">DB worker</span><span class="n">W2 · pop()</span><div class="slotrow"><div class="slot" id="qWS2">task</div></div></section></div>'+
+      '<section class="panel-box q-warn" id="qWarn"><span class="panel-title">为什么不用无界队列</span>'+
+        '<div class="rrow" id="qR0"><b>延迟</b>请求排在队列里，表面没有报错，真实延迟越来越大</div>'+
+        '<div class="rrow" id="qR1"><b>内存</b>积压随流量增长，最终拖垮进程或数据库</div>'+
+        '<div class="rrow" id="qR2"><b>反压</b>过载信号传不到上游，上游继续全速制造工作</div></section>'+
+      '<span class="pill" id="qPill"></span>'+
+      '<div class="ctoken task" id="qT1">T1</div><div class="ctoken task" id="qT2">T2</div><div class="ctoken task" id="qT3">T3</div><div class="ctoken task" id="qT4">T4</div><div class="ctoken task" id="qT5">T5</div><div class="ctoken task" id="qT6">T6</div></div>';
+    wires=createWires('qStage',[{id:'in',from:'qLoop',to:'qPanel',color:'blue'},{id:'out1',from:'qPanel',to:'qW1',color:'green'},{id:'out2',from:'qPanel',to:'qW2',color:'green'}]);
+    observer=new ResizeObserver(()=>{if(current)placeTokens(current);});observer.observe(el('qStage'));
+  }
+  function placeTokens(s){for(let i=1;i<=6;i++){const spec=s.tokens['qT'+i];if(spec)place('qT'+i,spec[0],spec[1]);else place('qT'+i,null);}}
+  function paint(s){
+    current=s;
+    classes('qLoop','gcard blue'+(s.loop==='active'?' active':s.loop==='warn'?' warn':s.loop==='bad'?' bad':s.loop==='dim'?' dim':''));
+    classes('qPanel','panel-box q-panel'+(s.panel==='on'?' on':s.panel==='full'?' full':''));
+    el('qCount').textContent=s.count;
+    classes('qW1','gcard green'+(s.workers[0]==='active'?' active':s.workers[0]==='dim'?' dim':''));
+    classes('qW2','gcard green'+(s.workers[1]==='active'?' active':s.workers[1]==='dim'?' dim':''));
+    classes('qReject','q-reject'+(s.reject?' on':''));
+    classes('qWarn','panel-box q-warn'+(s.warn?' on':''));
+    ['qR0','qR1','qR2'].forEach((id,i)=>classes(id,'rrow '+(s.warn===0?'dim':i<s.warn?'bad':'')));
+    placeTokens(s);setPill('qPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'queue',label:'有界队列与拒绝',sub:'bounded · busy · backpressure',steps,code,mount,paint,destroy(){observer?.disconnect();wires?.destroy();}};
+})();
+
+const resultScene=(()=>{
+  const code=[
+    'void DbWorker::run(DbTask task) {',
+    '  MysqlConn* conn = pool_.acquire();',
+    '  Result r = conn->query(task.sql);',
+    '  pool_.release(conn);',
+    '  // never write the socket from this thread',
+    '  task.loop->queueInLoop([weak = task.weakConn, r] {',
+    '    if (auto c = weak.lock()) {        // still alive?',
+    '      c->send(encode(r));              // -> output buffer',
+    '    }                                  // else: drop result',
+    '  });',
+    '}'
+  ];
+  const steps=[
+    {chip:'提交',chipC:'cb',title:'EventLoop 解析请求，投递 DBTask',desc:'DBTask 里带的是 <span class="blue">weak_ptr</span> 和连接标识，而不是裸指针——SQL 执行期间客户端随时可能断开。',lines:[0],hl:'blue',loop:'active',worker:'active',poolC:'',owner:'',boxes:['','',''],wires:['submit'],pill:'DBTask{sql, weak_ptr, loop}',pillC:'blue'},
+    {chip:'执行',chipC:'ca',title:'worker acquire → query → release',desc:'阻塞 SQL 全程发生在 worker 线程；连接短借短还，执行完立刻 release，不占着连接等网络。',lines:[1,2,3],hl:'amber',loop:'',worker:'active',poolC:'active',owner:'',boxes:['','',''],wires:['db'],pill:'blocking SQL runs off-loop',pillC:'amber'},
+    {chip:'反例',chipC:'cd',title:'worker 直接写 socket = 跨线程竞态',desc:'EventLoop 可能正处理同一连接的读事件或关闭流程；两个线程并发修改 Channel 与缓冲区，结果是竞态与崩溃。',lines:[4],hl:'danger',loop:'',worker:'bad',poolC:'',owner:'bad',boxes:['','',''],wires:['bad'],pill:'never touch socket off-thread',pillC:'danger'},
+    {chip:'回投',chipC:'cb',title:'queueInLoop 把结果交还所属线程',desc:'worker 只投递闭包，不改任何连接状态。所属 EventLoop 串行执行它——和跨线程唤醒、定时器回投是同一套模型。',lines:[5],hl:'blue',loop:'active',worker:'active',poolC:'',owner:'on',boxes:['','',''],wires:['post'],pill:'result posted to owner loop',pillC:'blue'},
+    {chip:'校验',chipC:'cg',title:'weak_ptr.lock() 确认连接仍存在',desc:'客户端可能在 SQL 执行期间断开。lock 成功才继续；失败就<b>安静丢弃结果</b>，绝不访问已析构的连接对象。',lines:[6],hl:'green',loop:'active',worker:'',poolC:'',owner:'on',boxes:['active','',''],wires:['apply'],pill:'alive -> continue; gone -> drop',pillC:'green'},
+    {chip:'回写',chipC:'cg',title:'写 output buffer，必要时注册 EPOLLOUT',desc:'响应先进输出缓冲；发不完时注册 EPOLLOUT，可写事件到来继续发。分段打点：排队、acquire、execute、回写各记一段。',lines:[7,8],hl:'green',loop:'active',worker:'',poolC:'',owner:'on',boxes:['done','done','active'],wires:['apply'],pill:'response on the wire',pillC:'green'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>结果回投</b>：DB worker 只算结果不碰 socket；结果经 queueInLoop 回到连接所属 EventLoop。</div><div class="stage rs-stage" id="rsStage">'+
+      '<section class="gcard blue" id="rsLoop"><span class="k">EventLoop (owner)</span><span class="n">epoll_wait()</span><span class="s">解析请求 · 串行改连接状态</span></section>'+
+      '<section class="gcard green" id="rsWorker"><span class="k">DB worker</span><span class="n">run(DbTask)</span><span class="s">阻塞 SQL 在这里执行</span></section>'+
+      '<section class="gcard amber" id="rsPool"><span class="k">ConnectionPool</span><span class="n">acquire / release</span><span class="s">短借短还</span></section>'+
+      '<section class="panel-box rs-owner" id="rsOwner"><span class="panel-title">owning EventLoop 线程内</span>'+
+        '<div class="owner-box" id="rsB0"><span class="a">weak_ptr.lock()</span><span class="b">连接还活着吗？客户端可能已断开</span></div>'+
+        '<div class="owner-box" id="rsB1"><span class="a">output buffer</span><span class="b">send(encode(r)) 写入输出缓冲</span></div>'+
+        '<div class="owner-box" id="rsB2"><span class="a">EPOLLOUT</span><span class="b">发不完时注册，可写事件继续发</span></div></section>'+
+      '<span class="pill" id="rsPill"></span></div>';
+    wires=createWires('rsStage',[{id:'submit',from:'rsLoop',to:'rsWorker',color:'blue'},{id:'db',from:'rsWorker',to:'rsPool',color:'amber'},{id:'bad',from:'rsWorker',to:'rsOwner',color:'danger'},{id:'post',from:'rsWorker',to:'rsLoop',color:'green'},{id:'apply',from:'rsLoop',to:'rsOwner',color:'blue'}]);
+  }
+  function paint(s){
+    classes('rsLoop','gcard blue'+(s.loop==='active'?' active':''));
+    classes('rsWorker','gcard green'+(s.worker==='active'?' active':s.worker==='bad'?' bad':''));
+    classes('rsPool','gcard amber'+(s.poolC==='active'?' active':''));
+    classes('rsOwner','panel-box rs-owner'+(s.owner==='on'?' on':s.owner==='bad'?' bad':''));
+    ['rsB0','rsB1','rsB2'].forEach((id,i)=>classes(id,'owner-box '+(s.boxes[i]||'')));
+    setPill('rsPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'result',label:'结果回投',sub:'queueInLoop · weak_ptr · send',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const SCENES=[poolScene,exhaustScene,queueScene,resultScene];
+const tabsBox=el('tabs'),stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc'),codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots'),btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);});
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();sceneIndex=index;stepIndex=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));const scene=SCENES[sceneIndex];scene.mount();codeBox.innerHTML=codePanel(scene.code);dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,i)=>{const dot=document.createElement('button');dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);dot.addEventListener('click',()=>{stop();go(i);});dotsBox.appendChild(dot);dotEls.push(dot);});go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;stepIndex=Math.max(0,Math.min(steps.length-1,index));const step=steps[stepIndex];SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.className='cl '+(step.lines.includes(i)?'hl-'+step.hl:''));stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}if(stepIndex===steps.length-1)stop();
+}
+function play(){if(stepIndex===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='暂停';timer=setInterval(()=>{stepIndex<SCENES[sceneIndex].steps.length-1?go(stepIndex+1):stop();},3000);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}});
+const hashScene=location.hash.match(/scene=(\w+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

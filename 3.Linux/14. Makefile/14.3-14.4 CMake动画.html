@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMake · configure、生成器与 target 依赖传播动画</title>
+<!-- Visual system: warm paper #F5F4ED, quiet panels #FBFBF6, saturated semantic blue #2467A6, green #087A5C, amber #A66408, danger #C34935; 8px rhythm, compact mono annotations, computed SVG connectors. -->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#625F56;--faint:#918D83;
+  --line:#D8D5C8;--grid:#E4E1D6;--soft:#F0EEE6;
+  --blue:#2467A6;--blue-bg:#E1EEF9;--blue-text:#1C4D7A;
+  --green:#087A5C;--green-bg:#DAF0E7;--green-text:#075B45;
+  --amber:#A66408;--amber-bg:#F7E9D4;--amber-text:#7C4A05;
+  --danger:#C34935;--danger-bg:#F7DFDA;--danger-text:#913025;
+  --dark:#2E2C27;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{padding:28px 32px 48px;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;text-wrap:pretty;}
+button{font:inherit;} .wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;line-height:1.35;font-weight:760;letter-spacing:0;}
+header p{margin-top:6px;color:var(--muted);font-size:13px;}
+header kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;background:var(--panel);padding:0 5px;color:var(--muted);font-family:var(--mono);font-size:11px;}
+code{border-radius:4px;background:var(--soft);padding:1px 4px;font-family:var(--mono);font-size:.91em;}
+.tabs{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;}
+.tab{display:flex;min-width:155px;flex-direction:column;align-items:flex-start;gap:2px;border:1.5px solid var(--line);border-radius:8px;background:var(--panel);padding:10px 15px;color:var(--muted);cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),transform .18s var(--ease),color var(--dur) var(--ease);}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab .tab-title{color:var(--ink);font-size:13px;font-weight:750;}
+.tab .tab-sub{color:var(--faint);font-family:var(--mono);font-size:10.5px;}
+.tab.is-active{border-color:var(--ink);background:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.14);}
+.tab.is-active .tab-title,.tab.is-active .tab-sub{color:var(--paper);}.tab.is-active .tab-sub{opacity:.78;}
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(300px,1fr);gap:28px;align-items:start;margin-top:22px;}
+.visual-card,.detail-card,.code-deck,.controls{border:1.5px solid var(--grid);border-radius:10px;background:var(--panel);box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.visual-card{min-height:536px;padding:22px;overflow:hidden;}
+.visual-caption{min-height:42px;color:var(--muted);font-size:13px;}.visual-caption b{color:var(--ink);}
+.scene{display:none;}.scene.is-active{display:block;}
+.stage{position:relative;width:100%;min-height:432px;padding:8px 2px 0;}
+.right{display:flex;flex-direction:column;gap:16px;}
+.detail-card{min-height:208px;padding:18px 20px;}
+.detail-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.detail-title{font-size:17px;font-weight:760;}
+.chip{border:1.5px solid var(--line);border-radius:999px;background:var(--soft);padding:3px 10px;color:var(--muted);font-size:11px;font-weight:750;}
+.chip.blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}
+.chip.green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+.chip.amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+.chip.danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+.action-line{min-height:38px;margin-top:14px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);padding:8px 11px;color:var(--ink);font-family:var(--mono);font-size:11.5px;font-weight:750;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.detail-desc{min-height:70px;margin-top:10px;color:var(--muted);font-size:14px;}.detail-desc b{color:var(--ink);}.blue{color:var(--blue);font-weight:750;}.green{color:var(--green);font-weight:750;}.amber{color:var(--amber);font-weight:750;}.danger{color:var(--danger);font-weight:750;}
+.code-deck{align-self:flex-start;width:100%;overflow:hidden;border-color:#4A473F;background:var(--dark);box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.code-scene{display:none;padding:10px 0;}.code-scene.is-active{display:block;}
+.cl{min-height:21px;padding:2px 14px;color:#D8D5CC;font-family:var(--mono);font-size:12px;line-height:1.5;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}
+.cl .cmt{color:#918D83;}.cl .kw{color:#E9AC50;}.cl .fn{color:#83C9B2;}.cl .type{color:#95C7EF;}.cl .str{color:#D9CE9F;}.cl .var{color:#F0BE7E;}
+.cl.hl-blue{background:rgba(52,122,198,.54);box-shadow:inset 4px 0 0 #91C7F5;color:#F7F4EA;}.cl.hl-green{background:rgba(22,143,107,.54);box-shadow:inset 4px 0 0 #90DFC2;color:#F7F4EA;}.cl.hl-amber{background:rgba(185,112,16,.58);box-shadow:inset 4px 0 0 #FFD08A;color:#F7F4EA;}.cl.hl-danger{background:rgba(198,73,53,.58);box-shadow:inset 4px 0 0 #FFAA98;color:#F7F4EA;}.cl[class*="hl-"] .cmt{color:#D5D0C1;}
+.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:22px;padding:14px 18px;}
+.btn{border:1.5px solid var(--line);border-radius:7px;background:var(--paper);padding:8px 15px;color:var(--ink);font-size:13px;font-weight:500;cursor:pointer;transition:background .15s var(--ease),border-color .15s,transform .1s var(--ease);}
+.btn:hover:not(:disabled){border-color:var(--ink);background:var(--soft);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{min-width:86px;border-color:var(--ink);background:var(--ink);color:var(--paper);}
+.dots{display:flex;flex-wrap:wrap;gap:7px;margin:0 auto;}.dot{width:10px;height:10px;border:1.5px solid var(--line);border-radius:50%;background:transparent;cursor:pointer;transition:transform .2s var(--ease),border-color .2s,background .2s;}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.done{border-color:var(--line);background:var(--line);}.dot.current{border-color:var(--ink);background:var(--ink);transform:scale(1.3);}
+.readout{min-width:46px;color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;}
+
+/* Persistent connector layer. Arrow tips meet a target border; source/target ports are calculated from live element rectangles. */
+.wire-svg{position:absolute;inset:0;z-index:5;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.wire-line{--wire:var(--muted);fill:none;stroke:var(--wire);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.wire-head{--wire:var(--muted);fill:var(--wire);stroke:none;opacity:0;transition:opacity 220ms var(--ease);}
+.wire-port{--wire:var(--muted);fill:var(--panel);stroke:var(--wire);stroke-width:2;opacity:0;transition:opacity 220ms var(--ease);}
+.wire-line.on,.wire-head.on,.wire-port.on{opacity:1;}.wire-line.hint{stroke-width:2;opacity:.1;}.wire-head.hint,.wire-port.hint{opacity:.1;}.wire-head.drawing{transition-delay:180ms;}
+.wire-line.blue,.wire-head.blue,.wire-port.blue{--wire:var(--blue);}.wire-line.green,.wire-head.green,.wire-port.green{--wire:var(--green);}.wire-line.amber,.wire-head.amber,.wire-port.amber{--wire:var(--amber);}.wire-line.danger,.wire-head.danger,.wire-port.danger{--wire:var(--danger);}
+
+.flow-node,.generator-card,.scope-card,.target-card,.dir-card,.target-node{position:relative;z-index:7;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease),color var(--dur) var(--ease);}
+.flow-node.active,.generator-card.active,.scope-card.active,.target-card.active,.dir-card.active,.target-node.active{box-shadow:0 0 0 2px rgba(43,42,38,.08);transform:translateY(-2px);}
+.node-k{color:var(--faint);font-family:var(--mono);font-size:10px;font-weight:750;}.node-n{margin-top:6px;font-size:14px;font-weight:760;line-height:1.3;}.node-s{margin-top:5px;color:var(--muted);font-size:10.5px;line-height:1.42;}.node-mono{margin-top:8px;color:var(--muted);font-family:var(--mono);font-size:10px;line-height:1.45;overflow-wrap:anywhere;}
+.flow-node.blue,.generator-card.blue,.scope-card.blue,.target-card.blue,.dir-card.blue,.target-node.blue{border-color:var(--blue);}.flow-node.green,.generator-card.green,.scope-card.green,.target-card.green,.dir-card.green,.target-node.green{border-color:var(--green);}.flow-node.amber,.generator-card.amber,.scope-card.amber,.target-card.amber,.dir-card.amber,.target-node.amber{border-color:var(--amber);}.flow-node.danger,.generator-card.danger,.scope-card.danger,.target-card.danger,.dir-card.danger,.target-node.danger{border-color:var(--danger);}
+.flow-node.active.blue,.generator-card.active.blue,.scope-card.active.blue,.target-card.active.blue,.dir-card.active.blue,.target-node.active.blue{background:var(--blue-bg);}.flow-node.active.green,.generator-card.active.green,.scope-card.active.green,.target-card.active.green,.dir-card.active.green,.target-node.active.green{background:var(--green-bg);}.flow-node.active.amber,.generator-card.active.amber,.scope-card.active.amber,.target-card.active.amber,.dir-card.active.amber,.target-node.active.amber{background:var(--amber-bg);}.flow-node.active.danger,.generator-card.active.danger,.scope-card.active.danger,.target-card.active.danger,.dir-card.active.danger,.target-node.active.danger{background:var(--danger-bg);}
+.is-muted{opacity:.34;transform:scale(.985);}
+.status-strip{position:relative;z-index:7;display:grid;grid-template-columns:1fr 1.2fr;gap:9px;margin-top:22px;}
+.status-cell{min-height:54px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:8px 9px;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.status-cell .small{color:var(--faint);font-family:var(--mono);font-size:9.5px;}.status-cell .value{margin-top:3px;color:var(--muted);font-size:11px;font-weight:700;line-height:1.35;}
+.status-cell.blue{border-color:var(--blue);background:var(--blue-bg);}.status-cell.blue .value{color:var(--blue-text);}.status-cell.green{border-color:var(--green);background:var(--green-bg);}.status-cell.green .value{color:var(--green-text);}.status-cell.amber{border-color:var(--amber);background:var(--amber-bg);}.status-cell.amber .value{color:var(--amber-text);}.status-cell.danger{border-color:var(--danger);background:var(--danger-bg);}.status-cell.danger .value{color:var(--danger-text);}
+
+/* Scene 1: a four-stage out-of-source configure/build flow, with a wide 38px connector lane. */
+.configure-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:38px;align-items:center;padding-top:58px;}
+.flow-node{min-height:170px;padding:14px 11px;display:flex;flex-direction:column;}
+.tree-list{display:grid;gap:4px;margin-top:8px;color:var(--muted);font-family:var(--mono);font-size:9.5px;line-height:1.25;}.tree-list span{display:block;overflow-wrap:anywhere;}.tree-list .folder{color:var(--blue-text);font-weight:750;}.tree-list .generated{color:var(--green-text);font-weight:750;}
+.command-pill{margin-top:11px;border:1px solid var(--line);border-radius:6px;background:var(--soft);padding:6px;color:var(--amber-text);font-family:var(--mono);font-size:9.5px;font-weight:750;line-height:1.35;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.flow-node.active .command-pill{border-color:var(--amber);background:var(--amber-bg);}
+
+/* Scene 2: configure fixes a generator; cmake --build remains a backend-neutral front end. */
+.generator-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:136px 138px;column-gap:40px;row-gap:48px;padding:20px 2px 0;}
+.generator-card{display:flex;min-width:0;flex-direction:column;padding:13px 12px;}.generator-card.frontend{grid-column:1 / span 2;grid-row:2;}.generator-card.artifact{grid-column:3;grid-row:2;}.generator-card .node-k,.generator-card .node-n,.generator-card .node-s,.generator-card .backend-name{overflow-wrap:anywhere;}.generator-card .backend-name{margin-top:10px;border:1.5px solid var(--line);border-radius:6px;background:var(--soft);padding:6px;color:var(--ink);font-family:var(--mono);font-size:11px;font-weight:750;text-align:center;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.generator-card.active .backend-name{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+.generator-foot{position:relative;z-index:7;margin-top:18px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:9px 11px;color:var(--muted);font-size:11.5px;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.generator-foot b{color:var(--ink);}.generator-foot.green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.generator-foot.green b{color:var(--green-text);}
+
+/* Scene 3: each requirement has a separate port, avoiding a collapsed fan-in at the target boundary. */
+.usage-stage{display:grid;grid-template-columns:128px minmax(150px,1fr) minmax(150px,1fr);grid-template-rows:repeat(3,1fr);column-gap:56px;row-gap:20px;min-height:414px;padding:12px 2px 0;}
+.scope-card{padding:10px 9px;min-height:110px;display:flex;flex-direction:column;justify-content:center;}.scope-card .scope-name{font-family:var(--mono);font-size:11px;font-weight:800;}.scope-card .scope-detail{margin-top:5px;color:var(--muted);font-size:9.5px;line-height:1.35;}.scope-card.private .scope-name{color:var(--blue);}.scope-card.public .scope-name{color:var(--green);}.scope-card.interface .scope-name{color:var(--amber);}
+.target-card{grid-row:1 / span 3;padding:14px 13px;display:flex;flex-direction:column;overflow:hidden;}.target-card .target-head{color:var(--ink);font-size:15px;font-weight:780;}.target-card .target-sub{margin-top:2px;color:var(--faint);font-family:var(--mono);font-size:10px;}.target-slots{display:grid;grid-template-rows:repeat(3,1fr);flex:1;gap:10px;margin-top:14px;}.target-slot{display:flex;align-items:center;border:1px dashed var(--line);border-radius:6px;background:var(--soft);padding:7px;color:var(--faint);font-family:var(--mono);font-size:9.5px;line-height:1.3;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+#reqPrivate,#reqPublic,#reqInterface{grid-column:1;}#usageLib{grid-column:2;}#usageApp{grid-column:3;}
+.target-slot.blue{border-style:solid;border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.target-slot.green{border-style:solid;border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.target-slot.amber{border-style:solid;border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+.usage-note{position:relative;z-index:7;margin-top:10px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:8px 10px;color:var(--muted);font-size:10.5px;line-height:1.4;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.usage-note b{color:var(--ink);}.usage-note.blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.usage-note.green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.usage-note.amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+
+/* Scene 4: subdirectories introduce targets; the explicit target link is the only cross-directory dependency route. */
+.targets-stage{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:80px 104px 112px;column-gap:56px;row-gap:32px;min-height:410px;padding:8px 2px 0;}
+.dir-card,.target-node{display:flex;min-width:0;flex-direction:column;padding:12px 13px;}.dir-card.root{grid-column:1 / span 2;text-align:center;padding:10px;}.dir-card .dir-title,.target-node .dir-title{color:var(--ink);font-family:var(--mono);font-size:12px;font-weight:800;overflow-wrap:anywhere;}.dir-card .dir-sub,.target-node .dir-sub{margin-top:5px;color:var(--muted);font-size:10.5px;line-height:1.35;overflow-wrap:anywhere;}.target-node .target-rule{margin-top:9px;border:1px solid var(--line);border-radius:6px;background:var(--soft);padding:5px 6px;color:var(--muted);font-family:var(--mono);font-size:9px;line-height:1.35;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.target-node.active .target-rule{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+.directory-note{position:relative;z-index:7;margin-top:10px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:8px 10px;color:var(--muted);font-size:10.5px;line-height:1.4;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.directory-note b{color:var(--ink);}.directory-note.green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.directory-note.green b{color:var(--green-text);}.directory-note.danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}.directory-note.danger b{color:var(--danger-text);}
+
+@media(max-width:1040px){
+  .layout{grid-template-columns:1fr;}.visual-card{min-height:0;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.detail-card{grid-column:1 / -1;min-height:0;}.code-deck{align-self:start;}
+}
+@media(max-width:640px){
+  body{padding:20px 16px 34px;font-size:14px;}header h1{font-size:20px;}header p{font-size:12px;}.tab{min-width:0;flex:1 1 145px;padding:9px 11px;}.visual-card{padding:15px;}.visual-caption{min-height:46px;font-size:12px;}.right{display:flex;}.detail-card{padding:16px;}.detail-desc{min-height:0;font-size:13px;}.controls{gap:9px;padding:12px;}.btn{padding:8px 11px;font-size:12px;}.dots{order:3;width:100%;justify-content:center;}.readout{margin-left:auto;}.cl{padding-right:11px;padding-left:12px;font-size:10.5px;line-height:1.45;}
+  .configure-stage{min-height:510px;}.configure-grid{grid-template-columns:1fr 1fr;gap:26px;padding-top:24px;}.flow-node{min-height:150px;padding:11px 9px;}.node-n{font-size:12px;}.node-s,.node-mono,.tree-list{font-size:9px;}.status-strip{margin-top:18px;}
+  .generator-stage{min-height:590px;}.generator-grid{grid-template-columns:1fr 1fr;grid-template-rows:124px 124px 112px;column-gap:26px;row-gap:28px;padding-top:16px;}.generator-card{padding:10px 9px;}.generator-card.backend{grid-column:1;grid-row:2;}.generator-card.frontend{grid-column:2;grid-row:2;}.generator-card.artifact{grid-column:1 / span 2;grid-row:3;}.generator-card .backend-name{margin-top:7px;font-size:9.5px;}.generator-foot{margin-top:14px;font-size:10px;}
+  .usage-stage{grid-template-columns:minmax(102px,.82fr) minmax(0,1.18fr);grid-template-rows:repeat(3,90px) 34px 205px;column-gap:26px;row-gap:14px;min-height:565px;padding-top:8px;}#reqPrivate{grid-column:1;grid-row:1;}#reqPublic{grid-column:1;grid-row:2;}#reqInterface{grid-column:1;grid-row:3;}#usageLib{grid-column:2;grid-row:1 / span 3;}#usageApp{grid-column:1 / span 2;grid-row:5;}.scope-card{min-height:0;padding:10px 9px;}.scope-card .scope-name{font-size:11px;}.scope-card .scope-detail{font-size:11px;line-height:1.36;}.target-card{padding:12px 11px;}.target-card .target-head{font-size:13px;}.target-card .target-sub{font-size:10px;}.target-slots{gap:8px;margin-top:10px;}.target-slot{padding:7px;font-size:11px;line-height:1.28;}.usage-note{margin-top:8px;font-size:10.5px;}
+  .targets-stage{grid-template-rows:74px 96px 108px;column-gap:26px;row-gap:25px;min-height:350px;padding-top:4px;}.dir-card,.target-node{padding:9px;}.dir-card .dir-title,.target-node .dir-title{font-size:10.5px;}.dir-card .dir-sub,.target-node .dir-sub{font-size:9px;}.target-node .target-rule{font-size:8px;margin-top:6px;}.directory-note{font-size:9.5px;margin-top:5px;}
+}
+@media(max-width:390px){
+  .flow-node{min-height:142px;}.configure-stage{min-height:500px;}.generator-stage{min-height:580px;}.usage-stage{column-gap:22px;}.targets-stage{column-gap:20px;}
+}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>CMake · 从 configure 到 target 使用要求</h1>
+    <p>配套笔记《14.3 CMake 基础》《14.4 CMake 进阶》 · <kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="CMake 动画场景">
+    <button class="tab" type="button" data-scene="configure"><span class="tab-title">configure 与构建目录</span><span class="tab-sub">source → build → artifact</span></button>
+    <button class="tab" type="button" data-scene="generator"><span class="tab-title">生成器与 build 前端</span><span class="tab-sub">configure picks backend</span></button>
+    <button class="tab" type="button" data-scene="usage"><span class="tab-title">PRIVATE / PUBLIC / INTERFACE</span><span class="tab-sub">usage requirements</span></button>
+    <button class="tab" type="button" data-scene="targets"><span class="tab-title">子目录与 target</span><span class="tab-sub">explicit target graph</span></button>
+  </nav>
+
+  <div class="layout">
+    <section class="visual-card" aria-label="CMake 步进动画">
+      <div class="visual-caption" id="visualCaption"></div>
+
+      <section class="scene" id="scene-configure" aria-label="配置与构建目录">
+        <div class="stage configure-stage" id="configureStage">
+          <svg class="wire-svg" id="configureWires" aria-hidden="true"></svg>
+          <article class="configure-grid">
+            <section class="flow-node blue" id="cfgSource">
+              <span class="node-k">source directory</span><span class="node-n">project/</span>
+              <div class="tree-list"><span class="folder">CMakeLists.txt</span><span>src/main.cpp</span><span>include/lib.hpp</span></div>
+            </section>
+            <section class="flow-node amber" id="cfgConfigure">
+              <span class="node-k">configure</span><span class="node-n">解析 target 图</span>
+              <span class="command-pill">cmake -S . -B build</span>
+              <span class="node-s">toolchain / cache / options</span>
+            </section>
+            <section class="flow-node green" id="cfgBuild">
+              <span class="node-k">generate → build/</span><span class="node-n">写入后端规则</span>
+              <div class="tree-list"><span class="generated">CMakeCache.txt</span><span class="generated">CMakeFiles/</span><span class="generated">build.ninja</span></div>
+            </section>
+            <section class="flow-node green" id="cfgArtifact">
+              <span class="node-k">build</span><span class="node-n">编译 / 链接</span>
+              <span class="command-pill">cmake --build build</span>
+              <span class="node-s">backend writes bin/demo</span>
+            </section>
+          </article>
+          <div class="status-strip">
+            <div class="status-cell" id="cfgSourceStatus"><div class="small">source tree</div><div class="value">只保留源码与 CMakeLists.txt</div></div>
+            <div class="status-cell" id="cfgBuildStatus"><div class="small">build tree</div><div class="value">缓存、生成规则与产物都在这里</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-generator" aria-label="生成器与构建前端">
+        <div class="stage generator-stage" id="generatorStage">
+          <svg class="wire-svg" id="generatorWires" aria-hidden="true"></svg>
+          <div class="generator-grid">
+            <section class="generator-card amber" id="genConfigure">
+              <span class="node-k">configure command</span><span class="node-n">cmake -S . -B build</span>
+              <span class="node-s">选项 <code>-G Ninja</code> 在此时生效</span>
+            </section>
+            <section class="generator-card amber" id="genCache">
+              <span class="node-k">build/ cache</span><span class="node-n">生成器被记录</span>
+              <div class="backend-name" id="genCacheName">generator = Ninja</div>
+            </section>
+            <section class="generator-card green backend" id="genBackend">
+              <span class="node-k">selected backend</span><span class="node-n" id="genBackendTitle">Ninja</span>
+              <div class="backend-name" id="genBackendName">reads build.ninja</div>
+            </section>
+            <section class="generator-card blue frontend" id="genFrontend">
+              <span class="node-k">portable build front end</span><span class="node-n">cmake --build build</span>
+              <span class="node-s">不要求调用者记住 Ninja、make 或 IDE 的构建命令</span>
+            </section>
+            <section class="generator-card green artifact" id="genArtifact">
+              <span class="node-k">backend result</span><span class="node-n">demo</span>
+              <span class="node-s">编译、链接，写出目标产物</span>
+            </section>
+          </div>
+          <div class="generator-foot" id="generatorFoot"><b>生成器</b> 是 configure 的选择；<code>cmake --build</code> 是统一入口。</div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-usage" aria-label="target 使用要求传播">
+        <div class="stage usage-stage" id="usageStage">
+          <svg class="wire-svg" id="usageWires" aria-hidden="true"></svg>
+          <section class="scope-card blue private" id="reqPrivate">
+            <span class="scope-name">PRIVATE</span><span class="scope-detail">tls_impl<br>只给 mylib 自己的构建</span>
+          </section>
+          <section class="scope-card green public" id="reqPublic">
+            <span class="scope-name">PUBLIC</span><span class="scope-detail">api_headers<br>mylib 与其消费者都需要</span>
+          </section>
+          <section class="scope-card amber interface" id="reqInterface">
+            <span class="scope-name">INTERFACE</span><span class="scope-detail">project_warnings<br>只给消费者，不编译 mylib</span>
+          </section>
+          <section class="target-card blue" id="usageLib">
+            <span class="target-head">mylib</span><span class="target-sub">provider target</span>
+            <div class="target-slots">
+              <div class="target-slot" id="libSlotPrivate" data-short="own">mylib own compile / link usage</div>
+              <div class="target-slot" id="libSlotPublic" data-short="use">mylib builds with this requirement</div>
+              <div class="target-slot" id="libSlotInterface" data-short="record">recorded for consumers; not used to compile mylib</div>
+            </div>
+          </section>
+          <section class="target-card green" id="usageApp">
+            <span class="target-head">app</span><span class="target-sub">consumer target</span>
+            <div class="target-slots">
+              <div class="target-slot" id="appSlotPrivate" data-short="no">not part of mylib usage interface</div>
+              <div class="target-slot" id="appSlotPublic" data-short="get">receives exported usage requirement</div>
+              <div class="target-slot" id="appSlotInterface" data-short="get">receives exported usage requirement</div>
+            </div>
+          </section>
+        </div>
+        <div class="usage-note" id="usageNote"></div>
+      </section>
+
+      <section class="scene" id="scene-targets" aria-label="子目录与明确 target 依赖">
+        <div class="stage targets-stage" id="targetsStage">
+          <svg class="wire-svg" id="targetsWires" aria-hidden="true"></svg>
+          <section class="dir-card blue root" id="rootDir"><span class="dir-title">CMakeLists.txt</span><span class="dir-sub">add_subdirectory(lib) &nbsp; add_subdirectory(src)</span></section>
+          <section class="dir-card amber" id="libDir"><span class="dir-title">lib/CMakeLists.txt</span><span class="dir-sub">声明库 target，而不是把 flags 散给整个项目</span></section>
+          <section class="dir-card blue" id="srcDir"><span class="dir-title">src/CMakeLists.txt</span><span class="dir-sub">声明可执行 target，并链接它真正使用的库</span></section>
+          <section class="target-node green" id="helperTarget"><span class="dir-title">helper</span><span class="dir-sub">add_library(helper helper.cpp)</span><span class="target-rule">target_include_directories(helper PUBLIC include)</span></section>
+          <section class="target-node blue" id="appTarget"><span class="dir-title">myapp</span><span class="dir-sub">add_executable(myapp main.cpp)</span><span class="target-rule">target_link_libraries(myapp PRIVATE helper)</span></section>
+        </div>
+        <div class="directory-note" id="directoryNote"></div>
+      </section>
+    </section>
+
+    <section class="right">
+      <section class="detail-card">
+        <div class="detail-head"><span class="detail-title" id="stepTitle"></span><span class="chip" id="stepChip"></span></div>
+        <div class="action-line" id="stepAction"></div>
+        <div class="detail-desc" id="stepDesc"></div>
+      </section>
+
+      <section class="code-deck" aria-label="当前场景 CMake 命令">
+        <div class="code-scene" id="code-configure">
+          <div class="cl" id="configure-code-0"><span class="fn">cmake</span> -S . -B build</div>
+          <div class="cl" id="configure-code-1"><span class="cmt"># configure: target graph, toolchain, cache, options</span></div>
+          <div class="cl" id="configure-code-2"><span class="cmt"># generate: write backend files into build/</span></div>
+          <div class="cl" id="configure-code-3"><span class="fn">cmake</span> --build build</div>
+          <div class="cl" id="configure-code-4"><span class="cmt"># source directory stays free of generated files</span></div>
+        </div>
+        <div class="code-scene" id="code-generator">
+          <div class="cl" id="generator-code-0"><span class="fn">cmake</span> -S . -B build -G <span class="str">Ninja</span></div>
+          <div class="cl" id="generator-code-1"><span class="cmt"># CMAKE_GENERATOR=Ninja is stored in build/</span></div>
+          <div class="cl" id="generator-code-2"><span class="fn">cmake</span> --build build</div>
+          <div class="cl" id="generator-code-3"><span class="cmt"># CMake dispatches to the configured backend</span></div>
+          <div class="cl" id="generator-code-4"><span class="fn">cmake</span> -S . -B build-debug -D<span class="var">CMAKE_BUILD_TYPE</span>=Debug</div>
+          <div class="cl" id="generator-code-5"><span class="fn">cmake</span> --build build-vs --config Release</div>
+        </div>
+        <div class="code-scene" id="code-usage">
+          <div class="cl" id="usage-code-0"><span class="fn">add_library</span>(mylib net.cpp)</div>
+          <div class="cl" id="usage-code-1"><span class="fn">target_link_libraries</span>(mylib</div>
+          <div class="cl" id="usage-code-2">  <span class="type">PRIVATE</span> tls_impl</div>
+          <div class="cl" id="usage-code-3">  <span class="type">PUBLIC</span> api_headers</div>
+          <div class="cl" id="usage-code-4">  <span class="type">INTERFACE</span> project_warnings)</div>
+          <div class="cl" id="usage-code-5"><span class="fn">target_link_libraries</span>(app <span class="type">PRIVATE</span> mylib)</div>
+        </div>
+        <div class="code-scene" id="code-targets">
+          <div class="cl" id="targets-code-0"><span class="cmt"># lib/CMakeLists.txt</span></div>
+          <div class="cl" id="targets-code-1"><span class="fn">add_library</span>(helper helper.cpp)</div>
+          <div class="cl" id="targets-code-2"><span class="fn">target_include_directories</span>(helper <span class="type">PUBLIC</span> include)</div>
+          <div class="cl" id="targets-code-3"><span class="cmt"># src/CMakeLists.txt</span></div>
+          <div class="cl" id="targets-code-4"><span class="fn">add_executable</span>(myapp main.cpp)</div>
+          <div class="cl" id="targets-code-5"><span class="fn">target_link_libraries</span>(myapp <span class="type">PRIVATE</span> helper)</div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <section class="controls" aria-label="动画控制">
+    <button class="btn" id="prevButton" type="button">‹ 上一步</button>
+    <button class="btn primary" id="playButton" type="button">播放</button>
+    <button class="btn" id="nextButton" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </section>
+</main>
+
+<script>
+const byId=id=>document.getElementById(id);
+const visualCaption=byId('visualCaption');
+const stepTitle=byId('stepTitle');
+const stepChip=byId('stepChip');
+const stepAction=byId('stepAction');
+const stepDesc=byId('stepDesc');
+const dots=byId('dots');
+const readout=byId('readout');
+const prevButton=byId('prevButton');
+const nextButton=byId('nextButton');
+const playButton=byId('playButton');
+const motionReduced=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const highlightKinds=['hl-blue','hl-green','hl-amber','hl-danger'];
+
+function classList(id, value){
+  const node=byId(id);
+  if(node)node.className=value;
+}
+function setText(id,value){
+  const node=byId(id);
+  if(node)node.textContent=value;
+}
+function setHtml(id,value){
+  const node=byId(id);
+  if(node)node.innerHTML=value;
+}
+function setActive(id,on,color){
+  const node=byId(id);
+  if(!node)return;
+  const base=node.dataset.base || node.className.split(' ').filter(token=>token!=='active'&&token!=='is-muted').join(' ');
+  node.dataset.base=base;
+  node.className=base+(on?' active':'')+(color?' '+color:'');
+}
+function setSlot(id,color){
+  const node=byId(id);
+  if(node)node.className='target-slot'+(color?' '+color:'');
+}
+function setStatus(id,color, value){
+  const node=byId(id);
+  if(!node)return;
+  node.className='status-cell'+(color?' '+color:'');
+  const content=node.querySelector('.value');
+  if(content)content.textContent=value;
+}
+
+/* Every path, port and filled triangle is created once. Steps only update classes and calculated attributes. */
+function createWires(stageId, svgId, specs){
+  const stage=byId(stageId);
+  const svg=byId(svgId);
+  const entries=specs.map(spec=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const head=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const port=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    line.classList.add('wire-line',spec.color);
+    head.classList.add('wire-head',spec.color);
+    port.classList.add('wire-port',spec.color);
+    port.setAttribute('r','4');
+    svg.append(line,head,port);
+    return Object.assign({},spec,{line:line,head:head,port:port});
+  });
+  let active=new Set();
+  let timers=[];
+
+  function sideFor(spec,key){
+    const mobile=window.matchMedia('(max-width: 640px)').matches;
+    const named=mobile ? spec['mobile'+key] : spec[key.charAt(0).toLowerCase()+key.slice(1)];
+    return named || (key==='FromSide'?'right':'left');
+  }
+  function point(rect,stageRect,side,ratio){
+    const x=rect.left-stageRect.left;
+    const y=rect.top-stageRect.top;
+    const r=ratio===undefined?.5:ratio;
+    if(side==='left')return{x:x,y:y+rect.height*r};
+    if(side==='right')return{x:x+rect.width,y:y+rect.height*r};
+    if(side==='top')return{x:x+rect.width*r,y:y};
+    return{x:x+rect.width*r,y:y+rect.height};
+  }
+  function controls(a,b,fromSide,toSide){
+    const distance=Math.max(34,Math.hypot(b.x-a.x,b.y-a.y)*.42);
+    const delta={left:[-distance,0],right:[distance,0],top:[0,-distance],bottom:[0,distance]};
+    const one=delta[fromSide]||delta.right;
+    const two=delta[toSide]||delta.left;
+    return[{x:a.x+one[0],y:a.y+one[1]},{x:b.x+two[0],y:b.y+two[1]}];
+  }
+  function geometry(item){
+    const stageRect=stage.getBoundingClientRect();
+    const source=byId(item.from);
+    const target=byId(item.to);
+    if(!source||!target||!stageRect.width||!stageRect.height)return;
+    const mobile=window.matchMedia('(max-width: 640px)').matches;
+    const fromSide=sideFor(item,'FromSide');
+    const toSide=sideFor(item,'ToSide');
+    const fromPort=mobile&&item.mobileFromPort!==undefined?item.mobileFromPort:item.fromPort;
+    const toPort=mobile&&item.mobileToPort!==undefined?item.mobileToPort:item.toPort;
+    const start=point(source.getBoundingClientRect(),stageRect,fromSide,fromPort);
+    const tip=point(target.getBoundingClientRect(),stageRect,toSide,toPort);
+    const dx=tip.x-start.x;
+    const dy=tip.y-start.y;
+    const length=Math.hypot(dx,dy)||1;
+    const unit={x:dx/length,y:dy/length};
+    const base={x:tip.x-unit.x*9,y:tip.y-unit.y*9};
+    const cps=controls(start,base,fromSide,toSide);
+    item.line.setAttribute('d','M '+start.x+' '+start.y+' C '+cps[0].x+' '+cps[0].y+', '+cps[1].x+' '+cps[1].y+', '+base.x+' '+base.y);
+    const perp={x:-unit.y*5,y:unit.x*5};
+    item.head.setAttribute('d','M '+tip.x+' '+tip.y+' L '+(base.x+perp.x)+' '+(base.y+perp.y)+' L '+(base.x-perp.x)+' '+(base.y-perp.y)+' Z');
+    item.port.setAttribute('cx',start.x);
+    item.port.setAttribute('cy',start.y);
+  }
+  function layout(){
+    const rect=stage.getBoundingClientRect();
+    svg.setAttribute('viewBox','0 0 '+rect.width+' '+rect.height);
+    entries.forEach(geometry);
+  }
+  function draw(item){
+    const length=item.line.getTotalLength();
+    item.line.style.transition='none';
+    item.line.style.strokeDasharray=length;
+    item.line.style.strokeDashoffset=length;
+    void item.line.getBoundingClientRect();
+    item.line.style.transition='';
+    item.line.style.strokeDashoffset='0';
+    const timer=window.setTimeout(()=>{
+      item.line.style.strokeDasharray='';
+      item.line.style.strokeDashoffset='';
+    },560);
+    timers.push(timer);
+  }
+  function state(item,kind){
+    item.line.className.baseVal='wire-line '+item.color+(kind?' '+kind:'');
+    item.head.className.baseVal='wire-head '+item.color+(kind?' '+kind:'');
+    item.port.className.baseVal='wire-port '+item.color+(kind?' '+kind:'');
+    if(kind==='on')item.head.classList.add('drawing');
+  }
+  function sync(ids){
+    layout();
+    const desired=new Set(ids);
+    const hasActive=desired.size>0;
+    let order=0;
+    entries.forEach(item=>{
+      if(desired.has(item.id)){
+        state(item,'on');
+        if(!active.has(item.id)&&!motionReduced()){
+          const timer=window.setTimeout(()=>draw(item),order*125);
+          timers.push(timer);
+          order+=1;
+        }
+      }else{
+        state(item,hasActive?'':'hint');
+      }
+    });
+    active=desired;
+  }
+  const observer=new ResizeObserver(layout);
+  observer.observe(stage);
+  window.addEventListener('resize',layout);
+  return{sync:sync,layout:layout,destroy(){
+    observer.disconnect();
+    window.removeEventListener('resize',layout);
+    timers.forEach(window.clearTimeout);
+    timers=[];
+  }};
+}
+
+const wires={
+  configure:createWires('configureStage','configureWires',[
+    {id:'source-configure',from:'cfgSource',to:'cfgConfigure',color:'blue'},
+    {id:'configure-build',from:'cfgConfigure',to:'cfgBuild',color:'amber',mobileFromSide:'bottom',mobileToSide:'top'},
+    {id:'build-artifact',from:'cfgBuild',to:'cfgArtifact',color:'green'}
+  ]),
+  generator:createWires('generatorStage','generatorWires',[
+    {id:'configure-cache',from:'genConfigure',to:'genCache',color:'amber'},
+    {id:'cache-backend',from:'genCache',to:'genBackend',color:'amber',mobileFromSide:'bottom',mobileToSide:'top'},
+    {id:'frontend-backend',from:'genFrontend',to:'genBackend',color:'blue',fromSide:'right',toSide:'left',mobileFromSide:'left',mobileToSide:'right'},
+    {id:'backend-artifact',from:'genBackend',to:'genArtifact',color:'green',fromSide:'bottom',toSide:'top'}
+  ]),
+  usage:createWires('usageStage','usageWires',[
+    {id:'private-lib',from:'reqPrivate',to:'usageLib',color:'blue',toPort:.17},
+    {id:'public-lib',from:'reqPublic',to:'usageLib',color:'green',toPort:.5},
+    {id:'public-app',from:'usageLib',to:'usageApp',color:'green',fromPort:.5,toPort:.5,mobileFromSide:'bottom',mobileToSide:'top',mobileFromPort:.33,mobileToPort:.33},
+    {id:'interface-lib',from:'reqInterface',to:'usageLib',color:'amber',toPort:.83},
+    {id:'interface-app',from:'usageLib',to:'usageApp',color:'amber',fromPort:.83,toPort:.83,mobileFromSide:'bottom',mobileToSide:'top',mobileFromPort:.67,mobileToPort:.67}
+  ]),
+  targets:createWires('targetsStage','targetsWires',[
+    {id:'root-lib',from:'rootDir',to:'libDir',color:'amber',fromSide:'bottom',toSide:'top',fromPort:.25,toPort:.5},
+    {id:'root-src',from:'rootDir',to:'srcDir',color:'blue',fromSide:'bottom',toSide:'top',fromPort:.75,toPort:.5},
+    {id:'lib-helper',from:'libDir',to:'helperTarget',color:'green',fromSide:'bottom',toSide:'top'},
+    {id:'src-app',from:'srcDir',to:'appTarget',color:'blue',fromSide:'bottom',toSide:'top'},
+    {id:'helper-app',from:'helperTarget',to:'appTarget',color:'green'}
+  ])
+};
+
+const scenes={
+  configure:{
+    caption:'<b>外部构建</b>：<code>cmake -S . -B build</code> 先 configure 目标图，再 generate 后端规则，最后由 <code>cmake --build</code> 执行构建。',
+    title:'configure 与构建目录',
+    code:'configure',
+    steps:[
+      {chip:'输入',kind:'blue',action:'▸ source directory 是 configure 的输入',desc:'<span class="blue">project/</span> 保存 <code>CMakeLists.txt</code>、源文件和头文件。CMake 先从这里读取目标与依赖声明。',lines:[0,1],hl:'blue',wires:[],state:'source'},
+      {chip:'configure',kind:'amber',action:'▸ configure 计算 target 图、工具链与选项',desc:'<code>-S .</code> 指向源码目录；<code>-B build</code> 指向二进制目录。configure 阶段读取 CMakeLists.txt，求出目标、工具链、缓存与配置选项；它还没有编译源文件。',lines:[0,1],hl:'amber',wires:['source-configure'],state:'configure'},
+      {chip:'generate',kind:'green',action:'▸ generate 将后端规则写入 build/',desc:'generate 阶段根据已选生成器写出 <span class="green">build.ninja</span>、Makefile 或 IDE 工程文件；<code>CMakeCache.txt</code> 与 <code>CMakeFiles/</code> 也留在构建目录。',lines:[2],hl:'green',wires:['configure-build'],state:'generate'},
+      {chip:'build',kind:'green',action:'▸ cmake --build build 调用已配置的后端',desc:'build 阶段读取 <code>build/</code> 中已有的规则，让后端执行编译和链接，最后写出 <span class="green">bin/demo</span>。',lines:[3],hl:'green',wires:['build-artifact'],state:'artifact'},
+      {chip:'分离',kind:'blue',action:'▸ 同一源码可以对应多个构建目录',desc:'Debug、Release 或不同生成器可以各有自己的 <code>build-*</code> 目录。删除一个构建目录即可清理对应配置和产物。',lines:[4],hl:'blue',wires:['source-configure','configure-build','build-artifact'],state:'separate'}
+    ],
+    paint(step){
+      setActive('cfgSource',step.state==='source'||step.state==='separate','blue');
+      setActive('cfgConfigure',step.state==='configure'||step.state==='separate','amber');
+      setActive('cfgBuild',step.state==='generate'||step.state==='separate','green');
+      setActive('cfgArtifact',step.state==='artifact'||step.state==='separate','green');
+      setStatus('cfgSourceStatus',step.state==='source'||step.state==='separate'?'blue':'','只保留源码与 CMakeLists.txt');
+      setStatus('cfgBuildStatus',step.state==='generate'||step.state==='artifact'?'green':step.state==='configure'?'amber':'','缓存、生成规则与产物都在这里');
+      wires.configure.sync(step.wires);
+    }
+  },
+  generator:{
+    caption:'<b>生成器</b> 在 configure / generate 时确定实际后端；<code>cmake --build</code> 把调用者与 Ninja、Make 或 IDE 后端隔开。',
+    title:'生成器与 build 前端',
+    code:'generator',
+    steps:[
+      {chip:'选择',kind:'amber',action:'▸ configure / generate 选择生成器',desc:'<code>-G Ninja</code> 属于 configure / generate 命令。它决定 CMake 为哪种后端写规则；<span class="amber">-G 不能作为 cmake --build 的临时开关</span>。',lines:[0],hl:'amber',wires:['configure-cache'],state:'configure'},
+      {chip:'记录',kind:'amber',action:'▸ 生成器信息写入 build/ 的缓存',desc:'CMake 把 <code>CMAKE_GENERATOR=Ninja</code> 记录在该构建目录。后续构建会沿用这套已经生成的规则。',lines:[1],hl:'amber',wires:['cache-backend'],state:'cache'},
+      {chip:'前端',kind:'blue',action:'▸ cmake --build build 是统一构建入口',desc:'调用者不需要把脚本写成只会调用 <code>ninja</code> 或 <code>make</code>。<span class="blue">cmake --build</span> 根据 build/ 的配置选择后端。',lines:[2,3],hl:'blue',wires:['frontend-backend'],state:'frontend'},
+      {chip:'后端',kind:'green',action:'▸ 已选后端执行实际构建规则',desc:'这里的 Ninja 读取 <code>build.ninja</code>，再调编译器与链接器。若 configure 时选择 Unix Makefiles，后端则会读取 Makefile。',lines:[2,3],hl:'green',wires:['backend-artifact'],state:'artifact'},
+      {chip:'配置类型',kind:'blue',action:'▸ single-config 与 multi-config 在不同阶段选配置',desc:'Ninja、Unix Makefiles 属于 single-config，常在 configure 时写入 <code>-DCMAKE_BUILD_TYPE=Debug</code>；Visual Studio、Xcode 属于 multi-config，构建时用 <code>--config Release</code> 选择配置。',lines:[4,5],hl:'blue',wires:['frontend-backend'],state:'configType'},
+      {chip:'边界',kind:'amber',action:'▸ 一个 build/ 对应一次生成器选择',desc:'生成器属于构建目录的配置状态。想换一种生成器时，通常为它创建独立 build 目录，避免混用两套生成文件。',lines:[0,1],hl:'amber',wires:['configure-cache','cache-backend'],state:'separate'}
+    ],
+    paint(step){
+      setActive('genConfigure',step.state==='configure'||step.state==='separate','amber');
+      setActive('genCache',step.state==='cache'||step.state==='separate','amber');
+      setActive('genBackend',step.state==='cache'||step.state==='frontend'||step.state==='artifact'||step.state==='configType'||step.state==='separate','green');
+      setActive('genFrontend',step.state==='frontend'||step.state==='configType','blue');
+      setActive('genArtifact',step.state==='artifact','green');
+      setText('genBackendTitle',step.state==='separate'?'Ninja build tree':'Ninja');
+      setText('genBackendName',step.state==='separate'?'own build directory':'reads build.ninja');
+      const foot=byId('generatorFoot');
+      foot.className='generator-foot'+(step.state==='frontend'||step.state==='artifact'||step.state==='configType'?' green':'');
+      foot.innerHTML=step.state==='separate'?'<b>一个 build/，一种生成器。</b> 将另一生成器放进另一个二进制目录。':step.state==='configType'?'<b>single-config</b> 在 configure 时定 <code>CMAKE_BUILD_TYPE</code>；<b>multi-config</b> 在 build 时给 <code>--config</code>。':'<b>生成器</b> 是 configure / generate 的选择；<code>cmake --build</code> 是统一入口。';
+      wires.generator.sync(step.wires);
+    }
+  },
+  usage:{
+    caption:'<b>PRIVATE / PUBLIC / INTERFACE</b> 描述 target 的 usage requirements。它们决定要求是否进入消费者接口，不是对最终链接命令的简单口号。',
+    title:'target 使用要求传播',
+    code:'usage',
+    steps:[
+      {chip:'边界',kind:'blue',action:'▸ mylib 对 app 暴露自己的 usage interface',desc:'依赖传播以 <span class="blue">target</span> 为边界。app 链接 mylib 时，CMake 读取 mylib 的接口使用要求。',lines:[0,5],hl:'blue',wires:[],state:'overview'},
+      {chip:'PRIVATE',kind:'blue',action:'▸ PRIVATE 只用于 mylib 自身',desc:'<code>tls_impl</code> 是 mylib 自己的编译或链接使用要求，但它<span class="blue">不会成为 mylib 面向 app 的 usage interface</span>。',lines:[1,2],hl:'blue',wires:['private-lib'],state:'private'},
+      {chip:'PUBLIC',kind:'green',action:'▸ PUBLIC 同时作用于 mylib 与消费者接口',desc:'<code>api_headers</code> 既给 mylib 使用，也写入 mylib 的接口；因此 app 消费 mylib 时会得到相应的包含目录、编译定义或链接要求。',lines:[1,3,5],hl:'green',wires:['public-lib','public-app'],state:'public'},
+      {chip:'INTERFACE',kind:'amber',action:'▸ INTERFACE 只进入消费者接口',desc:'<code>project_warnings</code> 不用于编译 mylib 本身；它被记录在 mylib 的接口里，供 app 这类消费者继承。纯 INTERFACE target 也没有自己的编译源文件。',lines:[1,4,5],hl:'amber',wires:['interface-lib','interface-app'],state:'interface'},
+      {chip:'组合',kind:'green',action:'▸ 用 target_* 声明要求及其传播范围',desc:'把包含目录、编译选项、定义和库依赖绑定到命名 target。消费者沿明确的 target 图得到公开接口，而不是接收某个目录里的全局设置。',lines:[1,2,3,4,5],hl:'green',wires:['private-lib','public-lib','public-app','interface-lib','interface-app'],state:'all'}
+    ],
+    paint(step){
+      const active=step.state;
+      setActive('reqPrivate',active==='private'||active==='all','blue');
+      setActive('reqPublic',active==='public'||active==='all','green');
+      setActive('reqInterface',active==='interface'||active==='all','amber');
+      setActive('usageLib',active!=='overview','blue');
+      setActive('usageApp',active==='public'||active==='interface'||active==='all','green');
+      setSlot('libSlotPrivate',active==='private'||active==='all'?'blue':'');
+      setSlot('libSlotPublic',active==='public'||active==='all'?'green':'');
+      setSlot('libSlotInterface',active==='interface'||active==='all'?'amber':'');
+      setSlot('appSlotPrivate','');
+      setSlot('appSlotPublic',active==='public'||active==='all'?'green':'');
+      setSlot('appSlotInterface',active==='interface'||active==='all'?'amber':'');
+      const note=byId('usageNote');
+      const data={
+        overview:['','mylib 的接口是 app 获得传播要求的入口。'],
+        private:['blue','PRIVATE 到此为止：mylib 自己用，app 的接口槽位保持为空。'],
+        public:['green','PUBLIC 穿过 target 边界：mylib 使用，同时把要求公开给 app。'],
+        interface:['amber','INTERFACE 被记录并继续传给 app；mylib 的自身编译不使用它。'],
+        all:['green','每项要求都标出作用域，target 图便能说明谁会使用、谁会继承。']
+      }[active];
+      note.className='usage-note '+data[0];
+      note.textContent=data[1];
+      wires.usage.sync(step.wires);
+    }
+  },
+  targets:{
+    caption:'<b>多目录项目</b>用 <code>add_subdirectory()</code> 组织声明；库与可执行文件通过显式 target link 建立依赖。',
+    title:'子目录与明确 target 图',
+    code:'targets',
+    steps:[
+      {chip:'遍历',kind:'blue',action:'▸ 顶层 CMakeLists.txt 进入子目录',desc:'顶层文件用 <code>add_subdirectory(lib)</code> 和 <code>add_subdirectory(src)</code> 组织配置过程。子目录分别声明各自的 target。',lines:[0],hl:'blue',wires:['root-lib','root-src'],state:'root'},
+      {chip:'库',kind:'green',action:'▸ lib/ 声明 helper target',desc:'<code>add_library(helper ...)</code> 产生一个可被其他目录引用的 target。它可以把自己的公开头文件目录写成 usage requirement。',lines:[0,1,2],hl:'green',wires:['lib-helper'],state:'library'},
+      {chip:'程序',kind:'blue',action:'▸ src/ 声明 myapp target',desc:'<code>add_executable(myapp ...)</code> 只描述 myapp 自身的源文件。依赖在下一步通过 target link 明确表达。',lines:[3,4],hl:'blue',wires:['src-app'],state:'app'},
+      {chip:'链接',kind:'green',action:'▸ myapp PRIVATE 链接 helper',desc:'<code>target_link_libraries(myapp PRIVATE helper)</code> 建出依赖边。helper 的 <span class="green">PUBLIC</span> 使用要求会随这条边进入 myapp。',lines:[2,5],hl:'green',wires:['helper-app'],state:'link'},
+      {chip:'范围',kind:'green',action:'▸ target_* 比目录级全局设置更可追踪',desc:'<code>target_include_directories(helper PUBLIC include)</code> 只把 include 要求随 helper 的消费者路径传播；它不像 <code>include_directories()</code> 那样隐式影响整个目录作用域。',lines:[1,2,5],hl:'green',wires:['root-lib','root-src','lib-helper','src-app','helper-app'],state:'scope'}
+    ],
+    paint(step){
+      const active=step.state;
+      setActive('rootDir',active==='root'||active==='scope','blue');
+      setActive('libDir',active==='library'||active==='scope','amber');
+      setActive('srcDir',active==='app'||active==='scope','blue');
+      setActive('helperTarget',active==='library'||active==='link'||active==='scope','green');
+      setActive('appTarget',active==='app'||active==='link'||active==='scope','blue');
+      const note=byId('directoryNote');
+      const data={
+        root:['','顶层只负责组织子目录，target 的定义仍在所属目录内。'],
+        library:['green','helper 把自身公开头文件路径写在 target 上。'],
+        app:['','myapp 先是独立 target，随后才声明它的库依赖。'],
+        link:['green','myapp 与 helper 的关系由一条 target_link_libraries 边表达。'],
+        scope:['green','公开要求沿 helper → myapp 这条明确边走，不是一次无边界的全局注入。']
+      }[active];
+      note.className='directory-note '+data[0];
+      note.textContent=data[1];
+      wires.targets.sync(step.wires);
+    }
+  }
+};
+
+let sceneId='configure';
+let stepIndex=0;
+let player=0;
+
+function stopPlayer(){
+  if(player){
+    window.clearInterval(player);
+    player=0;
+  }
+  playButton.textContent='播放';
+}
+function buildDots(){
+  dots.replaceChildren();
+  scenes[sceneId].steps.forEach((step,index)=>{
+    const dot=document.createElement('button');
+    dot.type='button';
+    dot.className='dot';
+    dot.setAttribute('aria-label','第 '+(index+1)+' 步');
+    dot.addEventListener('click',()=>setState(sceneId,index,true));
+    dots.append(dot);
+  });
+}
+function updateHash(){
+  const value='scene='+encodeURIComponent(sceneId)+'&step='+stepIndex;
+  history.replaceState(null,'','#'+value);
+}
+function paint(){
+  const scene=scenes[sceneId];
+  const step=scene.steps[stepIndex];
+  document.querySelectorAll('.scene').forEach(node=>node.classList.toggle('is-active',node.id==='scene-'+sceneId));
+  document.querySelectorAll('.tab').forEach(node=>{
+    const selected=node.dataset.scene===sceneId;
+    node.classList.toggle('is-active',selected);
+    node.setAttribute('aria-selected',String(selected));
+  });
+  document.querySelectorAll('.code-scene').forEach(node=>node.classList.toggle('is-active',node.id==='code-'+scene.code));
+  visualCaption.innerHTML=scene.caption;
+  stepTitle.textContent=scene.title;
+  stepChip.textContent=step.chip;
+  stepChip.className='chip '+step.kind;
+  stepAction.textContent=step.action;
+  stepDesc.innerHTML=step.desc;
+  document.querySelectorAll('.cl').forEach(node=>highlightKinds.forEach(kind=>node.classList.remove(kind)));
+  step.lines.forEach(index=>{
+    const line=byId(scene.code+'-code-'+index);
+    if(line)line.classList.add('hl-'+step.hl);
+  });
+  Array.from(dots.children).forEach((dot,index)=>{
+    dot.className='dot'+(index<stepIndex?' done':'')+(index===stepIndex?' current':'');
+  });
+  readout.textContent=(stepIndex+1)+' / '+scene.steps.length;
+  prevButton.disabled=stepIndex===0;
+  nextButton.disabled=stepIndex===scene.steps.length-1;
+  scene.paint(step);
+  requestAnimationFrame(()=>wires[sceneId].layout());
+}
+function setState(nextScene,nextStep,writeHash,keepPlaying){
+  const sceneChanged=sceneId!==nextScene;
+  sceneId=nextScene;
+  stepIndex=Math.max(0,Math.min(nextStep,scenes[sceneId].steps.length-1));
+  if(!keepPlaying)stopPlayer();
+  if(sceneChanged)buildDots();
+  paint();
+  if(writeHash)updateHash();
+}
+function next(){
+  if(stepIndex<scenes[sceneId].steps.length-1)setState(sceneId,stepIndex+1,true);
+  else stopPlayer();
+}
+function previous(){
+  if(stepIndex>0)setState(sceneId,stepIndex-1,true);
+}
+function togglePlay(){
+  if(player){updateHash();stopPlayer();return;}
+  if(stepIndex===scenes[sceneId].steps.length-1)setState(sceneId,0,true);
+  playButton.textContent='暂停';
+  player=window.setInterval(()=>{
+    if(stepIndex===scenes[sceneId].steps.length-1){stopPlayer();return;}
+    setState(sceneId,stepIndex+1,false,true);
+    if(stepIndex===scenes[sceneId].steps.length-1){updateHash();stopPlayer();}
+  },1900);
+}
+function stateFromHash(){
+  const raw=location.hash.replace(/^#/,'');
+  const params=new URLSearchParams(raw);
+  const candidate=params.get('scene');
+  const number=Number.parseInt(params.get('step')||'0',10);
+  if(scenes[candidate])return{scene:candidate,step:Number.isFinite(number)?number:0};
+  return{scene:'configure',step:0};
+}
+
+document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>setState(tab.dataset.scene,0,true)));
+prevButton.addEventListener('click',previous);
+nextButton.addEventListener('click',next);
+playButton.addEventListener('click',togglePlay);
+window.addEventListener('keydown',event=>{
+  if(event.target.closest('button,a,input,textarea,select'))return;
+  if(event.key==='ArrowLeft'){event.preventDefault();previous();}
+  if(event.key==='ArrowRight'){event.preventDefault();next();}
+  if(event.key===' '){event.preventDefault();togglePlay();}
+});
+window.addEventListener('hashchange',()=>{
+  const state=stateFromHash();
+  if(state.scene!==sceneId||state.step!==stepIndex)setState(state.scene,state.step,false);
+});
+
+const initial=stateFromHash();
+sceneId=initial.scene;
+stepIndex=Math.max(0,Math.min(initial.step,scenes[sceneId].steps.length-1));
+buildDots();
+paint();
+</script>
+</body>
+</html>

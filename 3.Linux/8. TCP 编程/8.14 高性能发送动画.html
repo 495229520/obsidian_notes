@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高性能发送动画 · sendfile · mmap · splice · writev</title>
+<!-- Visual system: warm paper #F5F4ED, quiet panels #FBFBF6, saturated semantic blue/green/amber/red, 8px rhythm. -->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#625F56;--faint:#918D83;
+  --line:#D8D5C8;--grid:#E4E1D6;--gray:#F0EEE6;
+  --blue:#2467A6;--bluebg:#E1EEF9;--bluetx:#1C4D7A;
+  --green:#087A5C;--greenbg:#DAF0E7;--greentx:#075B45;
+  --amber:#A66408;--amberbg:#F7E9D4;--ambertx:#7C4A05;
+  --danger:#C34935;--dangerbg:#F7DFDA;--dangertx:#913025;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:0;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:10px 16px;cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.14);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.78;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(300px,1fr);gap:28px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:13px;color:var(--muted);margin-bottom:15px;}.vcap b{color:var(--ink);font-weight:700;}
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:18px 20px;min-height:206px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:9px 12px;}
+#stDesc{margin-top:10px;font-size:14px;color:var(--muted);}.blue{color:var(--blue);font-weight:700;}.green{color:var(--green);font-weight:700;}.amber{color:var(--amber);font-weight:700;}.danger{color:var(--danger);font-weight:700;}
+.chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1.5px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.chip.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{align-self:flex-start;width:100%;background:#2E2C27;border-radius:8px;padding:10px 0;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#D8D5CC;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.codebox .cl{min-height:22px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}.codebox .cmt{color:#918D83;}.codebox .kw{color:#E9AC50;}.codebox .type{color:#95C7EF;}.codebox .fn{color:#83C9B2;}.codebox .num{color:#F0BE7E;}.codebox .str{color:#D9CE9F;}
+.codebox .cl.hl-blue{background:rgba(52,122,198,.54);box-shadow:inset 4px 0 0 #91C7F5;color:#F7F4EA;}.codebox .cl.hl-green{background:rgba(22,143,107,.54);box-shadow:inset 4px 0 0 #90DFC2;color:#F7F4EA;}.codebox .cl.hl-amber{background:rgba(185,112,16,.58);box-shadow:inset 4px 0 0 #FFD08A;color:#F7F4EA;}.codebox .cl.hl-danger{background:rgba(198,73,53,.58);box-shadow:inset 4px 0 0 #FFAA98;color:#F7F4EA;}.codebox .cl[class*="hl-"] .cmt{color:#D5D0C1;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:8px 15px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}.btn:hover:not(:disabled){background:var(--gray);border-color:var(--ink);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:86px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector layer: paths and arrow heads stay mounted; endpoints come from live element rectangles. */
+.stage{position:relative;width:100%;height:470px;min-height:470px;margin:0 auto;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;}
+.wire-line{--wc:var(--muted);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}.wire-head{--wc:var(--muted);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wire-port{--wc:var(--muted);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}.wire-line.on,.wire-head.on,.wire-port.on{opacity:1;}.wire-line.hint{stroke-width:2;opacity:.1;}.wire-head.hint,.wire-port.hint{opacity:.1;}.wire-head.drawing{transition-delay:200ms;}.wire-line.blue,.wire-head.blue,.wire-port.blue{--wc:var(--blue);}.wire-line.green,.wire-head.green,.wire-port.green{--wc:var(--green);}.wire-line.amber,.wire-head.amber,.wire-port.amber{--wc:var(--amber);}.wire-line.danger,.wire-head.danger,.wire-port.danger{--wc:var(--danger);}
+
+/* Data-path stage: three privilege bands, stations aligned in one 4-column grid. */
+.zc-stage{display:grid;grid-template-rows:96px 128px 96px 42px;row-gap:24px;height:470px;min-height:470px;}
+.band{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;align-items:center;padding:22px 12px 10px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.band-t{position:absolute;left:12px;top:5px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);}
+.band.user{border-color:var(--blue);}.band.user .band-t{color:var(--blue);}
+.band.kern{border-color:var(--amber);}.band.kern .band-t{color:var(--amber);}
+.station{position:relative;z-index:2;min-height:54px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;color:var(--muted);text-align:center;padding:4px 6px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.station .sk{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);}
+.station.on-blue{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);transform:scale(1.03);}
+.station.on-green{border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:scale(1.03);}
+.station.on-amber{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);transform:scale(1.03);}
+.station.ghost{opacity:.3;border-style:dashed;}
+.counts{display:flex;gap:10px;justify-content:center;align-items:center;}
+.count{border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 13px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.count.bump{transform:scale(1.08);}
+.count.cpu.lit{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.count.dma.lit{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.count.sys.lit{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.ctoken{position:absolute;z-index:4;min-width:66px;height:27px;padding:0 9px;border:1.5px solid var(--green);border-radius:6px;background:var(--greenbg);color:var(--greentx);font-family:var(--mono);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:0;transform:translate(-50%,-50%);transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.ctoken.on{opacity:1;}
+.ctoken.hdr{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.ctoken.stuck{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.pill{position:absolute;left:50%;bottom:-6px;z-index:3;transform:translateX(-50%);width:max-content;max-width:95%;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 12px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.pill.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.pill.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.pill.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.pill.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.rrow{min-height:30px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-size:11px;color:var(--muted);display:flex;align-items:center;padding:4px 10px;gap:8px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.rrow b{font-family:var(--mono);font-size:10.5px;}
+.rrow.on{border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateX(2px);}
+.rrow.warn{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.rrow.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.rrow.dim{opacity:.35;}
+.panel-box{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.panel-title{position:absolute;left:14px;top:9px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}
+.gcard{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:12px 13px;display:flex;flex-direction:column;justify-content:center;gap:3px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gcard .k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.gcard .n{font-size:14px;font-weight:700;}.gcard .s{font-size:11px;color:var(--muted);}
+.gcard.blue{border-color:var(--blue);}.gcard.blue .k{color:var(--blue);}
+.gcard.green{border-color:var(--green);}.gcard.green .k{color:var(--green);}
+.gcard.amber{border-color:var(--amber);}.gcard.amber .k{color:var(--amber);}
+.gcard.active{transform:scale(1.012);box-shadow:0 0 0 2px rgba(43,42,38,.08);}
+.gcard.blue.active{background:var(--bluebg);}.gcard.green.active{background:var(--greenbg);}.gcard.amber.active{background:var(--amberbg);}
+.gcard.bad{border-color:var(--danger);background:var(--dangerbg);}
+.gcard.dim{opacity:.42;}
+.slotrow{display:flex;gap:8px;margin-top:7px;}
+.slot{flex:1;height:29px;border:1.5px dashed var(--line);border-radius:6px;background:var(--gray);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;color:var(--faint);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+
+/* writev stage: two user buffers, three strategies, one socket buffer. */
+.wv-stage{display:grid;grid-template-columns:1fr 1fr 1.12fr;grid-template-rows:150px 1fr;column-gap:26px;row-gap:30px;height:440px;min-height:440px;}
+.wv-opts{grid-column:1 / span 3;grid-row:2;display:flex;flex-direction:column;gap:8px;padding:34px 14px 48px;}
+.wv-opts .panel-title{color:var(--green);}
+
+@media(max-width:1040px){.layout{grid-template-columns:1fr;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.codebox{grid-column:2;}.desc-card{grid-column:1;grid-row:1 / span 2;}}
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:15px;min-height:0;}.right{display:flex;}.desc-card{min-height:0;padding:16px;}.controls{padding:12px 13px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 138px;}.btn{padding:8px 12px;}
+.zc-stage{grid-template-rows:96px 122px 96px auto;height:490px;min-height:490px;row-gap:20px;}.station{font-size:10px;min-height:50px;}.counts{flex-wrap:wrap;}
+.wv-stage{grid-template-columns:1fr 1fr;grid-template-rows:140px 140px 1fr;height:600px;min-height:600px;column-gap:16px;row-gap:18px;}.wv-stage .gcard:nth-child(3){grid-column:1 / span 2;grid-row:2;}.wv-opts{grid-column:1 / span 2;grid-row:3;}
+.pill{font-size:9.5px;white-space:normal;text-align:center;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>高性能发送 · 数据路径与拷贝差异</h1>
+    <p>配套笔记《8.14 高性能发送与线上排障》 · read+write 基线 · sendfile · mmap · splice · writev　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SENTINEL=String.fromCharCode(1);
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightC(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts?parts[1]:line;
+  const comment=parts&&parts[2]?parts[2]:'';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{strings.push(escapeHtml(value));return SENTINEL+String.fromCharCode(65+strings.length-1)+SENTINEL;});
+  code=escapeHtml(code)
+    .replace(/\b(int|void|char|ssize_t|off_t|iovec|struct|sizeof)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(open|read|send|sendfile|mmap|splice|writev|pipe|process|memcpy)\b/g,'<span class="fn">$1</span>')
+    .replace(/\b(buf|big|sockfd|filefd|ffd|offset|file_size|len|iov|pfd|header|body|header_len|body_len|nullptr|PROT_READ|MAP_PRIVATE|O_RDONLY)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(0|1|2|4|65536)\b/g,'<span class="num">$1</span>')
+    .replace(new RegExp(SENTINEL+'([A-Z])'+SENTINEL,'g'),(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment?'<span class="cmt">'+escapeHtml(comment)+'</span>':'');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="codeLine'+index+'">'+highlightC(line||' ')+'</div>').join('');}
+function classes(id,value){const node=el(id);if(node)node.className=value;}
+function setPill(id,text,tone){const node=el(id);if(!node)return;node.textContent=text;node.className='pill'+(tone?' '+tone:'');}
+
+/* A persistent arrow controller: a path, filled triangle, and source port are created once per scene. */
+function createWires(stageId,specs){
+  const stage=el(stageId);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id=stageId+'-svg';svg.classList.add('wire-svg');svg.setAttribute('preserveAspectRatio','none');stage.appendChild(svg);
+  const entries=specs.map(spec=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const head=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const port=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    line.id=stageId+'-'+spec.id;head.id=line.id+'-head';port.id=line.id+'-port';port.setAttribute('r','4');
+    line.classList.add('wire-line',spec.color);head.classList.add('wire-head',spec.color);port.classList.add('wire-port',spec.color);
+    svg.append(line,head,port);return {...spec,line,head,port};
+  });
+  let active=new Set();let timers=[];
+  function geometry(item){
+    const sr=stage.getBoundingClientRect(),source=el(item.from)?.getBoundingClientRect(),target=el(item.to)?.getBoundingClientRect();
+    if(!source||!target)return;
+    const sx=source.left-sr.left,sy=source.top-sr.top,sw=source.width,sh=source.height;
+    const tx=target.left-sr.left,ty=target.top-sr.top,tw=target.width,th=target.height;
+    const scx=sx+sw/2,scy=sy+sh/2,tcx=tx+tw/2,tcy=ty+th/2;
+    const horizontal=Math.abs(tcx-scx)>=Math.abs(tcy-scy);
+    let x1,y1,x2,y2;
+    if(horizontal){const right=tcx>=scx;x1=right?sx+sw:sx;y1=scy;x2=right?tx:tx+tw;y2=tcy;}
+    else{const down=tcy>=scy;x1=scx;y1=down?sy+sh:sy;x2=tcx;y2=down?ty:ty+th;}
+    const dx=x2-x1,dy=y2-y1,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,baseX=x2-ux*9,baseY=y2-uy*9;
+    const d=horizontal?`M ${x1} ${y1} C ${x1+dx*.45} ${y1}, ${baseX-dx*.45} ${baseY}, ${baseX} ${baseY}`:`M ${x1} ${y1} C ${x1} ${y1+dy*.45}, ${baseX} ${baseY-dy*.45}, ${baseX} ${baseY}`;
+    const px=-uy*5,py=ux*5;
+    item.line.setAttribute('d',d);item.head.setAttribute('d',`M ${x2} ${y2} L ${baseX+px} ${baseY+py} L ${baseX-px} ${baseY-py} Z`);item.port.setAttribute('cx',x1);item.port.setAttribute('cy',y1);
+  }
+  function layout(){const rect=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);entries.forEach(geometry);}
+  function draw(item){
+    const length=item.line.getTotalLength();item.line.style.transition='none';item.line.style.strokeDasharray=length;item.line.style.strokeDashoffset=length;void item.line.getBoundingClientRect();item.line.style.transition='';item.line.style.strokeDashoffset='0';
+    const timeout=setTimeout(()=>{item.line.style.strokeDasharray='';item.line.style.strokeDashoffset='';},560);timers.push(timeout);
+  }
+  function setClass(item,state){
+    const suffix=' '+item.color+(state?' '+state:'');item.line.className.baseVal='wire-line'+suffix;item.head.className.baseVal='wire-head'+suffix;item.port.className.baseVal='wire-port'+suffix;
+    if(state==='on')item.head.classList.add('drawing');
+  }
+  function sync(ids){
+    layout();const wanted=new Set(ids),hasAny=wanted.size>0;let stagger=0;
+    entries.forEach(item=>{
+      if(wanted.has(item.id)){setClass(item,'on');if(!active.has(item.id)&&!reducedMotion()){const delay=stagger++*160;timers.push(setTimeout(()=>draw(item),delay));}}
+      else setClass(item,hasAny?'':'hint');
+    });active=wanted;
+  }
+  const observer=new ResizeObserver(layout);observer.observe(stage);window.addEventListener('resize',layout);layout();
+  return {sync,layout,destroy(){observer.disconnect();window.removeEventListener('resize',layout);timers.forEach(clearTimeout);timers=[];}};
+}
+
+/* Tokens glide between stations; positions come from the live station rectangles. */
+function makePlacer(stageId,dy){
+  return function place(tokenId,slotId,extra){
+    const token=el(tokenId);if(!token)return;
+    if(!slotId){token.className='ctoken';return;}
+    const stage=el(stageId),slot=el(slotId);if(!stage||!slot)return;
+    const sr=stage.getBoundingClientRect(),r=slot.getBoundingClientRect();
+    token.style.left=(r.left-sr.left+r.width/2)+'px';token.style.top=(r.top-sr.top+r.height/2+(dy||0))+'px';
+    token.className='ctoken on'+(extra?' '+extra:'');
+  };
+}
+
+/* The four path scenes share one three-band stage; splice reveals the pipe station. */
+function pathStageHtml(prefix,caption,pipeGhost){
+  return '<div class="vcap">'+caption+'</div><div class="stage zc-stage" id="'+prefix+'Stage">'+
+    '<section class="band user"><span class="band-t">用户态</span>'+
+      '<div class="station" id="'+prefix+'App"><span class="sk">application</span>发起系统调用</div>'+
+      '<div class="station" id="'+prefix+'User" style="grid-column:2 / span 2;"><span class="sk">user buffer</span>用户缓冲区 buf</div></section>'+
+    '<section class="band kern"><span class="band-t">内核态</span>'+
+      '<div class="station" id="'+prefix+'PC"><span class="sk">page cache</span>内核页缓存</div>'+
+      '<div class="station'+(pipeGhost?' ghost':'')+'" id="'+prefix+'Pipe" style="grid-column:2 / span 2;"><span class="sk">pipe</span>管道缓冲（页引用）</div>'+
+      '<div class="station" id="'+prefix+'Sock"><span class="sk">socket buffer</span>socket 发送缓冲</div></section>'+
+    '<section class="band hw"><span class="band-t">硬件</span>'+
+      '<div class="station" id="'+prefix+'Disk"><span class="sk">disk</span>磁盘</div>'+
+      '<div class="station" id="'+prefix+'Nic" style="grid-column:4;"><span class="sk">NIC</span>网卡</div></section>'+
+    '<div class="counts">'+
+      '<span class="count cpu" id="'+prefix+'Cpu">CPU copy 0</span>'+
+      '<span class="count dma" id="'+prefix+'Dma">DMA 0</span>'+
+      '<span class="count sys" id="'+prefix+'Sys">syscall 0</span></div>'+
+    '<span class="pill" id="'+prefix+'Pill"></span>'+
+    '<div class="ctoken" id="'+prefix+'Data">data 64KB</div></div>';
+}
+function paintCounts(prefix,s){
+  const cpu=el(prefix+'Cpu'),dma=el(prefix+'Dma'),sys=el(prefix+'Sys');
+  cpu.textContent='CPU copy '+s.cpu;dma.textContent='DMA '+s.dma;sys.textContent='syscall '+s.sys;
+  cpu.className='count cpu'+(s.cpu>0?' lit':'')+(s.bump==='cpu'?' bump':'');
+  dma.className='count dma'+(s.dma>0?' lit':'')+(s.bump==='dma'?' bump':'');
+  sys.className='count sys'+(s.sys>0?' lit':'')+(s.bump==='sys'?' bump':'');
+}
+function makePathScene(opts){
+  let wires,observer,current=null;
+  const prefix=opts.prefix;
+  const place=makePlacer(prefix+'Stage',27);
+  function mount(){
+    viz.innerHTML=pathStageHtml(prefix,opts.caption,opts.pipeGhost);
+    if(opts.pipeGhost)el(prefix+'Pipe').dataset.keepGhost='1';
+    wires=createWires(prefix+'Stage',opts.wireSpecs.map(w=>({id:w[0],from:prefix+w[1],to:prefix+w[2],color:w[3]})));
+    observer=new ResizeObserver(()=>{if(current)place(prefix+'Data',current.at?prefix+current.at:null,current.tokenCls||'');});
+    observer.observe(el(prefix+'Stage'));
+  }
+  function paint(s){
+    current=s;
+    ['App','User','PC','Pipe','Sock','Disk','Nic'].forEach(name=>{
+      const node=el(prefix+name);if(!node)return;
+      const ghost=opts.pipeGhost&&name==='Pipe'&&!(s.st&&s.st[name]);
+      node.className='station'+(ghost?' ghost':'')+((s.st&&s.st[name])?' on-'+s.st[name]:'');
+    });
+    place(prefix+'Data',s.at?prefix+s.at:null,s.tokenCls||'');
+    paintCounts(prefix,s);setPill(prefix+'Pill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:opts.id,label:opts.label,sub:opts.sub,steps:opts.steps,code:opts.code,mount,paint,destroy(){observer?.disconnect();wires?.destroy();}};
+}
+
+const classicScene=makePathScene({
+  id:'classic',prefix:'cl',label:'read + write 基线',sub:'4 copies · 2 syscalls',pipeGhost:true,
+  caption:'<b>传统路径</b>：数据两次穿越用户态边界，却从未被修改——这就是零拷贝要消灭的浪费。',
+  wireSpecs:[['d-pc','Disk','PC','blue'],['pc-u','PC','User','danger'],['u-s','User','Sock','danger'],['s-n','Sock','Nic','blue']],
+  code:[
+    'int ffd = open("index.html", O_RDONLY);',
+    'char buf[65536];',
+    'ssize_t n = read(ffd, buf, sizeof buf);',
+    'send(sockfd, buf, n, 0);',
+    '// copy 1: disk -> page cache      (DMA)',
+    '// copy 2: page cache -> user buf  (CPU)',
+    '// copy 3: user buf -> socket buf  (CPU)',
+    '// copy 4: socket buf -> NIC       (DMA)'
+  ],
+  steps:[
+    {chip:'read()',chipC:'ca',title:'应用发起 read，陷入内核',desc:'第 1 次系统调用：用户态到内核态的上下文切换。数据此刻还躺在磁盘上。',lines:[0,1,2],hl:'amber',at:'Disk',st:{App:'amber',Disk:'blue'},cpu:0,dma:0,sys:1,bump:'sys',wires:[],pill:'read() traps into the kernel',pillC:'amber'},
+    {chip:'DMA #1',chipC:'cb',title:'磁盘 → 页缓存（DMA）',desc:'DMA 控制器把数据搬进内核页缓存，<b>不占用 CPU</b>。这次拷贝任何方案都省不掉。',lines:[4],hl:'blue',at:'PC',st:{PC:'blue',Disk:'blue'},cpu:0,dma:1,sys:1,bump:'dma',wires:['d-pc'],pill:'disk -> page cache',pillC:'blue'},
+    {chip:'CPU copy',chipC:'cd',title:'页缓存 → 用户缓冲区（CPU 拷贝）',desc:'read 返回前，内核把数据<b>逐字节复制</b>到用户 buf——CPU 亲自搬运，这是第一次“纯属过路”的拷贝。',lines:[2,5],hl:'danger',at:'User',st:{User:'blue',PC:'amber'},cpu:1,dma:1,sys:1,bump:'cpu',wires:['pc-u'],pill:'page cache -> user buf (CPU)',pillC:'danger'},
+    {chip:'send()',chipC:'cd',title:'用户缓冲区 → socket 缓冲（CPU 拷贝）',desc:'第 2 次系统调用，又一次逐字节复制回内核。数据在用户态<b>什么都没做</b>，白白往返一趟。',lines:[3,6],hl:'danger',at:'Sock',st:{Sock:'amber',User:'blue',App:'amber'},cpu:2,dma:1,sys:2,bump:'cpu',wires:['u-s'],pill:'user buf -> socket buf (CPU)',pillC:'danger'},
+    {chip:'DMA #2',chipC:'cb',title:'socket 缓冲 → 网卡（DMA）',desc:'网卡通过 DMA 取走数据发上网络。至此 4 次拷贝、2 次系统调用、4 次上下文切换全部付清。',lines:[7],hl:'blue',at:'Nic',st:{Nic:'green',Sock:'amber'},cpu:2,dma:2,sys:2,bump:'dma',wires:['s-n'],pill:'socket buf -> NIC',pillC:'blue'},
+    {chip:'账单',chipC:'cd',title:'4 次拷贝，其中 2 次 CPU 拷贝纯属浪费',desc:'两次 DMA 无法避免，但页缓存→用户→socket 这两次 <span class="danger">CPU 拷贝</span>毫无意义——数据没被加工。后面三幕分别消灭它们。',lines:[4,5,6,7],hl:'danger',at:'Nic',st:{},cpu:2,dma:2,sys:2,bump:'',wires:['pc-u','u-s'],pill:'2 CPU copies for nothing',pillC:'danger'}
+  ]
+});
+
+const sendfileScene=makePathScene({
+  id:'sendfile',prefix:'sf',label:'sendfile',sub:'in-kernel · 1 syscall',pipeGhost:true,
+  caption:'<b>sendfile</b>：数据从头到尾不进用户态——应用只发指令，搬运全在内核完成。',
+  wireSpecs:[['d-pc','Disk','PC','blue'],['pc-s','PC','Sock','green'],['s-n','Sock','Nic','blue'],['pc-n','PC','Nic','green']],
+  code:[
+    'off_t offset = 0;',
+    'ssize_t n = sendfile(sockfd, filefd,',
+    '                     &offset, file_size);',
+    '// data never enters user space',
+    '// page cache -> socket buf (in-kernel)',
+    '// SG-DMA: NIC reads page cache directly',
+    '// 1 syscall; user code only steers'
+  ],
+  steps:[
+    {chip:'一次调用',chipC:'ca',title:'sendfile(sockfd, filefd, …)：只发指令',desc:'唯一的系统调用。应用告诉内核“把这个文件发到这个 socket”，然后<b>再也不碰数据</b>。',lines:[0,1,2],hl:'amber',at:'Disk',st:{App:'amber'},cpu:0,dma:0,sys:1,bump:'sys',wires:[],pill:'one syscall, zero user-space data',pillC:'amber'},
+    {chip:'DMA #1',chipC:'cb',title:'磁盘 → 页缓存（DMA）',desc:'与基线相同：DMA 把文件装进页缓存。差异从下一步开始。',lines:[3],hl:'blue',at:'PC',st:{PC:'blue',Disk:'blue'},cpu:0,dma:1,sys:1,bump:'dma',wires:['d-pc'],pill:'disk -> page cache',pillC:'blue'},
+    {chip:'内核直达',chipC:'cg',title:'页缓存 → socket 缓冲：不出内核',desc:'数据在内核态<b>横向移动</b>，跳过了用户态往返——基线里两次 CPU 拷贝变成一次，两次上下文切换消失。',lines:[4],hl:'green',at:'Sock',st:{PC:'amber',Sock:'amber'},cpu:1,dma:1,sys:1,bump:'cpu',wires:['pc-s'],pill:'in-kernel move, user space skipped',pillC:'green'},
+    {chip:'SG-DMA',chipC:'cg',title:'进阶：网卡直接从页缓存取数',desc:'网卡支持 scatter-gather 时，socket 缓冲只存<b>描述符</b>（位置+长度），网卡按描述符直接 DMA 页缓存——CPU 拷贝归零。',lines:[5],hl:'green',at:'PC',st:{PC:'green',Nic:'green'},cpu:0,dma:1,sys:1,bump:'cpu',wires:['pc-n'],pill:'descriptors only: 0 CPU copies',pillC:'green'},
+    {chip:'DMA #2',chipC:'cb',title:'DMA 发往网卡，路径闭合',desc:'最终账单：2 次 DMA + 0~1 次 CPU 拷贝、1 次系统调用。对比基线的 4 拷贝 2 调用。',lines:[6],hl:'blue',at:'Nic',st:{Nic:'green'},cpu:0,dma:2,sys:1,bump:'dma',wires:['pc-n'],pill:'2 DMA + 0-1 CPU copy + 1 syscall',pillC:'blue'},
+    {chip:'边界',chipC:'ca',title:'代价：用户态碰不到数据',desc:'适合静态文件服务这类<b>原样转发</b>；要压缩、加密、改写内容就不适用——数据根本不经过你手里。',lines:[3,6],hl:'amber',at:null,st:{},cpu:0,dma:2,sys:1,bump:'',wires:[],pill:'great for static files; no transforms',pillC:'amber'}
+  ]
+});
+
+const mmapScene=makePathScene({
+  id:'mmap',prefix:'mm',label:'mmap + send',sub:'map, not copy',pipeGhost:true,
+  caption:'<b>mmap</b>：映射不是拷贝——用户透过页表直接“看见”页缓存，省掉 read 那一次搬运。',
+  wireSpecs:[['d-pc','Disk','PC','blue'],['map','User','PC','green'],['u-s','User','Sock','danger'],['s-n','Sock','Nic','blue']],
+  code:[
+    'void* p = mmap(nullptr, len, PROT_READ,',
+    '               MAP_PRIVATE, filefd, 0);',
+    '// mapping, not a copy: user sees page cache',
+    'process(p, len);         // read / transform',
+    'send(sockfd, p, len, 0); // still one CPU copy',
+    '// saves the read() copy, keeps data editable'
+  ],
+  steps:[
+    {chip:'建映射',chipC:'cb',title:'mmap：页表指向页缓存物理页',desc:'系统调用只<b>修改页表</b>，不搬一个字节。用户虚拟地址和页缓存从此指向同一块物理内存。',lines:[0,1,2],hl:'blue',at:null,st:{App:'amber',User:'blue',PC:'blue'},cpu:0,dma:0,sys:1,bump:'sys',wires:['map'],pill:'page tables updated, zero bytes moved',pillC:'blue'},
+    {chip:'缺页',chipC:'cb',title:'首次访问触发 DMA 装载',desc:'访问映射区域产生缺页中断，DMA 把文件内容读进页缓存——用户态<b>透过映射直接读到它</b>，没有第二份副本。',lines:[2],hl:'blue',at:'PC',st:{PC:'blue',Disk:'blue',User:'blue'},cpu:0,dma:1,sys:1,bump:'dma',wires:['d-pc','map'],pill:'page fault -> DMA load',pillC:'blue'},
+    {chip:'加工',chipC:'cg',title:'用户态可以读、可以改',desc:'这是 mmap 相对 sendfile 的关键优势：数据<b>在你手里</b>——校验、模板渲染、压缩都可以做，而 read 那次 CPU 拷贝已经省掉。',lines:[3],hl:'green',at:'PC',st:{User:'green',PC:'green'},cpu:0,dma:1,sys:1,bump:'',wires:['map'],pill:'transform in place via the mapping',pillC:'green'},
+    {chip:'send()',chipC:'cd',title:'发送仍要一次 CPU 拷贝',desc:'send 把映射页的内容复制进 socket 缓冲——这次拷贝<b>没省掉</b>。第 2 次系统调用也随之而来。',lines:[4],hl:'danger',at:'Sock',st:{Sock:'amber',App:'amber'},cpu:1,dma:1,sys:2,bump:'cpu',wires:['u-s'],pill:'mapped pages -> socket buf (CPU)',pillC:'danger'},
+    {chip:'DMA',chipC:'cb',title:'DMA 到网卡，路径闭合',desc:'账单：2 DMA + 1 CPU 拷贝、2 次系统调用——比基线省一次 CPU 拷贝，比 sendfile 多一次但<b>保留加工能力</b>。',lines:[5],hl:'blue',at:'Nic',st:{Nic:'green',Sock:'amber'},cpu:1,dma:2,sys:2,bump:'dma',wires:['s-n'],pill:'saves read copy, keeps flexibility',pillC:'blue'}
+  ]
+});
+
+const spliceScene=makePathScene({
+  id:'splice',prefix:'sp',label:'splice',sub:'pipe · page refs',pipeGhost:false,
+  caption:'<b>splice</b>：pipe 当内核中转站，传递的是页引用不是字节——适合代理与转发。',
+  wireSpecs:[['d-pc','Disk','PC','blue'],['pc-p','PC','Pipe','green'],['p-s','Pipe','Sock','green'],['s-n','Sock','Nic','blue']],
+  code:[
+    'int pfd[2]; pipe(pfd);',
+    'splice(filefd, nullptr, pfd[1],',
+    '       nullptr, len, 0);   // file -> pipe',
+    'splice(pfd[0], nullptr, sockfd,',
+    '       nullptr, len, 0);   // pipe -> socket',
+    '// pipe passes page references, not bytes',
+    '// all in kernel; proxy / forwarding'
+  ],
+  steps:[
+    {chip:'搭管道',chipC:'ca',title:'pipe 就位，DMA 装载页缓存',desc:'pipe 的内核缓冲区其实是一组<b>页指针槽位</b>。文件数据先由 DMA 进入页缓存。',lines:[0],hl:'amber',at:'PC',st:{Pipe:'amber',PC:'blue',Disk:'blue'},cpu:0,dma:1,sys:1,bump:'dma',wires:['d-pc'],pill:'pipe = slots of page pointers',pillC:'amber'},
+    {chip:'splice #1',chipC:'cg',title:'file → pipe：挂引用，不搬字节',desc:'第一次 splice 把页缓存里那些页的<b>引用</b>挂进 pipe——没有逐字节复制，CPU 拷贝计数不动。',lines:[1,2,5],hl:'green',at:'Pipe',st:{PC:'green',Pipe:'green'},cpu:0,dma:1,sys:2,bump:'sys',wires:['pc-p'],pill:'page refs moved, 0 bytes copied',pillC:'green'},
+    {chip:'splice #2',chipC:'cg',title:'pipe → socket：还在内核里',desc:'第二次 splice 把引用交给 socket。数据全程<b>没离开内核</b>，用户态只负责发出两条指令。',lines:[3,4],hl:'green',at:'Sock',st:{Pipe:'green',Sock:'amber'},cpu:0,dma:1,sys:3,bump:'sys',wires:['p-s'],pill:'still in kernel, user only steers',pillC:'green'},
+    {chip:'DMA',chipC:'cb',title:'DMA 到网卡',desc:'账单：2 DMA、0 次逐字节 CPU 拷贝。系统调用比 sendfile 多，但换来了<b>任意 fd 组合</b>的灵活性。',lines:[6],hl:'blue',at:'Nic',st:{Nic:'green',Sock:'amber'},cpu:0,dma:2,sys:3,bump:'dma',wires:['s-n'],pill:'2 DMA, zero CPU byte copies',pillC:'blue'},
+    {chip:'定位',chipC:'ca',title:'sendfile 管文件到 socket，splice 管一切',desc:'socket→socket 的代理转发 sendfile 做不了，splice 经 pipe 中转即可。Linux 专用能力，管道式搬运的首选。',lines:[5,6],hl:'amber',at:null,st:{Pipe:'green'},cpu:0,dma:2,sys:3,bump:'',wires:['pc-p','p-s'],pill:'proxying: socket -> pipe -> socket',pillC:'amber'}
+  ]
+});
+
+const writevScene=(()=>{
+  const code=[
+    'iovec iov[2];',
+    'iov[0] = { header, header_len };',
+    'iov[1] = { body,   body_len   };',
+    'writev(sockfd, iov, 2);  // one syscall',
+    '// vs memcpy into big buf: extra CPU copy',
+    '// vs send() twice: 2 syscalls + tiny pkts',
+    '// gather: kernel walks iov in order'
+  ];
+  const steps=[
+    {chip:'现状',chipC:'cb',title:'协议头和 body 分居两块缓冲',desc:'header 是刚构造的协议头，body 来自业务数据。它们<b>物理上不相邻</b>，但必须作为一条消息发出。',lines:[0,1,2],hl:'blue',hd:'wvHSlot',bd:'wvBSlot',hdCls:'hdr',bdCls:'',hCard:'active',bCard:'active',sCard:'',opts:0,wires:[],pill:'two buffers, one message',pillC:'blue'},
+    {chip:'反例 A',chipC:'cd',title:'memcpy 拼成一块再 send',desc:'先分配大缓冲、把两块<b>都复制一遍</b>拼起来，再 send——凭空多一次 CPU 拷贝和一次内存分配。',lines:[4],hl:'danger',hd:'wvHSlot',bd:'wvBSlot',hdCls:'stuck',bdCls:'stuck',hCard:'bad',bCard:'bad',sCard:'',opts:1,wires:[],pill:'extra copy + extra allocation',pillC:'danger'},
+    {chip:'反例 B',chipC:'cd',title:'send 两次：系统调用翻倍',desc:'各发各的省了拼接，却付出 <b>2 次系统调用</b>；header 还可能单独成一个小包，与 Nagle/延迟确认纠缠。',lines:[5],hl:'danger',hd:'wvS1',bd:'wvBSlot',hdCls:'hdr',bdCls:'',hCard:'',bCard:'active',sCard:'active',opts:2,wires:['h-s'],pill:'2 syscalls, maybe 2 tiny packets',pillC:'danger'},
+    {chip:'writev',chipC:'cg',title:'iovec 描述两块，一次聚集写出',desc:'iov 数组只是<b>指针+长度</b>的清单。内核按序遍历，把两块缓冲直接聚集进 socket 缓冲——一次系统调用，无额外用户态拷贝。',lines:[0,1,2,3],hl:'green',hd:'wvS1',bd:'wvS2',hdCls:'hdr',bdCls:'',hCard:'active',bCard:'active',sCard:'active',opts:3,wires:['h-s','b-s'],pill:'writev: gather in one syscall',pillC:'green'},
+    {chip:'收口',chipC:'cg',title:'分散 / 聚集 IO 的定位',desc:'writev 聚集写出，readv 对称地分散读入。典型场景：协议头+body、减少系统调用、避免为拼包而复制。与 <code>TCP_CORK</code> 组合可进一步控制成包。',lines:[6],hl:'green',hd:'wvS1',bd:'wvS2',hdCls:'hdr',bdCls:'',hCard:'',bCard:'',sCard:'active',opts:3,wires:[],pill:'writev / readv: scatter-gather IO',pillC:'green'}
+  ];
+  let wires,observer,current=null;
+  const place=makePlacer('wvStage');
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>writev</b>：多块缓冲一次写出——不为“拼成一条消息”付出复制或多余的系统调用。</div><div class="stage wv-stage" id="wvStage">'+
+      '<section class="gcard blue" id="wvH"><span class="k">buffer 1</span><span class="n">header</span><span class="s">协议头 · 16B</span><div class="slotrow"><div class="slot" id="wvHSlot"></div></div></section>'+
+      '<section class="gcard green" id="wvB"><span class="k">buffer 2</span><span class="n">body</span><span class="s">业务数据 · 4KB</span><div class="slotrow"><div class="slot" id="wvBSlot"></div></div></section>'+
+      '<section class="gcard amber" id="wvSock"><span class="k">kernel</span><span class="n">socket 发送缓冲</span><div class="slotrow"><div class="slot" id="wvS1">1</div><div class="slot" id="wvS2">2</div></div></section>'+
+      '<section class="panel-box wv-opts" id="wvOpts"><span class="panel-title">三种发法对照</span>'+
+        '<div class="rrow" id="wvO0"><b>反例 A</b>memcpy 拼接：多一次 CPU 拷贝 + 一次分配</div>'+
+        '<div class="rrow" id="wvO1"><b>反例 B</b>两次 send：2 次系统调用，小包风险</div>'+
+        '<div class="rrow" id="wvO2"><b>writev</b>一次系统调用，内核按 iov 顺序聚集，零额外拷贝</div></section>'+
+      '<span class="pill" id="wvPill"></span>'+
+      '<div class="ctoken hdr" id="wvTH">header</div><div class="ctoken" id="wvTB">body</div></div>';
+    wires=createWires('wvStage',[{id:'h-s',from:'wvH',to:'wvSock',color:'green'},{id:'b-s',from:'wvB',to:'wvSock',color:'green'}]);
+    observer=new ResizeObserver(()=>{if(current){place('wvTH',current.hd,current.hdCls);place('wvTB',current.bd,current.bdCls);}});
+    observer.observe(el('wvStage'));
+  }
+  function paint(s){
+    current=s;
+    classes('wvH','gcard blue'+(s.hCard==='active'?' active':s.hCard==='bad'?' bad':''));
+    classes('wvB','gcard green'+(s.bCard==='active'?' active':s.bCard==='bad'?' bad':''));
+    classes('wvSock','gcard amber'+(s.sCard==='active'?' active':''));
+    place('wvTH',s.hd,s.hdCls);place('wvTB',s.bd,s.bdCls);
+    ['wvO0','wvO1','wvO2'].forEach((id,i)=>{
+      let cls='rrow ';
+      if(s.opts===0)cls+='dim';
+      else if(i+1<s.opts)cls+='bad';
+      else if(i+1===s.opts)cls+=(s.opts===3?'on':'bad');
+      classes(id,cls);
+    });
+    setPill('wvPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'writev',label:'writev 聚集写',sub:'iovec · gather · 1 syscall',steps,code,mount,paint,destroy(){observer?.disconnect();wires?.destroy();}};
+})();
+
+const SCENES=[classicScene,sendfileScene,mmapScene,spliceScene,writevScene];
+const tabsBox=el('tabs'),stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc'),codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots'),btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);});
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();sceneIndex=index;stepIndex=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));const scene=SCENES[sceneIndex];scene.mount();codeBox.innerHTML=codePanel(scene.code);dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,i)=>{const dot=document.createElement('button');dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);dot.addEventListener('click',()=>{stop();go(i);});dotsBox.appendChild(dot);dotEls.push(dot);});go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;stepIndex=Math.max(0,Math.min(steps.length-1,index));const step=steps[stepIndex];SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.className='cl '+(step.lines.includes(i)?'hl-'+step.hl:''));stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}if(stepIndex===steps.length-1)stop();
+}
+function play(){if(stepIndex===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='暂停';timer=setInterval(()=>{stepIndex<SCENES[sceneIndex].steps.length-1?go(stepIndex+1):stop();},3000);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}});
+const hashScene=location.hash.match(/scene=(\w+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

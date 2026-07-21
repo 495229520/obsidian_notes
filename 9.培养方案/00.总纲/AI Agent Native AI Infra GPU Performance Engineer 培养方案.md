@@ -1,11 +1,12 @@
 ---
 title: AI Agent Native AI Infra GPU Performance Engineer 培养方案
 date: 2026-05-06
+updated: 2026-07-21
 tags:
   - infra
   - CUDA
   - 总纲
-status: active
+status: reference
 ---
 
 # AI Agent Native 的 AI Infra / GPU Performance Engineer 培养方案
@@ -13,8 +14,8 @@ status: active
 > [!goal] 总目标
 > 从"会写 CUDA / Triton kernel，能做 AI Infra 实习"，升级为"会用 AI Agent 加速工程开发，但自己负责 GPU 性能分析、LLM 推理成本优化、kernel 正确性与上线判断"。
 
-> [!important] 2026-07-08 路线调整
-> 本方案降级为**副线（推理保温，每周约 25% 时间）**，主线见 [[AI Infra 存储与 GPU 数据路径系统工程师培养方案]]。已完成的 CUDA 基础与 serving benchmark 积累全部并入主线；[[Week 5 - Serving Benchmark Harness]] → [[Week 8 - Prefill Decode + Open Source Repro]] 周任务继续推进（它们是主线 S4 `gds-kv-offload-lab` 的输入），Week 9-16 GEMM 深入线降级为可选。存储方向每周任务见 [[00.存储方向阶段计划索引]]。
+> [!important] 2026-07-21 路线调整
+> 本方案是推理背景和 GPU 性能参考，不是当前第二主线。当前主线见 [[00.当前执行 - C++ 到 AI Infra 存储]]。保留 [[Week 5 - Serving Benchmark Harness]] 至 [[Week 8 - Prefill Decode + Open Source Repro]] 中与 KV cache、serving 指标和观测有关的内容；Week 9-16 的 GEMM 深入只在明确投递 GPU kernel 岗时启用。Agent 部分用于工程辅助与结果审查，不等同于 Agent Infra 路线。
 
 这条路线的核心，不是放弃 CUDA / Triton，而是把目标从"手写 kernel 的候选人"升级成：
 

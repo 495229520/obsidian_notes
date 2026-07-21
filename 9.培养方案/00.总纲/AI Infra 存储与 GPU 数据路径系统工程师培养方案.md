@@ -1,15 +1,18 @@
 ---
 title: AI Infra 存储与 GPU 数据路径系统工程师培养方案
 date: 2026-07-08
-updated: 2026-07-15
+updated: 2026-07-21
 tags:
   - infra
   - 存储
   - 总纲
-status: active
+status: reference
 ---
 
 # AI Infra 存储与 GPU 数据路径系统工程师培养方案
+
+> [!note] 文档角色
+> 这份详版保留岗位映射、项目构想、验收标准和历史取舍，供需要细节时查阅。当前执行顺序、项目上限和暑期实习倒排以 [[00.当前执行 - C++ 到 AI Infra 存储]] 为准；两份文档出现时间或项目数量冲突时，使用当前执行总纲。
 
 > [!goal] 总定位
 > **AI Infra 存储与 GPU 数据路径系统工程师。**

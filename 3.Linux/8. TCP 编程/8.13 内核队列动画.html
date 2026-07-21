@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP 内核队列动画 · 半连接 / 全连接 / backlog / SYN flood</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1200px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.2px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:600px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1060px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:20px;min-height:470px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ---------- 队列舞台 ---------- */
+.kq-msg{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:14px;text-align:center;transition:all .3s var(--ease);min-height:34px;}
+.kq-msg.warn{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.kq-msg.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.kq-stage{position:relative;display:grid;gap:14px;min-height:340px;align-content:start;}
+.kq-col{display:flex;flex-direction:column;gap:8px;}
+.kq-col .colh{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;font-weight:700;line-height:1.35;}
+.kq-col .colh small{display:block;color:var(--faint);font-weight:400;font-size:9.5px;}
+.kq-col.warn .colh{color:var(--danger);}
+.slot{height:46px;border:1.5px dashed var(--grid);border-radius:9px;background:var(--paper);transition:border-color .3s,background .3s;}
+.slot.lit{border-style:solid;border-color:var(--line);}
+.kq-col.warn .slot{border-color:var(--danger);}
+.kq-cookie{border:1.5px solid var(--line);border-radius:10px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:var(--mono);font-size:11px;color:var(--faint);padding:8px;text-align:center;transition:all .3s var(--ease);min-height:100px;}
+.kq-cookie.on{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.kq-cookie b{font-size:13px;}
+
+.conn{position:absolute;left:0;top:0;width:62px;height:40px;border-radius:9px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:700;box-shadow:0 2px 5px rgba(60,55,40,.12);z-index:5;
+  transition:left .5s var(--ease),top .5s var(--ease),background .3s,border-color .3s,color .3s,opacity .35s,transform .35s;}
+.conn .cst{font-size:8px;font-weight:600;opacity:.85;margin-top:1px;}
+.conn.syn{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.conn.est{border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.conn.acc{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.conn.spoof{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);border-style:dashed;}
+.conn.drop{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);opacity:0;transform:scale(.55) translateY(26px);}
+.conn.hidden{opacity:0;transform:scale(.7);}
+
+/* ---------- backlog 容量条 ---------- */
+.cap-wrap{display:flex;flex-direction:column;gap:20px;padding-top:14px;}
+.capbar{display:flex;flex-direction:column;gap:7px;}
+.capbar .cl{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12px;}
+.capbar .cl .nm{color:var(--ink);font-weight:700;}
+.capbar .cl .vv{color:var(--muted);}
+.captrack{height:26px;border-radius:8px;background:var(--gray);border:1px solid var(--grid);overflow:hidden;position:relative;}
+.capfill{height:100%;border-radius:7px;transition:width .6s var(--ease),background .4s;}
+.capfill.req{background:var(--bluebg);border-right:2px solid var(--blue);}
+.capfill.som{background:var(--brownbg);border-right:2px solid var(--brown);}
+.capfill.eff{background:var(--greenbg);border-right:2px solid var(--green);}
+.capbar.dim{opacity:.35;}
+.capnote{font-family:var(--mono);font-size:13px;text-align:center;color:var(--muted);margin-top:6px;padding:10px;border-radius:9px;background:var(--paper);border:1px solid var(--line);transition:all .3s;}
+.capnote b{color:var(--green);}
+
+/* ---------- 右栏 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:190px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:16px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;white-space:nowrap;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:12px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.cl2{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:#D8D5CC;white-space:pre;padding:2px 16px;transition:background .3s,box-shadow .3s,color .3s;}
+.cl2.on{background:rgba(52,122,198,.5);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.cl2.on .c-cmt{color:#CCC8BA;}
+.c-kw{color:#E3A44C;} .c-str{color:#9DC08B;} .c-num{color:#D98E73;}
+.c-cmt{color:#8F8B80;} .c-mac{color:#7FB0E0;} .c-pre{color:#C88AC8;}
+
+.facts{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:13px 16px;}
+.facts .fh{font-size:12px;color:var(--faint);font-family:var(--mono);margin-bottom:8px;}
+.facts table{width:100%;border-collapse:collapse;font-size:12px;}
+.facts td{padding:4px 6px;border-bottom:1px solid var(--grid);color:var(--muted);vertical-align:top;}
+.facts td:first-child{font-family:var(--mono);color:var(--ink);white-space:nowrap;font-weight:600;width:46%;}
+.facts tr:last-child td{border-bottom:none;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TCP 内核队列动画 · listen / accept 背后的两个队列</h1>
+    <p>半连接队列 · 全连接队列 · backlog=min(backlog, somaxconn) · 全连接溢出 · SYN flood　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+      <div class="facts">
+        <div class="fh">关键参数（typical）</div>
+        <table>
+          <tr><td>somaxconn</td><td>全连接队列上限 · 旧内核默认 128，新内核 4096</td></tr>
+          <tr><td>tcp_max_syn_backlog</td><td>半连接队列上限</td></tr>
+          <tr><td>全连接上限</td><td>min(backlog, somaxconn)</td></tr>
+          <tr><td>溢出计数</td><td>ss -s / nstat 中 ListenOverflows、ListenDrops</td></tr>
+          <tr><td>SYN flood 缓解</td><td>tcp_syncookies=1 + 增大队列 + 限速</td></tr>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+let cur=0;
+
+/* 语法高亮：注释切分 + 字符串哨兵 */
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function hlLine(raw){
+  const m=raw.match(/^(.*?)(\/\/.*)?$/);
+  let code=esc(m[1]); const cmt=m[2]?esc(m[2]):'';
+  if(code.trim().charAt(0)==='#'){
+    return '<span class="c-pre">'+code+'</span>'+(cmt?'<span class="c-cmt">'+cmt+'</span>':'');
+  }
+  const strs=[];
+  code=code.replace(/"[^"]*"/g,s=>{strs.push(s);return ''+String.fromCharCode(65+strs.length-1)+'';});
+  code=code
+    .replace(/\b(int|char|void|unsigned|const|static|struct|return|if|else|while|for|sizeof|socklen_t|ssize_t|size_t)\b/g,'<span class="c-kw">$1</span>')
+    .replace(/\b([A-Z_][A-Z0-9_]{2,})\b/g,'<span class="c-mac">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="c-num">$1</span>')
+    .replace(/([A-Z])/g,(_,c)=>'<span class="c-str">'+strs[c.charCodeAt(0)-65]+'</span>');
+  return code+(cmt?'<span class="c-cmt">'+cmt+'</span>':'');
+}
+
+/* 舞台工具：列 + 连接芯片定位 */
+function col(title,sub,prefix,cap,warn){
+  let s='<div class="kq-col'+(warn?' warn':'')+'" id="col-'+prefix+'"><div class="colh">'+title+'<small>'+sub+'</small></div>';
+  for(let i=0;i<cap;i++)s+='<div class="slot" id="'+prefix+'-'+i+'"></div>';
+  return s+'</div>';
+}
+function connEl(id,label){
+  return '<div class="conn hidden" id="'+id+'">'+label+'<span class="cst" id="'+id+'-st">—</span></div>';
+}
+function place(chipId,slotId,instant){
+  const chip=document.getElementById(chipId),slot=document.getElementById(slotId);
+  if(!chip||!slot)return;
+  const x=slot.offsetLeft+(slot.offsetWidth-chip.offsetWidth)/2;
+  const y=slot.offsetTop+(slot.offsetHeight-chip.offsetHeight)/2;
+  if(instant)chip.style.transition='none';
+  chip.style.left=x+'px';chip.style.top=y+'px';
+  if(instant){void chip.offsetWidth;chip.style.transition='';}
+}
+function paintChips(cfg,instant){
+  Object.keys(cfg._all).forEach(id=>{
+    const c=cfg[id];
+    const el=document.getElementById(id);if(!el)return;
+    if(!c){el.className='conn hidden';return;}
+    el.className='conn'+(c.cls?' '+c.cls:'');
+    document.getElementById(id+'-st').textContent=c.st||'';
+    place(id,c.slot,instant);
+  });
+}
+
+/* ============ 场景 1：两个队列 ============ */
+const sQueues=(()=>{
+  const ids=['c1'];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>三次握手</b>穿过两个内核队列：半连接队列 → 全连接队列 → accept()</div>'+
+      '<div class="kq-msg" id="kq-msg"></div>'+
+      '<div class="kq-stage" id="stage" style="grid-template-columns:96px 1fr 1fr 96px;">'+
+        col('客户端','incoming','cli','1')+
+        col('半连接队列','SYN_RECV','syn','1')+
+        col('全连接队列','ESTABLISHED','acc','1')+
+        col('accept()','user space','app','1')+
+        connEl('c1','C1')+
+      '</div>';
+  }
+  const steps=[
+    {title:'步骤 0 · listen() 建立两个队列',chip:'两个队列',chipC:'c0',hl:[2],msg:'listen(fd, backlog)：内核为该监听套接字维护半连接队列与全连接队列',
+     m:'listen(fd, backlog)：内核维护两个队列',c1:{slot:'cli-0',cls:'',st:'待连接'},
+     desc:'<code>listen(fd, backlog)</code> 背后不是一个队列。内核为监听套接字维护<b>两个</b>：<span class="br">半连接队列</span>（收到 SYN、等最后 ACK）与<span class="bl">全连接队列</span>（握手完成、等 <code>accept()</code>）。'},
+    {title:'步骤 1 · SYN 到达 → 进半连接队列',chip:'SYN_RECV',chipC:'ch',hl:[2],msg:'C1 发 SYN，服务器回 SYN+ACK，连接进入半连接队列',
+     m:'C1 → SYN；服务器回 SYN+ACK，进入半连接队列',c1:{slot:'syn-0',cls:'syn',st:'SYN_RECV'},
+     desc:'C1 发来 <b>SYN</b>，服务器回 <b>SYN+ACK</b> 并在<span class="br">半连接队列</span>创建一条 <code>SYN_RECV</code> 记录，等待客户端最后的 ACK。这一步受 <code>tcp_max_syn_backlog</code> 限制。'},
+    {title:'步骤 2 · 最后 ACK → 进全连接队列',chip:'ESTABLISHED',chipC:'cb',hl:[2],msg:'C1 发最后 ACK，三次握手完成，移入全连接队列',
+     m:'C1 → 最后 ACK：握手完成，移入全连接队列',c1:{slot:'acc-0',cls:'est',st:'ESTAB'},
+     desc:'客户端最后的 <b>ACK</b> 到达，三次握手完成。内核把这条连接从半连接队列<b>移入全连接队列</b>，状态变为 <code>ESTABLISHED</code>——但应用还没取走它。'},
+    {title:'步骤 3 · accept() 取走连接',chip:'accept()',chipC:'cg',hl:[5],msg:'应用调用 accept()，从全连接队列头部取出连接',
+     m:'应用 accept()：从全连接队列取走连接',c1:{slot:'app-0',cls:'acc',st:'ACCEPTED'},
+     desc:'应用调用 <code>accept()</code>，从<span class="bl">全连接队列</span>头部取出连接，得到一个新的已连接 fd。此后读写走这个 fd，监听 fd 继续收新连接。'},
+    {title:'步骤 4 · 小结',chip:'两条职责',chipC:'cg',hl:[2,5],msg:'半连接队列=握手中；全连接队列=已完成、等 accept()',
+     m:'半连接=握手中 · 全连接=已完成待 accept()',c1:{slot:'app-0',cls:'acc',st:'ACCEPTED'},
+     desc:'一句话记牢：<span class="br">半连接队列服务于握手过程</span>，<span class="bl">全连接队列服务于 accept()</span>。SYN 太多压半连接队列；accept 太慢压全连接队列——后面两个场景分别演示。'}
+  ];
+  function paint(){
+    const s=steps[cur];
+    document.getElementById('kq-msg').textContent=s.m;
+    const cfg={_all:{c1:1},c1:s.c1};
+    paintChips(cfg);
+  }
+  const code=[
+    'int fd = socket(AF_INET, SOCK_STREAM, 0);',
+    'bind(fd, &addr, sizeof(addr));',
+    'listen(fd, backlog);          // 建两个队列',
+    '',
+    'for (;;) {',
+    '    int c = accept(fd, 0, 0); // 取全连接队列头',
+    '    handoff_to_worker(c);     // 尽快移交',
+    '}'
+  ];
+  return {id:'queues',label:'两个队列',sub:'握手穿过队列',mount,steps,paint,code};
+})();
+
+/* ============ 场景 2：backlog = min(backlog, somaxconn) ============ */
+const sBacklog=(()=>{
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>全连接队列上限</b> = min(listen 的 backlog, net.core.somaxconn)</div>'+
+      '<div class="cap-wrap">'+
+        '<div class="capbar" id="cb-req"><div class="cl"><span class="nm">listen(fd, backlog)</span><span class="vv" id="v-req">请求 512</span></div><div class="captrack"><div class="capfill req" id="f-req" style="width:0%"></div></div></div>'+
+        '<div class="capbar" id="cb-som"><div class="cl"><span class="nm">net.core.somaxconn</span><span class="vv" id="v-som">内核上限 128</span></div><div class="captrack"><div class="capfill som" id="f-som" style="width:0%"></div></div></div>'+
+        '<div class="capbar" id="cb-eff"><div class="cl"><span class="nm">有效全连接上限</span><span class="vv" id="v-eff">= min(…)</span></div><div class="captrack"><div class="capfill eff" id="f-eff" style="width:0%"></div></div></div>'+
+        '<div class="capnote" id="cap-note"></div>'+
+      '</div>';
+  }
+  // 以 640 为满刻度：512→80%，128→20%，4096→100%
+  const steps=[
+    {title:'步骤 0 · 代码里请求 backlog=512',chip:'listen backlog',chipC:'cb',hl:[1],
+     req:80,som:0,eff:0,dimSom:true,dimEff:true,vreq:'请求 512',vsom:'—',veff:'—',
+     note:'你在代码里写 <b style="color:var(--blue)">listen(fd, 512)</b>，期望全连接队列能排到 512 条。',
+     desc:'很多人以为 <code>listen()</code> 的 <b>backlog</b> 就是最终队列长度。先记住你的请求值 <span class="bl">512</span>，下一步看内核怎么处理它。'},
+    {title:'步骤 1 · 内核参数 somaxconn 封顶',chip:'somaxconn',chipC:'ch',hl:[3,4],
+     req:80,som:20,eff:0,dimEff:true,vreq:'请求 512',vsom:'内核上限 128',veff:'—',
+     note:'系统参数 <b style="color:var(--brown)">net.core.somaxconn = 128</b>（旧内核默认），它会给 backlog 封顶。',
+     desc:'内核用 <code>net.core.somaxconn</code> 给 backlog 封顶。这里它只有 <span class="br">128</span>，远小于你请求的 512。'},
+    {title:'步骤 2 · 有效上限 = min(512, 128)',chip:'取较小值',chipC:'cd',hl:[6],
+     req:80,som:20,eff:20,vreq:'请求 512',vsom:'内核上限 128',veff:'= 128',
+     note:'有效全连接上限 = <b>min(512, 128) = 128</b>。只在代码里写大 backlog 没用。',
+     desc:'真正的队列上限是 <b>min(backlog, somaxconn) = <span class="dg">128</span></b>。所以只改代码不改系统参数，队列还是被压到 128——高并发下会更早溢出。'},
+    {title:'步骤 3 · 放开 somaxconn 才能生效',chip:'sysctl 调优',chipC:'cg',hl:[7],
+     req:80,som:80,eff:80,vreq:'请求 512',vsom:'放开到 512',veff:'= 512',
+     note:'<b style="color:var(--green)">sysctl -w net.core.somaxconn=512</b> 后，min(512,512)=512，backlog 才真正生效。',
+     desc:'把 <code>somaxconn</code> 调到 ≥ backlog，<b>min(512, 512) = <span class="gr">512</span></b>，队列上限才如你所愿。<b>结论：backlog 不是越大越好，还得系统参数配合。</b>'}
+  ];
+  function paint(){
+    const s=steps[cur];
+    document.getElementById('f-req').style.width=s.req+'%';
+    document.getElementById('f-som').style.width=s.som+'%';
+    document.getElementById('f-eff').style.width=s.eff+'%';
+    document.getElementById('v-req').textContent=s.vreq;
+    document.getElementById('v-som').textContent=s.vsom;
+    document.getElementById('v-eff').textContent=s.veff;
+    document.getElementById('cb-som').classList.toggle('dim',!!s.dimSom);
+    document.getElementById('cb-eff').classList.toggle('dim',!!s.dimEff);
+    document.getElementById('cap-note').innerHTML=s.note;
+  }
+  const code=[
+    '// 代码里请求 backlog',
+    'listen(fd, 512);',
+    '',
+    '// 但内核用 somaxconn 封顶',
+    '$ cat /proc/sys/net/core/somaxconn',
+    '128',
+    '// 有效上限 = min(backlog, somaxconn) = 128',
+    '$ sysctl -w net.core.somaxconn=512   // 放开'
+  ];
+  return {id:'backlog',label:'backlog 上限',sub:'min(backlog,somaxconn)',mount,steps,paint,code};
+})();
+
+/* ============ 场景 3：全连接队列溢出 ============ */
+const sOverflow=(()=>{
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>accept() 太慢 → 全连接队列溢出</b>：已完成握手的连接被丢弃</div>'+
+      '<div class="kq-msg" id="kq-msg"></div>'+
+      '<div class="kq-stage" id="stage" style="grid-template-columns:92px 1fr 96px;">'+
+        col('客户端','已完成握手','cli','4')+
+        col('全连接队列 (cap=3)','等待 accept()','acc','3')+
+        col('accept()','慢 / 阻塞','app','1')+
+        connEl('c1','C1')+connEl('c2','C2')+connEl('c3','C3')+connEl('c4','C4')+
+      '</div>';
+  }
+  const steps=[
+    {title:'步骤 0 · 应用 accept 很慢',chip:'队列会堆积',chipC:'c0',hl:[0,1],msg:'accept 线程被业务/日志/IO 阻塞，全连接队列开始堆积',
+     m:'accept 线程被阻塞，全连接队列开始堆积',warn:false,
+     chips:{c1:{slot:'cli-0',cls:'est',st:'ESTAB'},c2:{slot:'cli-1',cls:'est',st:'ESTAB'},c3:{slot:'cli-2',cls:'est',st:'ESTAB'},c4:{slot:'cli-3',cls:'est',st:'ESTAB'}},
+     desc:'三次握手由内核完成，跟应用无关。但如果应用 <code>accept()</code> 太慢（单线程直接处理耗时业务、被锁/日志/磁盘 IO 阻塞），<b>全连接队列会被填满</b>。'},
+    {title:'步骤 1 · 队列被填满 (3/3)',chip:'队列满',chipC:'ch',hl:[3],msg:'C1、C2、C3 完成握手进入全连接队列，已满 3/3',
+     m:'C1/C2/C3 入队，全连接队列已满 3/3',warn:false,
+     chips:{c1:{slot:'acc-0',cls:'est',st:'ESTAB'},c2:{slot:'acc-1',cls:'est',st:'ESTAB'},c3:{slot:'acc-2',cls:'est',st:'ESTAB'},c4:{slot:'cli-3',cls:'',st:'握手中'}},
+     desc:'C1、C2、C3 都握手完成、进入全连接队列，队列达到上限 <b>3/3</b>。应用还没来得及 <code>accept()</code>，第 4 个连接正在赶来。'},
+    {title:'步骤 2 · C4 完成握手但无位置 → 丢弃',chip:'ListenOverflow',chipC:'cd',hl:[3],msg:'C4 三次握手完成，但全连接队列已满 → 被丢弃',warn:true,
+     m:'队列满！C4 已完成握手却无处安放 → 丢弃',
+     chips:{c1:{slot:'acc-0',cls:'est',st:'ESTAB'},c2:{slot:'acc-1',cls:'est',st:'ESTAB'},c3:{slot:'acc-2',cls:'est',st:'ESTAB'},c4:{slot:'acc-2',cls:'drop',st:'DROP'}},
+     desc:'C4 也完成了握手，但<span class="dg">全连接队列已满</span>，内核默认<b>直接丢弃</b>这条已完成的连接（计数 <code>ListenOverflows/ListenDrops</code> 增长）。'},
+    {title:'步骤 3 · 客户端侧：SYN+ACK 重传 / 超时',chip:'连接失败',chipC:'cd',hl:[3],msg:'服务器不回应 C4 的 ACK，客户端触发 SYN+ACK 重传，最终超时',warn:true,
+     m:'C4 客户端：SYN+ACK 重传 → 最终超时 / RST',
+     chips:{c1:{slot:'acc-0',cls:'est',st:'ESTAB'},c2:{slot:'acc-1',cls:'est',st:'ESTAB'},c3:{slot:'acc-2',cls:'est',st:'ESTAB'},c4:null},
+     desc:'从 C4 客户端看，它以为连接成功了，但服务器像没收到 ACK 一样——触发 <b>SYN+ACK 重传</b>，多次后超时。若开了 <code>tcp_abort_on_overflow</code> 则直接回 <b>RST</b>。表现就是"偶发连接失败/变慢"。'},
+    {title:'步骤 4 · 改进方向',chip:'accept 要快',chipC:'cg',hl:[4,5,8],msg:'accept 后立刻交给 epoll/worker；增大队列；SO_REUSEPORT',warn:false,
+     m:'accept 变快：取走 C1，队列腾出空位',
+     chips:{c1:{slot:'app-0',cls:'acc',st:'ACCEPTED'},c2:{slot:'acc-0',cls:'est',st:'ESTAB'},c3:{slot:'acc-1',cls:'est',st:'ESTAB'},c4:null},
+     desc:'根因是<b>应用消费太慢</b>。改进：accept 后<b>立刻</b>把连接交给 <code>epoll</code>/worker，别在 accept 线程做重活；增大 <code>backlog</code>+<code>somaxconn</code>；用 <code>SO_REUSEPORT</code> 多监听分摊；注意 <code>EMFILE/ENFILE</code>（fd 耗尽）。'}
+  ];
+  function paint(){
+    const s=steps[cur];
+    const msg=document.getElementById('kq-msg');
+    msg.textContent=s.m;msg.className='kq-msg'+(s.warn?' warn':(cur===4?' ok':''));
+    document.getElementById('col-acc').classList.toggle('warn',!!s.warn);
+    paintChips(Object.assign({_all:{c1:1,c2:1,c3:1,c4:1}},s.chips));
+  }
+  const code=[
+    '// 全连接队列满 -> 默认丢弃已完成连接',
+    '// 现象: ss -s / nstat 里 ListenOverflows 增长',
+    '',
+    'listen(fd, 1024);            // 队列要够大',
+    'int c = accept(fd, 0, 0);',
+    'epoll_add(c);                // 别在 accept 线程做重活',
+    '',
+    '// 多监听负载分摊',
+    'setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));'
+  ];
+  return {id:'overflow',label:'全连接溢出',sub:'accept 太慢',mount,steps,paint,code};
+})();
+
+/* ============ 场景 4：SYN flood / 半连接溢出 ============ */
+const sFlood=(()=>{
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>SYN flood</b>：伪造 SYN 填满半连接队列，正常客户端被挡在门外</div>'+
+      '<div class="kq-msg" id="kq-msg"></div>'+
+      '<div class="kq-stage" id="stage" style="grid-template-columns:96px 1fr 104px 1fr;">'+
+        col('来源','SYN','cli','1')+
+        col('半连接队列 (cap=4)','SYN_RECV','syn','4')+
+        '<div class="kq-col"><div class="colh">syncookies<small>无状态防护</small></div><div class="kq-cookie" id="cookie">关闭<br><b>tcp_syncookies=0</b></div></div>'+
+        col('全连接 / 已建立','ESTABLISHED','acc','1')+
+        connEl('a1','A1')+connEl('a2','A2')+connEl('a3','A3')+connEl('a4','A4')+connEl('L1','L1')+
+      '</div>';
+  }
+  const steps=[
+    {title:'步骤 0 · 正常：半连接队列有空位',chip:'baseline',chipC:'c0',hl:[],msg:'正常客户端 L1 准备发起连接，半连接队列还有空位',cookie:false,warn:false,
+     m:'正常：L1 准备连接，半连接队列有空位',
+     chips:{L1:{slot:'cli-0',cls:'',st:'待连接'}},
+     desc:'正常情况下半连接队列有足够空位，握手很快从 <code>SYN_RECV</code> 过渡到 <code>ESTABLISHED</code>。现在来看攻击者怎么破坏它。'},
+    {title:'步骤 1 · 攻击者洪泛伪造 SYN',chip:'SYN flood',chipC:'ch',hl:[0,1],msg:'攻击者用伪造源地址发大量 SYN，只握手一半、从不回 ACK',cookie:false,warn:false,
+     m:'攻击者洪泛伪造 SYN，占满半连接队列，从不回 ACK',
+     chips:{a1:{slot:'syn-0',cls:'spoof',st:'SYN_RECV'},a2:{slot:'syn-1',cls:'spoof',st:'SYN_RECV'},a3:{slot:'syn-2',cls:'spoof',st:'SYN_RECV'},a4:{slot:'syn-3',cls:'spoof',st:'SYN_RECV'},L1:{slot:'cli-0',cls:'',st:'待连接'}},
+     desc:'攻击者用<b>伪造源 IP</b> 发送大量 SYN，服务器回 SYN+ACK 后一直等不到最后的 ACK。这些 <code>SYN_RECV</code> 半连接<b>占满整个半连接队列</b>。'},
+    {title:'步骤 2 · 队列满 → 正常 SYN 被丢',chip:'半连接满',chipC:'cd',hl:[0],msg:'半连接队列被占满，正常客户端 L1 的 SYN 被丢弃',cookie:false,warn:true,
+     m:'半连接队列满！正常客户端 L1 的 SYN 被丢弃',
+     chips:{a1:{slot:'syn-0',cls:'spoof',st:'SYN_RECV'},a2:{slot:'syn-1',cls:'spoof',st:'SYN_RECV'},a3:{slot:'syn-2',cls:'spoof',st:'SYN_RECV'},a4:{slot:'syn-3',cls:'spoof',st:'SYN_RECV'},L1:{slot:'cli-0',cls:'drop',st:'DROP'}},
+     desc:'半连接队列被伪造连接占满，正常客户端 L1 的 SYN <span class="dg">被丢弃</span>，表现为大量 <code>SYN_RECV</code> + 正常连接超时。CPU 不一定高，但新连接失败明显增多。'},
+    {title:'步骤 3 · 开启 syncookies → 无状态放行',chip:'syncookies',chipC:'cg',hl:[3,4],msg:'开启 syncookies：队列满时不再保存半连接，把状态编码进 SYN+ACK 序列号',cookie:true,warn:false,
+     m:'syncookies 开启：不再占队列，L1 凭 cookie 完成握手',
+     chips:{a1:{slot:'syn-0',cls:'drop',st:''},a2:{slot:'syn-1',cls:'drop',st:''},a3:{slot:'syn-2',cls:'drop',st:''},a4:{slot:'syn-3',cls:'drop',st:''},L1:{slot:'acc-0',cls:'est',st:'ESTAB'}},
+     desc:'开启 <code>tcp_syncookies</code>：当半连接队列满时，服务器<b>不再为新 SYN 分配队列项</b>，而是把连接信息<b>编码进 SYN+ACK 的序列号</b>（cookie）。真客户端回 ACK 时，服务器校验 cookie 即可重建连接——<span class="gr">队列无法被耗尽</span>，L1 成功建连。'},
+    {title:'步骤 4 · 组合缓解',chip:'纵深防御',chipC:'cg',hl:[3,4,6],msg:'syncookies + 增大 tcp_max_syn_backlog + 限速 + 前置 LB/防火墙',cookie:true,warn:false,
+     m:'syncookies + 增大半连接队列 + 限速 + 前置 LB',
+     chips:{L1:{slot:'acc-0',cls:'est',st:'ESTAB'}},
+     desc:'单靠 backlog 扛不住攻击。组合手段：<b>syncookies</b>、增大 <code>tcp_max_syn_backlog</code>、前置<b>负载均衡/防火墙限速</b>。记住：SYN flood 打<span class="br">半连接队列</span>，accept 慢压<span class="bl">全连接队列</span>，两者是不同的队列、不同的病因。'}
+  ];
+  function paint(){
+    const s=steps[cur];
+    const msg=document.getElementById('kq-msg');
+    msg.textContent=s.m;msg.className='kq-msg'+(s.warn?' warn':(s.cookie?' ok':''));
+    const ck=document.getElementById('cookie');
+    ck.classList.toggle('on',s.cookie);
+    ck.innerHTML=s.cookie?'开启<br><b>tcp_syncookies=1</b>':'关闭<br><b>tcp_syncookies=0</b>';
+    document.getElementById('col-syn').classList.toggle('warn',!!s.warn);
+    paintChips(Object.assign({_all:{a1:1,a2:1,a3:1,a4:1,L1:1}},s.chips));
+  }
+  const code=[
+    '// 半连接队列满 (SYN flood) -> 新 SYN 被丢',
+    '$ ss -ant state syn-recv | wc -l',
+    '',
+    '// 队列满时不再保存半连接，改用 cookie',
+    '$ sysctl -w net.ipv4.tcp_syncookies=1',
+    '// 同时增大半连接队列',
+    '$ sysctl -w net.ipv4.tcp_max_syn_backlog=8192'
+  ];
+  return {id:'flood',label:'SYN flood',sub:'半连接溢出',mount,steps,paint,code};
+})();
+
+/* ============ 引擎 ============ */
+const SCENES=[sQueues,sBacklog,sOverflow,sFlood];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();
+  codeBox.innerHTML=SCENES[si].code.map((l,idx)=>'<div class="cl2" id="cl'+idx+'">'+hlLine(l)+'</div>').join('');
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  // 首次即时定位芯片（无滑动），随后启用过渡
+  go(0,true);
+}
+function go(i,instant){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(instant);
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  SCENES[si].code.forEach((_,idx)=>document.getElementById('cl'+idx).classList.toggle('on',(s.hl||[]).includes(idx)));
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2600;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>go(cur,true),120);});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

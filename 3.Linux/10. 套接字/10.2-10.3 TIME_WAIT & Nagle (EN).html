@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP Teardown &amp; Small-Packet Batching · TIME_WAIT / Nagle</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1200px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.2px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:600px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1060px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:20px;min-height:470px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ---------- sequence diagram ---------- */
+.seq{width:100%;height:auto;overflow:visible;display:block;}
+.seq text{font-family:var(--mono);}
+.seq .life{stroke:var(--line);stroke-width:2;stroke-dasharray:2 6;}
+.hbox{fill:var(--panel);stroke:var(--line);stroke-width:1.5;}
+.hL .hbox{stroke:var(--blue);}
+.hR .hbox{stroke:var(--brown);}
+.htitle{font-size:13px;font-weight:700;text-anchor:middle;fill:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.hrole{font-size:10px;text-anchor:middle;fill:var(--faint);}
+.mlabel{font-size:11px;text-anchor:middle;fill:var(--muted);opacity:0;transition:opacity .3s;}
+.mline{fill:none;stroke:var(--faint);stroke-width:2;opacity:0;transition:opacity .3s,stroke-width .3s;}
+.marrow{stroke:none;fill:var(--faint);opacity:0;transition:opacity .25s;}
+.mlost{font-size:19px;font-weight:700;fill:var(--danger);text-anchor:middle;opacity:0;transition:opacity .3s;}
+.mg.hidden .mline,.mg.hidden .marrow,.mg.hidden .mlabel,.mg.hidden .mlost{opacity:0;}
+.mg.seen .mline{opacity:.4;} .mg.seen .marrow{opacity:.4;} .mg.seen .mlabel{opacity:.5;} .mg.seen .mlost{opacity:.7;}
+.mg.on .mline{opacity:1;stroke-width:3;} .mg.on .marrow{opacity:1;transition-delay:.2s;} .mg.on .mlabel{opacity:1;} .mg.on .mlost{opacity:1;}
+.mg.k-fin .mline{stroke:var(--danger);} .mg.k-fin .marrow{fill:var(--danger);}
+.mg.k-ack .mline{stroke:var(--green);} .mg.k-ack .marrow{fill:var(--green);}
+.mg.k-data .mline{stroke:var(--blue);} .mg.k-data .marrow{fill:var(--blue);}
+.mg.k-lost .mline{stroke:var(--danger);stroke-dasharray:5 4;}
+
+.sg{transition:opacity .3s;}
+.sg.hidden{opacity:0;} .sg.seen{opacity:.4;} .sg.on{opacity:1;}
+.sbox{transition:fill .3s,stroke .3s;stroke-width:1.4;}
+.stext{font-size:10.5px;font-weight:600;text-anchor:middle;transition:fill .3s;}
+.sg.k-est .sbox{fill:var(--gray);stroke:var(--line);} .sg.k-est .stext{fill:var(--muted);}
+.sg.k-wait .sbox{fill:var(--bluebg);stroke:var(--blue);} .sg.k-wait .stext{fill:var(--blue);}
+.sg.k-tw .sbox{fill:var(--dangerbg);stroke:var(--danger);} .sg.k-tw .stext{fill:var(--danger);}
+.sg.on.k-tw .sbox{stroke-width:2.4;}
+.sg.k-lastack .sbox{fill:var(--brownbg);stroke:var(--brown);} .sg.k-lastack .stext{fill:var(--brown);}
+.sg.k-closed .sbox{fill:var(--gray);stroke:var(--line);} .sg.k-closed .stext{fill:var(--faint);}
+
+.latband{fill:rgba(179,64,47,.10);stroke:var(--danger);stroke-width:1.4;stroke-dasharray:5 4;opacity:0;transition:opacity .4s,fill .4s,stroke .4s;}
+.latband.on{opacity:1;} .latband.done{opacity:1;fill:rgba(15,110,86,.10);stroke:var(--green);}
+.latlbl{font-size:12px;font-weight:700;text-anchor:middle;fill:var(--danger);opacity:0;transition:opacity .35s;}
+.latlbl.on{opacity:1;}
+
+/* 2MSL html bar (scene 1) */
+.twbar{margin-top:6px;padding:10px 6px 4px;transition:opacity .3s;}
+.twbar.off{opacity:.28;}
+.twlbl{font-family:var(--mono);font-size:11px;color:var(--danger);margin-bottom:7px;text-align:center;}
+.twtrack{height:12px;border-radius:6px;background:var(--dangerbg);border:1px solid var(--danger);overflow:hidden;}
+.twfill{height:100%;width:0;background:var(--danger);border-radius:6px;}
+
+/* ---------- Nagle / wire lanes (scenes 4,6) ---------- */
+.bytestream{display:flex;gap:7px;justify-content:center;align-items:center;margin:4px 0 18px;min-height:44px;}
+.bslabel{font-family:var(--mono);font-size:11px;color:var(--faint);margin-right:6px;}
+.bytec{width:32px;height:36px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:17px;font-weight:700;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--blue);opacity:0;transform:scale(.6);transition:all var(--dur) var(--ease);}
+.bytec.show{opacity:1;transform:scale(1);}
+.bytec.buffered{border-color:var(--brown);color:var(--brown);background:var(--brownbg);}
+
+.lane{border:1px solid var(--grid);border-radius:11px;padding:12px 14px;margin-bottom:14px;background:var(--paper);transition:border-color .3s,box-shadow .3s;}
+.lane.hot{box-shadow:0 0 0 2px rgba(24,95,165,.16);}
+.lane .lh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.lane .ln{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);}
+.lane .ln.off{color:var(--danger);} .lane .ln.on{color:var(--green);}
+.lane .tally{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;transition:color .3s;}
+.lane .tally b{color:var(--ink);}
+.wire{display:flex;gap:8px;flex-wrap:wrap;min-height:44px;align-items:center;}
+.seg{display:inline-flex;align-items:stretch;border-radius:7px;overflow:hidden;border:1px solid var(--line);font-family:var(--mono);font-size:11px;opacity:0;transform:translateY(6px);transition:all var(--dur) var(--ease);box-shadow:0 1px 2px rgba(60,55,40,.06);}
+.seg.show{opacity:1;transform:translateY(0);}
+.seg .hd{background:var(--gray);color:var(--faint);padding:5px 8px;display:flex;align-items:center;border-right:1px solid var(--line);}
+.seg .pl{background:var(--bluebg);color:var(--blue);font-weight:700;padding:5px 9px;display:flex;align-items:center;}
+.seg.big .pl{background:var(--greenbg);color:var(--green);}
+.wempty{font-family:var(--mono);font-size:12px;color:var(--faint);}
+
+.ndbadge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--faint);background:var(--gray);border:1px solid var(--line);border-radius:9px;padding:7px 13px;margin:0 auto 16px;transition:all .3s var(--ease);}
+.ndbadge.on{color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.aptable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;margin-top:8px;}
+.aptable th,.aptable td{border:1px solid var(--grid);padding:5px 9px;text-align:left;color:var(--muted);}
+.aptable th{background:var(--gray);color:var(--ink);}
+.aptable td.dis{color:var(--danger);font-weight:700;}
+.aptable td.keep{color:var(--green);font-weight:700;}
+.aptable tr.hl td{background:var(--bluebg);}
+
+/* ---------- port slot (scene 3) ---------- */
+.portwrap{display:flex;flex-direction:column;gap:16px;align-items:center;margin-top:6px;}
+.portslot{width:340px;border:2px solid var(--line);border-radius:12px;padding:14px 16px;text-align:center;transition:border-color .3s,background .3s;}
+.portslot .pt{font-family:var(--mono);font-size:12px;color:var(--faint);margin-bottom:10px;}
+.occupant{font-family:var(--mono);font-size:13px;font-weight:700;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--gray);color:var(--muted);transition:all .35s var(--ease);}
+.occupant.est{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.occupant.tw{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);box-shadow:0 0 0 3px rgba(179,64,47,.15);}
+.occupant.gone{opacity:.3;text-decoration:line-through;}
+.arrowdown{font-size:20px;color:var(--faint);line-height:1;}
+.srvbox{width:340px;border:1px solid var(--grid);border-radius:12px;padding:14px 16px;text-align:center;background:var(--paper);}
+.srvbox .st2{font-family:var(--mono);font-size:12px;color:var(--faint);margin-bottom:8px;}
+.bindstat{font-family:var(--mono);font-size:13px;font-weight:700;padding:9px 12px;border-radius:9px;transition:all .35s var(--ease);}
+.bindstat.wait{background:var(--gray);color:var(--muted);}
+.bindstat.fail{background:var(--dangerbg);color:var(--danger);border:1px solid var(--danger);}
+.bindstat.ok{background:var(--greenbg);color:var(--green);border:1px solid var(--green);}
+.reusebadge{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);background:var(--bluebg);border:1px solid var(--blue);border-radius:8px;padding:4px 10px;opacity:0;transform:scale(.8);transition:all .3s var(--ease);}
+.reusebadge.on{opacity:1;transform:scale(1);}
+
+/* ---------- right column ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:190px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:16px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;white-space:nowrap;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:12px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+
+/* code panel */
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.cl{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:#D8D5CC;white-space:pre;padding:2px 16px;transition:background .3s,box-shadow .3s,color .3s;}
+.cl.on{background:rgba(52,122,198,.5);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.cl.on .c-cmt{color:#CCC8BA;}
+.c-kw{color:#E3A44C;} .c-str{color:#9DC08B;} .c-num{color:#D98E73;}
+.c-cmt{color:#8F8B80;} .c-mac{color:#7FB0E0;} .c-pre{color:#C88AC8;}
+
+.facts{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:13px 16px;}
+.facts .fh{font-size:12px;color:var(--faint);font-family:var(--mono);margin-bottom:8px;}
+.facts table{width:100%;border-collapse:collapse;font-size:12px;}
+.facts td{padding:4px 6px;border-bottom:1px solid var(--grid);color:var(--muted);vertical-align:top;}
+.facts td:first-child{font-family:var(--mono);color:var(--ink);white-space:nowrap;font-weight:600;width:44%;}
+.facts tr:last-child td{border-bottom:none;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TCP Teardown &amp; Small-Packet Batching — Interactive Explainer</h1>
+    <p>TIME_WAIT · 2·MSL · SO_REUSEADDR  &nbsp;/&nbsp;  Nagle · Delayed-ACK · TCP_NODELAY　·　switch tabs above, <kbd>←</kbd> <kbd>→</kbd> step, <kbd>space</kbd> play</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+      <div class="facts">
+        <div class="fh">reference numbers (typical)</div>
+        <table>
+          <tr><td>MSL</td><td>30–120 s (RFC 793 suggests 2 min)</td></tr>
+          <tr><td>TIME_WAIT</td><td>2·MSL ≈ 1–4 min</td></tr>
+          <tr><td>TCP + IP header</td><td>≈ 40 B (20 + 20)</td></tr>
+          <tr><td>Delayed-ACK</td><td>≈ 40 ms (Linux) … 200 ms max</td></tr>
+          <tr><td>MSS</td><td>MTU − 40 ≈ 1460 B on Ethernet</td></tr>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ Prev</button>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnNext">Next ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+let cur=0;
+
+/* ================= syntax highlighter (comment-split + string sentinels) ================= */
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function hlLine(raw){
+  const m=raw.match(/^(.*?)(\/\/.*)?$/);
+  let code=esc(m[1]); const cmt=m[2]?esc(m[2]):'';
+  if(code.trim().charAt(0)==='#'){
+    return '<span class="c-pre">'+code+'</span>'+(cmt?'<span class="c-cmt">'+cmt+'</span>':'');
+  }
+  const strs=[];
+  code=code.replace(/"[^"]*"/g,s=>{strs.push(s);return ''+String.fromCharCode(65+strs.length-1)+'';});
+  code=code
+    .replace(/\b(int|char|void|unsigned|const|static|struct|return|if|else|while|for|sizeof|socklen_t|ssize_t|size_t)\b/g,'<span class="c-kw">$1</span>')
+    .replace(/\b([A-Z_][A-Z0-9_]{2,})\b/g,'<span class="c-mac">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="c-num">$1</span>')
+    .replace(/([A-Z])/g,(_,c)=>'<span class="c-str">'+strs[c.charCodeAt(0)-65]+'</span>');
+  return code+(cmt?'<span class="c-cmt">'+cmt+'</span>':'');
+}
+
+/* ================= sequence-diagram helpers ================= */
+const LX=120,RX=480,MID=300;
+function hdr(x,info,side){
+  return '<g class="hg h'+side+'">'+
+    '<rect class="hbox" x="'+(x-78)+'" y="38" width="156" height="44" rx="9"/>'+
+    '<text class="htitle" x="'+x+'" y="57">'+info.name+'</text>'+
+    '<text class="hrole" x="'+x+'" y="73">'+info.role+'</text></g>';
+}
+function msgSVG(m){
+  const sx=m.from==='L'?LX:RX;
+  let dx=m.to==='L'?LX:RX;
+  const lost=m.kind==='lost';
+  if(lost) dx=m.from==='L'?MID+40:MID-40;
+  const right=dx>sx;
+  const path='M '+sx+' '+m.y+' L '+dx+' '+m.y;
+  const tri=right
+    ?'M '+dx+' '+m.y+' L '+(dx-9)+' '+(m.y-5)+' L '+(dx-9)+' '+(m.y+5)+' Z'
+    :'M '+dx+' '+m.y+' L '+(dx+9)+' '+(m.y-5)+' L '+(dx+9)+' '+(m.y+5)+' Z';
+  return '<g class="mg k-'+m.kind+' hidden" id="'+m.id+'">'+
+    '<text class="mlabel" x="'+((sx+dx)/2)+'" y="'+(m.y-9)+'">'+m.label+'</text>'+
+    '<path class="mline" id="'+m.id+'-l" d="'+path+'"/>'+
+    (lost
+      ?'<text class="mlost" x="'+(dx+16)+'" y="'+(m.y+5)+'">✕ lost</text>'
+      :'<path class="marrow" id="'+m.id+'-a" d="'+tri+'"/>')+
+    '</g>';
+}
+function stateSVG(st){
+  const cx=st.side==='L'?62:538;
+  return '<g class="sg k-'+st.kind+' hidden" id="'+st.id+'">'+
+    '<rect class="sbox" x="'+(cx-52)+'" y="'+(st.y-13)+'" width="104" height="24" rx="6"/>'+
+    '<text class="stext" x="'+cx+'" y="'+(st.y+4)+'">'+st.text+'</text></g>';
+}
+function buildSeqSVG(o){
+  let s='<svg class="seq" viewBox="0 0 600 '+o.h+'" preserveAspectRatio="xMidYMid meet">';
+  s+='<line class="life" x1="'+LX+'" y1="92" x2="'+LX+'" y2="'+(o.h-14)+'"/>';
+  s+='<line class="life" x1="'+RX+'" y1="92" x2="'+RX+'" y2="'+(o.h-14)+'"/>';
+  s+=hdr(LX,o.left,'L')+hdr(RX,o.right,'R');
+  o.msgs.forEach(m=>{s+=msgSVG(m);});
+  o.states.forEach(st=>{s+=stateSVG(st);});
+  s+=(o.svgExtra||'');
+  s+='</svg>';
+  return s;
+}
+function drawIn(path){
+  if(!path)return;
+  const L=path.getTotalLength();
+  path.style.transition='none';
+  path.style.strokeDasharray=L;
+  path.style.strokeDashoffset=L;
+  void path.getBoundingClientRect();
+  path.style.transition='';
+  path.style.strokeDashoffset='0';
+  clearTimeout(path._t);
+  path._t=setTimeout(()=>{path.style.strokeDasharray='';path.style.strokeDashoffset='';},560);
+}
+function paintSeq(o){
+  o.msgs.forEach(m=>{
+    const g=document.getElementById(m.id);
+    g.classList.remove('on','seen','hidden');
+    if(m.step>cur) g.classList.add('hidden');
+    else if(m.step===cur) g.classList.add('on');
+    else g.classList.add('seen');
+  });
+  const act=o.msgs.find(m=>m.step===cur);
+  if(act && o._last!==act.id) drawIn(document.getElementById(act.id+'-l'));
+  o._last=act?act.id:null;
+  ['L','R'].forEach(side=>{
+    const list=o.states.filter(x=>x.side===side).sort((a,b)=>a.step-b.step);
+    let ci=-1; list.forEach((x,i)=>{if(x.step<=cur)ci=i;});
+    list.forEach((x,i)=>{
+      const g=document.getElementById(x.id);
+      g.classList.remove('on','seen','hidden');
+      if(i>ci) g.classList.add('hidden');
+      else if(i===ci) g.classList.add('on');
+      else g.classList.add('seen');
+    });
+  });
+}
+
+/* ================= SCENE 1 · 4-way close ================= */
+const s1=(()=>{
+  const o={h:500,
+    left:{name:'Host A',role:'active close'},
+    right:{name:'Host B',role:'passive close'},
+    msgs:[
+      {id:'a1',from:'L',to:'R',y:150,label:'FIN  seq=u',kind:'fin',step:1},
+      {id:'a2',from:'R',to:'L',y:220,label:'ACK  ack=u+1',kind:'ack',step:2},
+      {id:'a3',from:'R',to:'L',y:290,label:'FIN  seq=v',kind:'fin',step:3},
+      {id:'a4',from:'L',to:'R',y:360,label:'ACK  ack=v+1',kind:'ack',step:4}
+    ],
+    states:[
+      {id:'sa0',side:'L',y:118,text:'ESTABLISHED',kind:'est',step:0},
+      {id:'sa1',side:'L',y:185,text:'FIN_WAIT_1',kind:'wait',step:1},
+      {id:'sa2',side:'L',y:255,text:'FIN_WAIT_2',kind:'wait',step:2},
+      {id:'sa3',side:'L',y:400,text:'TIME_WAIT',kind:'tw',step:4},
+      {id:'sa4',side:'L',y:466,text:'CLOSED',kind:'closed',step:6},
+      {id:'sb0',side:'R',y:118,text:'ESTABLISHED',kind:'est',step:0},
+      {id:'sb1',side:'R',y:185,text:'CLOSE_WAIT',kind:'lastack',step:1},
+      {id:'sb2',side:'R',y:325,text:'LAST_ACK',kind:'lastack',step:3},
+      {id:'sb3',side:'R',y:395,text:'CLOSED',kind:'closed',step:4}
+    ]};
+  const steps=[
+    {title:'Step 0 · both ESTABLISHED',chip:'four-way handshake',chipC:'c0',hl:[0,6],
+     desc:'A full-duplex TCP connection is torn down with a <b>four-way handshake</b> — each direction is closed independently. Whoever calls <code>close()</code> first is the <span class="bl">active closer</span>; the peer is the <span class="br">passive closer</span>. Watch which side ends up in TIME_WAIT.'},
+    {title:'Step 1 · A sends FIN → FIN_WAIT_1',chip:'active close()',chipC:'cb',hl:[1,7],
+     desc:'A calls <code>close()</code>, emitting a <span class="dg">FIN</span>. A moves to <b>FIN_WAIT_1</b>. When B receives the FIN it enters <b>CLOSE_WAIT</b> — the kernel ACKs the FIN, but B may still have data to send, so it is not done yet.'},
+    {title:'Step 2 · B ACKs → A in FIN_WAIT_2',chip:'half-closed',chipC:'cb',hl:[2],
+     desc:'B acknowledges A’s FIN. A enters <b>FIN_WAIT_2</b>: A→B direction is closed, but B→A is still open. This is the <b>half-closed</b> state — B can keep streaming data to A.'},
+    {title:'Step 3 · B sends FIN → LAST_ACK',chip:'passive close()',chipC:'ch',hl:[8],
+     desc:'B finishes and calls <code>close()</code>, sending its own <span class="dg">FIN</span>. B enters <b>LAST_ACK</b>, waiting for the final acknowledgement of <em>its</em> FIN.'},
+    {title:'Step 4 · A ACKs → A enters TIME_WAIT',chip:'only the active closer',chipC:'cd',hl:[3,9],
+     desc:'A sends the final ACK and enters <span class="dg">TIME_WAIT</span>. B receives it and goes straight to <b>CLOSED</b>. <b>Key point:</b> TIME_WAIT appears <b>only on the side that closed actively</b> — B never sees it.'},
+    {title:'Step 5 · A waits 2·MSL',chip:'2·MSL timer',chipC:'cd',hl:[3],
+     desc:'A does not free the socket immediately. It lingers in TIME_WAIT for <b>2·MSL</b> (≈ 1–4 min). MSL is the maximum lifetime of an IP segment; two of them cover a round-trip retransmission. Why this matters is Tab 2.'},
+    {title:'Step 6 · timer elapsed → CLOSED',chip:'4-tuple freed',chipC:'cg',hl:[4],
+     desc:'After 2·MSL, every stray segment carrying this <code>(srcIP, srcPort, dstIP, dstPort)</code> 4-tuple has expired. A finally transitions to <b>CLOSED</b> and releases the port. The whole connection is now gone on both sides.'}
+  ];
+  function mount(){viz.innerHTML='<div class="vcap"><b>Four-way close</b> · states annotate each lifeline; TIME_WAIT sits only on Host A</div>'+buildSeqSVG(o)+
+    '<div class="twbar off" id="twbar"><div class="twlbl">2·MSL wait — let every stray segment of this 4-tuple die out</div><div class="twtrack"><div class="twfill" id="twfill"></div></div></div>';}
+  function paint(){
+    paintSeq(o);
+    const bar=document.getElementById('twbar'),f=document.getElementById('twfill');
+    if(cur<4){bar.classList.add('off');f.style.transition='none';f.style.width='0%';}
+    else{bar.classList.remove('off');
+      if(cur===4){f.style.transition='none';f.style.width='0%';}
+      else if(cur===5){void f.offsetWidth;f.style.transition='width 2.4s linear';f.style.width='100%';}
+      else{f.style.transition='none';f.style.width='100%';}}
+  }
+  const code=[
+    '// Active closer',
+    'close(fd);          // send FIN  -> FIN_WAIT_1',
+    '//  recv ACK        ->            FIN_WAIT_2',
+    '//  recv FIN, ACK   ->            TIME_WAIT',
+    '//  wait 2*MSL      ->            CLOSED',
+    '',
+    '// Passive closer',
+    '//  recv FIN, ACK   ->            CLOSE_WAIT',
+    'close(fd);          // send FIN  -> LAST_ACK',
+    '//  recv ACK        ->            CLOSED'
+  ];
+  return {id:'fin',label:'4-Way Close',sub:'TIME_WAIT arises',steps,mount,paint,code};
+})();
+
+/* ================= SCENE 2 · why 2·MSL ================= */
+const s2=(()=>{
+  const o={h:390,
+    left:{name:'Host A',role:'active · TIME_WAIT'},
+    right:{name:'Host B',role:'passive · LAST_ACK'},
+    msgs:[
+      {id:'b1',from:'L',to:'R',y:150,label:'ACK (final)',kind:'lost',step:1},
+      {id:'b2',from:'R',to:'L',y:225,label:'FIN (retransmit)',kind:'fin',step:2},
+      {id:'b3',from:'L',to:'R',y:300,label:'ACK (resent)',kind:'ack',step:3}
+    ],
+    states:[
+      {id:'tb0',side:'L',y:118,text:'TIME_WAIT',kind:'tw',step:0},
+      {id:'tb1',side:'L',y:350,text:'CLOSED',kind:'closed',step:4},
+      {id:'ub0',side:'R',y:118,text:'LAST_ACK',kind:'lastack',step:0},
+      {id:'ub1',side:'R',y:335,text:'CLOSED',kind:'closed',step:3}
+    ]};
+  const steps=[
+    {title:'Step 0 · A in TIME_WAIT, B in LAST_ACK',chip:'reason #1: guard the ACK',chipC:'c0',hl:[0],
+     desc:'The primary reason for TIME_WAIT: the <b>final ACK might get lost</b>. A stays alive so it can re-answer. B is still in <b>LAST_ACK</b>, waiting to hear that its FIN was received.'},
+    {title:'Step 1 · final ACK is lost',chip:'ACK ✕',chipC:'cd',hl:[1],
+     desc:'A’s final ACK <span class="dg">vanishes in the network</span>. From B’s point of view nothing arrived — it still believes its FIN is unacknowledged and remains stuck in LAST_ACK.'},
+    {title:'Step 2 · B’s RTO fires → FIN retransmit',chip:'timeout',chipC:'ch',hl:[2,3],
+     desc:'B’s retransmission timer (RTO) expires and B <b>resends its FIN</b>. This is exactly the case TIME_WAIT exists to handle — a lost final ACK.'},
+    {title:'Step 3 · A is still alive → re-ACK',chip:'TIME_WAIT pays off',chipC:'cg',hl:[4,5,6],
+     desc:'Because A sits in <span class="dg">TIME_WAIT</span> (not CLOSED), it can <b>re-send the ACK</b>. B finally receives it and moves to <b>CLOSED</b>. Had A closed immediately, it would answer the FIN with an <b>RST</b>, and B would error out.'},
+    {title:'Step 4 · 2·MSL also flushes old duplicates',chip:'reason #2',chipC:'cg',hl:[7,8],
+     desc:'The full 2·MSL also serves a second purpose: it lets any <b>delayed duplicate segments</b> from this 4-tuple expire, so a brand-new connection reusing the same ports can never receive stale data. Then A → CLOSED.'}
+  ];
+  function mount(){viz.innerHTML='<div class="vcap"><b>Why 2·MSL?</b> · a lost final ACK must still be answerable</div>'+buildSeqSVG(o);}
+  function paint(){paintSeq(o);}
+  const code=[
+    '// A is in TIME_WAIT, not CLOSED yet',
+    '//   the final ACK may be LOST',
+    '// B in LAST_ACK: no ACK -> RTO fires,',
+    '//   B retransmits its FIN',
+    '// A still alive in TIME_WAIT:',
+    'resend_ack();          // A answers again',
+    '// B finally gets ACK   -> CLOSED',
+    '// 2*MSL also lets old duplicate',
+    '//   segments of this 4-tuple expire'
+  ];
+  return {id:'msl',label:'Why 2·MSL',sub:'guard the last ACK',steps,mount,paint,code};
+})();
+
+/* ================= SCENE 3 · SO_REUSEADDR ================= */
+const s3=(()=>{
+  const steps=[
+    {title:'Step 0 · server running, client connected',chip:'baseline',chipC:'c0',hl:[0],
+     desc:'A server owns TCP port <b>9527</b>; a client is connected. The listening socket and the connection both live under this port.',
+     occ:'active socket · ESTABLISHED',occC:'est',slotC:'green',bind:'server running',bindC:'ok',reuse:false},
+    {title:'Step 1 · server closes → old socket in TIME_WAIT',chip:'port still held',chipC:'cd',hl:[0],
+     desc:'The server <b>actively closes</b>. Its socket enters <span class="dg">TIME_WAIT</span> and keeps <b>holding port 9527</b> for the whole 2·MSL — even though the process may already be gone.',
+     occ:'old socket · TIME_WAIT (2·MSL)',occC:'tw',slotC:'danger',bind:'process exited',bindC:'wait',reuse:false},
+    {title:'Step 2 · restart → bind() fails',chip:'EADDRINUSE',chipC:'cd',hl:[10],
+     desc:'You relaunch immediately. <code>bind()</code> to 9527 returns <span class="dg">EADDRINUSE</span> → <b>"Address already in use"</b>, because a TIME_WAIT socket still occupies the port.',
+     occ:'old socket · TIME_WAIT (2·MSL)',occC:'tw',slotC:'danger',bind:'bind() → EADDRINUSE ✕',bindC:'fail',reuse:false},
+    {title:'Step 3 · set SO_REUSEADDR before bind()',chip:'setsockopt',chipC:'cb',hl:[2,3,4],
+     desc:'The fix: set <b>SO_REUSEADDR</b> on the fresh socket <b>before</b> <code>bind()</code>. It tells the kernel: allow binding to a port that is only held by a TIME_WAIT socket.',
+     occ:'old socket · TIME_WAIT (2·MSL)',occC:'tw',slotC:'danger',bind:'bind() pending…',bindC:'wait',reuse:true},
+    {title:'Step 4 · bind() succeeds — instant restart',chip:'fixed',chipC:'cg',hl:[10,11],
+     desc:'With SO_REUSEADDR the <code>bind()</code> succeeds even while the old socket lingers. The server restarts <b>immediately</b>; the stale TIME_WAIT socket expires on its own. This is why every server sets it before bind.',
+     occ:'old socket · TIME_WAIT (expiring)',occC:'gone',slotC:'green',bind:'bind() → OK, listening',bindC:'ok',reuse:true}
+  ];
+  function mount(){viz.innerHTML='<div class="vcap"><b>"Address already in use"</b> on restart — and the one-line fix</div>'+
+    '<div class="portwrap">'+
+      '<div class="portslot" id="p-slot"><div class="pt">TCP port 9527</div><div class="occupant" id="p-occ"></div></div>'+
+      '<div class="arrowdown">↓ new server process</div>'+
+      '<div class="srvbox"><div class="st2">restart: socket() → setsockopt() → bind()</div>'+
+        '<div class="bindstat" id="p-bind"></div>'+
+        '<span class="reusebadge" id="p-reuse">SO_REUSEADDR = 1</span></div>'+
+    '</div>';}
+  function paint(){
+    const s=steps[cur];
+    const occ=document.getElementById('p-occ');occ.className='occupant '+s.occC;occ.textContent=s.occ;
+    const slot=document.getElementById('p-slot');slot.style.borderColor=s.slotC==='danger'?'var(--danger)':(s.slotC==='green'?'var(--green)':'var(--line)');
+    const bind=document.getElementById('p-bind');bind.className='bindstat '+s.bindC;bind.textContent=s.bind;
+    document.getElementById('p-reuse').classList.toggle('on',s.reuse);
+  }
+  const code=[
+    'int sock = socket(AF_INET, SOCK_STREAM, 0);',
+    '',
+    'int opt = 1;                          // enable',
+    'setsockopt(sock, SOL_SOCKET,',
+    '           SO_REUSEADDR, &opt, sizeof(opt));',
+    '',
+    'struct sockaddr_in addr = {0};',
+    'addr.sin_family = AF_INET;',
+    'addr.sin_port   = htons(9527);',
+    '',
+    'bind(sock, (sockaddr*)&addr, sizeof(addr));',
+    'listen(sock, 128);                    // now OK'
+  ];
+  return {id:'reuse',label:'SO_REUSEADDR',sub:'port reuse fix',steps,mount,paint,code};
+})();
+
+/* ================= SCENE 4 · Nagle coalescing ================= */
+const s4=(()=>{
+  const bytes=['H','e','l','l','o'];
+  const steps=[
+    {title:'Step 0 · app writes "Hello" byte-by-byte',chip:'the problem',chipC:'c0',hl:[0,1],
+     desc:'An interactive app pushes tiny 1-byte writes (think a keystroke stream). Every raw TCP segment still carries a <b>~40 B TCP+IP header</b>. Sending 1 payload byte per packet wastes 40× on headers.',
+     showBytes:0,off:0,on:0,buffered:false},
+    {title:'Step 1 · Nagle OFF: first byte → its own segment',chip:'1 pkt / byte',chipC:'cd',hl:[4],
+     desc:'Without batching, <span class="dg">‘H’</span> goes out instantly as one segment: <b>40 B header + 1 B data</b>. Fine so far — but the app keeps writing.',
+     showBytes:1,off:1,on:0,buffered:false},
+    {title:'Step 2 · Nagle OFF: 5 tiny segments',chip:'200 B header / 5 B data',chipC:'cd',hl:[4],
+     desc:'Each of ‘e’,‘l’,‘l’,‘o’ ships in its own segment too. <span class="dg">5 packets, ~200 B of headers</span> to move 5 B of data — a 40:1 overhead and a flood of tiny packets that stress routers.',
+     showBytes:5,off:5,on:0,buffered:false},
+    {title:'Step 3 · Nagle ON: send first, buffer the rest',chip:'x & (unacked)',chipC:'ch',hl:[3],
+     desc:'Nagle rule: if there is <b>unacknowledged in-flight data</b> and the pending chunk is < MSS, <b>hold it</b>. ‘H’ was sent (nothing was unacked). While ‘H’ is unacked, ‘e’‘l’‘l’‘o’ <span class="br">accumulate in the buffer</span>.',
+     showBytes:5,off:5,on:1,buffered:true},
+    {title:'Step 4 · Nagle ON: ACK arrives → flush coalesced',chip:'2 pkts total',chipC:'cg',hl:[6,7],
+     desc:'When the ACK for ‘H’ returns, the buffered bytes flush as <b>one</b> segment "ello". Total: <span class="gr">2 packets, ~80 B headers</span> instead of 5 packets / 200 B. Same data, far fewer packets.',
+     showBytes:5,off:5,on:2,buffered:false},
+    {title:'Step 5 · trade-off',chip:'fewer pkts vs latency',chipC:'cb',hl:[2,3,4],
+     desc:'Nagle boosts throughput efficiency and eases congestion by <b>coalescing small writes</b>. The cost is <b>added latency</b> — a write may wait for an ACK before it leaves. Tabs 5–6 show when that hurts and how to switch it off.',
+     showBytes:5,off:5,on:2,buffered:false}
+  ];
+  function mount(){
+    let bs='<span class="bslabel">app writes:</span>';
+    bytes.forEach((b,i)=>bs+='<div class="bytec" id="by-'+i+'">'+b+'</div>');
+    let offSeg='';for(let i=0;i<5;i++)offSeg+='<span class="seg" id="of-'+i+'"><span class="hd">40B</span><span class="pl">'+bytes[i]+'</span></span>';
+    let onSeg='<span class="seg" id="on-0"><span class="hd">40B</span><span class="pl">H</span></span>'+
+              '<span class="seg big" id="on-1"><span class="hd">40B</span><span class="pl">ello</span></span>';
+    viz.innerHTML='<div class="vcap"><b>Nagle’s algorithm</b> · coalesce tiny writes to cut header overhead</div>'+
+      '<div class="bytestream">'+bs+'</div>'+
+      '<div class="lane" id="lane-off"><div class="lh"><span class="ln off">Nagle OFF (TCP_NODELAY)</span><span class="tally" id="t-off">—</span></div><div class="wire" id="w-off"><span class="wempty" id="e-off">no segments yet</span>'+offSeg+'</div></div>'+
+      '<div class="lane" id="lane-on"><div class="lh"><span class="ln on">Nagle ON (default)</span><span class="tally" id="t-on">—</span></div><div class="wire" id="w-on"><span class="wempty" id="e-on">no segments yet</span>'+onSeg+'</div></div>';
+  }
+  function paint(){
+    const s=steps[cur];
+    bytes.forEach((b,i)=>{
+      const el=document.getElementById('by-'+i);
+      el.className='bytec'+(i<s.showBytes?' show':'')+((s.buffered&&i>=1&&i<s.showBytes)?' buffered':'');
+    });
+    for(let i=0;i<5;i++)document.getElementById('of-'+i).className='seg'+(i<s.off?' show':'');
+    document.getElementById('on-0').className='seg'+(s.on>=1?' show':'');
+    document.getElementById('on-1').className='seg big'+(s.on>=2?' show':'');
+    document.getElementById('e-off').style.display=s.off?'none':'inline';
+    document.getElementById('e-on').style.display=s.on?'none':'inline';
+    document.getElementById('t-off').innerHTML=s.off?('<b>'+s.off+'</b> segs · ~'+(s.off*40)+' B header / '+s.off+' B data'):'—';
+    document.getElementById('t-on').innerHTML=s.on?('<b>'+s.on+'</b> segs · ~'+(s.on*40)+' B header / 5 B data'):'—';
+    document.getElementById('lane-off').classList.toggle('hot',cur>=1&&cur<=2);
+    document.getElementById('lane-on').classList.toggle('hot',cur>=3&&cur<=4);
+  }
+  const code=[
+    '// Nagle: coalesce tiny writes',
+    'if (data_ready) {',
+    '    if (len >= MSS)        send_now();   // full segment',
+    '    else if (unacked)      buffer_it();  // wait for ACK',
+    '    else                   send_now();   // first small pkt',
+    '}',
+    'on_ack_received:',
+    '    if (buffer_nonempty)   flush_all();  // send coalesced'
+  ];
+  return {id:'nagle',label:'Nagle Coalescing',sub:'merge tiny writes',steps,mount,paint,code};
+})();
+
+/* ================= SCENE 5 · Nagle × Delayed-ACK ================= */
+const s5=(()=>{
+  const o={h:430,
+    left:{name:'Sender',role:'write-write-read'},
+    right:{name:'Receiver',role:'delayed ACK'},
+    msgs:[
+      {id:'d1',from:'L',to:'R',y:150,label:'seg1 (small)',kind:'data',step:1},
+      {id:'d2',from:'R',to:'L',y:300,label:'ACK (after ~40ms)',kind:'ack',step:3},
+      {id:'d3',from:'L',to:'R',y:360,label:'seg2 (flushed)',kind:'data',step:4}
+    ],
+    states:[
+      {id:'ea0',side:'L',y:118,text:'ESTABLISHED',kind:'est',step:0},
+      {id:'ea1',side:'L',y:225,text:'seg2 HELD',kind:'tw',step:2},
+      {id:'ea2',side:'L',y:400,text:'flush seg2',kind:'wait',step:4},
+      {id:'eb0',side:'R',y:118,text:'ESTABLISHED',kind:'est',step:0},
+      {id:'eb1',side:'R',y:225,text:'ACK held',kind:'lastack',step:2},
+      {id:'eb2',side:'R',y:290,text:'timer fires',kind:'wait',step:3}
+    ],
+    svgExtra:'<rect id="lat-band" class="latband" x="128" y="180" width="344" height="120" rx="8"/>'+
+             '<text id="lat-lbl" class="latlbl" x="300" y="330">~40 ms stall</text>'};
+  const steps=[
+    {title:'Step 0 · a write-write-read pattern',chip:'the trap',chipC:'c0',hl:[0],
+     desc:'The classic stall appears with <b>write → write → read</b> of small messages: the sender writes seg1, then seg2, then waits for a reply. Nagle and Delayed-ACK combine badly here.'},
+    {title:'Step 1 · seg1 sent immediately',chip:'no unacked data',chipC:'cb',hl:[1],
+     desc:'seg1 is small but nothing is in flight, so Nagle lets it go <b>right away</b>. The sender then immediately tries to write seg2.'},
+    {title:'Step 2 · deadlock: both sides wait',chip:'mutual wait',chipC:'cd',hl:[2,3,4,5,6],
+     desc:'Nagle <span class="dg">HOLDS seg2</span> because seg1 is still unacked. Meanwhile the receiver runs <b>Delayed-ACK</b>: it withholds the ACK (up to ~40 ms) hoping to piggyback it on a reply. <b>Neither side moves</b> — sender waits for the ACK, receiver waits for data.'},
+    {title:'Step 3 · delayed-ACK timer fires',chip:'~40 ms later',chipC:'ch',hl:[7],
+     desc:'The stall only breaks when the receiver’s <b>delayed-ACK timer expires</b> (~40 ms on Linux, up to 200 ms) and it finally sends the ACK. That ~40 ms was pure, avoidable latency.'},
+    {title:'Step 4 · ACK unblocks seg2',chip:'too late',chipC:'cd',hl:[8],
+     desc:'The ACK arrives, Nagle releases seg2, and it goes out — but a full delayed-ACK interval was wasted on every such exchange. On a chatty protocol this destroys latency.'},
+    {title:'Step 5 · the cure',chip:'TCP_NODELAY',chipC:'cg',hl:[],
+     desc:'Fix it by disabling Nagle with <b>TCP_NODELAY</b> (or by avoiding write-write-read — batch into one write, or use <code>writev</code>). Latency-sensitive protocols must not pay the 40 ms tax. That’s Tab 6.'}
+  ];
+  function mount(){viz.innerHTML='<div class="vcap"><b>Nagle × Delayed-ACK</b> · two optimisations that deadlock into a ~40 ms stall</div>'+buildSeqSVG(o);}
+  function paint(){
+    paintSeq(o);
+    const b=document.getElementById('lat-band'),l=document.getElementById('lat-lbl');
+    b.classList.remove('on','done');l.classList.remove('on');
+    if(cur>=2&&cur<=3){b.classList.add('on');l.classList.add('on');l.textContent='~40 ms stall — both sides wait';}
+    else if(cur===4){b.classList.add('done');l.classList.add('on');l.textContent='ACK arrived → seg2 flushed';}
+  }
+  const code=[
+    '// write-write-read pattern',
+    'write(fd, seg1, small);   // sent now (no unacked)',
+    'write(fd, seg2, small);   // Nagle: HELD',
+    '// receiver side:',
+    '//   got seg1, Delayed-ACK holds ~40ms',
+    '//   hoping to piggyback ACK on a reply',
+    '// --> both wait: sender ACK, recv data',
+    '// timer fires -> ACK finally sent',
+    '// sender flushes seg2 (~40ms too late)'
+  ];
+  return {id:'dack',label:'Nagle × Delayed-ACK',sub:'the 40 ms stall',steps,mount,paint,code};
+})();
+
+/* ================= SCENE 6 · TCP_NODELAY ================= */
+const s6=(()=>{
+  const bytes=['a','b','c'];
+  const steps=[
+    {title:'Step 0 · latency-sensitive apps disable Nagle',chip:'when to switch off',chipC:'c0',hl:[0],
+     desc:'For interactive, low-latency traffic (SSH, games, RPC), the batching delay is unacceptable. These apps turn Nagle <b>off</b> so every write leaves the host at once.',
+     badge:false,segs:0,rows:[]},
+    {title:'Step 1 · setsockopt(TCP_NODELAY, 1)',chip:'one flag',chipC:'cb',hl:[2,3,4,5],
+     desc:'Set <b>TCP_NODELAY = 1</b> at level <code>IPPROTO_TCP</code>. This disables Nagle on the socket: small writes are never held back waiting for an ACK.',
+     badge:true,segs:0,rows:[]},
+    {title:'Step 2 · first write ships instantly',chip:'no buffering',chipC:'cg',hl:[9],
+     desc:'‘a’ goes out immediately as its own segment — <b>no waiting</b> for prior data to be acked.',
+     badge:true,segs:1,rows:[]},
+    {title:'Step 3 · b, c ship immediately too',chip:'no ACK wait',chipC:'cg',hl:[10,11],
+     desc:'‘b’ and ‘c’ each fly the moment they are written. <span class="gr">Zero stall</span> — the price is more packets and more header overhead, the exact opposite trade-off from Nagle.',
+     badge:true,segs:3,rows:[]},
+    {title:'Step 4 · so when do you disable it?',chip:'decision table',chipC:'cb',hl:[],
+     desc:'Rule of thumb: <b>disable</b> for interactive / real-time traffic; <b>keep</b> Nagle for bulk transfer where efficiency beats latency. Highlighted rows below say disable.',
+     badge:true,segs:3,rows:[0,1]}
+  ];
+  const APP=[
+    ['SSH / Telnet','disable','realtime keystrokes'],
+    ['Online game / RPC','disable','low-latency interaction'],
+    ['HTTP / REST','usually keep','request/response is large enough'],
+    ['File transfer','keep','bulk data — efficiency wins'],
+    ['Video stream','keep','packets already large']
+  ];
+  function mount(){
+    let bs='<span class="bslabel">keystrokes:</span>';
+    bytes.forEach((b,i)=>bs+='<div class="bytec" id="nd-by-'+i+'">'+b+'</div>');
+    let segs='';bytes.forEach((b,i)=>segs+='<span class="seg" id="nd-seg-'+i+'"><span class="hd">40B</span><span class="pl">'+b+'</span></span>');
+    let rows='';APP.forEach((r,i)=>{const cls=r[1]==='keep'?'keep':'dis';rows+='<tr id="ap-'+i+'"><td>'+r[0]+'</td><td class="'+cls+'">'+r[1]+'</td><td>'+r[2]+'</td></tr>';});
+    viz.innerHTML='<div class="vcap"><b>TCP_NODELAY</b> · disable Nagle for latency-sensitive sockets</div>'+
+      '<div style="text-align:center"><span class="ndbadge" id="nd-badge">TCP_NODELAY = 0 (Nagle on)</span></div>'+
+      '<div class="bytestream">'+bs+'</div>'+
+      '<div class="lane"><div class="lh"><span class="ln on">wire · each write sent immediately</span><span class="tally" id="nd-tally">—</span></div><div class="wire" id="nd-wire"><span class="wempty" id="nd-empty">no segments yet</span>'+segs+'</div></div>'+
+      '<table class="aptable"><tr><th>application</th><th>Nagle</th><th>why</th></tr>'+rows+'</table>';
+  }
+  function paint(){
+    const s=steps[cur];
+    const badge=document.getElementById('nd-badge');
+    badge.classList.toggle('on',s.badge);badge.textContent=s.badge?'TCP_NODELAY = 1 (Nagle off)':'TCP_NODELAY = 0 (Nagle on)';
+    bytes.forEach((b,i)=>document.getElementById('nd-by-'+i).className='bytec'+(i<s.segs?' show':''));
+    bytes.forEach((b,i)=>document.getElementById('nd-seg-'+i).className='seg'+(i<s.segs?' show':''));
+    document.getElementById('nd-empty').style.display=s.segs?'none':'inline';
+    document.getElementById('nd-tally').innerHTML=s.segs?('<b>'+s.segs+'</b> segs · sent with no ACK wait'):'—';
+    APP.forEach((r,i)=>document.getElementById('ap-'+i).classList.toggle('hl',s.rows.includes(i)));
+  }
+  const code=[
+    'int sock = socket(AF_INET, SOCK_STREAM, 0);',
+    '',
+    'int nodelay = 1;                    // 1 = off',
+    'setsockopt(sock, IPPROTO_TCP,',
+    '           TCP_NODELAY, &nodelay,',
+    '           sizeof(nodelay));',
+    '',
+    '// every write() now flushes at once,',
+    '// no coalescing, no wait for prior ACK',
+    'write(sock, "a", 1);',
+    'write(sock, "b", 1);',
+    'write(sock, "c", 1);'
+  ];
+  return {id:'nodelay',label:'TCP_NODELAY',sub:'disable Nagle',steps,mount,paint,code};
+})();
+
+/* ================= engine ================= */
+const SCENES=[s1,s2,s3,s4,s5,s6];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  SCENES[si]._last=null;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();
+  codeBox.innerHTML=SCENES[si].code.map((l,idx)=>'<div class="cl" id="cl'+idx+'">'+hlLine(l)+'</div>').join('');
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  SCENES[si].code.forEach((_,idx)=>document.getElementById('cl'+idx).classList.toggle('on',(s.hl||[]).includes(idx)));
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2600;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ Pause';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ Play';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

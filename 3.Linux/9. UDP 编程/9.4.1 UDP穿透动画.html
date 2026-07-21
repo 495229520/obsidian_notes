@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E">
+<title>UDP穿透动画</title>
+<!--
+Visual system: 22 / 17 / 15 / 13 / 11px type scale; warm paper #F5F4ED and panel #FBFBF6;
+blue = Peer A / 出网方向, green = Peer B / 放行, amber = 交换/保活/中继, red = 丢包/失效;
+all transitions share the 520ms cubic-bezier motion language.
+Engine: build-once + mutate（与 17.2.1 同一套步进引擎），#scene=xxx&step=n 深链。
+-->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;--gray:#F1EFE8;
+  --blue:#2467A6;--bluebg:#E1EFFA;--bluetx:#1A4F84;
+  --green:#087A5C;--greenbg:#DCF3E9;--greentx:#075A43;
+  --amber:#A66408;--amberbg:#FFF0D7;--ambertx:#764600;
+  --danger:#C34935;--dangerbg:#FAE1DC;--dangertx:#8F2B1C;
+  --code:#2E2C27;--codetext:#E8E3D6;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;line-height:1.3;text-wrap:balance;}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{min-height:48px;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.35);outline-offset:2px;}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1280px){.layout{grid-template-columns:minmax(0,1fr);}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;}.viz .vcap b{font-weight:700;color:var(--ink);}
+.stage-frame{position:relative;width:min(632px,100%);height:420px;margin:0 auto;}
+.stage{position:absolute;left:0;top:0;width:632px;height:420px;transform-origin:top left;}
+.layout > .right{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+#stDesc{font-size:14px;color:var(--muted);margin-top:11px;}.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{background:var(--code);border:1px solid #24231F;border-radius:10px;padding:12px 0;color:var(--codetext);font-family:var(--mono);font-size:13px;line-height:1.55;overflow:hidden;box-shadow:0 1px 3px rgba(60,55,40,.08);}
+.codebox .cl{min-height:24px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background .3s var(--ease),color .3s var(--ease),box-shadow .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}.codebox .cl.hl .cmt{color:#CCC8BA;}
+.codebox .kw{color:#D9B177;}.codebox .type{color:#8EB5DC;}.codebox .ord{color:#A7D7BF;}.codebox .num{color:#E0A797;}.codebox .str{color:#C8B694;}.codebox .cmt{color:#9A968B;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{min-height:40px;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector language. */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.wire{--wc:var(--arrow);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.warrow{--wc:var(--arrow);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wport{--wc:var(--arrow);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire.on,.warrow.on,.wport.on{opacity:1;}.wire.hint{stroke-width:2;opacity:.1;}.warrow.hint,.wport.hint{opacity:.1;}.warrow.drawing{transition-delay:200ms;}
+.wire.blue,.warrow.blue,.wport.blue{--wc:var(--blue);}.wire.green,.warrow.green,.wport.green{--wc:var(--green);}.wire.amber,.warrow.amber,.wport.amber{--wc:var(--amber);}.wire.danger,.warrow.danger,.wport.danger{--wc:var(--danger);}
+
+/* Shared bottom note bar. */
+.snote{position:absolute;left:16px;top:352px;width:600px;min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);padding:8px 14px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.snote.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.snote.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.snote.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.snote.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+/* Generic cards / op rows shared by all scenes. */
+.gcard{position:absolute;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:10px 12px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.gcard.bl{border-color:var(--blue);}.gcard.gr{border-color:var(--green);}.gcard.am{border-color:var(--amber);}.gcard.ik{border-color:var(--ink);}
+.gcard.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.gcard.dim{opacity:.5;}
+.gcard.badbg{border-color:var(--danger);background:var(--dangerbg);}.gcard.okbg{border-color:var(--green);background:var(--greenbg);}.gcard.warnbg{border-color:var(--amber);background:var(--amberbg);}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:700;}
+.ghead span{font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.gsub{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:3px;transition:color var(--dur) var(--ease);}
+.gop{margin-top:8px;min-height:30px;border:1px solid var(--grid);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);padding:5px 8px;display:flex;align-items:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gop.active{color:var(--ink);border-color:var(--ink);background:var(--paper);}
+.gop.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.gop.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.gop.bad{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.gop.off{opacity:.35;border-style:dashed;}
+.glab{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);margin-top:9px;}
+
+/* Scene 4: TTL bar. */
+.ttl-track{margin-top:9px;height:16px;border:1.5px solid var(--line);border-radius:999px;background:var(--gray);overflow:hidden;}
+.ttl-fill{height:100%;width:100%;border-radius:999px;background:var(--green);transition:width 900ms var(--ease),background-color var(--dur) var(--ease);}
+.ttl-fill.warn{background:var(--amber);}.ttl-fill.bad{background:var(--danger);}
+
+/* Scene 5: candidate chips. */
+.cand{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.cand span{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);border:1px dashed var(--line);border-radius:999px;padding:2px 8px;background:var(--gray);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.cand span.on{color:var(--greentx);border-style:solid;border-color:var(--green);background:var(--greenbg);}
+
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:16px;}.desc-card{padding:16px;}.controls{padding:12px 14px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 142px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>UDP 穿透 · 从 NAT 行为到打洞与兜底</h1>
+    <p>配套笔记《9.4 UDP穿透》 · NAT 映射/过滤 · 同 socket 复用 · 双端 PUNCH · Keepalive · STUN/ICE/TURN　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts ? parts[1] : line;
+  const comment=parts && parts[2] ? parts[2] : '';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{
+    strings.push(escapeHtml(value));
+    return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';
+  });
+  code=escapeHtml(code)
+    .replace(/\b(int|auto|for|if|while|return|std|thread|uint16_t|bool|void|const|candidates)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(INADDR_ANY|nullptr|true|false|host|srflx|relay)\b/g,'<span class="ord">$1</span>')
+    .replace(/\b(socket|bind|sendto|recvfrom|send_text|sleep_for|stun_query|check|use|relay_via_turn)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(\d+ms|\d+s)\b/g,'<span class="num">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment ? '<span class="cmt">'+escapeHtml(comment)+'</span>' : '');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="cl'+index+'">'+(line ? highlightCpp(line) : '&nbsp;')+'</div>').join('');}
+function stageFrame(id,classes,html){return '<div class="stage-frame" id="'+id+'Frame"><div class="stage '+classes+'" id="'+id+'Stage">'+html+'</div></div>';}
+function fitStage(id){
+  const base=id.endsWith('Stage')?id.slice(0,-5):id;
+  const stage=el(id),frame=el(base+'Frame');
+  if(!stage||!frame)return;
+  const scale=Math.min(1,frame.clientWidth/632);
+  stage.style.transform='scale('+scale+')';
+  frame.style.height=(420*scale)+'px';
+}
+
+function wireHTML(id){return '<path id="'+id+'" class="wire"></path><path id="'+id+'-head" class="warrow"></path><circle id="'+id+'-port" class="wport" r="4"></circle>';}
+function wireNodes(id){return [el(id),el(id+'-head'),el(id+'-port')];}
+function setWire(id,state,color){
+  const [path,head,port]=wireNodes(id);
+  if(!path||!head||!port)return;
+  const suffix=(state?' '+state:'')+(color?' '+color:'');
+  path.setAttribute('class','wire'+suffix);
+  head.setAttribute('class','warrow'+suffix);
+  port.setAttribute('class','wport'+suffix);
+  if(state!=='on'){
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    path.style.transition='';
+    head.classList.remove('drawing');
+  }
+}
+function drawWire(id,color,timers){
+  setWire(id,'on',color);
+  const [path,head]=wireNodes(id);
+  if(!path||reducedMotion())return;
+  const length=path.getTotalLength();
+  path.style.transition='none';
+  path.style.strokeDasharray=length;
+  path.style.strokeDashoffset=length;
+  head.classList.add('drawing');
+  void path.getBoundingClientRect();
+  path.style.transition='';
+  path.style.strokeDashoffset='0';
+  const timer=setTimeout(()=>{
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    head.classList.remove('drawing');
+  },560);
+  timers.push(timer);
+}
+function wireController(ids,colors){
+  let active=new Set();
+  let timers=[];
+  return {
+    sync(nextIds,hints=false){
+      timers.forEach(clearTimeout);timers=[];
+      const next=new Set(nextIds);
+      const any=next.size>0;
+      ids.forEach(id=>{
+        const state=next.has(id)?'on':(!any&&hints?'hint':'');
+        if(next.has(id)&&!active.has(id))drawWire(id,colors[id],timers);
+        else setWire(id,state,colors[id]);
+      });
+      active=next;
+    },
+    destroy(){timers.forEach(clearTimeout);timers=[];active.clear();}
+  };
+}
+function relRect(stageRect,id){
+  const rect=el(id).getBoundingClientRect();
+  return {left:rect.left-stageRect.left,right:rect.right-stageRect.left,top:rect.top-stageRect.top,bottom:rect.bottom-stageRect.top,cx:(rect.left+rect.right)/2-stageRect.left,cy:(rect.top+rect.bottom)/2-stageRect.top};
+}
+function point(rect,side,offset=0){
+  if(side==='left')return {x:rect.left,y:rect.cy+offset};
+  if(side==='right')return {x:rect.right,y:rect.cy+offset};
+  return {x:rect.cx,y:rect.cy+offset};
+}
+function bezierArrow(id,from,to){
+  const path=el(id),head=el(id+'-head'),port=el(id+'-port');
+  if(!path||!head||!port)return;
+  const direction=to.x>=from.x?1:-1;
+  const baseX=to.x-direction*9;
+  const gap=Math.max(1,Math.abs(baseX-from.x));
+  const c1=from.x+direction*gap*.45;
+  const c2=baseX-direction*gap*.45;
+  path.setAttribute('d','M '+from.x+' '+from.y+' C '+c1+' '+from.y+', '+c2+' '+to.y+', '+baseX+' '+to.y);
+  head.setAttribute('d','M '+to.x+' '+to.y+' L '+baseX+' '+(to.y-5)+' L '+baseX+' '+(to.y+5)+' Z');
+  port.setAttribute('cx',from.x);port.setAttribute('cy',from.y);
+}
+function classes(id,value){el(id).className=value;}
+function setOps(prefix,states){states.forEach((state,index)=>classes(prefix+index,'gop '+state));}
+
+/* ---------- Scene 1 · NAT 映射与过滤 ---------- */
+const natScene=(()=>{
+  const code=[
+    '// NAT 的两套独立行为',
+    '// 映射 Mapping —— 我从公网看起来是谁?',
+    '//   首包出网: 192.168.1.10:50000 => 203.0.113.5:62000',
+    '//   EIM : 换目标, 公网端口不变       -> 最利于打洞',
+    '//   APDM: 目标一变, 端口跟着变       -> 对称 NAT, 最难打',
+    '// 过滤 Filtering —— 谁有资格从公网回来?',
+    '//   EIF : 只要向外发过包, 都容易进来',
+    '//   APDF: 只放行你联系过的精确 IP:port'
+  ];
+  const wires=['hn','ns','nb','sn','xn'];
+  const colors={hn:'blue',ns:'blue',nb:'blue',sn:'green',xn:'danger'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · NAT 的两套行为：映射 + 过滤',chip:'NAT',chipC:'c0',lines:[0,1,5],m1:['——','off'],m2:['——','off'],filt:['—','off'],w:[],hint:true,host:'',nat:'',s:'',b:'',x:'dim',note:'映射：我从公网看起来是谁？过滤：谁有资格从公网回来找我？两者独立，共同决定能否打通。',noteC:''},
+    {title:'步骤 1 · 首包出网：NAT 建立映射',chip:'Mapping',chipC:'cb',lines:[2],m1:['50000 ⇢ 62000（去 S）','active'],m2:['——','off'],filt:['—','off'],w:['hn','ns'],hint:false,host:'active',nat:'active',s:'active',b:'dim',x:'dim',note:'第一次向外发包时 NAT 记下内外映射。服务器用 recvfrom 看到的就是 203.0.113.5:62000。',noteC:'blue'},
+    {title:'步骤 2 · EIM：换个目标，公网端口不变',chip:'EIM 友好',chipC:'cg',lines:[3],m1:['50000 ⇢ 62000（对谁都是）','done'],m2:['——','off'],filt:['—','off'],w:['nb'],hint:false,host:'',nat:'active',s:'dim',b:'active',x:'dim',note:'Endpoint-Independent Mapping：同一 socket 无论去找谁都映射到 62000——服务器告知的地址在打洞时仍然有效。',noteC:'green'},
+    {title:'步骤 3 · 对称 NAT：目标一变端口就变',chip:'APDM 难打',chipC:'cd',lines:[4],m1:['50000 ⇢ 62000（对 S）','warn'],m2:['50000 ⇢ 62001（对 B）','bad'],filt:['—','off'],w:['nb'],hint:false,host:'',nat:'active',s:'dim',b:'active',x:'dim',note:'服务器看到的是 62000，B 朝 62000 打，真实会话却是 62001——地址交换看似成功，裸打洞大概率失败。',noteC:'danger'},
+    {title:'步骤 4 · 过滤：联系过的地址才放行',chip:'Filtering',chipC:'cg',lines:[5,6],m1:['50000 ⇢ 62000','active'],m2:['——','off'],filt:['ADF/APDF：只放行联系过的端点','active'],w:['sn'],hint:false,host:'',nat:'active',s:'active',b:'dim',x:'dim',note:'过滤三档：EIF 宽松、ADF 认 IP、APDF 认精确 IP:port。S 是这个 socket 联系过的端点，回包放行。',noteC:'green'},
+    {title:'步骤 5 · 严过滤：陌生地址直接丢弃',chip:'APDF',chipC:'cd',lines:[7],m1:['50000 ⇢ 62000','active'],m2:['——','off'],filt:['APDF：X 不在放行名单里','bad'],w:['xn'],hint:false,host:'',nat:'active',s:'dim',b:'dim',x:'active',note:'没联系过的 X 打进来直接被丢——"知道对方地址"不够，还得让 NAT 先认识对方。这正是 PUNCH 的意义（场景③）。',noteC:'danger'},
+    {title:'步骤 6 · 收口：映射稳 + 过滤过，才可能直连',chip:'判定',chipC:'ca',lines:[0,1,5],m1:['50000 ⇢ 62000','done'],m2:['——','off'],filt:['映射 × 过滤 = 打洞成功率','warn'],w:[],hint:false,host:'',nat:'',s:'',b:'',x:'dim',note:'映射不稳（对称 NAT）或过滤过严时，裸打洞成功率骤降——真实系统必须准备 TURN 兜底（场景⑤）。',noteC:'amber'}
+  ];
+  function layout(){
+    fitStage('ntStage');
+    const stage=el('ntStage'),svg=el('ntSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const host=relRect(sr,'ntHost'),nat=relRect(sr,'ntNat'),s=relRect(sr,'ntS'),b=relRect(sr,'ntB'),x=relRect(sr,'ntX');
+    bezierArrow('hn',point(host,'right'),point(nat,'left'));
+    bezierArrow('ns',point(nat,'right',-24),point(s,'left'));
+    bezierArrow('nb',point(nat,'right'),point(b,'left',-8));
+    bezierArrow('sn',point(s,'left',14),point(nat,'right',-42));
+    bezierArrow('xn',point(x,'left'),point(nat,'right',24));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>NAT 两套行为</b>：映射决定你是谁，过滤决定谁能进来</div>'+stageFrame('nt','nat-stage',
+      '<div class="gcard bl" id="ntHost" style="left:16px;top:60px;width:150px;min-height:66px;"><div class="ghead">内网主机 <span>peer</span></div><div class="gsub">192.168.1.10:50000</div></div>'+
+      '<div class="gcard ik" id="ntNat" style="left:226px;top:16px;width:180px;min-height:206px;"><div class="ghead">NAT 路由器 <span>203.0.113.5</span></div>'+
+        '<div class="glab">映射表 Mapping</div><div class="gop" id="ntMap1">——</div><div class="gop" id="ntMap2">——</div>'+
+        '<div class="glab">过滤 Filtering</div><div class="gop" id="ntFilt">—</div></div>'+
+      '<div class="gcard gr" id="ntS" style="left:466px;top:16px;width:150px;min-height:60px;"><div class="ghead">服务器 S <span>known</span></div><div class="gsub">203.0.113.10:40000</div></div>'+
+      '<div class="gcard am" id="ntB" style="left:466px;top:98px;width:150px;min-height:60px;"><div class="ghead">Peer B <span>target</span></div><div class="gsub">198.51.100.8:7000</div></div>'+
+      '<div class="gcard" id="ntX" style="left:466px;top:180px;width:150px;min-height:60px;"><div class="ghead">陌生地址 X <span>unknown</span></div><div class="gsub">192.0.2.9:9999</div></div>'+
+      '<svg class="arr-layer" id="ntSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="ntNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('ntFrame'));
+  }
+  function paint(s){
+    layout();
+    classes('ntHost','gcard bl '+s.host);classes('ntNat','gcard ik '+s.nat);
+    classes('ntS','gcard gr '+s.s);classes('ntB','gcard am '+s.b);classes('ntX','gcard '+s.x);
+    el('ntMap1').textContent=s.m1[0];classes('ntMap1','gop '+s.m1[1]);
+    el('ntMap2').textContent=s.m2[0];classes('ntMap2','gop '+s.m2[1]);
+    el('ntFilt').textContent=s.filt[0];classes('ntFilt','gop '+s.filt[1]);
+    classes('ntNote','snote '+s.noteC);el('ntNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'nat',label:'NAT 映射与过滤',sub:'mapping · filtering',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 2 · 同 socket 复用 ---------- */
+const sockScene=(()=>{
+  const code=[
+    'int sock = socket(AF_INET, SOCK_DGRAM, 0); // 只创建这一个',
+    'bind(sock, {INADDR_ANY, 50000});',
+    'sendto(sock, "REG room1 A", server);   // ① 注册',
+    '// 服务器以 recvfrom() 看到的源地址为准: 62000',
+    'sendto(sock, "PUNCH room1 A", peer);   // ② 同一 sock 打洞',
+    'sendto(sock, "DATA hello",    peer);   // ③ 同一 sock 通信',
+    '// 中途换 socket = 全新会话 = NAT 另建映射 62999',
+    '// -> 对端仍朝 62000 发包, 怎么打都打不通'
+  ];
+  const wires=['a1','a2','ns','nb','bok','bbad'];
+  const colors={a1:'blue',a2:'amber',ns:'blue',nb:'blue',bok:'green',bbad:'danger'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 前提：注册、打洞、通信共用一个 socket',chip:'前提',chipC:'c0',lines:[0,1],s1:'active',s2:'off',m1:['——','off'],m2:['——','off'],w:[],hint:true,s:'',b:'dim',note:'这不是代码风格问题：NAT 映射跟着"本地端点"走，换端点就是换会话。',noteC:''},
+    {title:'步骤 1 · socket A 注册：NAT 记下 62000',chip:'REG',chipC:'cb',lines:[2,3],s1:'active',s2:'off',m1:['50000 ⇢ 62000','active'],m2:['——','off'],w:['a1','ns'],hint:false,s:'active',b:'dim',note:'服务器看到源地址 203.0.113.5:62000，并把它作为"A 的公网端点"告诉 B。',noteC:'blue'},
+    {title:'步骤 2 · 复用 socket A 打洞：沿用同一映射',chip:'同源',chipC:'cg',lines:[4,5],s1:'active',s2:'off',m1:['50000 ⇢ 62000（沿用）','done'],m2:['——','off'],w:['a1','nb','bok'],hint:false,s:'dim',b:'active',note:'打洞包沿用 62000 这条映射；B 朝 62000 发包正中现有会话——能对上。',noteC:'green'},
+    {title:'步骤 3 · 反例：中途换了 socket B 去打洞',chip:'换端点',chipC:'ca',lines:[6],s1:'dim2',s2:'warn',m1:['50000 ⇢ 62000（注册用）','warn'],m2:['50001 ⇢ 62999（全新会话）','warn'],w:['a2'],hint:false,s:'dim',b:'dim',note:'对 NAT 来说这是另一条全新会话：公网端口变成 62999，与服务器告知的 62000 无关。',noteC:'amber'},
+    {title:'步骤 4 · B 仍朝旧地址 62000 发包：打不通',chip:'失效',chipC:'cd',lines:[6,7],s1:'dim2',s2:'warn',m1:['50000 ⇢ 62000（已不用）','bad'],m2:['50001 ⇢ 62999（B 不知道）','warn'],w:['a2','bbad'],hint:false,s:'dim',b:'active',note:'"看起来流程都对，但怎么打都打不通"——90% 是这里：交换出去的地址和真正打洞的会话不同源。',noteC:'danger'},
+    {title:'步骤 5 · 收口：三个阶段必须同源',chip:'铁律',chipC:'cg',lines:[0,2,4,5],s1:'active',s2:'off',m1:['50000 ⇢ 62000','done'],m2:['——','off'],w:['a1','ns','nb'],hint:false,s:'',b:'',note:'注册看到的地址 = 打洞用的地址 = 通信用的地址。同一个本地 socket 是打洞成立的前提。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('skStage');
+    const stage=el('skStage'),svg=el('skSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const so1=relRect(sr,'skSock1'),so2=relRect(sr,'skSock2'),m1=relRect(sr,'skMap1'),m2=relRect(sr,'skMap2'),nat=relRect(sr,'skNat'),s=relRect(sr,'skS'),b=relRect(sr,'skB');
+    bezierArrow('a1',point(so1,'right'),point(m1,'left'));
+    bezierArrow('a2',point(so2,'right'),point(m2,'left'));
+    bezierArrow('ns',point(nat,'right',-30),point(s,'left'));
+    bezierArrow('nb',point(nat,'right',10),point(b,'left',-10));
+    bezierArrow('bok',point(b,'left',10),point(nat,'right',30));
+    bezierArrow('bbad',point(b,'left',10),point(nat,'right',30));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>同一个本地 socket</b>：注册、打洞、通信必须同源</div>'+stageFrame('sk','sock-stage',
+      '<div class="gcard bl" id="skHost" style="left:16px;top:40px;width:170px;min-height:160px;"><div class="ghead">内网主机 <span>peer A</span></div>'+
+        '<div class="gop" id="skSock1">socket A · 端口 50000</div><div class="gop off" id="skSock2">socket B · 端口 50001</div></div>'+
+      '<div class="gcard ik" id="skNat" style="left:256px;top:40px;width:150px;min-height:160px;"><div class="ghead">NAT <span>映射表</span></div>'+
+        '<div class="gop" id="skMap1">——</div><div class="gop" id="skMap2">——</div></div>'+
+      '<div class="gcard gr" id="skS" style="left:466px;top:44px;width:150px;min-height:60px;"><div class="ghead">服务器 S <span>rendezvous</span></div><div class="gsub">告知 B："A 在 62000"</div></div>'+
+      '<div class="gcard am" id="skB" style="left:466px;top:150px;width:150px;min-height:60px;"><div class="ghead">Peer B <span>发往 62000</span></div><div class="gsub">198.51.100.8:7000</div></div>'+
+      '<svg class="arr-layer" id="skSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="skNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('skFrame'));
+  }
+  function paint(s){
+    layout();
+    classes('skSock1','gop '+(s.s1==='dim2'?'':s.s1));if(s.s1==='dim2')el('skSock1').style.opacity=.45;else el('skSock1').style.opacity='';
+    classes('skSock2','gop '+s.s2);
+    el('skMap1').textContent=s.m1[0];classes('skMap1','gop '+s.m1[1]);
+    el('skMap2').textContent=s.m2[0];classes('skMap2','gop '+s.m2[1]);
+    classes('skS','gcard gr '+s.s);classes('skB','gcard am '+s.b);
+    classes('skNote','snote '+s.noteC);el('skNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'sock',label:'同 socket 复用',sub:'same local endpoint',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 3 · 双端 PUNCH ---------- */
+const punchScene=(()=>{
+  const code=[
+    '// 收到 "PEER <ip> <port>" 后立刻开始打洞',
+    'punch_thread = std::thread([&]{',
+    '  for (int i = 0; i < 40 && !connected; ++i) {',
+    '    send_text(sock, peer_addr, "PUNCH room1 A");',
+    '    sleep_for(200ms);      // 连续发: 前几包被丢很正常',
+    '  }',
+    '});',
+    'if (cmd == "PUNCH") {      // 真正收到对端的洞穿包',
+    '  send_text(sock, from, "PUNCH_ACK room1 A");',
+    '  connected = true;',
+    '  peer_addr = from;        // 以实际收到的源地址为准',
+    '}'
+  ];
+  const wires=['as','bs','sa','sb','bp1','ap','bp2','ack'];
+  const colors={as:'blue',bs:'green',sa:'blue',sb:'green',bp1:'danger',ap:'blue',bp2:'green',ack:'green'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · A、B 都在各自 NAT 后面',chip:'现状',chipC:'c0',lines:[0],w:[],hint:true,srow:['记录：（空）','off'],aOps:['','',''],bOps:['','',''],naB:['B_pub ?','off'],nbA:['A_pub ?','off'],sC:'',aC:'',bC:'',naC:'',nbC:'',note:'外部主动打进来的包，NAT 没有映射就直接丢——所以谁也不能"等对方先来找自己"。',noteC:''},
+    {title:'步骤 1 · REG：双方先各自联系服务器',chip:'注册',chipC:'cb',lines:[0],w:['as','bs'],hint:false,srow:['记录：A_pub=…:62000 · B_pub=…:7000','active'],aOps:['done','',''],bOps:['done','',''],naB:['B_pub ?','off'],nbA:['A_pub ?','off'],sC:'active',aC:'active',bC:'active',naC:'',nbC:'',note:'S 以 recvfrom 看到的源地址为准，分别记下 A、B 当前的公网端点。',noteC:'blue'},
+    {title:'步骤 2 · 服务器交换双方公网地址',chip:'PEER',chipC:'ca',lines:[0],w:['sa','sb'],hint:false,srow:['向 A 发 B_pub · 向 B 发 A_pub','done'],aOps:['done','',''],bOps:['done','',''],naB:['B_pub ?','off'],nbA:['A_pub ?','off'],sC:'active',aC:'active',bC:'active',naC:'',nbC:'',note:'引介服务器只是"介绍认识"——真正把路打通的，是双方自己后续发出的 UDP 包。',noteC:'amber'},
+    {title:'步骤 3 · B 先发 PUNCH：在 NAT A 被丢',chip:'先丢后通',chipC:'cd',lines:[4],w:['bp1'],hint:false,srow:['交换完成','off'],aOps:['done','',''],bOps:['done','active',''],naB:['不认识 B_pub ✗','bad'],nbA:['认识 A_pub ✓','done'],sC:'dim',aC:'dim',bC:'active',naC:'active',nbC:'active',note:'A 还没向 B_pub 发过包，NAT A 的过滤不放行——前几包被丢是正常现象。注意：B 发包出去时，NAT B 已经记下 A_pub。',noteC:'danger'},
+    {title:'步骤 4 · A 也开始向 B_pub 发 PUNCH',chip:'主动出击',chipC:'cb',lines:[2,3,4],w:['ap'],hint:false,srow:['交换完成','off'],aOps:['done','active',''],bOps:['done','active',''],naB:['认识 B_pub ✓','done'],nbA:['认识 A_pub ✓','done'],sC:'dim',aC:'active',bC:'dim',naC:'active',nbC:'active',note:'A 的 NAT 从此认识 B_pub、允许它回流；这包到 NAT B 时，因 B 之前主动发过包，也会被放行。',noteC:'blue'},
+    {title:'步骤 5 · B 再发 PUNCH：穿过来了，A 回 ACK',chip:'打通',chipC:'cg',lines:[7,8,9,10],w:['bp2','ack'],hint:false,srow:['交换完成','off'],aOps:['done','done','done'],bOps:['done','done','done'],naB:['认识 B_pub ✓','done'],nbA:['认识 A_pub ✓','done'],sC:'dim',aC:'active',bC:'active',naC:'',nbC:'',note:'两边 NAT 都有了对方的可回流状态。一旦收到对端的包，就把"实际收到的源地址"当成后续通信地址。',noteC:'green'},
+    {title:'步骤 6 · DATA 直连：不再经过服务器',chip:'P2P',chipC:'cg',lines:[2,3,4],w:['ack'],hint:false,srow:['退出数据路径','off'],aOps:['done','done','done'],bOps:['done','done','done'],naB:['认识 B_pub ✓','done'],nbA:['认识 A_pub ✓','done'],sC:'dim',aC:'active',bC:'active',naC:'',nbC:'',note:'工程做法：拿到地址立即开打、每 200ms 连发、持续几秒；同一 NAT 后的两个 peer 还要看 hairpinning 支持。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('pnStage');
+    const stage=el('pnStage'),svg=el('pnSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const s=relRect(sr,'pnS'),a=relRect(sr,'pnA'),na=relRect(sr,'pnNA'),nb=relRect(sr,'pnNB'),b=relRect(sr,'pnB');
+    bezierArrow('as',point(a,'right',-38),point(s,'left',6));
+    bezierArrow('bs',point(b,'left',-38),point(s,'right',6));
+    bezierArrow('sa',point(s,'left',-8),point(a,'right',-52));
+    bezierArrow('sb',point(s,'right',-8),point(b,'left',-52));
+    bezierArrow('bp1',point(nb,'left',-16),point(na,'right',-16));
+    bezierArrow('ap',point(na,'right',2),point(nb,'left',2));
+    bezierArrow('bp2',point(nb,'left',20),point(a,'right',20));
+    bezierArrow('ack',point(a,'right',40),point(b,'left',40));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>双端 PUNCH</b>：谁也别等谁，双方同时朝外发包</div>'+stageFrame('pn','punch-stage',
+      '<div class="gcard ik" id="pnS" style="left:241px;top:10px;width:150px;min-height:70px;"><div class="ghead">S · 引介服务器 <span>公网</span></div><div class="gop" id="pnSrow" style="font-size:9px;">记录：（空）</div></div>'+
+      '<div class="gcard bl" id="pnA" style="left:10px;top:110px;width:140px;min-height:150px;"><div class="ghead">Peer A <span>blue</span></div>'+
+        '<div class="gop" id="pnA0">① REG → S</div><div class="gop" id="pnA1">② PUNCH ×N → B_pub</div><div class="gop" id="pnA2">③ 收到 B ✓ 回 ACK</div></div>'+
+      '<div class="gcard" id="pnNA" style="left:166px;top:110px;width:130px;min-height:150px;"><div class="ghead">NAT A <span>过滤</span></div>'+
+        '<div class="gop done" id="pnNAs">认识 S ✓</div><div class="gop off" id="pnNAb">B_pub ?</div></div>'+
+      '<div class="gcard" id="pnNB" style="left:336px;top:110px;width:130px;min-height:150px;"><div class="ghead">NAT B <span>过滤</span></div>'+
+        '<div class="gop done" id="pnNBs">认识 S ✓</div><div class="gop off" id="pnNBa">A_pub ?</div></div>'+
+      '<div class="gcard gr" id="pnB" style="left:492px;top:110px;width:130px;min-height:150px;"><div class="ghead">Peer B <span>green</span></div>'+
+        '<div class="gop" id="pnB0">① REG → S</div><div class="gop" id="pnB1">② PUNCH ×N → A_pub</div><div class="gop" id="pnB2">③ 收到 ACK ✓</div></div>'+
+      '<svg class="arr-layer" id="pnSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="pnNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('pnFrame'));
+  }
+  function paint(s){
+    layout();
+    classes('pnS','gcard ik '+s.sC);classes('pnA','gcard bl '+s.aC);classes('pnB','gcard gr '+s.bC);
+    classes('pnNA','gcard '+s.naC);classes('pnNB','gcard '+s.nbC);
+    el('pnSrow').textContent=s.srow[0];classes('pnSrow','gop '+s.srow[1]);el('pnSrow').style.fontSize='9px';
+    setOps('pnA',s.aOps);setOps('pnB',s.bOps);
+    el('pnNAb').textContent=s.naB[0];classes('pnNAb','gop '+s.naB[1]);
+    el('pnNBa').textContent=s.nbA[0];classes('pnNBa','gop '+s.nbA[1]);
+    classes('pnNote','snote '+s.noteC);el('pnNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'punch',label:'双端 PUNCH',sub:'hole punching',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 4 · Keepalive 保活 ---------- */
+const keepScene=(()=>{
+  const code=[
+    '// NAT 映射靠流量续命: 无流量几十秒~几分钟被回收',
+    'while (connected) {',
+    '    send_text(sock, peer_addr, "KEEPALIVE");',
+    '    sleep_for(15s);      // 每 10~25s 一个轻量心跳',
+    '}',
+    '// 保活中断 -> 映射超时被清 -> 对端包被丢',
+    '// -> 通信失败后要能重新走一遍打洞流程'
+  ];
+  const wires=['ab','ba','ka'];
+  const colors={ab:'green',ba:'danger',ka:'blue'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 直连已建立，但映射不是永久的',chip:'现状',chipC:'c0',lines:[0],w:['ab'],ttl:100,ttlC:'',row:['50000 ⇢ 62000 · 存活','active'],mapC:'',note:'洞已经打通。但多数家用路由器在一段时间不见流量后就回收 UDP 映射——洞会自己关上。',noteC:''},
+    {title:'步骤 1 · 一段时间没有流量',chip:'空闲计时',chipC:'ca',lines:[0],w:[],ttl:38,ttlC:'warn',row:['50000 ⇢ 62000 · 空闲中','warn'],mapC:'',note:'双方都没发包，NAT 的空闲计时一直在走。常见超时大约几十秒到几分钟。',noteC:'amber'},
+    {title:'步骤 2 · 超时：映射被回收',chip:'洞关上了',chipC:'cd',lines:[5],w:[],ttl:0,ttlC:'bad',row:['映射已回收','bad'],mapC:'badbg',note:'NAT 把这条映射状态清掉了。此刻双方都还以为"连接"存在。',noteC:'danger'},
+    {title:'步骤 3 · B 再发包：被当陌生包丢弃',chip:'需重新打洞',chipC:'cd',lines:[5,6],w:['ba'],ttl:0,ttlC:'bad',row:['映射已回收','bad'],mapC:'badbg',note:'映射没了，B 的包如同陌生地址来包被过滤——后续通信失败，需要重新走一遍打洞流程。',noteC:'danger'},
+    {title:'步骤 4 · 正确做法：定期轻量心跳',chip:'Keepalive',chipC:'cb',lines:[1,2,3],w:['ka'],ttl:100,ttlC:'',row:['50000 ⇢ 62000 · 已续命','done'],mapC:'okbg',note:'每 10~25 秒发一个小包，空闲计时被重置，映射长期有效。心跳内容无所谓，有流量就行。',noteC:'blue'},
+    {title:'步骤 5 · 收口：保活 + 失败重打',chip:'工程铁律',chipC:'cg',lines:[1,2,3,6],w:['ab'],ttl:100,ttlC:'',row:['50000 ⇢ 62000 · 存活','done'],mapC:'',note:'应用休眠、网络抖动都可能让保活中断——检测到通信失败时，要能自动重新打洞或回退 TURN（场景⑤）。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('kpStage');
+    const stage=el('kpStage'),svg=el('kpSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const a=relRect(sr,'kpA'),b=relRect(sr,'kpB'),m=relRect(sr,'kpMap');
+    bezierArrow('ab',point(a,'right',-12),point(b,'left',-12));
+    bezierArrow('ba',point(b,'left',12),point(a,'right',12));
+    bezierArrow('ka',point(a,'right',30),point(m,'left',-20));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>Keepalive</b>：洞打通之后，还得让它一直开着</div>'+stageFrame('kp','keep-stage',
+      '<div class="gcard bl" id="kpA" style="left:16px;top:40px;width:150px;min-height:64px;"><div class="ghead">Peer A <span>direct</span></div><div class="gsub">203.0.113.5:62000</div></div>'+
+      '<div class="gcard gr" id="kpB" style="left:466px;top:40px;width:150px;min-height:64px;"><div class="ghead">Peer B <span>direct</span></div><div class="gsub">198.51.100.8:7000</div></div>'+
+      '<div class="gcard ik" id="kpMap" style="left:196px;top:160px;width:240px;min-height:120px;"><div class="ghead">NAT 映射条目 <span>UDP</span></div>'+
+        '<div class="gop" id="kpRow">50000 ⇢ 62000 · 存活</div>'+
+        '<div class="glab">空闲超时计时</div><div class="ttl-track"><div class="ttl-fill" id="kpTTL"></div></div></div>'+
+      '<svg class="arr-layer" id="kpSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="kpNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('kpFrame'));
+  }
+  function paint(s){
+    layout();
+    el('kpTTL').style.width=s.ttl+'%';classes('kpTTL','ttl-fill '+s.ttlC);
+    el('kpRow').textContent=s.row[0];classes('kpRow','gop '+s.row[1]);
+    classes('kpMap','gcard ik '+s.mapC);
+    classes('kpNote','snote '+s.noteC);el('kpNote').textContent=s.note;
+    controller.sync(s.w,false);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'keep',label:'保活 Keepalive',sub:'mapping timeout',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 5 · STUN / ICE / TURN ---------- */
+const iceScene=(()=>{
+  const code=[
+    '// NAT 制造问题, STUN 照镜子, ICE 试路, TURN 兜底',
+    'pub = stun_query(sock);            // 我的公网 IP:port?',
+    'candidates = {host, srflx, relay}; // ICE 收集候选',
+    'for (auto& pair : candidate_pairs) // 逐对连通性检查',
+    '    if (check(pair)) return use(pair); // 能直连就直连',
+    'return relay_via_turn();           // 兜底: TURN 中继'
+  ];
+  const wires=['st','p2p','r1','r2'];
+  const colors={st:'green',p2p:'green',r1:'amber',r2:'amber'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 四个角色各管一段',chip:'总览',chipC:'c0',lines:[0],w:[],hint:true,roles:['','','',''],aSub:'公网端点：未知',aSubC:'',cand:[false,false,false],mid:['STUN 服务器','TURN 中继'],midC:['',''],note:'NAT 制造问题，STUN 帮你看清自己，ICE 负责试路，TURN 负责兜底。',noteC:''},
+    {title:'步骤 1 · STUN：照镜子看清自己',chip:'STUN',chipC:'cg',lines:[1],w:['st'],hint:false,roles:['dim','active','dim','dim'],aSub:'公网端点：203.0.113.5:62000',aSubC:'ok',cand:[false,false,false],mid:['STUN 服务器','TURN 中继'],midC:['active','dim'],note:'误区①：STUN ≠ UDP 穿透。它只回答"你从公网看是谁"，是发现映射地址的工具，不负责打通。',noteC:'green'},
+    {title:'步骤 2 · ICE：收集候选，逐对试路',chip:'ICE',chipC:'cb',lines:[2,3],w:[],hint:false,roles:['dim','dim','active','dim'],aSub:'公网端点：203.0.113.5:62000',aSubC:'ok',cand:[true,true,true],mid:['STUN 服务器','TURN 中继'],midC:['dim','dim'],note:'候选 = 本地地址(host) + 服务器反射地址(srflx) + 中继地址(relay)，按优先级两两配对做连通性检查。',noteC:'blue'},
+    {title:'步骤 3 · 直连检查成功 → 走 P2P',chip:'直连',chipC:'cg',lines:[4],w:['p2p'],hint:false,roles:['dim','dim','active','dim'],aSub:'公网端点：203.0.113.5:62000',aSubC:'ok',cand:[true,true,false],mid:['STUN 服务器','TURN 中继'],midC:['dim','dim'],note:'能直连就直连：延迟最低、不占服务器带宽。打洞（场景③）就发生在这一步的连通性检查里。',noteC:'green'},
+    {title:'步骤 4 · 直连失败 → 回退 TURN 中继',chip:'TURN 兜底',chipC:'ca',lines:[5],w:['r1','r2'],hint:false,roles:['active','dim','dim','active'],aSub:'公网端点：不稳定（对称 NAT）',aSubC:'bad',cand:[false,false,true],mid:['STUN 服务器','TURN 中继（转发所有数据）'],midC:['dim','warnbg'],note:'对称 NAT、CGNAT、严过滤都可能让直连失败——数据改走 TURN 转发：可靠但有额外延迟与带宽成本。',noteC:'amber'},
+    {title:'步骤 5 · 收口：能直连就直连，不行就 TURN',chip:'策略',chipC:'cg',lines:[3,4,5],w:['p2p'],hint:false,roles:['','','',''],aSub:'公网端点：203.0.113.5:62000',aSubC:'ok',cand:[true,true,true],mid:['STUN 服务器','TURN 中继（备用）'],midC:['',''],note:'误区②：地址交换完 ≠ 结束——真正难的是映射稳定性、过滤策略与打洞时机。WebRTC 正是这套 ICE 协调流程。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('icStage');
+    const stage=el('icStage'),svg=el('icSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const a=relRect(sr,'icA'),b=relRect(sr,'icB'),stun=relRect(sr,'icStun'),turn=relRect(sr,'icTurn');
+    bezierArrow('st',point(a,'right',-30),point(stun,'left'));
+    bezierArrow('p2p',point(a,'right',-10),point(b,'left',-10));
+    bezierArrow('r1',point(a,'right',26),point(turn,'left'));
+    bezierArrow('r2',point(turn,'right'),point(b,'left',26));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>STUN · ICE · TURN</b>：尽量直连，必要时回退中继</div>'+stageFrame('ic','ice-stage',
+      '<div class="gcard" id="icR0" style="left:16px;top:14px;width:141px;min-height:74px;"><div class="ghead">NAT</div><div class="gsub">制造问题的那一层</div></div>'+
+      '<div class="gcard gr" id="icR1" style="left:170px;top:14px;width:141px;min-height:74px;"><div class="ghead">STUN</div><div class="gsub">照镜子：我从公网看是谁</div></div>'+
+      '<div class="gcard bl" id="icR2" style="left:324px;top:14px;width:141px;min-height:74px;"><div class="ghead">ICE</div><div class="gsub">候选管理 + 连通性检查</div></div>'+
+      '<div class="gcard am" id="icR3" style="left:478px;top:14px;width:141px;min-height:74px;"><div class="ghead">TURN</div><div class="gsub">直连失败时的中继兜底</div></div>'+
+      '<div class="gcard gr" id="icStun" style="left:246px;top:126px;width:140px;min-height:48px;padding:8px 12px;"><div class="gsub" id="icStunTx" style="margin-top:0;">STUN 服务器</div></div>'+
+      '<div class="gcard am" id="icTurn" style="left:246px;top:288px;width:140px;min-height:48px;padding:8px 12px;"><div class="gsub" id="icTurnTx" style="margin-top:0;">TURN 中继</div></div>'+
+      '<div class="gcard bl" id="icA" style="left:16px;top:210px;width:170px;min-height:104px;"><div class="ghead">Peer A <span>caller</span></div><div class="gsub" id="icASub">公网端点：未知</div>'+
+        '<div class="cand"><span id="icC0">host</span><span id="icC1">srflx</span><span id="icC2">relay</span></div></div>'+
+      '<div class="gcard gr" id="icB" style="left:446px;top:210px;width:170px;min-height:104px;"><div class="ghead">Peer B <span>callee</span></div><div class="gsub">候选已就绪</div></div>'+
+      '<svg class="arr-layer" id="icSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="icNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('icFrame'));
+  }
+  function paint(s){
+    layout();
+    ['icR0','icR1','icR2','icR3'].forEach((id,i)=>{
+      const base=['gcard','gcard gr','gcard bl','gcard am'][i];
+      classes(id,base+' '+s.roles[i]);
+    });
+    el('icASub').textContent=s.aSub;
+    el('icASub').style.color=s.aSubC==='ok'?'var(--greentx)':s.aSubC==='bad'?'var(--dangertx)':'';
+    s.cand.forEach((on,i)=>classes('icC'+i,on?'on':''));
+    el('icStunTx').textContent=s.mid[0];el('icTurnTx').textContent=s.mid[1];
+    classes('icStun','gcard gr '+s.midC[0]);el('icStunTx').style.marginTop='0';
+    classes('icTurn','gcard am '+s.midC[1]);el('icTurnTx').style.marginTop='0';
+    classes('icNote','snote '+s.noteC);el('icNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'ice',label:'STUN · ICE · TURN',sub:'fallback strategy',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- 步进引擎 ---------- */
+const SCENES=[natScene,sockScene,punchScene,keepScene,iceScene];
+const tabsBox=el('tabs');
+const stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc');
+const codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots');
+const btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{
+  const tab=document.createElement('button');
+  tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';
+  tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);
+});
+
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();
+  sceneIndex=index;stepIndex=0;
+  [...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));
+  const scene=SCENES[sceneIndex];
+  scene.mount();
+  codeBox.innerHTML=codePanel(scene.code);
+  dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,index)=>{
+    const dot=document.createElement('button');
+    dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);
+    dot.addEventListener('click',()=>{stop();go(index);});dotsBox.appendChild(dot);dotEls.push(dot);
+  });
+  go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;
+  stepIndex=Math.max(0,Math.min(steps.length-1,index));
+  const step=steps[stepIndex];
+  SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.classList.toggle('hl',Boolean(step.lines&&step.lines.includes(i))));
+  stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;
+  stDesc.textContent=step.desc||step.note||'从初始状态开始，观察每一个包在两层 NAT 之间的命运。';
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});
+  readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}
+  if(stepIndex===steps.length-1)stop();
+}
+function play(){
+  const steps=SCENES[sceneIndex].steps;
+  if(stepIndex===steps.length-1)go(0);
+  btnPlay.textContent='暂停';
+  timer=setInterval(()=>{stepIndex<steps.length-1?go(stepIndex+1):stop();},2700);
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());
+btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});
+btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{
+  if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}
+});
+const hashScene=location.hash.match(/scene=(\w+)/);const hashStep=location.hash.match(/step=(\d+)/);
+let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}
+switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

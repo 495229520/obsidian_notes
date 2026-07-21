@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPC 动画 · 管道字节流 / 共享内存映射 / 信号量 P·V</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1200px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.2px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.9em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:600px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1060px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:20px;min-height:470px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+.imsg{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:16px;text-align:center;transition:all .3s var(--ease);min-height:34px;}
+.imsg.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.imsg.warn{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+
+/* ---------- 场景1 管道 ---------- */
+.pipe-row{display:grid;grid-template-columns:88px 1fr 88px;gap:12px;align-items:center;}
+.actor{border:1.5px solid var(--line);border-radius:11px;background:var(--paper);padding:10px 8px;text-align:center;font-family:var(--mono);transition:all .3s var(--ease);}
+.actor .an{font-size:12px;font-weight:700;color:var(--ink);}
+.actor .af{font-size:10px;color:var(--faint);margin-top:2px;}
+.actor .ast{font-size:10px;margin-top:6px;padding:2px 6px;border-radius:6px;background:var(--gray);color:var(--muted);}
+.actor.act{border-color:var(--blue);background:var(--bluebg);}
+.actor.act .an{color:var(--blue);}
+.actor.block{border-color:var(--danger);background:var(--dangerbg);}
+.actor.block .ast{background:var(--danger);color:var(--paper);}
+.pipe-buf{position:relative;}
+.pipe-cells{display:flex;gap:4px;justify-content:center;}
+.pcell{flex:1;max-width:34px;height:44px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:16px;font-weight:700;border:1.5px dashed var(--grid);border-radius:7px;background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);}
+.pcell.filled{border-style:solid;border-color:var(--blue);background:var(--bluebg);color:var(--blue);}
+.pcell.consumed{border-style:solid;border-color:var(--grid);background:var(--gray);color:transparent;}
+.pcell.flash{animation:pop .5s var(--ease);}
+@keyframes pop{0%{transform:scale(.7);}70%{transform:scale(1.16);}100%{transform:scale(1);}}
+.ptr-track{position:relative;height:26px;margin-top:6px;}
+.ptr{position:absolute;top:0;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;transition:left .5s var(--ease);white-space:nowrap;transform:translateX(-50%);}
+.ptr.w{color:var(--blue);background:var(--bluebg);border:1px solid var(--blue);}
+.ptr.r{color:var(--brown);background:var(--brownbg);border:1px solid var(--brown);top:13px;}
+.pipe-meta{display:flex;justify-content:center;gap:18px;margin-top:26px;font-family:var(--mono);font-size:12px;color:var(--muted);}
+.pipe-meta b{color:var(--ink);}
+.arrow-lbl{text-align:center;font-family:var(--mono);font-size:15px;color:var(--faint);}
+
+/* ---------- 场景2 共享内存 ---------- */
+.shm-stage{position:relative;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:1;}
+.wire-svg .wline{fill:none;stroke:var(--brown);stroke-width:2.5;opacity:0;transition:opacity .3s;}
+.wire-svg .wline.on{opacity:1;}
+.wire-svg .warr{fill:var(--brown);stroke:none;opacity:0;transition:opacity .25s;}
+.wire-svg .warr.on{opacity:1;transition-delay:.2s;}
+.wire-svg .wport{fill:var(--panel);stroke:var(--brown);stroke-width:2;opacity:0;transition:opacity .3s;}
+.wire-svg .wport.on{opacity:1;}
+.shm-top{display:grid;grid-template-columns:1fr 1fr;gap:60px;position:relative;z-index:2;}
+.vaspace{border:1.5px solid var(--grid);border-radius:11px;background:var(--paper);padding:8px;}
+.vaspace .vh{font-family:var(--mono);font-size:11px;font-weight:700;text-align:center;color:var(--ink);margin-bottom:7px;}
+.vaseg{border:1px solid var(--grid);border-radius:6px;padding:5px 8px;margin-bottom:4px;font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;transition:all .3s var(--ease);}
+.vaseg.shm{border-color:var(--grid);color:var(--faint);opacity:.35;}
+.vaseg.shm.on{opacity:1;border-color:var(--brown);background:var(--brownbg);color:var(--brown);font-weight:700;}
+.vaseg.shm.writing{border-color:var(--blue);background:var(--bluebg);color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.15);}
+.vaseg.shm.reading{border-color:var(--green);background:var(--greenbg);color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.15);}
+.vaseg .adr{font-size:9px;opacity:.8;display:block;}
+.phys-wrap{display:flex;justify-content:center;margin-top:64px;position:relative;z-index:2;}
+.phys{border:1.5px solid var(--brown);border-radius:11px;background:var(--brownbg);padding:10px 14px;text-align:center;min-width:280px;}
+.phys .ph-h{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;}
+.phys-cells{display:flex;gap:4px;justify-content:center;}
+.phcell{width:30px;height:34px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:700;border:1px solid var(--brown);border-radius:6px;background:var(--paper);color:var(--brown);transition:all var(--dur) var(--ease);}
+.phcell.empty{color:var(--faint);border-color:var(--grid);border-style:dashed;background:var(--paper);}
+.phcell.flash{animation:pop .5s var(--ease);}
+.nattch{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:14px;}
+.nattch b{color:var(--brown);font-size:15px;}
+
+/* ---------- 场景3 信号量 ---------- */
+.sem-stage{display:grid;grid-template-columns:1fr 150px 1fr;gap:16px;align-items:start;}
+.sem-actor{border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:12px 10px;text-align:center;transition:all .3s var(--ease);}
+.sem-actor .san{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ink);}
+.sem-actor .sop{margin-top:10px;font-family:var(--mono);font-size:12px;font-weight:700;padding:7px 8px;border-radius:8px;background:var(--gray);color:var(--muted);transition:all .3s var(--ease);min-height:34px;display:flex;align-items:center;justify-content:center;}
+.sem-actor.prod.act{border-color:var(--blue);background:var(--bluebg);}
+.sem-actor.prod.act .sop{background:var(--blue);color:var(--paper);}
+.sem-actor.cons.act{border-color:var(--green);background:var(--greenbg);}
+.sem-actor.cons.act .sop{background:var(--green);color:var(--paper);}
+.sem-actor.block{border-color:var(--danger);background:var(--dangerbg);}
+.sem-actor.block .sop{background:var(--danger);color:var(--paper);}
+.sem-mid{display:flex;flex-direction:column;gap:10px;}
+.sem-counters{display:flex;gap:10px;justify-content:center;}
+.counter{flex:1;border:1.5px solid var(--grid);border-radius:10px;padding:8px 6px;text-align:center;background:var(--paper);}
+.counter .cn{font-family:var(--mono);font-size:10.5px;font-weight:700;margin-bottom:4px;}
+.counter.empty .cn{color:var(--blue);}
+.counter.full .cn{color:var(--green);}
+.counter .cv{font-family:var(--mono);font-size:26px;font-weight:800;line-height:1;transition:color .3s;}
+.counter.empty .cv{color:var(--blue);}
+.counter.full .cv{color:var(--green);}
+.ctok{display:flex;flex-direction:column-reverse;gap:3px;margin-top:7px;}
+.ctok i{height:9px;border-radius:3px;background:var(--gray);border:1px solid var(--grid);transition:all .35s var(--ease);}
+.counter.empty .ctok i.on{background:var(--bluebg);border-color:var(--blue);}
+.counter.full .ctok i.on{background:var(--greenbg);border-color:var(--green);}
+.sem-buf{display:flex;flex-direction:column;gap:6px;}
+.sbufh{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:center;}
+.sbuf-cells{display:flex;flex-direction:column;gap:5px;}
+.scell{height:30px;border:1.5px dashed var(--grid);border-radius:7px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--faint);transition:all .35s var(--ease);}
+.scell.full{border-style:solid;border-color:var(--brown);background:var(--brownbg);color:var(--brown);font-weight:700;}
+.scell.rw{box-shadow:0 0 0 3px rgba(154,91,14,.18);}
+.invariant{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:16px;padding:9px;border-radius:9px;background:var(--paper);border:1px solid var(--line);transition:all .3s;}
+.invariant b{color:var(--ink);}
+.invariant.rest{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.invariant.rest b{color:var(--green);}
+
+/* ---------- 右栏 ---------- */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:190px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:16px;font-weight:600;}
+.act2{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;white-space:nowrap;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:12px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .br{color:var(--brown);font-weight:600;}
+
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.cl2{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:#D8D5CC;white-space:pre;padding:2px 16px;transition:background .3s,box-shadow .3s,color .3s;}
+.cl2.on{background:rgba(52,122,198,.5);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.cl2.on .c-cmt{color:#CCC8BA;}
+.c-kw{color:#E3A44C;} .c-str{color:#9DC08B;} .c-num{color:#D98E73;}
+.c-cmt{color:#8F8B80;} .c-mac{color:#7FB0E0;} .c-pre{color:#C88AC8;}
+
+.facts{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:13px 16px;}
+.facts .fh{font-size:12px;color:var(--faint);font-family:var(--mono);margin-bottom:8px;}
+.facts table{width:100%;border-collapse:collapse;font-size:12px;}
+.facts td{padding:4px 6px;border-bottom:1px solid var(--grid);color:var(--muted);vertical-align:top;}
+.facts td:first-child{font-family:var(--mono);color:var(--ink);white-space:nowrap;font-weight:600;width:40%;}
+.facts tr:last-child td{border-bottom:none;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Linux IPC 动画 · 管道 / 共享内存 / 信号量</h1>
+    <p>管道字节流（无边界·满空阻塞） · 共享内存映射（同一物理页·零复制） · 信号量 P·V 计数器　·　上方切主题，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act2" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+      <div class="facts">
+        <div class="fh">要点速查</div>
+        <table>
+          <tr><td>管道</td><td>半双工 · 字节流无消息边界 · 缓冲区约 64KB</td></tr>
+          <tr><td>匿名 vs FIFO</td><td>pipe() 需亲缘 · mkfifo() 任意进程有路径</td></tr>
+          <tr><td>共享内存</td><td>最快 IPC · 零复制 · 本身不带同步</td></tr>
+          <tr><td>SHM 流程</td><td>ftok→shmget→shmat→读写→shmdt→IPC_RMID</td></tr>
+          <tr><td>信号量</td><td>只同步不传数据 · P 减 V 加 · empty+full=CAP</td></tr>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+let cur=0;
+
+/* 语法高亮 */
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function hlLine(raw){
+  const m=raw.match(/^(.*?)(\/\/.*)?$/);
+  let code=esc(m[1]); const cmt=m[2]?esc(m[2]):'';
+  if(code.trim().charAt(0)==='#'){
+    return '<span class="c-pre">'+code+'</span>'+(cmt?'<span class="c-cmt">'+cmt+'</span>':'');
+  }
+  const strs=[];
+  code=code.replace(/"[^"]*"/g,s=>{strs.push(s);return ''+String.fromCharCode(65+strs.length-1)+'';});
+  code=code
+    .replace(/\b(int|char|void|unsigned|const|static|struct|return|if|else|while|for|sizeof|socklen_t|ssize_t|size_t|key_t)\b/g,'<span class="c-kw">$1</span>')
+    .replace(/\b([A-Z_][A-Z0-9_]{2,})\b/g,'<span class="c-mac">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="c-num">$1</span>')
+    .replace(/([A-Z])/g,(_,c)=>'<span class="c-str">'+strs[c.charCodeAt(0)-65]+'</span>');
+  return code+(cmt?'<span class="c-cmt">'+cmt+'</span>':'');
+}
+function drawIn(path){
+  if(!path)return;const L=path.getTotalLength();
+  path.style.transition='none';path.style.strokeDasharray=L;path.style.strokeDashoffset=L;
+  void path.getBoundingClientRect();path.style.transition='';path.style.strokeDashoffset='0';
+  clearTimeout(path._t);path._t=setTimeout(()=>{path.style.strokeDasharray='';path.style.strokeDashoffset='';},560);
+}
+
+/* ============ 场景1：管道字节流 ============ */
+const sPipe=(()=>{
+  const CAP=12;
+  function mount(){
+    let cells='';for(let i=0;i<CAP;i++)cells+='<div class="pcell" id="pc-'+i+'"></div>';
+    viz.innerHTML='<div class="vcap"><b>匿名管道</b>：内核缓冲区里的<b>字节流</b>——半双工、单向、无消息边界</div>'+
+      '<div class="imsg" id="imsg"></div>'+
+      '<div class="pipe-row">'+
+        '<div class="actor" id="ap"><div class="an">生产者</div><div class="af">写端 fd[1]</div><div class="ast" id="ap-st">write()</div></div>'+
+        '<div class="pipe-buf"><div class="arrow-lbl">内核管道缓冲区 (字节流)　→</div>'+
+          '<div class="pipe-cells" style="margin-top:8px">'+cells+'</div>'+
+          '<div class="ptr-track" id="ptrk"><div class="ptr w" id="ptr-w">写 w</div><div class="ptr r" id="ptr-r">读 r</div></div></div>'+
+        '<div class="actor" id="ac"><div class="an">消费者</div><div class="af">读端 fd[0]</div><div class="ast" id="ac-st">read()</div></div>'+
+      '</div>'+
+      '<div class="pipe-meta"><span>已缓冲字节 <b id="pm-n">0</b> / '+CAP+'</span><span id="pm-note"></span></div>';
+  }
+  // 每步完整描述缓冲状态：data=至今写入的字节序列, r/w 指针, 阻塞标志
+  const steps=[
+    {title:'步骤 0 · pipe(fd) 建立管道',chip:'半双工字节流',chipC:'c0',hl:[0,1,2],data:'',r:0,w:0,msg:'pipe(fd)：fd[1] 写端、fd[0] 读端，中间是内核缓冲区',
+     ap:'就绪',ac:'就绪',note:'空',
+     desc:'<code>pipe(fd)</code> 建立一条<b>单向字节流</b>：<code>fd[1]</code> 写、<code>fd[0]</code> 读。数据从写端流向读端，<b>半双工</b>——要双向得建两个管道。'},
+    {title:'步骤 1 · write(fd[1],"hello",5)',chip:'写入 5 字节',chipC:'cb',hl:[4],data:'hello',r:0,w:5,msg:'write 把 5 个字节追加到缓冲区尾部',
+     ap:'write 5B',ac:'就绪',note:'5 字节可读',apAct:true,
+     desc:'写端 <code>write(fd[1], "hello", 5)</code> 把 5 个字节<b>追加</b>到缓冲区。写指针 <span class="bl">w</span> 前移 5 格。此刻读端还没来取。'},
+    {title:'步骤 2 · write(fd[1]," world",6)',chip:'无消息边界',chipC:'ch',hl:[5],data:'hello world',r:0,w:11,msg:'再写 6 字节：两次 write 在缓冲里拼成连续字节流,没有分界',
+     ap:'write 6B',ac:'就绪',note:'11 字节 · 无边界',apAct:true,
+     desc:'再写 <code>" world"</code>。关键：管道<b>没有消息边界</b>——两次 <code>write</code> 的内容在缓冲里首尾相连成 <b>"hello world"</b>，读端无法据此还原"这是两次写"。'},
+    {title:'步骤 3 · read(fd[0],buf,4)',chip:'读多少你定',chipC:'cb',hl:[7,8],data:'hello world',r:4,w:11,msg:'read 只取 4 字节 "hell"——读出的大小可以 != 写入的大小',
+     ac:'read 4B',ap:'就绪',note:'剩 7 字节未读',acAct:true,
+     desc:'读端 <code>read(fd[0], buf, 4)</code> 只取走 <b>"hell"</b>。读出的块大小由调用者决定，<b>可以和写入的块大小不同</b>——这正是"字节流、无边界"的直接后果。已消费的格子变灰。'},
+    {title:'步骤 4 · read 取走剩余',chip:'缓冲清空',chipC:'cb',hl:[7],data:'hello world',r:11,w:11,msg:'再次 read 取走剩下 "o world",缓冲清空 (r == w)',
+     ac:'read 7B',ap:'就绪',note:'空',acAct:true,
+     desc:'再 <code>read</code> 取走剩余 7 字节 <b>"o world"</b>，读指针 <span class="br">r</span> 追上写指针 <span class="bl">w</span>，缓冲区<b>清空</b>。'},
+    {title:'步骤 5 · 缓冲写满 → write 阻塞',chip:'满则阻塞',chipC:'cd',hl:[9],data:'PIPEFULL0123',r:0,w:12,msg:'缓冲区被写满 (12/12),读端还没消费,write() 阻塞等待',
+     ap:'write 阻塞',ac:'未读取',note:'满 12/12',apBlock:true,
+     desc:'如果读端跟不上，缓冲区被<b>写满</b>（这里演示满 12/12）。此时写端再 <code>write()</code> 会<span class="dg">阻塞</span>，直到读端消费出空间。这是管道的<b>背压</b>机制。'},
+    {title:'步骤 6 · 缓冲为空 → read 阻塞 · overlap',chip:'空则阻塞',chipC:'cg',hl:[9],data:'abcdef',r:6,w:6,msg:'缓冲为空时 read() 阻塞;写一块读一块 = 流水线 overlap',
+     ac:'read 阻塞',ap:'生产中',note:'空 · 等待写入',acBlock:true,
+     desc:'反过来，缓冲为空时 <code>read()</code> 会<span class="dg">阻塞</span>，直到写端产出数据。生产者写下一块、消费者处理上一块，二者天然<b>流水线并发（overlap）</b>——这就是 <code>cat file | grep x | wc -l</code> 高效的原因。'}
+  ];
+  let prev=null;
+  function ptr(id,idx){
+    const p=document.getElementById(id);
+    let x;
+    if(idx>=CAP){const last=document.getElementById('pc-'+(CAP-1));x=last.offsetLeft+last.offsetWidth;}
+    else{const c=document.getElementById('pc-'+idx);x=c.offsetLeft;}
+    p.style.left=x+'px';
+  }
+  function paint(instant){
+    const s=steps[cur];
+    document.getElementById('imsg').textContent=s.msg;
+    for(let i=0;i<CAP;i++){
+      const c=document.getElementById('pc-'+i);
+      let cls='pcell',txt='';
+      if(i<s.r){cls+=' consumed';txt=s.data[i]||'';}
+      else if(i<s.w){cls+=' filled';txt=s.data[i]||'';}
+      const changed=prev&&prev.cls!==cls&&cls.includes('filled');
+      c.className=cls;c.textContent=txt;
+    }
+    if(instant){document.getElementById('ptr-w').style.transition='none';document.getElementById('ptr-r').style.transition='none';}
+    ptr('ptr-w',s.w);ptr('ptr-r',s.r);
+    if(instant){void viz.offsetWidth;document.getElementById('ptr-w').style.transition='';document.getElementById('ptr-r').style.transition='';}
+    document.getElementById('pm-n').textContent=Math.max(0,s.w-s.r);
+    document.getElementById('pm-note').textContent='· '+s.note;
+    const ap=document.getElementById('ap'),ac=document.getElementById('ac');
+    ap.className='actor'+(s.apBlock?' block':(s.apAct?' act':''));
+    ac.className='actor'+(s.acBlock?' block':(s.acAct?' act':''));
+    document.getElementById('ap-st').textContent=s.ap;
+    document.getElementById('ac-st').textContent=s.ac;
+    const im=document.getElementById('imsg');im.className='imsg'+(s.apBlock||s.acBlock?' warn':'');
+    prev=s;
+  }
+  const code=[
+    'int fd[2];',
+    'pipe(fd);                 // fd[1] 写端, fd[0] 读端',
+    '// fork 后: 写进程关 fd[0], 读进程关 fd[1]',
+    '',
+    'write(fd[1], "hello", 5); // 追加字节到内核缓冲',
+    'write(fd[1], " world", 6);// 无边界: 拼成连续字节流',
+    '',
+    'char buf[32];',
+    'ssize_t n = read(fd[0], buf, 4); // 读多少可 != 写入',
+    '// 缓冲满 write 阻塞; 缓冲空 read 阻塞'
+  ];
+  return {id:'pipe',label:'管道字节流',sub:'无边界·满空阻塞',mount,steps,paint,code};
+})();
+
+/* ============ 场景2：共享内存映射 ============ */
+const sShm=(()=>{
+  const lit=new Set();
+  function seg(cls,label,adr){return '<div class="vaseg '+cls+'">'+label+(adr?'<span class="adr">'+adr+'</span>':'')+'</div>';}
+  function mount(){
+    lit.clear();
+    let ph='';for(let i=0;i<8;i++)ph+='<div class="phcell empty" id="ph-'+i+'"></div>';
+    viz.innerHTML='<div class="vcap"><b>共享内存</b>：两个进程把<b>同一物理页</b>映射进各自虚拟地址空间——零复制</div>'+
+      '<div class="imsg" id="imsg"></div>'+
+      '<div class="shm-stage" id="shm-stage">'+
+        '<svg class="wire-svg" id="wire"><path class="wline" id="wl-a"/><path class="wline" id="wl-b"/><path class="warr" id="wa-a"/><path class="warr" id="wa-b"/><circle class="wport" id="wp-a" r="4"/><circle class="wport" id="wp-b" r="4"/></svg>'+
+        '<div class="shm-top">'+
+          '<div class="vaspace"><div class="vh">进程 A · 虚拟地址空间</div>'+
+            seg('','栈 stack','')+seg('shm','共享映射区','0x7f..a000')+seg('','堆 heap','')+seg('','数据/代码','')+
+          '</div>'+
+          '<div class="vaspace"><div class="vh">进程 B · 虚拟地址空间</div>'+
+            seg('','栈 stack','')+seg('shm','共享映射区','0x7f..b000')+seg('','堆 heap','')+seg('','数据/代码','')+
+          '</div>'+
+        '</div>'+
+        '<div class="phys-wrap"><div class="phys"><div class="ph-h">物理内存 · 共享页帧 (shmid)</div><div class="phys-cells">'+ph+'</div></div></div>'+
+        '<div class="nattch" id="nattch">nattch（映射进程数）= <b>0</b></div>'+
+      '</div>';
+    // 记录 shm 段引用
+    const segsA=viz.querySelectorAll('.shm-top .vaspace:nth-child(1) .vaseg.shm');
+  }
+  const steps=[
+    {title:'步骤 0 · shmget 创建共享段',chip:'物理页就绪',chipC:'ch',hl:[0,1],a:false,b:false,phys:'',natt:0,msg:'ftok→shmget 在物理内存创建一块共享页,返回 shmid',
+     desc:'先用 <code>ftok()</code> 生成 <code>key</code>，再 <code>shmget(key, size, IPC_CREAT|0666)</code> 在<b>物理内存</b>分配一块共享段（按页对齐），返回 <code>shmid</code>。此刻还没有任何进程映射它。'},
+    {title:'步骤 1 · 进程A shmat 映射',chip:'nattch=1',chipC:'cb',hl:[3],a:true,b:false,phys:'',natt:1,msg:'进程A shmat：把共享页映射进 A 的虚拟地址 0x7f..a000',
+     desc:'进程 A 调用 <code>shmat(shmid, NULL, 0)</code>，内核在 A 的<b>虚拟地址空间</b>划出"共享映射区"（这里 <code>0x7f..a000</code>），指向那块物理页。<code>nattch</code> 变 1。'},
+    {title:'步骤 2 · 进程B shmat（同 key）',chip:'不同 VA·同物理页',chipC:'cb',hl:[3,5],a:true,b:true,phys:'',natt:2,msg:'进程B 用同 key 拿到同一 shmid 再 shmat,映射到 0x7f..b000',
+     desc:'进程 B 用<b>相同 key</b> 得到同一 <code>shmid</code>，也 <code>shmat</code>。注意 B 的映射地址 <code>0x7f..b000</code> 和 A <b>不一定相同</b>——<b>虚拟地址可以不同，但指向同一物理页帧</b>。这是共享内存的核心。'},
+    {title:'步骤 3 · A 写入 "Hello"',chip:'写 → 物理页',chipC:'cb',hl:[5],a:true,b:true,phys:'Hello',natt:2,write:true,msg:'进程A 往映射区写 "Hello",直接落到共享物理页',
+     desc:'A 像操作普通内存一样 <code>strcpy(pA, "Hello")</code>。因为映射区就是那块物理页，<b>数据直接写进物理内存</b>，不经过内核缓冲、不做复制。'},
+    {title:'步骤 4 · B 立即读到 "Hello"',chip:'零复制·最快',chipC:'cg',hl:[6],a:true,b:true,phys:'Hello',natt:2,read:true,msg:'进程B 读自己的映射区,立刻看到 "Hello"——无需任何复制',
+     desc:'B 读自己的映射区，<b>立刻</b>看到 <b>"Hello"</b>。数据从没被拷贝过——这就是共享内存是<b>最快 IPC</b> 的原因（对比管道/消息队列都要在内核和用户空间之间复制）。'},
+    {title:'步骤 5 · 需要同步 + 生命周期',chip:'配合信号量',chipC:'cd',hl:[8,9],a:true,b:true,phys:'Hello',natt:1,msg:'共享内存本身不带同步:同时读写会竞态,需配合信号量',
+     desc:'代价：共享内存<b>本身不提供同步</b>，两进程同时读写会<span class="dg">竞态</span>——必须配合<b>信号量</b>（见下一个标签）。用完 <code>shmdt</code> 解除映射（nattch 减 1），<code>shmctl(IPC_RMID)</code> 在 nattch=0 时真正删除。'}
+  ];
+  function shmSegs(){
+    const cols=viz.querySelectorAll('.shm-top .vaspace');
+    return {a:cols[0].querySelector('.vaseg.shm'),b:cols[1].querySelector('.vaseg.shm')};
+  }
+  function wire(lineId,arrId,portId,fromEl,toEl,active){
+    const line=document.getElementById(lineId),arr=document.getElementById(arrId),port=document.getElementById(portId);
+    if(!active){line.classList.remove('on');arr.classList.remove('on');port.classList.remove('on');lit.delete(lineId);return;}
+    const svg=document.getElementById('wire').getBoundingClientRect();
+    const a=fromEl.getBoundingClientRect(),b=toEl.getBoundingClientRect();
+    const x1=a.left+a.width/2-svg.left,y1=a.bottom-svg.top;
+    const x2=b.left+b.width/2-svg.left,y2=b.top-svg.top;
+    const my=(y1+y2)/2;
+    line.setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+my+', '+x2+' '+my+', '+x2+' '+y2);
+    arr.setAttribute('d','M '+x2+' '+y2+' L '+(x2-5)+' '+(y2-9)+' L '+(x2+5)+' '+(y2-9)+' Z');
+    port.setAttribute('cx',x1);port.setAttribute('cy',y1);
+    line.classList.add('on');arr.classList.add('on');port.classList.add('on');
+    if(!lit.has(lineId)){drawIn(line);lit.add(lineId);}
+  }
+  function paint(instant){
+    const s=steps[cur];
+    const im=document.getElementById('imsg');im.textContent=s.msg;im.className='imsg'+(s.read?' ok':'');
+    const segs=shmSegs();
+    segs.a.className='vaseg shm'+(s.a?' on':'')+(s.write?' writing':'');
+    segs.b.className='vaseg shm'+(s.b?' on':'')+(s.read?' reading':'');
+    for(let i=0;i<8;i++){
+      const c=document.getElementById('ph-'+i);const ch=s.phys[i]||'';
+      const was=c.textContent;
+      c.className='phcell'+(ch?'':' empty')+((ch&&was!==ch)?' flash':'');
+      c.textContent=ch;
+    }
+    document.getElementById('nattch').innerHTML='nattch（映射进程数）= <b>'+s.natt+'</b>';
+    const phys=document.querySelector('.phys');
+    wire('wl-a','wa-a','wp-a',segs.a,phys,s.a);
+    wire('wl-b','wa-b','wp-b',segs.b,phys,s.b);
+  }
+  const code=[
+    'key_t key = ftok(".", \'a\');',
+    'int shmid = shmget(key, 4096, IPC_CREAT | 0666);',
+    '',
+    'char *p = (char *)shmat(shmid, NULL, 0); // 映射',
+    '',
+    'strcpy(p, "Hello");       // 写 -> 同一物理页',
+    '// 另一进程同 key -> shmat, 立即可见',
+    '',
+    'shmdt(p);                 // 解除映射(不删除)',
+    'shmctl(shmid, IPC_RMID, 0); // nattch=0 时删除'
+  ];
+  return {id:'shm',label:'共享内存映射',sub:'同物理页·零复制',mount,steps,paint,code};
+})();
+
+/* ============ 场景3：信号量 P/V 计数器 ============ */
+const sSem=(()=>{
+  const CAP=4;
+  function mount(){
+    let et='',ft='';for(let i=0;i<CAP;i++){et+='<i id="et-'+i+'"></i>';ft+='<i id="ft-'+i+'"></i>';}
+    let sb='';for(let i=0;i<CAP;i++)sb+='<div class="scell" id="sc-'+i+'">slot'+i+'</div>';
+    viz.innerHTML='<div class="vcap"><b>计数信号量</b>：empty / full 两个计数器守护缓冲区，P 减 V 加</div>'+
+      '<div class="imsg" id="imsg"></div>'+
+      '<div class="sem-stage">'+
+        '<div class="sem-actor prod" id="prod"><div class="san">生产者</div><div class="sop" id="prod-op">就绪</div></div>'+
+        '<div class="sem-mid">'+
+          '<div class="sem-counters">'+
+            '<div class="counter empty"><div class="cn">empty 空槽</div><div class="cv" id="cv-e">'+CAP+'</div><div class="ctok" id="tok-e">'+et+'</div></div>'+
+            '<div class="counter full"><div class="cn">full 满槽</div><div class="cv" id="cv-f">0</div><div class="ctok" id="tok-f">'+ft+'</div></div>'+
+          '</div>'+
+          '<div class="sem-buf"><div class="sbufh">共享缓冲区 (CAP='+CAP+')</div><div class="sbuf-cells">'+sb+'</div></div>'+
+        '</div>'+
+        '<div class="sem-actor cons" id="cons"><div class="san">消费者</div><div class="sop" id="cons-op">就绪</div></div>'+
+      '</div>'+
+      '<div class="invariant" id="inv"></div>';
+  }
+  const steps=[
+    {title:'步骤 0 · 初始化 empty=4, full=0',chip:'不变式',chipC:'c0',hl:[0,1],e:4,f:0,buf:[],msg:'sem_init: 空槽=CAP=4, 满槽=0; 缓冲全空',
+     prod:'就绪',cons:'就绪',
+     desc:'初始化两个<b>计数信号量</b>：<span class="bl">empty=4</span>（4 个空槽可写）、<span class="gr">full=0</span>（还没有可读数据）。计数不是声明出来的，是<b>初值</b>决定的。始终满足 <b>empty+full=CAP</b>。'},
+    {title:'步骤 1 · 生产者 P(empty)',chip:'P: 4→3',chipC:'cb',hl:[4],e:3,f:0,buf:[],msg:'sem_wait(empty): empty 4→3, 占用一个空槽准备写',
+     prod:'P(empty)→3',cons:'就绪',pAct:true,
+     desc:'生产者先 <code>sem_wait(&empty)</code>（P 操作）：<span class="bl">empty 4→3</span>，表示占用一个空槽准备写入。若 empty=0（缓冲满）这里会<b>阻塞</b>。'},
+    {title:'步骤 2 · 生产者写入 slot0',chip:'写数据',chipC:'cb',hl:[5],e:3,f:0,buf:[0],rw:0,msg:'把数据写进 slot0; 此时还没 V(full),消费者看不到',
+     prod:'写 slot0',cons:'就绪',pAct:true,
+     desc:'生产者把数据写进 <code>slot0</code>。注意此刻 <span class="gr">full 还是 0</span>——数据虽已写入，但<b>还没通知</b>消费者，消费者的 <code>P(full)</code> 仍会等待。'},
+    {title:'步骤 3 · 生产者 V(full)',chip:'V: 0→1',chipC:'cg',hl:[6],e:3,f:1,buf:[0],msg:'sem_post(full): full 0→1, 通知"有一个满槽可读"',
+     prod:'V(full)→1',cons:'就绪',pAct:true,
+     desc:'生产者 <code>sem_post(&full)</code>（V 操作）：<span class="gr">full 0→1</span>，唤醒可能在等待的消费者。<b>V(full) 就是"通知有数据可读"这个动作。</b>'},
+    {title:'步骤 4 · 消费者 P(full)',chip:'P: 1→0',chipC:'cb',hl:[9],e:3,f:0,buf:[0],rw:0,msg:'sem_wait(full): full 1→0, 占用满槽准备读取',
+     prod:'就绪',cons:'P(full)→0',cAct:true,
+     desc:'消费者 <code>sem_wait(&full)</code>：<span class="gr">full 1→0</span>，占用这个满槽准备读。若 full=0（缓冲空）消费者会在此<b>阻塞</b>，而不是空转忙等。'},
+    {title:'步骤 5 · 消费者读取 slot0',chip:'读数据',chipC:'cb',hl:[10],e:3,f:0,buf:[0],rw:0,msg:'从 slot0 读出数据; 还没 V(empty),槽位尚未释放',
+     prod:'就绪',cons:'读 slot0',cAct:true,
+     desc:'消费者从 <code>slot0</code> 读出数据。此刻 <span class="bl">empty 仍是 3</span>——槽位还没释放给生产者，要等下一步 V(empty)。'},
+    {title:'步骤 6 · 消费者 V(empty)',chip:'V: 3→4',chipC:'cg',hl:[11],e:4,f:0,buf:[],msg:'sem_post(empty): empty 3→4, 释放空槽, 回到初始, 不变式成立',
+     prod:'就绪',cons:'V(empty)→4',cAct:true,
+     desc:'消费者 <code>sem_post(&empty)</code>：<span class="bl">empty 3→4</span>，把槽位还给生产者。一轮完成，回到 <b>empty=4, full=0</b>，<b>empty+full=CAP=4</b> 重新成立。'},
+    {title:'步骤 7 · 阻塞与 overlap',chip:'交通灯',chipC:'cd',hl:[4,9],e:0,f:4,buf:[0,1,2,3],msg:'empty=0(缓冲满) → 生产者 P(empty) 阻塞; full=0(空) → 消费者阻塞',
+     prod:'P(empty) 阻塞',cons:'消费中',pBlock:true,
+     desc:'反例：当 <span class="bl">empty=0</span>（缓冲写满）生产者 P(empty) <span class="dg">阻塞</span>；当 <span class="gr">full=0</span>（缓冲空）消费者 P(full) 阻塞。信号量把"等资源"从<b>忙等变成阻塞/唤醒</b>，并让多槽位之间形成<b>生产者写下一块、消费者读上一块</b>的 overlap。'}
+  ];
+  function setCounter(prefix,cvId,val){
+    document.getElementById(cvId).textContent=val;
+    for(let i=0;i<CAP;i++)document.getElementById(prefix+'-'+i).classList.toggle('on',i<val);
+  }
+  function paint(){
+    const s=steps[cur];
+    const im=document.getElementById('imsg');im.textContent=s.msg;im.className='imsg'+(s.pBlock||s.cBlock?' warn':'');
+    setCounter('et','cv-e',s.e);setCounter('ft','cv-f',s.f);
+    for(let i=0;i<CAP;i++){
+      const c=document.getElementById('sc-'+i);
+      const filled=s.buf.includes(i);
+      c.className='scell'+(filled?' full':'')+(s.rw===i?' rw':'');
+      c.textContent=filled?'data':'slot'+i;
+    }
+    const prod=document.getElementById('prod'),cons=document.getElementById('cons');
+    prod.className='sem-actor prod'+(s.pBlock?' block':(s.pAct?' act':''));
+    cons.className='sem-actor cons'+(s.cBlock?' block':(s.cAct?' act':''));
+    document.getElementById('prod-op').textContent=s.prod;
+    document.getElementById('cons-op').textContent=s.cons;
+    const inv=document.getElementById('inv');const sum=s.e+s.f;
+    const rest=(sum===CAP);
+    inv.className='invariant'+(rest?' rest':'');
+    inv.innerHTML='不变式：empty + full = '+s.e+' + '+s.f+' = <b>'+sum+'</b>　（CAP='+CAP+'）'+(rest?' ✓ 静止':' · 有槽位正在读写');
+  }
+  const code=[
+    'sem_init(&empty, 1, 4);   // 空槽 = CAP',
+    'sem_init(&full,  1, 0);   // 满槽 = 0',
+    '',
+    '// 生产者',
+    'sem_wait(&empty);         // P(empty): 占空槽',
+    'buf[head] = item;         // 写数据',
+    'sem_post(&full);          // V(full): 通知可读',
+    '',
+    '// 消费者',
+    'sem_wait(&full);          // P(full): 占满槽',
+    'item = buf[tail];         // 读数据',
+    'sem_post(&empty);         // V(empty): 释放空槽'
+  ];
+  return {id:'sem',label:'信号量 P·V',sub:'empty/full 计数',mount,steps,paint,code};
+})();
+
+/* ============ 引擎 ============ */
+const SCENES=[sPipe,sShm,sSem];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();
+  codeBox.innerHTML=SCENES[si].code.map((l,idx)=>'<div class="cl2" id="cl'+idx+'">'+hlLine(l)+'</div>').join('');
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0,true);
+}
+function go(i,instant){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(instant);
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  SCENES[si].code.forEach((_,idx)=>document.getElementById('cl'+idx).classList.toggle('on',(s.hl||[]).includes(idx)));
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2600;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>go(cur,true),120);});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>
