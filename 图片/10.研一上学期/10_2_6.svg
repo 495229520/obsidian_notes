@@ -1,51 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680">
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="700" viewBox="0 0 1340 700">
   <title>requestId 关联机制</title>
-  <desc>机械臂同步栈内直返与 AGV 异步全程携带两条 requestId 关联链路</desc>
+  <desc>机械臂 jog 同步栈内直返、机械臂到点异步显式携带、AGV 异步全程携带三条 requestId 关联链路</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
   </defs>
-  <rect x="0" y="0" width="1240" height="680" fill="rgb(245, 244, 237)"/>
+  <rect x="0" y="0" width="1340" height="700" fill="rgb(245, 244, 237)"/>
 
-  <text x="620" y="26" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#444441">requestId 关联机制：同步栈内直返 vs 异步全程携带（bac7252）</text>
+  <text x="670" y="26" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#444441">requestId 关联机制：同步栈内直返 · 异步显式携带（bac7252 + ac76897）</text>
 
-  <rect x="340" y="60" width="560" height="64" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="620" y="82" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">UI 调用运动接口 → 返回 qint64 requestId</text>
-  <text x="620" y="104" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">armJog* / armMoveToWaypoint / agvMove* / agvTurn* / stopAgvManualControl</text>
+  <rect x="390" y="60" width="560" height="64" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="670" y="82" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">UI 调用运动接口 → 返回 qint64 requestId</text>
+  <text x="670" y="104" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">armJog* / armMoveToWaypoint / agvMove* / agvTurn* / stopAgvManualControl</text>
 
-  <line x1="620" y1="124" x2="620" y2="182" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="124" x2="670" y2="182" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="340" y="184" width="560" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
-  <text x="620" y="204" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">CommunicationInterfaceImpl：nextRequestId_.fetch_add(1)</text>
-  <text x="620" y="224" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">原子自增，从 1 起；0 保留 =「无法关联」</text>
+  <rect x="390" y="184" width="560" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="670" y="204" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">CommunicationInterfaceImpl：nextRequestId_.fetch_add(1)</text>
+  <text x="670" y="224" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">原子自增，从 1 起；0 保留 =「无法关联」</text>
 
-  <polyline points="500,240 500,270 320,270 320,298" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <polyline points="740,240 740,270 920,270 920,298" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="530,240 530,268 230,268 230,298" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="240" x2="670" y2="298" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <polyline points="810,240 810,268 1110,268 1110,298" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="60" y="300" width="520" height="110" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="320" y="322" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">机械臂：同步链路（worker 线程栈内）</text>
-  <text x="320" y="346" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">activeArmRequestId_ = id</text>
-  <text x="320" y="366" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">gateway-&gt;jogRobotAxis(...) 同步 RPC（持 opMutex）</text>
-  <text x="320" y="386" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">返回后置 0；结果回调发生在同一调用栈内</text>
+  <!-- 三条链路 -->
+  <rect x="40" y="300" width="380" height="130" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="230" y="322" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">机械臂 jog：同步链路（worker 栈内）</text>
+  <text x="230" y="346" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">activeArmRequestId_ = id</text>
+  <text x="230" y="366" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">gateway→jogRobotAxis 同步 RPC（3s·持 opMutex）</text>
+  <text x="230" y="386" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">返回后置 0 · 结果回调在同一调用栈</text>
+  <text x="230" y="406" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">robotMotionExecuted(…, requestId=0)</text>
 
-  <rect x="660" y="300" width="520" height="110" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="920" y="322" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">AGV：异步链路（QtConcurrent 池线程）</text>
-  <text x="920" y="346" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">AgvMotionCommand.requestId 全程携带</text>
-  <text x="920" y="366" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">池线程执行 RPC → invokeMethod(Queued) 回 worker</text>
-  <text x="920" y="386" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">agvMotionExecuted(... , cmd.requestId) 原样带回</text>
+  <rect x="480" y="300" width="380" height="130" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="670" y="322" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">机械臂到点：异步链路（ac76897 新增）</text>
+  <text x="670" y="346" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">moveToRobotWaypoint(…, requestId) 显式下传</text>
+  <text x="670" y="366" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">QtConcurrent 池执行 moveJ/L（按次 60s）</text>
+  <text x="670" y="386" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">结果 invokeMethod(Queued) 回投 worker</text>
+  <text x="670" y="406" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">robotMotionExecuted(…, requestId≠0) 显式携带</text>
 
-  <line x1="320" y1="410" x2="320" y2="468" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <line x1="920" y1="410" x2="920" y2="468" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="920" y="300" width="380" height="130" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="1110" y="322" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">AGV：异步链路（QtConcurrent 池）</text>
+  <text x="1110" y="346" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">AgvMotionCommand.requestId 全程携带</text>
+  <text x="1110" y="366" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">池线程 RPC → invokeMethod(Queued) 回 worker</text>
+  <text x="1110" y="386" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">agvMotionExecuted(…, cmd.requestId) 原样带回</text>
+  <text x="1110" y="406" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">穿过池线程与 Queued 投递不丢不串</text>
 
-  <rect x="60" y="470" width="520" height="80" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="320" y="492" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">armControlRes(ok, errCode, msg, requestId)</text>
-  <text x="320" y="520" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">RobotProxyAdapter 不感知 ID —— 该链路异步化会丢失关联</text>
+  <line x1="230" y1="430" x2="230" y2="488" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="670" y1="430" x2="670" y2="488" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="1110" y1="430" x2="1110" y2="488" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <rect x="660" y="470" width="520" height="80" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="920" y="492" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">agvControlRes(ok, errCode, msg, requestId)</text>
-  <text x="920" y="520" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">站点 / 路径 / 导航类结果无发起 ID，一律传 0</text>
+  <!-- 结果信号 -->
+  <rect x="40" y="490" width="820" height="96" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="450" y="512" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">armControlRes(ok, errCode, msg, requestId)</text>
+  <text x="450" y="540" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">worker 转发规则：requestId != 0 ? 显式携带（到点） : activeArmRequestId_（jog 栈内当时值）</text>
+  <text x="450" y="564" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">适配器 commandExecuted 仍无 ID 字段 —— jog 异步化前必须先把 ID 下沉到适配器层</text>
 
-  <text x="620" y="596" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">Qt 信号可比槽多尾参：结果信号追加第 4 参 requestId 后，存量 3 参槽函数零改动仍可连接</text>
-  <text x="620" y="620" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">UI 侧按 ID 过滤串扰的精确配对已具备条件，尚未消费 —— 见遗留事项</text>
+  <rect x="920" y="490" width="380" height="96" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="1110" y="512" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">agvControlRes(ok, errCode, msg, requestId)</text>
+  <text x="1110" y="540" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">站点 / 路径 / 导航 / 控制权类结果</text>
+  <text x="1110" y="564" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">无发起 ID，一律传 0</text>
+
+  <text x="670" y="628" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">Qt 信号可比槽多尾参：结果信号追加 requestId 尾参后，存量 3 参槽函数零改动仍可连接（robotMotionExecuted 5 参同理）</text>
+  <text x="670" y="652" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">UI 侧按 ID 过滤串扰的精确配对已具备条件，尚未消费 —— 见遗留事项</text>
 </svg>

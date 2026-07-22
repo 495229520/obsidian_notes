@@ -133,6 +133,33 @@ b{color:var(--ink);font-weight:600;}
 .bridge.on{border-color:var(--ink);background:var(--gray);color:var(--ink);}
 .bridge b{font-family:var(--mono);}
 
+/* 物理页帧：可视化「加载建映射(VMA)」与「缺页装入物理页(demand paging)」两层 */
+.pgs{display:flex;align-items:center;gap:5px;margin-top:9px;}
+.pgs .pglab{font-family:var(--mono);font-size:9px;color:var(--faint);margin-right:2px;letter-spacing:.2px;}
+.pg{width:17px;height:12px;border-radius:3px;border:1px dashed var(--line);background:transparent;opacity:0;transition:opacity var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease);}
+.pg.mapped{opacity:1;border-style:dashed;border-color:var(--muted);background:transparent;}
+.pg.file{opacity:1;border-style:solid;}
+.pg.zero{opacity:1;border-style:solid;border-color:var(--faint);background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(0,0,0,.10) 3px,rgba(0,0,0,.10) 5px);}
+.pg.zero::after{content:"0";display:block;font-family:var(--mono);font-size:8px;line-height:12px;text-align:center;color:var(--faint);}
+.pg.anon{opacity:1;border-style:solid;border-color:var(--stack);background:var(--stackbg);}
+#pgRX .pg.file{border-color:var(--text);background:var(--textbg);}
+#pgRW .pg.file{border-color:var(--data);background:var(--databg);}
+#pgDyn .pg.zero{border-color:var(--stack);}
+#pgDyn .pg.anon{border-color:var(--stack);background:var(--stackbg);}
+
+/* 段类型徽章：文件页(file-backed) vs 匿名页(anonymous) */
+.segtype{position:absolute;top:9px;right:10px;font-family:var(--mono);font-size:9px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--faint);background:var(--paper);letter-spacing:.2px;}
+.segtype.file{color:var(--data);border-color:var(--data);background:var(--databg);}
+.segtype.anon{color:var(--stack);border-color:var(--stack);background:var(--stackbg);}
+
+.pglegend{margin-top:8px;font-size:10.5px;color:var(--faint);display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-family:var(--mono);}
+.pglegend span{display:inline-flex;align-items:center;}
+.pglegend i{display:inline-block;width:16px;height:11px;border-radius:3px;margin-right:5px;border:1px solid var(--line);}
+.pglegend i.m{border-style:dashed;border-color:var(--muted);background:transparent;}
+.pglegend i.f{border-style:solid;border-color:var(--data);background:var(--databg);}
+.pglegend i.z{border-style:solid;border-color:var(--stack);background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(0,0,0,.10) 3px,rgba(0,0,0,.10) 5px);}
+.pglegend i.a{border-style:solid;border-color:var(--stack);background:var(--stackbg);}
+
 .right{display:flex;flex-direction:column;gap:12px;min-height:560px;}
 .desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 16px;min-height:140px;}
 .desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -200,7 +227,7 @@ b{color:var(--ink);font-weight:600;}
   <header>
     <h1>虚拟地址空间 · Section / Segment 与各段归属</h1>
     <p>
-      把 <code>.text</code> <code>.rodata</code> <code>.data</code> <code>.bss</code> 从「磁盘上的 Section」映射到「进程里的 Segment」，并看清栈/堆的相对位置
+      从「磁盘上的 Section」→「进程里的 Segment」，看清谁决定映射（程序头表）、加载只建 VMA、以及缺页→按需分页时文件映射与匿名映射的区别
       · <kbd>←</kbd> <kbd>→</kbd> 单步 · <kbd>空格</kbd> 播放
     </p>
   </header>
@@ -270,24 +297,36 @@ b{color:var(--ink);font-weight:600;}
           <div class="col-title">PROCESS Segment（PT_LOAD 段）</div>
           <div class="seg-list">
             <div class="seg rx" id="segRX">
+              <span class="segtype file">文件页</span>
               <div class="t">LOAD · R-X</div>
               <div class="d">.text + .rodata<br>代码与只读数据页</div>
               <div class="perm">可读 · 可执行 · 不可写</div>
+              <div class="pgs" id="pgRX"><span class="pglab">页帧</span><span class="pg"></span><span class="pg"></span><span class="pg"></span><span class="pg"></span></div>
             </div>
             <div class="seg rw" id="segRW">
+              <span class="segtype file">文件+匿名</span>
               <div class="t">LOAD · RW-</div>
-              <div class="d">.data + .bss<br>可写数据页（bss 装载时清零）</div>
+              <div class="d">.data 文件页 + .bss 匿名零填充<br>可写数据页</div>
               <div class="perm">可读 · 可写 · 不可执行</div>
+              <div class="pgs" id="pgRW"><span class="pglab">页帧</span><span class="pg"></span><span class="pg"></span><span class="pg"></span><span class="pg"></span></div>
             </div>
             <div class="seg" id="segDyn" style="min-height:88px;opacity:.55;">
+              <span class="segtype anon">匿名页</span>
               <div class="t">运行时段</div>
               <div class="d">heap / stack / mmap<br>不由静态 Section 描述</div>
               <div class="perm">由 brk / mmap / 线程栈建立</div>
+              <div class="pgs" id="pgDyn"><span class="pglab">页帧</span><span class="pg"></span><span class="pg"></span><span class="pg"></span></div>
             </div>
           </div>
         </div>
       </div>
       <div class="bridge" id="bridge">Section 是链接器眼里的「节」；Segment 是装载器眼里的「段」。多节可合并进同一装载段。</div>
+      <div class="pglegend">
+        <span><i class="m"></i>已建映射(VMA)·未装入</span>
+        <span><i class="f"></i>文件页·从文件装入</span>
+        <span><i class="z"></i>匿名·清零页(全0)</span>
+        <span><i class="a"></i>匿名·已写入(数据页)</span>
+      </div>
     </section>
 
     <section class="right">
@@ -439,6 +478,22 @@ function setSegHot(keys) {
     el.classList.toggle('hot', on);
     el.classList.toggle('dim', keys.length > 0 && !on);
     if (k === 'dyn') el.style.opacity = on ? '1' : (keys.length ? '.28' : '.55');
+  });
+}
+
+// 物理页帧状态：'mapped'(仅建映射) / 'file'(从文件装入) / 'zero'(匿名清零页) / 'anon'(已写入数据页) / 未设→隐藏
+// cfg[k] 可为字符串(全部页帧同态)或数组(逐格指定，用于演示清零→写入的过渡)
+function setPages(cfg) {
+  const map = { rx: 'pgRX', rw: 'pgRW', dyn: 'pgDyn' };
+  Object.entries(map).forEach(([k, id]) => {
+    const cont = document.getElementById(id);
+    if (!cont) return;
+    const st = cfg && cfg[k];
+    cont.querySelectorAll('.pg').forEach((p, idx) => {
+      p.classList.remove('mapped', 'file', 'zero', 'anon');
+      const cell = Array.isArray(st) ? st[idx] : st;
+      if (cell) p.classList.add(cell);
+    });
   });
 }
 
@@ -623,52 +678,113 @@ const STEPS = [
   {
     title: '步骤 6 · 合并：R-X 与 RW- 两段',
     chip: '装载映射', chipC: 'cm',
-    action: '▸ 链接器合并节 → 装载器按 Segment 建页权限',
-    desc: '典型合并：<b class="t">.text + .rodata → R-X</b>；<b class="d">.data + .bss → RW-</b>。这样代码页不可写、数据页不可执行（W^X）。heap/stack 不在静态 Section 表里，由运行时创建。',
+    action: '▸ 链接器把「合并结果」写进程序头表，装载器照表建段',
+    desc: '典型合并：<b class="t">.text + .rodata → R-X</b>；<b class="d">.data + .bss → RW-</b>。这样代码页不可写、数据页不可执行（W^X）。「哪些节合成哪段、加载到哪、什么权限」由<b>链接器</b>写进 ELF 的<b>程序头表（Program Header）</b>。',
     hot: ['blkText','blkRodata','blkData','blkBss'],
     sec: ['text','rodata','data','bss'],
     seg: ['rx','rw'],
     wires: ['text','rodata','data','bss'],
     code: { main: 'text', msg: 'ro', g1: 'data', g2: 'bss' },
     layout: {},
+    pages: {},
     arrows: { stack: false, heap: false },
-    bridge: 'readelf -S 看 Section；readelf -l 看 Segment。两者对照最清晰。',
+    bridge: 'readelf -S 看 Section（节头表）；readelf -l 看 Program Header（LOAD 段）。',
   },
   {
-    title: '步骤 7 · 堆在 .bss 之上向上长',
+    title: '步骤 7 · 谁决定映射 · 程序头表',
+    chip: 'Program Header', chipC: 'cm',
+    action: '▸ 链接器决策（写程序头表）· 内核执行（照表 mmap）',
+    desc: '常见误解是「内核决定布局」。其实布局由<b>链接器</b>敲定并写进<b>程序头表</b>：每个 <code>PT_LOAD</code> 记录「文件偏移 → 虚拟地址、大小、权限」。进程启动时内核读这张表，逐段 <code>mmap</code> 建立映射——<b>内核是执行者，不是决策者</b>。',
+    hot: ['blkText','blkRodata','blkData','blkBss'],
+    sec: ['text','rodata','data','bss'],
+    seg: ['rx','rw'],
+    wires: ['text','rodata','data','bss'],
+    code: {},
+    layout: {},
+    pages: {},
+    arrows: { stack: false, heap: false },
+    bridge: '程序头表 = 装载「说明书」；节头表 = 链接「说明书」。同一个文件、两张表。',
+  },
+  {
+    title: '步骤 8 · 加载 = 只建映射（VMA）',
+    chip: '虚拟映射', chipC: 'cm',
+    action: '▸ exec 时只登记 VMA，物理页一张都还没分',
+    desc: '关键分层①：加载/exec 时内核只<b>登记 VMA</b>——记下「这段虚拟地址属于谁、什么权限、对应文件哪段或匿名」。此刻<b>并不读入数据、不占物理内存</b>。看下方页帧：<b>虚线框 = 映射已建、物理页未装入</b>。',
+    hot: ['blkText','blkRodata','blkData','blkBss'],
+    sec: ['text','rodata','data','bss'],
+    seg: ['rx','rw','dyn'],
+    wires: [],
+    code: {},
+    layout: {},
+    pages: { rx: 'mapped', rw: 'mapped', dyn: 'mapped' },
+    arrows: { stack: false, heap: false },
+    bridge: '栈/堆的 VMA 在 exec 时也已建好——不是「运行时才有虚拟空间」。',
+  },
+  {
+    title: '步骤 9 · 缺页中断 → 按需分页',
+    chip: 'demand paging', chipC: 'ct',
+    action: '▸ 首次访问 → 缺页 → 分配物理页 → 文件映射从文件填',
+    desc: '关键分层②：CPU 首次访问某页 → 触发<b>缺页中断</b> → 内核这才分配一张<b>物理页框</b>并填内容。<b class="t">.text/.rodata</b>、<b class="d">.data</b> 是<b>文件页</b>：缺页时<b>从文件读入</b>（实心）；<b>.bss</b> 无文件内容，是段内的<b>匿名零填充</b>（斜纹 0），缺页给清零页。',
+    hot: ['blkText','blkRodata','blkData','blkBss'],
+    sec: ['text','rodata','data','bss'],
+    seg: ['rx','rw'],
+    wires: ['text','rodata','data','bss'],
+    code: { main: 'text', msg: 'ro', g1: 'data' },
+    layout: {},
+    pages: { rx: 'file', rw: ['file', 'file', 'zero', 'zero'], dyn: 'mapped' },
+    arrows: { stack: false, heap: false },
+    bridge: '「用到才分」：加载快、内存省；从没碰过的页永远不占物理内存。',
+  },
+  {
+    title: '步骤 10 · 堆：匿名映射 · 向上生长',
     chip: 'heap', chipC: 'ch',
-    action: '▸ malloc/new 抬高 brk · 堆：低地址 → 高地址',
-    desc: '<span class="h">heap</span> 紧挨静态数据区上方（逻辑上），随 <code>malloc</code>/<code>new</code>/<code>brk/sbrk</code> 向<b>高地址</b>生长。动态对象本体在堆；栈上通常只留指针。',
+    action: '▸ malloc/new 抬高 brk · 匿名页缺页填清零页',
+    desc: '<span class="h">heap</span> 是<b>匿名映射</b>（无文件后备），随 <code>malloc</code>/<code>new</code>/<code>brk</code> 向<b>高地址</b>增长。缺页时内核给一张<b>清零的空白页</b>（斜纹页帧），不是从文件读。动态对象本体在堆，栈上通常只留指针。',
     hot: ['blkHeap'], sec: [], seg: ['dyn'], wires: [],
     code: { p: 'heap' },
     layout: { heap: 96, gap: 50 },
+    pages: { rx: 'file', rw: ['file', 'file', 'zero', 'zero'], dyn: 'zero' },
     arrows: { stack: false, heap: true },
-    bridge: '堆不是 .data/.bss 的一部分；它是运行时段。',
+    bridge: '堆不是 .data/.bss 的一部分；它是运行时匿名段。',
   },
   {
-    title: '步骤 8 · 栈在高地址向下长',
+    title: '步骤 11 · 栈：匿名映射 · 向下生长',
     chip: 'stack', chipC: 'cs',
-    action: '▸ 局部变量/返回地址在栈 · 栈：高地址 → 低地址',
-    desc: '<span class="s">stack</span> 从用户空间高端向下长。普通局部变量<b>不产生全局符号</b>，靠 .text 里的指令在栈上开槽。每个线程一份栈。',
+    action: '▸ 局部/返回地址在栈 · 匿名页缺页填清零页 · 每线程一份',
+    desc: '<span class="s">stack</span> 从用户空间高端向<b>低地址</b>长，同样是<b>匿名映射</b>：缺页填清零空白页、按需增长。普通局部变量<b>不产生全局符号</b>，靠 .text 指令在栈上开槽。每个线程一份独立栈。',
     hot: ['blkStack'], sec: [], seg: ['dyn'], wires: [],
     code: { a: 'stack', p: 'stack' },
     layout: { stack: 96, gap: 50 },
+    pages: { rx: 'file', rw: ['file', 'file', 'zero', 'zero'], dyn: 'zero' },
     arrows: { stack: true, heap: false },
-    bridge: '与「堆栈相向生长」动画衔接：中间空洞被两端吃掉。',
+    bridge: '文件段缺页「从文件填」，匿名段（堆/栈）缺页「填空白页」——这是本质区别。',
   },
   {
-    title: '步骤 9 · 一张表记住落点',
+    title: '步骤 12 · 匿名页：分配即清零，写后成数据页',
+    chip: '匿名页 · 清零保证', chipC: 'cs',
+    action: '▸ Linux 保证匿名物理页初始全 0 → 写入后成私有数据页',
+    desc: '匿名页（heap / stack / 匿名 mmap / .bss）缺页时，内核分配的物理页<b>必须先清零</b>——这是 Linux 的<b>安全保证</b>，防止读到别的进程释放的残留数据。所以初始是<b>清零页（全 0，斜纹）</b>；一旦你<b>写入数据</b>，它不再全 0，就成了持有数据的<b>私有匿名页</b>（实心）。注意：清零页与已写入页<b>都属于匿名页</b>，区别只在有没有被写过。',
+    hot: ['blkHeap','blkStack'], sec: [], seg: ['dyn'], wires: [],
+    code: { p: 'heap', a: 'stack' },
+    layout: {},
+    pages: { rx: 'file', rw: ['file', 'file', 'zero', 'anon'], dyn: ['zero', 'anon', 'anon'] },
+    arrows: { stack: true, heap: true },
+    bridge: '文件页始终有文件后备；匿名页先清零、写后成数据页——这是两类页的根本分野。',
+  },
+  {
+    title: '步骤 13 · 两层视角 · 一张表记住',
     chip: '对照表', chipC: 'c0',
-    action: '▸ 全局/静态看初值；局部看栈；动态看堆；指令看 .text',
-    desc: '<b>已初始化≠0 全局/静态 → .data</b> · <b>未初始化/0 → .bss</b> · <b>字符串字面量 → .rodata</b> · <b>指令 → .text</b> · <b>普通局部 → stack</b> · <b>new/malloc → heap</b>。static 局部虽作用域在函数内，存储仍在 .data/.bss。',
+    action: '▸ 落点看 Section；权限看 Segment；物理页看缺页与页类型',
+    desc: '<b>落点</b>：初值≠0→.data · 0/未初始化→.bss · 字面量→.rodata · 指令→.text · 局部→stack · new→heap。<b>两层</b>：加载只建 VMA，物理页「用到才分」；<b class="d">文件页</b>缺页从文件填，<b class="s">匿名页</b>（堆/栈/.bss）先清零、写后成数据页。',
     hot: ['blkText','blkRodata','blkData','blkBss','blkHeap','blkStack'],
     sec: ['text','rodata','data','bss'],
     seg: ['rx','rw','dyn'],
     wires: ['text','rodata','data','bss'],
     code: { g1: 'data', g2: 'bss', g3: 'bss', s1: 'data', msg: 'ro', main: 'text', a: 'stack', d: 'data', p: 'heap', ret: 'text' },
     layout: {},
+    pages: { rx: 'file', rw: ['file', 'file', 'zero', 'anon'], dyn: ['zero', 'anon', 'anon'] },
     arrows: { stack: true, heap: true },
-    bridge: 'Section 回答「链接放哪」；Segment 回答「页权限」；stack/heap 回答「运行时谁在动」。',
+    bridge: 'Section→链接放哪 · Segment→页权限 · 文件页/匿名页→缺页怎么填 · stack/heap→运行时谁在动。',
   },
 ];
 
@@ -704,6 +820,7 @@ function go(i) {
   setHot(s.hot || []);
   setSecHot(s.sec || []);
   setSegHot(s.seg || []);
+  setPages(s.pages || {});
   wireOn = s.wires || [];
   setCodeHL(s.code || {});
   requestAnimationFrame(() => { layoutWires(); setWires(wireOn); });

@@ -1,35 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="620" viewBox="0 0 1240 620">
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="660" viewBox="0 0 1240 660">
   <title>qt_file 进程内线程拓扑</title>
-  <desc>UI 主线程、CommunicationWorker QThread、两个适配器 executor 线程与 QtConcurrent 线程池的分工与交互</desc>
+  <desc>UI 主线程、CommunicationWorker QThread、两个适配器 executor 线程与 QtConcurrent 线程池的分工与交互（含首页聚合与告警 tail 定时器）</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
   </defs>
-  <rect x="0" y="0" width="1240" height="620" fill="rgb(245, 244, 237)"/>
+  <rect x="0" y="0" width="1240" height="660" fill="rgb(245, 244, 237)"/>
 
-  <text x="620" y="26" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#444441">qt_file 进程内线程拓扑（单进程 · 多线程，Docker linux/amd64 容器）</text>
+  <text x="620" y="26" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="16" font-weight="500" fill="#444441">qt_file 进程内线程拓扑（单进程 · 多线程，fix/homepage-client-api @ 2f21499）</text>
 
   <!-- A: UI 主线程 -->
-  <rect x="40" y="70" width="350" height="170" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <rect x="40" y="70" width="350" height="210" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
   <text x="215" y="92" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">① Qt UI 主线程</text>
   <text x="215" y="116" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">QApplication 事件循环</text>
   <text x="215" y="136" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">login → hybrid_robot_system / Control</text>
   <text x="215" y="156" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">agvControlPollTimer 2s（控制权）</text>
   <text x="215" y="176" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">agvNavStatusPollTimer 1s（导航）</text>
-  <text x="215" y="196" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">Myviz：rviz_render_node（rviz 自 spin）</text>
-  <text x="215" y="216" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">DatabasePool：每线程一条连接</text>
+  <text x="215" y="196" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">控制按钮 200ms 点击节流闸门</text>
+  <text x="215" y="216" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">HomePage：消费聚合信号 + 构造拉缓存</text>
+  <text x="215" y="236" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">Myviz：rviz_render_node（rviz 自 spin）</text>
+  <text x="215" y="256" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">DatabasePool：每线程一条连接</text>
 
   <!-- B: Worker QThread -->
-  <rect x="450" y="70" width="400" height="196" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <rect x="450" y="70" width="400" height="236" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
   <text x="650" y="92" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">② CommunicationWorker（QThread）</text>
   <text x="650" y="116" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">rosNode：communication_worker_node</text>
   <text x="650" y="136" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">doXxx 槽 ≈34 · gateway 三服务同线程</text>
   <text x="650" y="156" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">spinTimer 10ms → rclcpp::spin_some</text>
-  <text x="650" y="176" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">statusTimer 1s（心跳评估·3s 分频拉表）</text>
+  <text x="650" y="176" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">statusTimer 1s（心跳评估 · 3s 分频拉表）</text>
   <text x="650" y="196" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">pollTimer 100ms（*_ui_event）</text>
-  <text x="650" y="216" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">singleShot：组收尾 2s · 连接死线 20s</text>
-  <text x="650" y="236" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">臂指令在此线程同步 RPC（持 opMutex）</text>
+  <text x="650" y="216" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">middlePlatformTimer 1s（首页聚合·单飞查询）</text>
+  <text x="650" y="236" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">alarmTimer 100ms（告警 tail · 3s 源重扫）</text>
+  <text x="650" y="256" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">singleShot：组收尾 2s · 连接死线 20s</text>
+  <text x="650" y="276" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">臂 jog 在此线程同步 RPC（持 opMutex）</text>
 
   <!-- C: Robot executor -->
   <rect x="910" y="70" width="290" height="110" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
@@ -46,36 +50,38 @@
   <text x="1055" y="326" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">驱动 SeerCtrl 节点（解析 future）</text>
 
   <!-- E: QtConcurrent pool -->
-  <rect x="450" y="330" width="400" height="120" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="650" y="352" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">⑤ Qt 全局线程池（QtConcurrent）</text>
-  <text x="650" y="376" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">dispatchAgvTask：AGV RPC 全在池线程执行</text>
-  <text x="650" y="396" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">结果 QMetaObject::invokeMethod(Queued) 回投</text>
-  <text x="650" y="416" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">UI 侧 database_proxy 查询也用此池</text>
+  <rect x="450" y="370" width="400" height="150" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="650" y="392" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">⑤ Qt 全局线程池（QtConcurrent）</text>
+  <text x="650" y="416" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">dispatchAgvTask：AGV RPC 全在池线程</text>
+  <text x="650" y="436" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">臂到点 moveJ/L：池线程 + 按次 60s 超时</text>
+  <text x="650" y="456" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">结果 invokeMethod(Queued) 回投 worker</text>
+  <text x="650" y="476" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">（到点结果显式携带 requestId）</text>
+  <text x="650" y="496" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">UI 侧 database_proxy 查询也用此池</text>
 
   <!-- F: QProcess 子进程 -->
-  <rect x="40" y="300" width="350" height="90" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5" stroke-dasharray="6 4"/>
-  <text x="215" y="322" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">QProcess 子进程（Myviz 拉起）</text>
-  <text x="215" y="346" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">ros2 launch …（RViz 地图/URDF）</text>
-  <text x="215" y="366" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">ros2 topic subscriber</text>
+  <rect x="40" y="340" width="350" height="90" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5" stroke-dasharray="6 4"/>
+  <text x="215" y="362" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">QProcess 子进程（Myviz 拉起）</text>
+  <text x="215" y="386" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">ros2 launch …（RViz 地图/URDF）</text>
+  <text x="215" y="406" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">ros2 topic subscriber</text>
 
   <!-- arrows -->
   <line x1="390" y1="130" x2="448" y2="130" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="420" y="116" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">requestXxx(Queued)</text>
+  <text x="420" y="114" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">requestXxx(Queued)</text>
   <line x1="450" y1="170" x2="392" y2="170" stroke="#5F5E5A" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-  <text x="420" y="186" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">结果信号(Queued)</text>
+  <text x="420" y="186" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">结果/聚合信号(Queued)</text>
 
   <line x1="850" y1="120" x2="908" y2="120" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="879" y="104" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">臂 RPC（同步）</text>
+  <text x="906" y="104" text-anchor="end" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">臂 jog RPC（同步）</text>
 
-  <line x1="650" y1="266" x2="650" y2="328" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="668" y="298" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">QtConcurrent::run</text>
-  <line x1="780" y1="330" x2="780" y2="268" stroke="#5F5E5A" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-  <text x="798" y="300" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">invokeMethod 回投</text>
+  <line x1="650" y1="306" x2="650" y2="368" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="668" y="338" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">QtConcurrent::run</text>
+  <line x1="780" y1="370" x2="780" y2="308" stroke="#5F5E5A" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="798" y="340" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">invokeMethod 回投</text>
 
-  <polyline points="850,390 878,390 878,295 908,295" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="874" y="342" text-anchor="end" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">AGV RPC（池线程）</text>
+  <polyline points="850,420 878,420 878,295 908,295" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="858" y="404" text-anchor="start" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="11" font-weight="400" fill="#444441">AGV RPC（池线程）</text>
 
-  <text x="620" y="502" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">另有 rclcpp/DDS 内部线程与 QtWebEngine 渲染子进程（Blockly 页面），不参与数据中台数据流</text>
-  <text x="620" y="526" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">顺序保证：同设备 RPC 由 opMutex 串行 —— 无论发起自 worker 线程还是池线程</text>
-  <text x="620" y="550" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">实线 = 同步调用 · 虚线 = Qt Queued / 异步回投 / 子进程边界</text>
+  <text x="620" y="556" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">臂到点 RPC 同样发起自池线程，经 RobotProxyAdapter（future 由 ③ 解析）；另有 rclcpp/DDS 内部线程与 QtWebEngine 渲染子进程，不参与中台数据流</text>
+  <text x="620" y="580" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">顺序保证：同设备 RPC 由 opMutex 串行 —— 无论发起自 worker 线程还是池线程（jog 3s 与到点 60s 共用同一把设备锁）</text>
+  <text x="620" y="604" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">实线 = 同步调用 · 虚线 = Qt Queued / 异步回投 / 子进程边界</text>
 </svg>
