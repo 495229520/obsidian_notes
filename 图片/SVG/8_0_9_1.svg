@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+  <title>三条数据路径对照：baseline DMA、CXL load/store、DPU 卸载</title>
+  <desc>同一次读/写在三种路径下经过的层级、拷贝点（红）与等待点（琥珀）对照</desc>
+
+  <rect x="0" y="0" width="1240" height="900" fill="#F5F4ED"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">同一次读/写，三条数据路径：拷贝点与等待点谁被删掉了</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">红点＝一次额外的字节拷贝（吃 CPU 与内存带宽）　琥珀＝一个等待点（线程或 CPU 在这里停住）</text>
+
+  <!-- 图例 -->
+  <circle cx="900" cy="50" r="6" fill="#A64B3C"/>
+  <text x="912" y="54" font-size="11.5" fill="#733428">拷贝</text>
+  <rect x="960" y="44" width="12" height="12" rx="2" fill="#F3E8D3" stroke="#B07D2B"/>
+  <text x="978" y="54" font-size="11.5" fill="#6B4E28">等待点</text>
+  <text x="1040" y="54" font-size="11.5" fill="#6B675C">DMA＝设备搬运　load/store＝CPU 直接访存</text>
+
+  <!-- ============ A: baseline ============ -->
+  <rect x="40" y="104" width="1160" height="228" rx="9" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="60" y="130" font-size="14" font-weight="700" fill="#4A473F">A · Baseline：块设备路径（DMA 搬运 + doorbell + 中断）</text>
+  <text x="60" y="150" font-size="11.5" fill="#6B675C">读一块数据要走完“描述符下发 → 设备 DMA → 完成中断 → 唤醒 → 拷回”整个来回</text>
+
+  <!-- lane boxes -->
+  <rect x="60" y="170" width="180" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="150" y="196" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">应用线程</text>
+  <text x="150" y="216" font-size="10.5" fill="#2C4460" text-anchor="middle">read/write buf</text>
+
+  <rect x="300" y="170" width="200" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="400" y="192" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">内核：页缓存 + 块层</text>
+  <text x="400" y="211" font-size="10.5" fill="#24473F" text-anchor="middle">copy_from/to_user</text>
+  <text x="400" y="226" font-size="10" fill="#24473F" text-anchor="middle">bio → 硬件队列 · 拿 tag</text>
+  <circle cx="315" cy="182" r="6" fill="#A64B3C"/>
+
+  <rect x="560" y="170" width="180" height="66" rx="7" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="650" y="192" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">PCIe：doorbell</text>
+  <text x="650" y="211" font-size="10.5" fill="#733428" text-anchor="middle">MMIO 写 + MSI-X</text>
+  <text x="650" y="226" font-size="10" fill="#733428" text-anchor="middle">提交/完成一个来回</text>
+
+  <rect x="800" y="170" width="180" height="66" rx="7" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="890" y="192" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">NVMe 设备</text>
+  <text x="890" y="211" font-size="10.5" fill="#733428" text-anchor="middle">DMA 搬块 + 介质</text>
+  <circle cx="815" cy="182" r="6" fill="#A64B3C"/>
+
+  <!-- wait boxes A -->
+  <rect x="300" y="256" width="200" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="400" y="277" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">等待①：排队拿 tag（背压）</text>
+  <text x="400" y="294" font-size="10" fill="#6B4E28" text-anchor="middle">队列满则线程阻塞</text>
+
+  <rect x="560" y="256" width="180" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="650" y="277" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">等待②：完成通知</text>
+  <text x="650" y="294" font-size="10" fill="#6B4E28" text-anchor="middle">中断→唤醒→重新调度</text>
+
+  <rect x="800" y="256" width="180" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="890" y="277" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">等待③：介质延迟</text>
+  <text x="890" y="294" font-size="10" fill="#6B4E28" text-anchor="middle">~10–100 μs · 线程睡眠</text>
+
+  <line x1="240" y1="203" x2="298" y2="203" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="500" y1="203" x2="558" y2="203" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="740" y1="203" x2="798" y2="203" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="1010" y="196" font-size="11" fill="#6B675C">合计</text>
+  <text x="1010" y="214" font-size="11" font-weight="700" fill="#A64B3C">拷贝 ×1–2</text>
+  <text x="1010" y="231" font-size="11" font-weight="700" fill="#B07D2B">等待 ×3</text>
+
+  <!-- ============ B: CXL ============ -->
+  <rect x="40" y="352" width="1160" height="196" rx="9" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="60" y="378" font-size="14" font-weight="700" fill="#4A473F">B · CXL Type-3：缓存一致的字节访问（load/store 取代 DMA）</text>
+  <text x="60" y="398" font-size="11.5" fill="#6B675C">CPU 直接对设备内存做 load/store，cache line 粒度，一致性由硬件保证 —— 删掉 doorbell、中断、块拷贝</text>
+
+  <rect x="60" y="418" width="180" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="150" y="444" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">应用线程</text>
+  <text x="150" y="464" font-size="10.5" fill="#2C4460" text-anchor="middle">*ptr 读写</text>
+
+  <rect x="300" y="418" width="360" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="480" y="444" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">CPU load/store → 缓存一致性 fabric（CXL.mem）</text>
+  <text x="480" y="464" font-size="10.5" fill="#24473F" text-anchor="middle">无 syscall · 无 doorbell · 无中断 · 无块拷贝</text>
+
+  <rect x="720" y="418" width="260" height="66" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="850" y="440" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">CXL 内存扩展器</text>
+  <text x="850" y="459" font-size="10.5" fill="#4A3F68" text-anchor="middle">OS 视角＝无 CPU 的 NUMA 节点</text>
+  <text x="850" y="475" font-size="10" fill="#4A3F68" text-anchor="middle">DRAM 与 NVMe 之间的新一档</text>
+
+  <line x1="240" y1="451" x2="298" y2="451" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="660" y1="451" x2="718" y2="451" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="300" y="502" width="360" height="36" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="480" y="525" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">剩下的等待：同步访存 stall（load 阻塞 CPU ~数百 ns，无法异步重叠）</text>
+  <text x="1010" y="444" font-size="11" fill="#6B675C">合计</text>
+  <text x="1010" y="462" font-size="11" font-weight="700" fill="#2F6B5E">拷贝 ×0</text>
+  <text x="1010" y="479" font-size="11" font-weight="700" fill="#B07D2B">等待 ×1</text>
+
+  <!-- ============ C: DPU ============ -->
+  <rect x="40" y="568" width="1160" height="272" rx="9" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="60" y="594" font-size="14" font-weight="700" fill="#4A473F">C · DPU / SmartNIC：把远端存储的数据面整段搬离 host CPU</text>
+  <text x="60" y="614" font-size="11.5" fill="#6B675C">host 只看到一块“本地 NVMe 盘”；协议、网络、拷贝都在网卡的 ARM 核与加速器上完成</text>
+
+  <!-- host view -->
+  <rect x="60" y="634" width="180" height="70" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="150" y="660" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">host 应用</text>
+  <text x="150" y="680" font-size="10.5" fill="#2C4460" text-anchor="middle">read/write 本地盘</text>
+
+  <rect x="300" y="634" width="200" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="400" y="656" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">host 内核</text>
+  <text x="400" y="675" font-size="10.5" fill="#24473F" text-anchor="middle">标准 NVMe 驱动</text>
+  <text x="400" y="691" font-size="10" fill="#24473F" text-anchor="middle">对协议一无所知</text>
+
+  <!-- boundary -->
+  <line x1="530" y1="628" x2="530" y2="812" stroke="#A64B3C" stroke-width="1.6" stroke-dasharray="6 5"/>
+  <text x="530" y="626" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">PCIe · 信任边界</text>
+
+  <!-- DPU box -->
+  <rect x="560" y="634" width="620" height="130" rx="8" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="580" y="657" font-size="12.5" font-weight="700" fill="#733428">DPU：网卡上的小型服务器（ARM 核 + 加速器）</text>
+
+  <rect x="580" y="670" width="180" height="54" rx="6" fill="#EFE0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="670" y="691" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">NVMe/virtio 模拟</text>
+  <text x="670" y="708" font-size="9.5" fill="#733428" text-anchor="middle">向 host 假扮本地盘</text>
+
+  <rect x="778" y="670" width="180" height="54" rx="6" fill="#EFE0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="868" y="691" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">NVMe-oF 客户端</text>
+  <text x="868" y="708" font-size="9.5" fill="#733428" text-anchor="middle">TCP/RDMA · 加解密/EC</text>
+
+  <rect x="976" y="670" width="184" height="54" rx="6" fill="#EFE0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1068" y="691" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">RNIC → 远端集群</text>
+  <text x="1068" y="708" font-size="9.5" fill="#733428" text-anchor="middle">协议处理不占 host 核</text>
+
+  <text x="580" y="748" font-size="10.5" fill="#733428">拷贝与等待没消失，只是从 host 挪到 DPU —— 换来 host 归还 CPU 核 + 多租户隔离</text>
+
+  <line x1="240" y1="669" x2="298" y2="669" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="500" y1="669" x2="558" y2="669" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="760" y1="697" x2="776" y2="697" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrR)"/>
+  <line x1="958" y1="697" x2="974" y2="697" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrR)"/>
+
+  <rect x="60" y="778" width="1120" height="46" rx="7" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1"/>
+  <text x="80" y="799" font-size="11.5" font-weight="700" fill="#2C4460">host 视角 合计：拷贝 ×0、等待 ×0（协议成本全部下沉）</text>
+  <text x="80" y="815" font-size="10.5" fill="#2C4460">系统整体视角：拷贝与等待仍在 DPU 上发生，但有硬件加速 + 与 host 隔离；这是“移走”而非“消灭”</text>
+</svg>
