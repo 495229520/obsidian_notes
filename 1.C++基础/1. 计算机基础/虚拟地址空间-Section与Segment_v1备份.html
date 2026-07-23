@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>虚拟地址空间 · .text/.data/.bss/.rodata · Section 与 Segment</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#444441;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;--gray:#F1EFE8;
+  --text:#185FA5;--textbg:#E6F1FB;
+  --ro:#0F6E56;--robg:#E1F5EE;
+  --data:#854F0B;--databg:#FAEEDA;
+  --bss:#8A3A52;--bssbg:#F7E9EE;
+  --heap:#993C1D;--heapbg:#FAECE7;
+  --stack:#3B6D11;--stackbg:#EAF3DE;
+  --kernel:#6B5E8A;--kernelbg:#ECE7F2;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 40px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.5px;}
+header p{font-size:13px;color:var(--muted);margin-top:4px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+b{color:var(--ink);font-weight:600;}
+
+.layout{display:grid;grid-template-columns:280px minmax(340px,1fr) minmax(380px,1.15fr);gap:18px;margin-top:22px;align-items:start;}
+@media(max-width:1100px){.layout{grid-template-columns:1fr 1fr;}}
+@media(max-width:760px){.layout{grid-template-columns:1fr;}}
+
+.panel{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 16px;}
+.cap{font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.cap .hint{font-family:var(--mono);font-size:10px;}
+
+.vas{position:relative;height:560px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);}
+.blk{
+  position:absolute;left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 12px;font-size:12px;overflow:hidden;
+  border-bottom:1px solid rgba(0,0,0,.04);
+  transition:top var(--dur) var(--ease),height var(--dur) var(--ease),opacity var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),filter var(--dur) var(--ease);
+}
+.blk .nm{font-weight:700;font-family:var(--mono);font-size:12px;}
+.blk .sub{font-size:10px;color:inherit;opacity:.72;margin-left:6px;font-weight:500;}
+.blk .addr{font-family:var(--mono);font-size:10px;opacity:.65;}
+.blk.dim{opacity:.28;filter:grayscale(.35);}
+.blk.hot{box-shadow:inset 0 0 0 2px currentColor;z-index:3;}
+.blk.pulse{animation:pulse 900ms var(--ease) 1;}
+@keyframes pulse{0%{transform:scale(1);}40%{transform:scale(1.015);}100%{transform:scale(1);}}
+
+.blk.kernel{background:var(--kernelbg);color:var(--kernel);}
+.blk.stack{background:var(--stackbg);color:var(--stack);}
+.blk.gap{background:repeating-linear-gradient(-45deg,transparent,transparent 7px,rgba(0,0,0,.03) 7px,rgba(0,0,0,.03) 14px);color:var(--faint);}
+.blk.shlib{background:var(--gray);color:var(--muted);}
+.blk.heap{background:var(--heapbg);color:var(--heap);}
+.blk.bss{background:var(--bssbg);color:var(--bss);}
+.blk.data{background:var(--databg);color:var(--data);}
+.blk.rodata{background:var(--robg);color:var(--ro);}
+.blk.text{background:var(--textbg);color:var(--text);}
+.blk.reserved{background:#EDEBE3;color:var(--faint);}
+
+.grow-arrow{
+  position:absolute;right:8px;z-index:6;font-family:var(--mono);font-size:12px;font-weight:700;
+  padding:4px 9px;border-radius:6px;color:#fff;opacity:0;
+  transition:opacity var(--dur) var(--ease),top var(--dur) var(--ease),transform var(--dur) var(--ease);
+  pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.18);letter-spacing:.2px;
+}
+.grow-arrow.show{opacity:1;transform:scale(1.04);}
+.grow-arrow.stack{background:var(--stack);}
+.grow-arrow.heap{background:var(--heap);}
+
+.map-wrap{display:flex;flex-direction:column;gap:12px;min-height:560px;}
+.map-row{display:grid;grid-template-columns:1fr 72px 1fr;gap:10px;align-items:stretch;min-height:0;flex:1;}
+.col-title{font-size:11px;color:var(--muted);text-align:center;margin-bottom:6px;font-weight:600;letter-spacing:.3px;}
+.sec-list,.seg-list{display:flex;flex-direction:column;gap:8px;height:100%;}
+.sec,.seg{
+  border:1px solid var(--line);border-radius:10px;padding:12px 12px;background:var(--panel);
+  transition:all var(--dur) var(--ease);position:relative;min-height:72px;
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+}
+.sec .t,.seg .t{font-family:var(--mono);font-weight:700;font-size:13px;}
+.sec .d,.seg .d{font-size:11px;color:var(--muted);line-height:1.4;}
+.sec .perm,.seg .perm{font-family:var(--mono);font-size:10px;margin-top:4px;opacity:.8;}
+.sec.dim,.seg.dim{opacity:.28;filter:grayscale(.3);}
+.sec.hot,.seg.hot{transform:translateY(-1px);box-shadow:0 6px 14px rgba(0,0,0,.07);}
+.sec.text.hot{border-color:var(--text);background:var(--textbg);color:var(--text);}
+.sec.rodata.hot{border-color:var(--ro);background:var(--robg);color:var(--ro);}
+.sec.data.hot{border-color:var(--data);background:var(--databg);color:var(--data);}
+.sec.bss.hot{border-color:var(--bss);background:var(--bssbg);color:var(--bss);}
+.seg.rx.hot{border-color:var(--text);background:var(--textbg);}
+.seg.rw.hot{border-color:var(--data);background:var(--databg);}
+.seg.rx .t{color:var(--text);}
+.seg.rw .t{color:var(--data);}
+
+.wires{position:relative;height:100%;min-width:56px;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.wire-svg path:not(.arrow){
+  fill:none;stroke:var(--line);stroke-width:2;stroke-linecap:round;
+  opacity:.12;transition:opacity var(--dur) var(--ease),stroke var(--dur) var(--ease),stroke-width var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);
+}
+.wire-svg path.on:not(.arrow){opacity:1;stroke-width:3;}
+.wire-svg path.on.w-text:not(.arrow){stroke:var(--text);}
+.wire-svg path.on.w-ro:not(.arrow){stroke:var(--ro);}
+.wire-svg path.on.w-data:not(.arrow){stroke:var(--data);}
+.wire-svg path.on.w-bss:not(.arrow){stroke:var(--bss);}
+.wire-svg .arrow{
+  fill:var(--line);stroke:none;stroke-width:0;
+  opacity:.12;transition:opacity var(--dur) var(--ease),fill var(--dur) var(--ease);
+}
+.wire-svg .arrow.on{opacity:1;transition-delay:200ms;}
+.wire-svg .arrow.on.w-text{fill:var(--text);}
+.wire-svg .arrow.on.w-ro{fill:var(--ro);}
+.wire-svg .arrow.on.w-data{fill:var(--data);}
+.wire-svg .arrow.on.w-bss{fill:var(--bss);}
+.wire-svg circle{
+  fill:var(--panel);stroke:var(--line);stroke-width:2.5;
+  opacity:.12;transition:opacity var(--dur) var(--ease),stroke var(--dur) var(--ease),fill var(--dur) var(--ease);
+}
+.wire-svg circle.on{opacity:1;}
+.wire-svg circle.on.w-text{stroke:var(--text);fill:var(--textbg);}
+.wire-svg circle.on.w-ro{stroke:var(--ro);fill:var(--robg);}
+.wire-svg circle.on.w-data{stroke:var(--data);fill:var(--databg);}
+.wire-svg circle.on.w-bss{stroke:var(--bss);fill:var(--bssbg);}
+.bridge{
+  margin-top:2px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;background:var(--paper);
+  font-size:12px;color:var(--muted);min-height:54px;transition:all var(--dur) var(--ease);
+}
+.bridge.on{border-color:var(--ink);background:var(--gray);color:var(--ink);}
+.bridge b{font-family:var(--mono);}
+
+.right{display:flex;flex-direction:column;gap:12px;min-height:560px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 16px;min-height:140px;}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:16px;font-weight:600;}
+.chip{font-size:11px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.ct{color:var(--text);border-color:var(--text);background:var(--textbg);}
+.chip.cr{color:var(--ro);border-color:var(--ro);background:var(--robg);}
+.chip.cd{color:var(--data);border-color:var(--data);background:var(--databg);}
+.chip.cb{color:var(--bss);border-color:var(--bss);background:var(--bssbg);}
+.chip.ch{color:var(--heap);border-color:var(--heap);background:var(--heapbg);}
+.chip.cs{color:var(--stack);border-color:var(--stack);background:var(--stackbg);}
+.chip.cm{color:var(--kernel);border-color:var(--kernel);background:var(--kernelbg);}
+.action{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--gray);border-radius:8px;padding:7px 10px;}
+.desc-body{margin-top:10px;font-size:13.5px;color:var(--muted);}
+.desc-body .t{color:var(--text);font-weight:600;}
+.desc-body .r{color:var(--ro);font-weight:600;}
+.desc-body .d{color:var(--data);font-weight:600;}
+.desc-body .b{color:var(--bss);font-weight:600;}
+.desc-body .h{color:var(--heap);font-weight:600;}
+.desc-body .s{color:var(--stack);font-weight:600;}
+
+.code-card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 16px;}
+.code-title{font-size:13px;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.code-title .tag{font-family:var(--mono);font-weight:600;}
+.codebox{
+  background:#2E2C27;border-radius:10px;padding:12px 0;font-family:var(--mono);font-size:13px;line-height:1.55;
+  overflow:auto;
+}
+.cl{padding:2px 14px;white-space:pre;color:#D8D5CC;transition:background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.cl .cmt{color:#8F8B80;}
+.cl .kw{color:#E3A44C;}
+.cl .str{color:#9BBF8A;}
+.cl .num{color:#D9A06B;}
+.cl[class*="hl-"]{color:#F7F4EA;}
+.cl[class*="hl-"] .cmt{color:#CCC8BA;}
+.cl.hl-text{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;}
+.cl.hl-ro{background:rgba(22,144,113,.52);box-shadow:inset 4px 0 0 #63CFAC;}
+.cl.hl-data{background:rgba(190,118,20,.5);box-shadow:inset 4px 0 0 #EAB466;}
+.cl.hl-bss{background:rgba(192,86,122,.5);box-shadow:inset 4px 0 0 #EC96B3;}
+.cl.hl-heap{background:rgba(200,88,42,.5);box-shadow:inset 4px 0 0 #F09C73;}
+.cl.hl-stack{background:rgba(116,160,52,.52);box-shadow:inset 4px 0 0 #AFD778;}
+
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:4px;font-size:11px;color:var(--muted);}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+.controls{margin-top:20px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:88px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:52px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>虚拟地址空间 · Section / Segment 与各段归属</h1>
+    <p>
+      把 <code>.text</code> <code>.rodata</code> <code>.data</code> <code>.bss</code> 从「磁盘上的 Section」映射到「进程里的 Segment」，并看清栈/堆的相对位置
+      · <kbd>←</kbd> <kbd>→</kbd> 单步 · <kbd>空格</kbd> 播放
+    </p>
+  </header>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="cap"><span>进程虚拟地址空间（x86 32 位）</span><span class="hint">↑ 高 · 低 ↓</span></div>
+      <div class="vas" id="vas">
+        <div class="blk kernel" id="blkKernel"><span><span class="nm">内核空间</span><span class="sub">共享</span></span><span class="addr">0xC0000000</span></div>
+        <div class="blk stack" id="blkStack"><span><span class="nm">.stack</span><span class="sub">局部 / 栈帧</span></span><span class="addr">↓ 生长</span></div>
+        <div class="blk gap" id="blkGap"><span><span class="nm">空洞</span><span class="sub">可扩展区</span></span><span class="addr">shared</span></div>
+        <div class="blk shlib" id="blkShlib"><span><span class="nm">共享库</span><span class="sub">.so / .dll</span></span><span class="addr">mmap</span></div>
+        <div class="blk heap" id="blkHeap"><span><span class="nm">.heap</span><span class="sub">malloc / new</span></span><span class="addr">↑ 生长</span></div>
+        <div class="blk bss" id="blkBss"><span><span class="nm">.bss</span><span class="sub">零初始化</span></span><span class="addr">RW</span></div>
+        <div class="blk data" id="blkData"><span><span class="nm">.data</span><span class="sub">已初始化≠0</span></span><span class="addr">RW</span></div>
+        <div class="blk rodata" id="blkRodata"><span><span class="nm">.rodata</span><span class="sub">常量串</span></span><span class="addr">R</span></div>
+        <div class="blk text" id="blkText"><span><span class="nm">.text</span><span class="sub">机器码</span></span><span class="addr">RX · 0x08048000</span></div>
+        <div class="blk reserved" id="blkReserved"><span><span class="nm">保留区</span><span class="sub">空指针陷阱</span></span><span class="addr">0x0</span></div>
+        <div class="grow-arrow stack" id="arrStack">▼ esp</div>
+        <div class="grow-arrow heap" id="arrHeap">▲ brk</div>
+      </div>
+      <div class="legend" style="margin-top:12px;">
+        <span><i style="background:var(--text)"></i>.text</span>
+        <span><i style="background:var(--ro)"></i>.rodata</span>
+        <span><i style="background:var(--data)"></i>.data</span>
+        <span><i style="background:var(--bss)"></i>.bss</span>
+        <span><i style="background:var(--heap)"></i>heap</span>
+        <span><i style="background:var(--stack)"></i>stack</span>
+      </div>
+    </section>
+
+    <section class="panel map-wrap">
+      <div class="cap">
+        <span>链接视角：Section → 装载视角：Segment</span>
+        <span class="hint">ld 合并 · loader 映射</span>
+      </div>
+      <div class="map-row">
+        <div>
+          <div class="col-title">OBJECT Section（.o / ELF 节）</div>
+          <div class="sec-list">
+            <div class="sec text" id="secText">
+              <div class="t">.text</div>
+              <div class="d">函数体机器码 / 指令</div>
+              <div class="perm">SHF_ALLOC · SHF_EXECINSTR</div>
+            </div>
+            <div class="sec rodata" id="secRodata">
+              <div class="t">.rodata</div>
+              <div class="d">字符串字面量、const 常量</div>
+              <div class="perm">SHF_ALLOC（只读）</div>
+            </div>
+            <div class="sec data" id="secData">
+              <div class="t">.data</div>
+              <div class="d">已初始化且非零的全局/静态</div>
+              <div class="perm">SHF_ALLOC · SHF_WRITE</div>
+            </div>
+            <div class="sec bss" id="secBss">
+              <div class="t">.bss</div>
+              <div class="d">未初始化 / 初值为 0 · 不占磁盘</div>
+              <div class="perm">SHF_ALLOC · SHF_WRITE · NOBITS</div>
+            </div>
+          </div>
+        </div>
+        <div class="wires" id="wires">
+          <svg class="wire-svg" id="wireSvg" width="100%" height="100%" preserveAspectRatio="none"></svg>
+        </div>
+        <div>
+          <div class="col-title">PROCESS Segment（PT_LOAD 段）</div>
+          <div class="seg-list">
+            <div class="seg rx" id="segRX">
+              <div class="t">LOAD · R-X</div>
+              <div class="d">.text + .rodata<br>代码与只读数据页</div>
+              <div class="perm">可读 · 可执行 · 不可写</div>
+            </div>
+            <div class="seg rw" id="segRW">
+              <div class="t">LOAD · RW-</div>
+              <div class="d">.data + .bss<br>可写数据页（bss 装载时清零）</div>
+              <div class="perm">可读 · 可写 · 不可执行</div>
+            </div>
+            <div class="seg" id="segDyn" style="min-height:88px;opacity:.55;">
+              <div class="t">运行时段</div>
+              <div class="d">heap / stack / mmap<br>不由静态 Section 描述</div>
+              <div class="perm">由 brk / mmap / 线程栈建立</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bridge" id="bridge">Section 是链接器眼里的「节」；Segment 是装载器眼里的「段」。多节可合并进同一装载段。</div>
+    </section>
+
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head">
+          <span class="st" id="stTitle"></span>
+          <span class="chip" id="stChip"></span>
+        </div>
+        <div class="action" id="stAction"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="code-card">
+        <div class="code-title">
+          <span>变量 / 指令落点示例</span>
+          <span class="tag" id="codeTag">demo.cpp</span>
+        </div>
+        <div class="codebox" id="codebox"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const CODE_LINES = [
+  { t: '// demo.cpp', c: 'cmt' },
+  { t: 'int g1 = 10;          // .data', c: '', id: 'g1' },
+  { t: 'int g2 = 0;           // .bss', c: '', id: 'g2' },
+  { t: 'int g3;               // .bss', c: '', id: 'g3' },
+  { t: 'static int s1 = 7;    // .data', c: '', id: 's1' },
+  { t: 'const char* msg = "hi"; // .rodata + .data(指针)', c: '', id: 'msg' },
+  { t: '', c: '' },
+  { t: 'int main() {          // .text', c: '', id: 'main' },
+  { t: '  int a = 12;         // .stack', c: '', id: 'a' },
+  { t: '  static int d = 13;  // .data', c: '', id: 'd' },
+  { t: '  int* p = new int(5);// .heap + .stack(指针)', c: '', id: 'p' },
+  { t: '  return a;           // .text 指令', c: '', id: 'ret' },
+  { t: '}', c: '' },
+];
+
+function paintCode() {
+  const box = document.getElementById('codebox');
+  box.innerHTML = CODE_LINES.map((ln, i) => {
+    let html = ' ';
+    if (ln.t) {
+      // split trailing comment first, park string literals behind
+      // digit-free placeholders, so later passes never touch span markup
+      const m = ln.t.match(/^(.*?)(\/\/.*)?$/);
+      let code = m[1];
+      const cmt = m[2] || '';
+      const strs = [];
+      code = code.replace(/"[^"]*"/g, s => {
+        strs.push(s);
+        return '\u0001' + String.fromCharCode(65 + strs.length - 1) + '\u0001';
+      });
+      code = code
+        .replace(/\b(int|const|static|return|new|char)\b/g, '<span class="kw">$1</span>')
+        .replace(/\b(\d+)\b/g, '<span class="num">$1</span>')
+        .replace(/\u0001([A-Z])\u0001/g, (_, c) => '<span class="str">' + strs[c.charCodeAt(0) - 65] + '</span>');
+      html = code + (cmt ? '<span class="cmt">' + cmt + '</span>' : '');
+    }
+    return `<div class="cl" id="cl${i}" data-id="${ln.id || ''}">${html}</div>`;
+  }).join('');
+}
+
+const BAR = 560;
+const BASE = {
+  kernel: 42,
+  stack: 54,
+  gap: 78,
+  shlib: 36,
+  heap: 48,
+  bss: 48,
+  data: 48,
+  rodata: 48,
+  text: 66,
+  reserved: 32,
+};
+
+function applyLayout(extra = {}) {
+  const h = { ...BASE, ...extra };
+  const keys = ['kernel','stack','gap','shlib','heap','bss','data','rodata','text','reserved'];
+  let sum = keys.reduce((a, k) => a + h[k], 0);
+  h.gap = Math.max(24, h.gap + (BAR - sum));
+
+  let y = 0;
+  const order = [
+    ['blkKernel', 'kernel'],
+    ['blkStack', 'stack'],
+    ['blkGap', 'gap'],
+    ['blkShlib', 'shlib'],
+    ['blkHeap', 'heap'],
+    ['blkBss', 'bss'],
+    ['blkData', 'data'],
+    ['blkRodata', 'rodata'],
+    ['blkText', 'text'],
+    ['blkReserved', 'reserved'],
+  ];
+  const tops = {};
+  for (const [id, k] of order) {
+    const el = document.getElementById(id);
+    el.style.top = y + 'px';
+    el.style.height = h[k] + 'px';
+    tops[k] = { top: y, h: h[k], mid: y + h[k] / 2 };
+    y += h[k];
+  }
+  document.getElementById('arrStack').style.top = (tops.stack.top + tops.stack.h - 14) + 'px';
+  document.getElementById('arrHeap').style.top = (tops.heap.top - 2) + 'px';
+  return tops;
+}
+
+function setHot(ids, pulse = true) {
+  const all = ['blkKernel','blkStack','blkGap','blkShlib','blkHeap','blkBss','blkData','blkRodata','blkText','blkReserved'];
+  all.forEach(id => {
+    const el = document.getElementById(id);
+    const on = ids.includes(id);
+    el.classList.toggle('hot', on);
+    el.classList.toggle('dim', ids.length > 0 && !on);
+    if (on && pulse) {
+      el.classList.remove('pulse');
+      void el.offsetWidth;
+      el.classList.add('pulse');
+    }
+  });
+}
+
+function setSecHot(keys) {
+  const map = { text: 'secText', rodata: 'secRodata', data: 'secData', bss: 'secBss' };
+  Object.entries(map).forEach(([k, id]) => {
+    const el = document.getElementById(id);
+    const on = keys.includes(k);
+    el.classList.toggle('hot', on);
+    el.classList.toggle('dim', keys.length > 0 && !on);
+  });
+}
+
+function setSegHot(keys) {
+  const map = { rx: 'segRX', rw: 'segRW', dyn: 'segDyn' };
+  Object.entries(map).forEach(([k, id]) => {
+    const el = document.getElementById(id);
+    const on = keys.includes(k);
+    el.classList.toggle('hot', on);
+    el.classList.toggle('dim', keys.length > 0 && !on);
+    if (k === 'dyn') el.style.opacity = on ? '1' : (keys.length ? '.28' : '.55');
+  });
+}
+
+const WIRE_META = [
+  { key: 'text', sec: 'secText', seg: 'segRX', cls: 'w-text' },
+  { key: 'rodata', sec: 'secRodata', seg: 'segRX', cls: 'w-ro' },
+  { key: 'data', sec: 'secData', seg: 'segRW', cls: 'w-data' },
+  { key: 'bss', sec: 'secBss', seg: 'segRW', cls: 'w-bss' },
+];
+let wireOn = [];
+
+function ensureWireSvg() {
+  const svg = document.getElementById('wireSvg');
+  if (svg.dataset.ready) return svg;
+  const ns = 'http://www.w3.org/2000/svg';
+  WIRE_META.forEach((w, i) => {
+    const path = document.createElementNS(ns, 'path');
+    path.id = 'wp' + i; path.setAttribute('class', w.cls);
+    const circ = document.createElementNS(ns, 'circle');
+    circ.id = 'wc' + i; circ.setAttribute('class', w.cls); circ.setAttribute('r', '4');
+    circ.setAttribute('fill', 'none');
+    circ.setAttribute('stroke-width', '2.5');
+    const arrow = document.createElementNS(ns, 'path');
+    arrow.id = 'wa' + i; arrow.setAttribute('class', 'arrow ' + w.cls);
+    svg.appendChild(path); svg.appendChild(circ); svg.appendChild(arrow);
+  });
+  svg.dataset.ready = '1';
+  return svg;
+}
+
+function layoutWires() {
+  const svg = ensureWireSvg();
+  const box = document.getElementById('wires');
+  const br = box.getBoundingClientRect();
+  const W = Math.max(1, br.width);
+  const H = Math.max(1, br.height);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  // stagger endpoints on shared segment so 2 lines don't fully overlap
+  const segSlots = { segRX: 0, segRW: 0 };
+  const segCounts = { segRX: 0, segRW: 0 };
+  WIRE_META.forEach(w => { if (wireOn.includes(w.key) || wireOn.length === 0) segCounts[w.seg] = (segCounts[w.seg]||0)+1; });
+
+  WIRE_META.forEach((w, i) => {
+    const sEl = document.getElementById(w.sec);
+    const gEl = document.getElementById(w.seg);
+    const sr = sEl.getBoundingClientRect();
+    const gr = gEl.getBoundingClientRect();
+    const y1 = sr.top + sr.height / 2 - br.top;
+    // offset multiple targets on same segment
+    const slot = segSlots[w.seg] || 0;
+    const total = Math.max(1, segCounts[w.seg] || 1);
+    segSlots[w.seg] = slot + 1;
+    const ySpread = (slot - (total - 1) / 2) * 20;
+    const y2 = gr.top + gr.height / 2 - br.top + ySpread;
+    const x1 = 2;
+    const x2 = W - 1;
+    const d = `M ${x1} ${y1} C ${W * 0.45} ${y1}, ${W * 0.55} ${y2}, ${x2} ${y2}`;
+    document.getElementById('wp' + i).setAttribute('d', d);
+    document.getElementById('wc' + i).setAttribute('cx', x1);
+    document.getElementById('wc' + i).setAttribute('cy', y1);
+    // filled triangle arrowhead, reaching into the grid gap to touch the segment card
+    const ah = 5, aw = 9;
+    const tipX = x2 + aw, tipY = y2;
+    const dArr = `M ${tipX} ${tipY} L ${tipX - aw} ${tipY - ah} L ${tipX - aw} ${tipY + ah} Z`;
+    document.getElementById('wa' + i).setAttribute('d', dArr);
+  });
+  setWires(wireOn);
+}
+
+const wireLit = new Set();
+function drawWireIn(i) {
+  // draw-in: animate stroke-dashoffset on the persistent path, then clear
+  const p = document.getElementById('wp' + i);
+  const L = p.getTotalLength();
+  p.style.transition = 'none';
+  p.style.strokeDasharray = L;
+  p.style.strokeDashoffset = L;
+  void p.getBoundingClientRect();
+  p.style.transition = '';
+  p.style.strokeDashoffset = '0';
+  clearTimeout(p._drawTimer);
+  p._drawTimer = setTimeout(() => {
+    p.style.strokeDasharray = '';
+    p.style.strokeDashoffset = '';
+  }, 560);
+}
+
+function setWires(onKeys) {
+  wireOn = onKeys || [];
+  const any = wireOn.length > 0;
+  WIRE_META.forEach((w, i) => {
+    const on = wireOn.includes(w.key);
+    ['wp','wc','wa'].forEach(prefix => {
+      const el = document.getElementById(prefix + i);
+      el.classList.toggle('on', on);
+      // inactive while others are on: hide completely so active arrows don't blend
+      el.style.opacity = (!any || on) ? '' : '0';
+    });
+    if (on && !wireLit.has(w.key)) drawWireIn(i);
+    if (on) wireLit.add(w.key); else wireLit.delete(w.key);
+  });
+}
+
+function setCodeHL(ids) {
+  document.querySelectorAll('.cl').forEach(el => {
+    el.className = 'cl';
+    const id = el.dataset.id;
+    if (!id || !ids[id]) return;
+    el.classList.add('hl-' + ids[id]);
+  });
+}
+
+const STEPS = [
+  {
+    title: '步骤 0 · 先看整张地图',
+    chip: '总览', chipC: 'c0',
+    action: '▸ 建立心智模型：进程看到的是虚拟地址，不是物理页',
+    desc: 'x86 32 位进程有 <b>4GB</b> 虚拟地址空间。用户态大致是：<b>保留区 → .text → .rodata → .data → .bss → heap → 共享库 → 空洞 → stack → 内核</b>。左侧条从上（高地址）到下（低地址）。',
+    hot: [], sec: [], seg: [], wires: [],
+    code: {}, layout: {},
+    arrows: { stack: false, heap: false },
+    bridge: '先记住位置关系；下一步分清 Section（节）和 Segment（段）。',
+  },
+  {
+    title: '步骤 1 · Section ≠ Segment',
+    chip: '概念拆分', chipC: 'cm',
+    action: '▸ Section 是链接单位；Segment 是装载/权限单位',
+    desc: '<b>Section</b>：编译/链接时的逻辑分区（.text/.data…），写在 ELF 节头里。<b>Segment</b>（PT_LOAD）：装载进进程时的连续映射区，决定页权限（R-X / RW-）。多个 Section 常被 <b>合并</b> 进同一个 Segment。',
+    hot: ['blkText','blkRodata','blkData','blkBss'],
+    sec: ['text','rodata','data','bss'],
+    seg: ['rx','rw'],
+    wires: ['text','rodata','data','bss'],
+    code: {}, layout: {},
+    arrows: { stack: false, heap: false },
+    bridge: '问「变量在哪个 section」和「页是 R-X 还是 RW-」是两层问题。',
+  },
+  {
+    title: '步骤 2 · .text 代码段',
+    chip: '.text', chipC: 'ct',
+    action: '▸ 指令进 .text → 装入 R-X 段 · 典型起点 0x08048000',
+    desc: '<span class="t">.text</span> 存机器码：函数体、控制流指令。属性：<b>只读 + 可执行</b>。写 .text 会段错误（现代系统 W^X）。局部变量的「分配指令」也在 .text，但变量值在栈上。',
+    hot: ['blkText'], sec: ['text'], seg: ['rx'], wires: ['text'],
+    code: { main: 'text', ret: 'text' },
+    layout: { text: 90 },
+    arrows: { stack: false, heap: false },
+    bridge: '.text + .rodata 通常合进同一个 <b>LOAD R-X</b> Segment。',
+  },
+  {
+    title: '步骤 3 · .rodata 只读数据',
+    chip: '.rodata', chipC: 'cr',
+    action: '▸ 字符串字面量 / const 进 .rodata · 写它 → 段错误',
+    desc: '<span class="r">.rodata</span> 放常量：<code>"hi"</code>、字面量数组、部分 const 对象。权限只读。经典坑：<code>char* p="hi"; *p=\'x\';</code> 试图写 .rodata。',
+    hot: ['blkRodata'], sec: ['rodata'], seg: ['rx'], wires: ['rodata'],
+    code: { msg: 'ro' },
+    layout: { rodata: 80 },
+    arrows: { stack: false, heap: false },
+    bridge: '指针变量本身可能在 .data；指向的字符串内容在 .rodata。',
+  },
+  {
+    title: '步骤 4 · .data 已初始化非零',
+    chip: '.data', chipC: 'cd',
+    action: '▸ 初值 ≠ 0 的全局/静态 → .data · 占磁盘镜像',
+    desc: '<span class="d">.data</span> 存「编译期就知道、且非零」的全局/静态变量。可读写。镜像里会带初值字节，所以<b>占可执行文件体积</b>。',
+    hot: ['blkData'], sec: ['data'], seg: ['rw'], wires: ['data'],
+    code: { g1: 'data', s1: 'data', d: 'data', msg: 'data' },
+    layout: { data: 80 },
+    arrows: { stack: false, heap: false },
+    bridge: '.data 与 .bss 合进 <b>LOAD RW-</b>；bss 在装载时按大小清零。',
+  },
+  {
+    title: '步骤 5 · .bss 零段 · 不占磁盘',
+    chip: '.bss', chipC: 'cb',
+    action: '▸ 未初始化或初值=0 → .bss · NOBITS · 装载时清零',
+    desc: '<span class="b">.bss</span>：未初始化或显式 <code>=0</code> 的全局/静态。文件里只记大小（SHT_NOBITS），<b>不占磁盘空间</b>；装入内存时 loader 按大小分配并清零。',
+    hot: ['blkBss'], sec: ['bss'], seg: ['rw'], wires: ['bss'],
+    code: { g2: 'bss', g3: 'bss' },
+    layout: { bss: 80 },
+    arrows: { stack: false, heap: false },
+    bridge: '省磁盘的原因：全零内容不必写进文件，运行时再 memset。',
+  },
+  {
+    title: '步骤 6 · 合并：R-X 与 RW- 两段',
+    chip: '装载映射', chipC: 'cm',
+    action: '▸ 链接器合并节 → 装载器按 Segment 建页权限',
+    desc: '典型合并：<b class="t">.text + .rodata → R-X</b>；<b class="d">.data + .bss → RW-</b>。这样代码页不可写、数据页不可执行（W^X）。heap/stack 不在静态 Section 表里，由运行时创建。',
+    hot: ['blkText','blkRodata','blkData','blkBss'],
+    sec: ['text','rodata','data','bss'],
+    seg: ['rx','rw'],
+    wires: ['text','rodata','data','bss'],
+    code: { main: 'text', msg: 'ro', g1: 'data', g2: 'bss' },
+    layout: {},
+    arrows: { stack: false, heap: false },
+    bridge: 'readelf -S 看 Section；readelf -l 看 Segment。两者对照最清晰。',
+  },
+  {
+    title: '步骤 7 · 堆在 .bss 之上向上长',
+    chip: 'heap', chipC: 'ch',
+    action: '▸ malloc/new 抬高 brk · 堆：低地址 → 高地址',
+    desc: '<span class="h">heap</span> 紧挨静态数据区上方（逻辑上），随 <code>malloc</code>/<code>new</code>/<code>brk/sbrk</code> 向<b>高地址</b>生长。动态对象本体在堆；栈上通常只留指针。',
+    hot: ['blkHeap'], sec: [], seg: ['dyn'], wires: [],
+    code: { p: 'heap' },
+    layout: { heap: 96, gap: 50 },
+    arrows: { stack: false, heap: true },
+    bridge: '堆不是 .data/.bss 的一部分；它是运行时段。',
+  },
+  {
+    title: '步骤 8 · 栈在高地址向下长',
+    chip: 'stack', chipC: 'cs',
+    action: '▸ 局部变量/返回地址在栈 · 栈：高地址 → 低地址',
+    desc: '<span class="s">stack</span> 从用户空间高端向下长。普通局部变量<b>不产生全局符号</b>，靠 .text 里的指令在栈上开槽。每个线程一份栈。',
+    hot: ['blkStack'], sec: [], seg: ['dyn'], wires: [],
+    code: { a: 'stack', p: 'stack' },
+    layout: { stack: 96, gap: 50 },
+    arrows: { stack: true, heap: false },
+    bridge: '与「堆栈相向生长」动画衔接：中间空洞被两端吃掉。',
+  },
+  {
+    title: '步骤 9 · 一张表记住落点',
+    chip: '对照表', chipC: 'c0',
+    action: '▸ 全局/静态看初值；局部看栈；动态看堆；指令看 .text',
+    desc: '<b>已初始化≠0 全局/静态 → .data</b> · <b>未初始化/0 → .bss</b> · <b>字符串字面量 → .rodata</b> · <b>指令 → .text</b> · <b>普通局部 → stack</b> · <b>new/malloc → heap</b>。static 局部虽作用域在函数内，存储仍在 .data/.bss。',
+    hot: ['blkText','blkRodata','blkData','blkBss','blkHeap','blkStack'],
+    sec: ['text','rodata','data','bss'],
+    seg: ['rx','rw','dyn'],
+    wires: ['text','rodata','data','bss'],
+    code: { g1: 'data', g2: 'bss', g3: 'bss', s1: 'data', msg: 'ro', main: 'text', a: 'stack', d: 'data', p: 'heap', ret: 'text' },
+    layout: {},
+    arrows: { stack: true, heap: true },
+    bridge: 'Section 回答「链接放哪」；Segment 回答「页权限」；stack/heap 回答「运行时谁在动」。',
+  },
+];
+
+const stTitle = document.getElementById('stTitle');
+const stChip = document.getElementById('stChip');
+const stAction = document.getElementById('stAction');
+const stDesc = document.getElementById('stDesc');
+const bridge = document.getElementById('bridge');
+const readout = document.getElementById('readout');
+const btnPrev = document.getElementById('btnPrev');
+const btnNext = document.getElementById('btnNext');
+const btnPlay = document.getElementById('btnPlay');
+const dotsBox = document.getElementById('dots');
+const arrStack = document.getElementById('arrStack');
+const arrHeap = document.getElementById('arrHeap');
+
+const dotEls = [];
+STEPS.forEach((s, i) => {
+  const d = document.createElement('button');
+  d.className = 'dot';
+  d.title = s.title;
+  d.onclick = () => go(i);
+  dotsBox.appendChild(d);
+  dotEls.push(d);
+});
+
+let cur = 0;
+function go(i) {
+  cur = Math.max(0, Math.min(STEPS.length - 1, i));
+  const s = STEPS[cur];
+
+  applyLayout(s.layout || {});
+  setHot(s.hot || []);
+  setSecHot(s.sec || []);
+  setSegHot(s.seg || []);
+  wireOn = s.wires || [];
+  setCodeHL(s.code || {});
+  requestAnimationFrame(() => { layoutWires(); setWires(wireOn); });
+
+  arrStack.classList.toggle('show', !!(s.arrows && s.arrows.stack));
+  arrHeap.classList.toggle('show', !!(s.arrows && s.arrows.heap));
+
+  stTitle.textContent = s.title;
+  stChip.textContent = s.chip;
+  stChip.className = 'chip ' + s.chipC;
+  stAction.textContent = s.action;
+  stDesc.innerHTML = s.desc;
+  bridge.textContent = s.bridge;
+  bridge.classList.add('on');
+
+  dotEls.forEach((d, idx) => {
+    d.classList.toggle('now', idx === cur);
+    d.classList.toggle('done', idx < cur);
+  });
+  readout.textContent = cur + ' / ' + (STEPS.length - 1);
+  btnPrev.disabled = cur === 0;
+  btnNext.disabled = cur === STEPS.length - 1;
+  if (cur === STEPS.length - 1) stop();
+}
+
+let timer = null;
+const ms = 2400;
+function play() {
+  if (cur === STEPS.length - 1) go(0);
+  btnPlay.textContent = '⏸ 暂停';
+  timer = setInterval(() => { cur < STEPS.length - 1 ? go(cur + 1) : stop(); }, ms);
+}
+function stop() {
+  if (timer) { clearInterval(timer); timer = null; }
+  btnPlay.textContent = '▶ 播放';
+}
+
+btnPlay.onclick = () => timer ? stop() : play();
+btnPrev.onclick = () => { stop(); go(cur - 1); };
+btnNext.onclick = () => { stop(); go(cur + 1); };
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') { stop(); go(cur + 1); }
+  else if (e.key === 'ArrowLeft') { stop(); go(cur - 1); }
+  else if (e.key === ' ') { e.preventDefault(); timer ? stop() : play(); }
+});
+window.addEventListener('resize', layoutWires);
+
+paintCode();
+applyLayout();
+const m = location.hash.match(/step=(\d+)/);
+go(m ? +m[1] : 0);
+setTimeout(layoutWires, 50);
+</script>
+</body>
+</html>
