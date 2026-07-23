@@ -156,6 +156,16 @@ code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 
 .mod-row .r{color:var(--green);border-color:var(--green);background:var(--greenbg);}
 .mod-row .r.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
 .mod-row .r.hi{box-shadow:0 0 0 3px rgba(15,110,86,.3);}
+.mod-row .raw{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.mod-row .raw.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.mod-identity{text-align:center;font-family:var(--mono);font-size:15px;font-weight:700;color:var(--ink);background:var(--gray);border:1px solid var(--grid);border-radius:9px;padding:11px 12px;margin-bottom:14px;min-height:22px;line-height:1.7;}
+.mod-identity .lhs{color:var(--blue);}
+.mod-identity .rhs{color:var(--green);}
+.mod-identity .eqs{color:var(--faint);margin:0 8px;}
+.mod-identity .neq{color:var(--danger);font-weight:800;margin:0 8px;}
+.mod-identity .corr{color:var(--brown);background:var(--brownbg);border-radius:4px;padding:0 4px;}
+.mod-identity .badspan{color:var(--danger);text-decoration:line-through;text-decoration-color:rgba(179,64,47,.55);}
+.mod-identity .muted{color:var(--faint);font-weight:600;}
 .mod-note{margin-top:auto;padding-top:14px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);min-height:22px;}
 .mod-note b{color:var(--ink);}
 .mod-note .dg{color:var(--danger);font-weight:700;}
@@ -508,49 +518,66 @@ const powScene=(()=>{
    ============================================================ */
 const modScene=(()=>{
   const MOD=7;
-  const code='<span class="cmt">// 常见：const long long MOD = 1e9+7;</span>\n'+
-    '<span class="cmt">// 演示用小模数 7，规则完全相同</span>\n'+
-    '(a + b) % MOD\n'+
-    '(a - b + MOD) % MOD   <span class="cmt">// 防负数</span>\n'+
-    '(a * b) % MOD\n'+
-    '<span class="cmt">// 除法：a / b ≡ a * inv(b)  (MOD 质数)</span>\n'+
-    'inv = fastPow(b, MOD - 2) % MOD;  <span class="cmt">// 费马</span>\n'+
-    '(a * inv) % MOD';
-  // ops highlight index: 0+,1-,2*,3/  |  pair [a,b,raw,norm] | mode
+  const code='<span class="kw">const long long</span> MOD = 1e9+7;      <span class="cmt">// 通常取质数</span>\n'+
+    '<span class="cmt">// 加：(a+b)%m = ((a%m)+(b%m))%m</span>\n'+
+    'add = (a + b) % MOD;\n'+
+    '<span class="cmt">// 减：(a-b)%m = ((a%m)-(b%m)+m)%m  ← +m 防负</span>\n'+
+    'sub = ((a - b) % MOD + MOD) % MOD;\n'+
+    '<span class="cmt">// 乘：(a*b)%m = ((a%m)*(b%m))%m</span>\n'+
+    'mul = (a * b) % MOD;\n'+
+    '<span class="cmt">// 除：a/b = a*inv(b)（m 质数，费马小定理）</span>\n'+
+    'inv = fastPow(b, MOD - 2);        <span class="cmt">// b^(m-2)%m</span>\n'+
+    'div = a % MOD * inv % MOD;';
+  // 每步字段：op 高亮哪个盒(0加1减2乘3除,-1无) | mode | ident 恒等式 |
+  //          行演示 a opSym b = raw modLab res，及 rawBad/resBad/resHi 上色
   const steps=[
-    {title:'步骤 0 · 为什么取模',chip:'MOD = 1e9+7',chipC:'c0',op:-1,pair:null,mode:'intro',
+    {title:'步骤 0 · 为什么要取模',chip:'MOD = 1e9+7',chipC:'c0',op:-1,mode:'intro',
+     ident:'<span class="muted">加减乘</span> 可拆开取模　·　<span class="muted">除法</span> 要用逆元',
+     a:'a',opSym:'⊙',b:'b',raw:'?',modLab:'% m',res:'?',rawBad:false,resBad:false,resHi:false,
      foot:'题面常见 MOD = 1 000 000 007（质数）',
-     desc:'答案很大、方案数爆炸时，题面要求对 <b>1e9+7</b> 取余。规则：<b>加、减、乘可以拆开取模</b>；<span class="dg">除法不能直接拆</span>，需要模逆元。下面用小模数 <span class="bl">MOD = 7</span> 演示（规则与 1e9+7 相同）。'},
-    {title:'步骤 1 · 加法 / 乘法可拆',chip:'(a±b)% · (a×b)%',chipC:'cg',op:0,pair:[5,6,11,4],mode:'addmul',
-     foot:'(5+6)%7 = 4　·　(5×6)%7 = 30%7 = 2',
-     desc:'<span class="bl">5 + 6 = 11</span> → 11 % 7 = <span class="gr">4</span>。乘法：5 × 6 = 30 → 30 % 7 = <span class="gr">2</span>。可写成 <code>((a%MOD)+(b%MOD))%MOD</code>，每步都取模防溢出。'},
-    {title:'步骤 2 · 减法会变负',chip:'C++ 负数取模',chipC:'cd',op:1,pair:[2,5,-3,-3],mode:'sub-bad',
-     foot:'(2−5)%7 在 C++ 里是 −3，不是 4',
-     desc:'<span class="bl">2 − 5 = −3</span>。C++ 里 <code>(-3) % 7 == −3</code>（向零取整），得到<span class="dg">负数余数</span>。数组下标、哈希桶、答案规范化都会踩坑。'},
-    {title:'步骤 3 · 负数规范化',chip:'(x%M+M)%M',chipC:'cg',op:1,pair:[2,5,-3,4],mode:'sub-ok',
-     foot:'(−3 % 7 + 7) % 7 = 4',
-     desc:'模板：<b>(x % MOD + MOD) % MOD</b>。把 −3 拉回正区间：−3 + 7 = 4 → 4 % 7 = <span class="gr">4</span>。减法稳写：<code>(a - b % MOD + MOD) % MOD</code>。'},
-    {title:'步骤 4 · 除法不能直接拆',chip:'禁止 a/b % MOD',chipC:'cd',op:3,pair:[6,3,2,null],mode:'div-bad',
-     foot:'6/3=2 碰巧对，换 6/4 就挂',
-     desc:'取模下<span class="dg">不能写</span> <code>a / b % MOD</code>。整数除法会先丢掉小数，且 6÷4 在模 7 下应有“商”却整除得不到。必须换成<span class="bl">乘以模逆元</span>：<b>a / b ≡ a · inv(b)</b>。'},
-    {title:'步骤 5 · 费马求逆元',chip:'inv = b^(MOD-2)',chipC:'cg',op:3,pair:[6,3,5,2],mode:'inv',
-     foot:'inv(3)=3^5%7=5　·　6×5%7=2 ≡ 6/3',
-     desc:'当 <b>MOD 是质数</b>且 b 与 MOD 互质时，费马小定理：<b>inv(b) = b<sup>MOD−2</sup> % MOD</b>（用快速幂）。例：inv(3)=3<sup>5</sup>%7=<span class="br">5</span>（因 3×5=15≡1）。于是 6/3 ≡ 6×5 % 7 = <span class="gr">2</span>。'},
+     desc:'答案可能是天文数字（方案数、幂）时，题面要求对 <b>1e9+7</b> 取余。关键性质：<b>先取模再运算，结果不变</b>——<span class="gr">加、减、乘</span>都能把大数拆成小数分别取模；只有<span class="dg">除法</span>不满足，要改用<b>模逆元</b>。下面用小模数 <span class="bl">MOD = 7</span> 演示（换成 1e9+7 规则一模一样）。'},
+    {title:'步骤 1 · 加法可拆',chip:'(a+b)%m',chipC:'cg',op:0,mode:'add',
+     ident:'<span class="lhs">(a + b) % m</span><span class="eqs">=</span><span class="rhs">( (a%m) + (b%m) ) % m</span>',
+     a:'5',opSym:'+',b:'6',raw:'11',modLab:'% 7',res:'4',rawBad:false,resBad:false,resHi:true,
+     foot:'(5 + 6) % 7 = 11 % 7 = 4',
+     desc:'<b>加法恒等式：(a + b) % m = ((a % m) + (b % m)) % m</b>。每个数可以先各自取模，再相加、再取模，结果不变。例：(<span class="bl">5</span> + <span class="br">6</span>) % 7 = 11 % 7 = <span class="gr">4</span>。连加时每加一次就 % m，能防止和爆出 <code>long long</code>。'},
+    {title:'步骤 2 · 减法要 +m 防负',chip:'(a−b+m)%m',chipC:'cg',op:1,mode:'sub',
+     ident:'<span class="lhs">(a − b) % m</span><span class="eqs">=</span><span class="rhs">( (a%m) − (b%m) <span class="corr">+ m</span> ) % m</span>',
+     a:'2',opSym:'−',b:'5',raw:'−3',modLab:'+7 %7',res:'4',rawBad:true,resBad:false,resHi:true,
+     foot:'(2 − 5) % 7 在 C++ 是 −3　→　(−3 + 7) % 7 = 4',
+     desc:'<b>减法恒等式：(a − b) % m = ((a % m) − (b % m) + m) % m</b>。为什么要 <span class="dg">+ m</span>？C++ 里负数取模仍是负：<code>(2 − 5) % 7 == −3</code>（向零取整），不是数学期望的 4。<b>+ m 再 % m</b> 把余数拉回 <b>[0, m)</b>：(−3 + 7) % 7 = <span class="gr">4</span>。稳写：<code>((a − b) % m + m) % m</code>。'},
+    {title:'步骤 3 · 乘法可拆',chip:'(a×b)%m',chipC:'cg',op:2,mode:'mul',
+     ident:'<span class="lhs">(a × b) % m</span><span class="eqs">=</span><span class="rhs">( (a%m) × (b%m) ) % m</span>',
+     a:'5',opSym:'×',b:'6',raw:'30',modLab:'% 7',res:'2',rawBad:false,resBad:false,resHi:true,
+     foot:'(5 × 6) % 7 = 30 % 7 = 2',
+     desc:'<b>乘法恒等式：(a × b) % m = ((a % m) × (b % m)) % m</b>。同样先各自取模再相乘。例：(<span class="bl">5</span> × <span class="br">6</span>) % 7 = 30 % 7 = <span class="gr">2</span>。注意即使 a、b 都 < m，乘积 a×b 仍可能溢出，所以大数相乘要用 <code>__int128</code> 或每步取模。'},
+    {title:'步骤 4 · 除法不能直接拆',chip:'禁止 a/b%m',chipC:'cd',op:3,mode:'div-bad',
+     ident:'<span class="lhs">(a ÷ b) % m</span><span class="neq">≠</span><span class="badspan">( (a%m) ÷ (b%m) ) % m</span>',
+     a:'6',opSym:'÷',b:'4',raw:'1',modLab:'← 截断',res:'✗',rawBad:true,resBad:true,resHi:false,
+     foot:'模 7 下 6/4 应是 5，整除却得 1 —— 错',
+     desc:'<b>除法不能照搬</b>：<span class="dg">(a ÷ b) % m ≠ ((a % m) ÷ (b % m)) % m</span>。整数除法会把小数截断、丢信息。例：模 7 下 <b>6 / 4</b> 的真答案是 <span class="gr">5</span>（因为 4 × 5 = 20 ≡ 6），可直接写 <code>6 / 4</code> 只得整除的 <span class="dg">1</span>，完全错。除法必须换成<b>乘以模逆元</b>。'},
+    {title:'步骤 5 · 除法 = 乘逆元',chip:'inv(b)=b^(m−2)',chipC:'cg',op:3,mode:'inv',
+     ident:'<span class="lhs">(a ÷ b) % m</span><span class="eqs">=</span><span class="rhs">( a × inv(b) ) % m</span><span class="muted">，inv(b)=b^(m−2)%m</span>',
+     a:'6',opSym:'×',b:'2',raw:'12',modLab:'% 7',res:'5',rawBad:false,resBad:false,resHi:true,
+     foot:'inv(4)=4⁵%7=2　·　6 × 2 % 7 = 5 ≡ 6/4',
+     desc:'<b>除法恒等式：(a ÷ b) % m = (a × inv(b)) % m</b>。inv(b) 是 b 的<b>模逆元</b>，满足 b × inv(b) ≡ 1。当 <b>m 为质数</b>且 b 不是 m 的倍数时，费马小定理给出 <b>inv(b) = b<sup>m−2</sup> % m</b>（快速幂算）。例：inv(4) = 4<sup>5</sup> % 7 = <span class="br">2</span>，于是 6 / 4 ≡ 6 × <span class="br">2</span> % 7 = <span class="gr">5</span>，与上一步的正确答案一致。'},
   ];
   function mount(){
     viz.innerHTML=
-      '<div class="vcap"><b>模运算</b>：加减乘可拆，负数要规范化，除法用逆元</div>'+
-      '<div class="mod-banner">演示 <span class="modv">MOD = '+MOD+'</span>（题面常见 1e9+7）</div>'+
+      '<div class="vcap"><b>模运算</b>：加减乘可「拆开取模」，除法要用逆元</div>'+
+      '<div class="mod-banner">演示 <span class="modv">MOD = '+MOD+'</span>（题面常见 1e9+7，均为质数）</div>'+
       '<div class="mod-ops">'+
-        '<div class="mod-op" id="mop-0"><div class="k">加法</div><div class="f" id="mf-0">(a + b) % MOD</div></div>'+
-        '<div class="mod-op" id="mop-1"><div class="k">减法</div><div class="f" id="mf-1">(a − b + MOD) % MOD</div></div>'+
-        '<div class="mod-op" id="mop-2"><div class="k">乘法</div><div class="f" id="mf-2">(a × b) % MOD</div></div>'+
-        '<div class="mod-op" id="mop-3"><div class="k">除法 → 逆元</div><div class="f" id="mf-3">a × inv(b) % MOD</div></div>'+
+        '<div class="mod-op" id="mop-0"><div class="k">加法</div><div class="f" id="mf-0">(a + b) % m</div></div>'+
+        '<div class="mod-op" id="mop-1"><div class="k">减法</div><div class="f" id="mf-1">(a − b + m) % m</div></div>'+
+        '<div class="mod-op" id="mop-2"><div class="k">乘法</div><div class="f" id="mf-2">(a × b) % m</div></div>'+
+        '<div class="mod-op" id="mop-3"><div class="k">除法 → 逆元</div><div class="f" id="mf-3">a × inv(b) % m</div></div>'+
       '</div>'+
+      '<div class="mod-identity" id="mod-identity"></div>'+
       '<div class="mod-row" id="mod-row">'+
-        '<div class="numbox a" id="m-a">—</div><div class="op" id="m-op">?</div>'+
-        '<div class="numbox b" id="m-b">—</div><div class="eq">=</div>'+
-        '<div class="numbox r" id="m-r">?</div>'+
+        '<div class="numbox a" id="m-a">a</div><div class="op" id="m-op1">⊙</div>'+
+        '<div class="numbox b" id="m-b">b</div><div class="eq">=</div>'+
+        '<div class="numbox raw" id="m-raw">?</div><div class="op" id="m-op2">% 7</div>'+
+        '<div class="eq">=</div><div class="numbox r" id="m-r">?</div>'+
       '</div>'+
       '<div class="mod-note" id="mod-note"></div>';
   }
@@ -559,43 +586,21 @@ const modScene=(()=>{
       const el=document.getElementById('mop-'+i);
       el.className='mod-op';
       if(s.op===i)el.classList.add('on');
-      else if(s.op>=0 && i!==s.op)el.classList.add('dim');
-      if(s.mode==='addmul'&&(i===0||i===2))el.classList.add('ok');
-      if(s.mode==='sub-bad'&&i===1)el.classList.add('bad');
-      if(s.mode==='sub-ok'&&i===1)el.classList.add('ok');
+      else if(s.op>=0)el.classList.add('dim');
+      if(s.mode==='add'&&i===0)el.classList.add('ok');
+      if(s.mode==='sub'&&i===1)el.classList.add('ok');
+      if(s.mode==='mul'&&i===2)el.classList.add('ok');
       if(s.mode==='div-bad'&&i===3)el.classList.add('bad');
       if(s.mode==='inv'&&i===3)el.classList.add('ok');
     }
-    document.getElementById('mf-0').textContent=s.mode==='addmul'?'(5+6)%7 = 4':'(a + b) % MOD';
-    document.getElementById('mf-1').textContent=
-      s.mode==='sub-bad'?'(2-5)%7 = −3 ✗':
-      s.mode==='sub-ok'?'(−3+7)%7 = 4 ✓':'(a − b + MOD) % MOD';
-    document.getElementById('mf-2').textContent=s.mode==='addmul'?'(5×6)%7 = 2':'(a × b) % MOD';
-    document.getElementById('mf-3').textContent=
-      s.mode==='div-bad'?'a/b % MOD 不可直写':
-      s.mode==='inv'?'6×inv(3)%7 = 2':'a × inv(b) % MOD';
-
-    const a=document.getElementById('m-a'),b=document.getElementById('m-b');
-    const op=document.getElementById('m-op'),r=document.getElementById('m-r');
-    r.className='numbox r';
-    if(!s.pair){
-      a.textContent='a';b.textContent='b';op.textContent='⊙';r.textContent='?';
-    }else if(s.mode==='addmul'){
-      a.textContent='5';b.textContent='6';op.textContent='+ / ×';
-      r.textContent='4 / 2';r.classList.add('hi');
-    }else if(s.mode==='sub-bad'){
-      a.textContent='2';b.textContent='5';op.textContent='−';
-      r.textContent='−3';r.classList.add('bad');
-    }else if(s.mode==='sub-ok'){
-      a.textContent='−3';b.textContent='+7';op.textContent='norm';
-      r.textContent='4';r.classList.add('hi');
-    }else if(s.mode==='div-bad'){
-      a.textContent='6';b.textContent='3';op.textContent='/';
-      r.textContent='?';r.classList.add('bad');
-    }else if(s.mode==='inv'){
-      a.textContent='6';b.textContent='inv3=5';op.textContent='×';
-      r.textContent='2';r.classList.add('hi');
-    }
+    document.getElementById('mod-identity').innerHTML=s.ident||'';
+    document.getElementById('m-a').textContent=s.a;
+    document.getElementById('m-b').textContent=s.b;
+    document.getElementById('m-op1').textContent=s.opSym;
+    document.getElementById('m-op2').textContent=s.modLab;
+    const raw=document.getElementById('m-raw'),r=document.getElementById('m-r');
+    raw.textContent=s.raw;raw.className='numbox raw'+(s.rawBad?' bad':'');
+    r.textContent=s.res;r.className='numbox r'+(s.resBad?' bad':'')+(s.resHi?' hi':'');
     document.getElementById('mod-note').innerHTML=s.foot||'';
   }
   const links=[
@@ -604,7 +609,7 @@ const modScene=(()=>{
     {t:'974. 和可被 K 整除的子数组',u:'https://leetcode.cn/problems/subarray-sums-divisible-by-k/'},
     {t:'523. 连续的子数组和',u:'https://leetcode.cn/problems/continuous-subarray-sum/'},
   ];
-  return {id:'mod',label:'模运算',sub:'拆模 · 负数 · 逆元',steps,mount,paint,code,links};
+  return {id:'mod',label:'模运算',sub:'加减乘拆 · 除用逆元',steps,mount,paint,code,links};
 })();
 
 /* ============================================================
