@@ -2,7 +2,8 @@
 title: "The conviction in India continues to be very high: Citi's Achintya Mangla"
 source: https://economictimes.indiatimes.com/industry/banking/finance/banking/the-conviction-in-india-continues-to-be-very-high-citis-achintya-mangla/articleshow/131668216.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # The conviction in India continues to be very high: Citi's Achintya Mangla

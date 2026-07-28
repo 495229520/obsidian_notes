@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>文件锁的挂载对象：flock 挂 open file description，POSIX 记录锁挂 (进程, inode)</title>
+  <desc>上半部分是一张对象图，展示进程、fd 表项、open file description、inode 四层引用关系，以及三种锁分别挂在哪一层；下半部分是由挂载点直接推出的五个行为差异表。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">锁挂在哪个内核对象上，决定了 fork / dup / close 的全部行为</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">背不住那些规则，是因为把它们当成了并列的条款，它们其实是同一张对象图的推论</text>
+
+  <!-- ========== Panel A ========== -->
+  <rect x="56" y="112" width="1128" height="358" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · 三种锁分别挂在哪一层</text>
+
+  <text x="166" y="174" font-size="11" fill="#6B675C" text-anchor="middle">进程 task_struct</text>
+  <text x="372" y="174" font-size="11" fill="#6B675C" text-anchor="middle">fd 表项</text>
+  <text x="627" y="174" font-size="11" fill="#6B675C" text-anchor="middle">open file description</text>
+  <text x="930" y="174" font-size="11" fill="#6B675C" text-anchor="middle">inode（文件本体）</text>
+
+  <!-- 进程 -->
+  <rect x="100" y="196" width="132" height="150" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="166" y="228" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">进程 P</text>
+  <text x="166" y="248" font-size="10.5" fill="#2C4460" text-anchor="middle">pid = 4213</text>
+  <line x1="118" y1="266" x2="214" y2="266" stroke="#3D5A80" stroke-width="0.8" stroke-dasharray="3 3"/>
+  <text x="166" y="288" font-size="10.5" fill="#2C4460" text-anchor="middle">线程 T1</text>
+  <text x="166" y="306" font-size="10.5" fill="#2C4460" text-anchor="middle">线程 T2</text>
+  <text x="166" y="328" font-size="9.5" fill="#6B675C" text-anchor="middle">共用同一张 fd 表</text>
+
+  <!-- fd 表项 -->
+  <rect x="300" y="202" width="144" height="40" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.2"/>
+  <text x="372" y="220" font-size="12" font-weight="700" fill="#444441" text-anchor="middle">fd 3</text>
+  <text x="372" y="236" font-size="9.5" fill="#6B675C" text-anchor="middle">open("data.txt")</text>
+
+  <rect x="312" y="252" width="144" height="38" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="384" y="270" font-size="11" font-weight="700" fill="#444441" text-anchor="middle">子进程 C 的 fd 3</text>
+  <text x="384" y="284" font-size="9.5" fill="#6B675C" text-anchor="middle">fork 复制了表项</text>
+
+  <rect x="300" y="300" width="144" height="40" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.2"/>
+  <text x="372" y="318" font-size="12" font-weight="700" fill="#444441" text-anchor="middle">fd 5</text>
+  <text x="372" y="334" font-size="9.5" fill="#6B675C" text-anchor="middle">第二次 open 同一文件</text>
+
+  <line x1="232" y1="222" x2="298" y2="222" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="232" y1="320" x2="298" y2="320" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- open file description -->
+  <rect x="520" y="200" width="214" height="84" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="627" y="222" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">open file description #1</text>
+  <text x="627" y="240" font-size="10" fill="#6B4E28" text-anchor="middle">f_pos · f_flags · f_mode</text>
+  <text x="627" y="266" font-size="10.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">flock 锁 / OFD 锁挂这里</text>
+
+  <rect x="520" y="296" width="214" height="84" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="627" y="318" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">#2（第二次 open 新建）</text>
+  <text x="627" y="336" font-size="10" fill="#6B4E28" text-anchor="middle">独立的 f_pos</text>
+  <text x="627" y="362" font-size="10.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">同样挂 flock / OFD 锁</text>
+
+  <line x1="444" y1="222" x2="518" y2="226" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="456" y1="271" x2="518" y2="252" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="444" y1="320" x2="518" y2="324" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- inode -->
+  <rect x="830" y="236" width="200" height="108" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="930" y="262" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">inode — data.txt</text>
+  <text x="930" y="280" font-size="10" fill="#733428" text-anchor="middle">设备号 8:2 · ino 1048577</text>
+  <text x="930" y="306" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">POSIX 记录锁挂这里</text>
+  <text x="930" y="324" font-size="9.5" fill="#733428" text-anchor="middle">按 (持锁进程, 字节区间) 记</text>
+
+  <line x1="734" y1="242" x2="828" y2="266" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="734" y1="338" x2="828" y2="314" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- POSIX 归属虚线 -->
+  <path d="M166 346 L166 400 L925 400 L925 346" fill="none" stroke="#A64B3C" stroke-width="1.4" stroke-dasharray="6 4"/>
+  <circle cx="166" cy="346" r="3" fill="#A64B3C"/>
+  <circle cx="925" cy="346" r="3" fill="#A64B3C"/>
+  <text x="545" y="393" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">POSIX 记录锁的所有者是「进程 + inode」这个二元组，与哪个 fd、哪个 open file description 都无关</text>
+
+  <text x="72" y="440" font-size="11.5" fill="#6B675C">读法：先找到锁挂在哪一格，再看谁跟谁共用那一格。下半页五行差异，全部是这张图的直接推论。</text>
+
+  <!-- ========== Panel B ========== -->
+  <rect x="56" y="490" width="1128" height="330" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="518" font-size="13" font-weight="700" fill="#4A473F">B · 由挂载点推出的五个行为差异</text>
+
+  <!-- header -->
+  <rect x="80" y="534" width="246" height="30" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="330" y="534" width="274" height="30" rx="5" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1"/>
+  <rect x="608" y="534" width="274" height="30" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <rect x="886" y="534" width="274" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="203" y="554" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">场景</text>
+  <text x="467" y="554" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">flock()</text>
+  <text x="745" y="554" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">fcntl() POSIX 记录锁</text>
+  <text x="1023" y="554" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">fcntl() OFD 锁（Linux 3.15+）</text>
+
+  <!-- R1 -->
+  <rect x="80" y="568" width="246" height="46" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="330" y="568" width="274" height="46" rx="5" fill="#F6F0E4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="608" y="568" width="274" height="46" rx="5" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="886" y="568" width="274" height="46" rx="5" fill="#E9F1EC" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="92" y="596" font-size="11" font-weight="700" fill="#4A473F">fork() 出来的子进程</text>
+  <text x="342" y="588" font-size="10.5" fill="#4A473F">共享同一把锁</text>
+  <text x="342" y="605" font-size="9.5" fill="#6B675C">父子的 fd 指向同一个 OFD</text>
+  <text x="620" y="588" font-size="10.5" font-weight="700" fill="#A64B3C">子进程一把锁都拿不到</text>
+  <text x="620" y="605" font-size="9.5" fill="#6B675C">锁只认父进程的 pid</text>
+  <text x="898" y="588" font-size="10.5" fill="#4A473F">共享同一把锁</text>
+  <text x="898" y="605" font-size="9.5" fill="#6B675C">与 flock 一致</text>
+
+  <!-- R2 -->
+  <rect x="80" y="616" width="246" height="46" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="330" y="616" width="274" height="46" rx="5" fill="#F6F0E4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="608" y="616" width="274" height="46" rx="5" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="886" y="616" width="274" height="46" rx="5" fill="#E9F1EC" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="92" y="644" font-size="11" font-weight="700" fill="#4A473F">dup() 出的第二个 fd</text>
+  <text x="342" y="636" font-size="10.5" fill="#4A473F">还是那一把锁</text>
+  <text x="342" y="653" font-size="9.5" fill="#6B675C">任一 fd 都能解掉它</text>
+  <text x="620" y="636" font-size="10.5" fill="#4A473F">本来就只有一把</text>
+  <text x="620" y="653" font-size="9.5" fill="#6B675C">锁按进程记，与 fd 数量无关</text>
+  <text x="898" y="636" font-size="10.5" fill="#4A473F">还是那一把锁</text>
+  <text x="898" y="653" font-size="9.5" fill="#6B675C">与 flock 一致</text>
+
+  <!-- R3 -->
+  <rect x="80" y="664" width="246" height="46" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="330" y="664" width="274" height="46" rx="5" fill="#F6F0E4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="608" y="664" width="274" height="46" rx="5" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="886" y="664" width="274" height="46" rx="5" fill="#E9F1EC" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="92" y="692" font-size="11" font-weight="700" fill="#4A473F">同进程二次 open 同一文件</text>
+  <text x="342" y="684" font-size="10.5" font-weight="700" fill="#8A6A3A">两个 OFD 互相冲突</text>
+  <text x="342" y="701" font-size="9.5" fill="#6B675C">自己把自己挡在门外</text>
+  <text x="620" y="684" font-size="10.5" fill="#4A473F">不冲突</text>
+  <text x="620" y="701" font-size="9.5" fill="#6B675C">第二次直接覆盖第一次的区间</text>
+  <text x="898" y="684" font-size="10.5" font-weight="700" fill="#2F6B5E">两个 OFD 互相冲突</text>
+  <text x="898" y="701" font-size="9.5" fill="#6B675C">线程互斥正是靠这一点</text>
+
+  <!-- R4 -->
+  <rect x="80" y="712" width="246" height="46" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="330" y="712" width="274" height="46" rx="5" fill="#F6F0E4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="608" y="712" width="274" height="46" rx="5" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.6"/>
+  <rect x="886" y="712" width="274" height="46" rx="5" fill="#E9F1EC" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="92" y="740" font-size="11" font-weight="700" fill="#4A473F">close() 掉其中一个 fd</text>
+  <text x="342" y="732" font-size="10.5" fill="#4A473F">最后一个 fd 关闭才释放</text>
+  <text x="342" y="749" font-size="9.5" fill="#6B675C">锁跟着 OFD 的引用计数走</text>
+  <text x="620" y="732" font-size="10.5" font-weight="700" fill="#A64B3C">关任一 fd，该文件锁全丢</text>
+  <text x="620" y="749" font-size="9.5" fill="#6B675C">库函数偷偷 open/close 就中招</text>
+  <text x="898" y="732" font-size="10.5" fill="#4A473F">最后一个 fd 关闭才释放</text>
+  <text x="898" y="749" font-size="9.5" fill="#6B675C">修掉了左边那颗地雷</text>
+
+  <!-- R5 -->
+  <rect x="80" y="760" width="246" height="46" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="330" y="760" width="274" height="46" rx="5" fill="#F6F0E4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="608" y="760" width="274" height="46" rx="5" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="886" y="760" width="274" height="46" rx="5" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="92" y="788" font-size="11" font-weight="700" fill="#4A473F">同进程两个线程互斥</text>
+  <text x="342" y="780" font-size="10.5" fill="#4A473F">各自 open 才行</text>
+  <text x="342" y="797" font-size="9.5" fill="#6B675C">共用一个 fd 则毫无作用</text>
+  <text x="620" y="780" font-size="10.5" font-weight="700" fill="#A64B3C">做不到</text>
+  <text x="620" y="797" font-size="9.5" fill="#6B675C">锁属于进程，线程之间没有边界</text>
+  <text x="898" y="780" font-size="10.5" font-weight="700" fill="#2F6B5E">各自 open 即可</text>
+  <text x="898" y="797" font-size="9.5" fill="#6B675C">目前最省事的做法</text>
+</svg>

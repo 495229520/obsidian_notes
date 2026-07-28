@@ -2,7 +2,9 @@
 title: FlashAttention 版本演进与面试口述
 date: 2026-05-24
 tags:
-  - AI-infra/素材库-GPU与推理方向/推理专题清单
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 推理专题清单
 roadmap_week: Week 8, Week 9-16
 sort_order: "08.00"
 status: active

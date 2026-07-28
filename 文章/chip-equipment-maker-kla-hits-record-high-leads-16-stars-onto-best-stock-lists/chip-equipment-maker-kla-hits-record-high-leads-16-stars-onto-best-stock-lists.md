@@ -2,7 +2,8 @@
 title: Chip Equipment Maker KLA Hits Record High, Leads 16 Stars Onto Best Stock Lists
 source: https://www.investors.com/research/chip-equipment-maker-kla-hits-record-high-leads-16-stars-onto-best-stock-lists/
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Chip Equipment Maker KLA Hits Record High, Leads 16 Stars Onto Best Stock Lists

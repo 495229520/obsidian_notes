@@ -2,7 +2,8 @@
 title: Fuel prices to be reviewed based on crude oil supply, says Union Minister Suresh Gopi
 source: https://economictimes.indiatimes.com/industry/energy/oil-gas/fuel-prices-to-be-reviewed-based-on-crude-oil-supply-says-union-minister-suresh-gopi/articleshow/131715482.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Fuel prices to be reviewed based on crude oil supply, says Union Minister Suresh Gopi

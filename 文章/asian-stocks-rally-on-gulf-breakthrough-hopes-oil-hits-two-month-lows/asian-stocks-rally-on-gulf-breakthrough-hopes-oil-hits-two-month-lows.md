@@ -2,7 +2,8 @@
 title: Asian stocks rally on Gulf breakthrough hopes, oil hits two-month lows
 source: https://economictimes.indiatimes.com/markets/us-stocks/news/asian-stocks-rally-on-gulf-breakthrough-hopes-oil-hits-two-month-lows/articleshow/131671270.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Asian stocks rally on Gulf breakthrough hopes, oil hits two-month lows

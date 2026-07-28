@@ -2,7 +2,9 @@
 title: S-Week 26 - checkpoint 干扰与 S4 报告收口
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向阶段计划/总结
+  - 高性能存储
+  - 存储方向阶段计划
+  - 总结
 status: active
 ---
 

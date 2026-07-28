@@ -2,7 +2,8 @@
 title: Tata's Apple iPhone factory in Tamil Nadu faces shutdown threat over farmland water contamination; pollution body seeks explanation
 source: https://economictimes.indiatimes.com/industry/cons-products/electronics/tatas-apple-iphone-factory-in-tamil-nadu-may-get-shut-down-over-farmland-water-contamination-pollution-body-seeks-explanation/articleshow/131700726.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Tata's Apple iPhone factory in Tamil Nadu faces shutdown threat over farmland water contamination; pollution body seeks explanation

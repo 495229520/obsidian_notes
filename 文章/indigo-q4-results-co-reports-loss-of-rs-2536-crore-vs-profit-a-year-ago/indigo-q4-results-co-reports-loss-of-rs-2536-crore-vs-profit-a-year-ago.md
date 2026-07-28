@@ -2,7 +2,8 @@
 title: "IndiGo Q4 Results: Co reports loss of Rs 2,536 crore vs profit a year ago"
 source: https://economictimes.indiatimes.com/markets/stocks/earnings/indigo-q4-results-co-reports-loss-of-rs-2536-crore-vs-profit-year-ago/articleshow/131389129.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # IndiGo Q4 Results: Co reports loss of Rs 2,536 crore vs profit a year ago

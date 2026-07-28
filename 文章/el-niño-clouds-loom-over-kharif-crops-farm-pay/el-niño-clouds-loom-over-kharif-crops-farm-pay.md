@@ -2,7 +2,8 @@
 title: El Niño clouds loom over kharif crops, farm pay
 source: https://economictimes.indiatimes.com/news/economy/agriculture/el-nio-clouds-loom-over-kharif-crops-farm-pay-weak-monsoon-millets-pulses/articleshow/131596622.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # El Niño clouds loom over kharif crops, farm pay

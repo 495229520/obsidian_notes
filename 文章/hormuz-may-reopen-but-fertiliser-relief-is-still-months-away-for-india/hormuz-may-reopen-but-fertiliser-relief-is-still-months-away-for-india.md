@@ -2,7 +2,8 @@
 title: Hormuz may reopen, but fertiliser relief is still months away for India
 source: https://economictimes.indiatimes.com/news/economy/agriculture/hormuz-may-reopen-but-fertiliser-relief-is-still-months-away-for-india/articleshow/131754272.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Hormuz may reopen, but fertiliser relief is still months away for India

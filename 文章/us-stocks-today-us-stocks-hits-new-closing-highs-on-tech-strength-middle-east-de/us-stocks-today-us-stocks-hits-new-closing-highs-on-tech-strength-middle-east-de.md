@@ -2,7 +2,8 @@
 title: "US stocks today: US stocks hits new closing highs on tech strength, Middle East deal hopes"
 source: https://economictimes.indiatimes.com/markets/us-stocks/news/us-stocks-today-us-stocks-hits-new-closing-highs-on-tech-strength-middle-east-deal-hopes/articleshow/131398367.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # US stocks today: US stocks hits new closing highs on tech strength, Middle East deal hopes

@@ -2,7 +2,8 @@
 title: "RBI MPC: Growth rate could top 7% if oil prices fall further"
 source: https://economictimes.indiatimes.com/news/economy/indicators/rbi-mpc-growth-rate-could-top-7-if-oil-prices-fall-further/articleshow/131919901.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # RBI MPC: Growth rate could top 7% if oil prices fall further

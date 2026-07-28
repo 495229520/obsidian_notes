@@ -2,7 +2,8 @@
 title: 块层观测专题 - iostat blktrace eBPF
 date: 2026-07-11
 tags:
-  - 高性能存储/存储方向专题清单
+  - 高性能存储
+  - 存储方向专题清单
 roadmap_week: 阶段 1（S-Week 8、S-Week 9）
 sort_order: "05.10"
 status: active

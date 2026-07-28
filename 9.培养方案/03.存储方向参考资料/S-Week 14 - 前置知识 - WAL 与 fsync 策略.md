@@ -2,7 +2,9 @@
 title: S-Week 14 - 前置知识 - WAL 与 fsync 策略
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向参考资料/计划
+  - 高性能存储
+  - 存储方向参考资料
+  - 计划
 aliases:
   - 存储 Week 14 前置知识
   - fsync 策略前置知识

@@ -2,7 +2,8 @@
 title: BHEL, SAIL at risk of losing Maharatna tag
 source: https://economictimes.indiatimes.com/news/company/corporate-trends/bhel-sail-at-risk-of-losing-maharatna-tag/articleshow/131539001.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # BHEL, SAIL at risk of losing Maharatna tag

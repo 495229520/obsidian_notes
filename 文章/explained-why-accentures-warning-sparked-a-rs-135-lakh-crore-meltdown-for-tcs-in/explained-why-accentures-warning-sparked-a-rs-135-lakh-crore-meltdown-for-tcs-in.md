@@ -2,7 +2,8 @@
 title: "Explained: Why Accenture's warning sparked a Rs 1.35 lakh crore meltdown for TCS, Infosys, other IT stocks"
 source: https://economictimes.indiatimes.com/markets/stocks/news/explained-why-accentures-warning-sparked-a-rs-1-35-lakh-crore-meltdown-for-tcs-infosys-other-it-stocks/articleshow/131847136.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Explained: Why Accenture's warning sparked a Rs 1.35 lakh crore meltdown for TCS, Infosys, other IT stocks

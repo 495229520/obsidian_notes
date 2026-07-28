@@ -1,6 +1,8 @@
 ---
 tags:
-  - 研一上学期/归档/MFMS-AGV历史设计
+  - 研一上学期
+  - 归档
+  - MFMS-AGV历史设计
 ---
 # CommunicationInterface 当前调用链与接口状态说明
 

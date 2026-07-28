@@ -2,7 +2,8 @@
 title: Ola Electric files application to settle Sebi probe
 source: https://economictimes.indiatimes.com/markets/stocks/news/ola-electric-files-application-to-settle-sebi-probe/articleshow/131783674.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Ola Electric files application to settle Sebi probe

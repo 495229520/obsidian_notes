@@ -2,7 +2,9 @@
 title: GPU 存储层次与算子融合口述
 date: 2026-05-24
 tags:
-  - AI-infra/素材库-GPU与推理方向/推理专题清单
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 推理专题清单
 roadmap_week: Week 3-4, Week 9-16
 sort_order: "03.50"
 status: active

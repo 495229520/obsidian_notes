@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <title>write() 的调用者：stdio 路径与直接系统调用路径</title>
+  <desc>左侧主图为分层调用链：第一层应用代码有两条入口，printf/fwrite 只写 FILE 库缓冲，由 glibc 在缓冲满、fflush、fclose 或正常 exit 时代为调用 write；直接调用 write 则不经过库缓冲。两条路在 write() 系统调用处合并，陷入内核后 copy_from_user 把数据拷进 Page Cache 并标记脏页，再由回写线程或 fsync 推向设备。右上说明内核不会主动替应用调用 write，右下说明数据库为什么绕开 stdio。底部表格列出 printf、fflush、write、fsync 各自的调用者与跨越的层。</desc>
+
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">write() 是谁调用的：两条入口，一个内核门</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">内核从不主动替应用写文件 —— 数据能往下走，只因为用户程序自己调了 write()，或 glibc 替它调了</text>
+
+  <!-- ============ Panel A: 分层调用链 ============ -->
+  <rect x="48" y="100" width="722" height="462" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="62" y="124" font-size="13" font-weight="700" fill="#4A473F">A · 一次写入的调用链：谁按下了每一级的按钮</text>
+
+  <!-- 层带背景 -->
+  <rect x="58" y="134" width="702" height="130" rx="7" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="58" y="292" width="702" height="64" rx="7" fill="#EFE7DA" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="58" y="366" width="702" height="70" rx="7" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="58" y="446" width="702" height="60" rx="7" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="66" y="152" font-size="10.5" font-weight="700" fill="#3D5A80">用户态</text>
+  <text x="66" y="166" font-size="9.5" fill="#6B675C">进程内存</text>
+  <text x="66" y="312" font-size="10.5" font-weight="700" fill="#8A6A3A">跨界</text>
+  <text x="66" y="326" font-size="9.5" fill="#6B675C">syscall</text>
+  <text x="66" y="392" font-size="10.5" font-weight="700" fill="#6B5B95">内核态</text>
+  <text x="66" y="406" font-size="9.5" fill="#6B675C">DRAM</text>
+  <text x="66" y="470" font-size="10.5" font-weight="700" fill="#2F6B5E">设备</text>
+  <text x="66" y="484" font-size="9.5" fill="#6B675C">介质</text>
+  <!-- 路径一：stdio -->
+  <rect x="122" y="146" width="252" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="134" y="166" font-size="12" font-weight="700" fill="#2C4460">路径一 · printf / fwrite / fputs</text>
+  <text x="134" y="183" font-size="10" fill="#4A473F">用户态库函数，不是系统调用</text>
+
+  <rect x="122" y="212" width="230" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="134" y="231" font-size="11.5" font-weight="700" fill="#4A473F">FILE 库缓冲（stdio）</text>
+  <text x="134" y="247" font-size="10" fill="#6B675C">只是一次 memcpy，内核毫不知情</text>
+
+  <line x1="237" y1="192" x2="237" y2="210" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 路径二：直接 write -->
+  <rect x="446" y="146" width="290" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="458" y="166" font-size="12" font-weight="700" fill="#2C4460">路径二 · 程序直接调 write / pwrite</text>
+  <text x="458" y="183" font-size="10" fill="#4A473F">自己管缓冲，没有第二层库缓冲</text>
+
+  <!-- 触发条件标注：只属于路径一 -->
+  <rect x="378" y="208" width="322" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="390" y="226" font-size="11" font-weight="700" fill="#6B4E28">glibc 在四种时机替你调 write()</text>
+  <text x="390" y="242" font-size="9.8" fill="#6B4E28">缓冲写满 · fflush() · fclose() · 正常 exit()</text>
+  <text x="390" y="255" font-size="9.8" fill="#A64B3C">_exit() 与被信号杀死都不刷，库缓冲直接消失</text>
+
+  <line x1="352" y1="234" x2="376" y2="234" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 汇合到 write -->
+  <rect x="300" y="298" width="400" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="312" y="318" font-size="12.5" font-weight="700" fill="#6B4E28">write(fd, buf, n) —— 进入内核的唯一入口</text>
+  <text x="312" y="336" font-size="10" fill="#6B4E28">陷入（trap）+ fd → struct file → inode 定位</text>
+
+  <!-- 路径一：经库缓冲，由 glibc 代调 -->
+  <line x1="470" y1="260" x2="470" y2="296" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="478" y="282" font-size="9.5" fill="#6B675C">glibc 代为调用</text>
+
+  <!-- 路径二：绕过库缓冲，程序自己调 -->
+  <line x1="722" y1="192" x2="722" y2="324" stroke="#5A564B" stroke-width="1.5"/>
+  <line x1="722" y1="324" x2="702" y2="324" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="716" y="288" font-size="9.5" text-anchor="end" fill="#6B675C">程序自己调用</text>
+
+  <!-- 内核层 -->
+  <rect x="122" y="376" width="286" height="50" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="134" y="396" font-size="11.5" font-weight="700" fill="#4A3F6B">copy_from_user()</text>
+  <text x="134" y="413" font-size="10" fill="#4A473F">整条路径上仅此一次 CPU 拷贝</text>
+
+  <rect x="430" y="376" width="306" height="50" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="442" y="396" font-size="11.5" font-weight="700" fill="#4A3F6B">Page Cache 页标记 PG_dirty</text>
+  <text x="442" y="413" font-size="10" fill="#4A473F">write() 到此立刻返回，尚未落盘</text>
+
+  <line x1="380" y1="350" x2="260" y2="374" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="408" y1="401" x2="428" y2="401" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 设备层 -->
+  <rect x="122" y="456" width="286" height="42" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="134" y="473" font-size="11" font-weight="700" fill="#24473F">回写线程（不可预测）</text>
+  <text x="134" y="489" font-size="9.8" fill="#24473F">超时 30s 或脏页比例越线时自动写出</text>
+
+  <rect x="430" y="456" width="306" height="42" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="442" y="473" font-size="11" font-weight="700" fill="#24473F">fsync() / fdatasync()（应用可控）</text>
+  <text x="442" y="489" font-size="9.8" fill="#24473F">提交脏页 + 下发 FLUSH，等设备确认</text>
+
+  <line x1="240" y1="426" x2="240" y2="454" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="600" y1="426" x2="600" y2="454" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrTeal)"/>
+
+  <text x="62" y="530" font-size="10.5" fill="#6B675C">读法：向下的每一根箭头都需要一个明确的推动者；找不到推动者的那一层，就是数据可能长期停留、并在故障中丢失的位置。</text>
+  <text x="62" y="548" font-size="10.5" fill="#733428">跨过中间那道 write() 门，数据才脱离进程崩溃的杀伤范围；而只有右下那条绿线，才真正把数据送出内存。</text>
+  <!-- ============ Panel B: 内核不会主动调 write ============ -->
+  <rect x="790" y="100" width="402" height="206" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="804" y="124" font-size="13" font-weight="700" fill="#4A473F">B · 内核会不会自己调 write()？</text>
+
+  <rect x="804" y="136" width="374" height="60" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="816" y="156" font-size="12" font-weight="700" fill="#733428">不会。一次也不会。</text>
+  <text x="816" y="173" font-size="10" fill="#733428">进程里躺着一个 char buf[100]，内核既不知道它存在，</text>
+  <text x="816" y="188" font-size="10" fill="#733428">也不会替你决定「该写进文件了」。</text>
+
+  <text x="804" y="216" font-size="10.5" fill="#4A473F">内核是被动的一方：它只在收到 syscall 请求后才动作 ——</text>
+  <text x="804" y="232" font-size="10.5" fill="#4A473F">执行 copy_from_user()，把数据搬进 Page Cache。</text>
+
+  <rect x="804" y="242" width="374" height="52" rx="7" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="816" y="261" font-size="10.5" fill="#4A473F">所以「数据自己会到磁盘」的直觉是错的。没人调</text>
+  <text x="816" y="276" font-size="10.5" fill="#4A473F">write()，Page Cache 就永远收不到这份数据 —— 它会</text>
+  <text x="816" y="289" font-size="10.5" fill="#4A473F">一直停在用户态内存里，直到进程退出时蒸发。</text>
+
+  <!-- ============ Panel C: 数据库为什么绕开 stdio ============ -->
+  <rect x="790" y="320" width="402" height="242" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="804" y="344" font-size="13" font-weight="700" fill="#4A473F">C · 数据库为什么几乎不用 stdio</text>
+
+  <text x="804" y="366" font-size="10.5" fill="#6B675C">MySQL、PostgreSQL、RocksDB、Redis AOF 都用</text>
+  <text x="804" y="381" font-size="10.5" fill="#6B675C">write / pwrite / pwritev / io_uring，而非 fwrite。</text>
+
+  <rect x="804" y="392" width="374" height="60" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="816" y="410" font-size="10.5" font-weight="700" fill="#4A473F">它们不想要的：三层缓冲</text>
+  <text x="816" y="427" font-size="10.2" fill="#6B675C">自己的 buf → stdio 缓冲 → Page Cache</text>
+  <text x="816" y="443" font-size="10.2" fill="#733428">中间那层的刷新时机由库决定，事务提交点无从掌控</text>
+
+  <rect x="804" y="462" width="374" height="86" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="816" y="480" font-size="10.5" font-weight="700" fill="#24473F">它们要的：自己是唯一的缓冲决策者</text>
+  <text x="816" y="497" font-size="10.2" fill="#24473F">Buffer Pool → write() → Page Cache → fsync()</text>
+  <text x="816" y="513" font-size="10.2" fill="#24473F">或者更彻底：Buffer Pool → O_DIRECT → 块设备</text>
+  <text x="816" y="530" font-size="9.8" fill="#24473F">（O_DIRECT 要求地址/偏移/长度按块对齐；且它不保证</text>
+  <text x="816" y="543" font-size="9.8" fill="#24473F">元数据落盘，持久性仍然要 fsync）</text>
+
+  <!-- ============ Band D: 四个函数的分工表 ============ -->
+  <rect x="48" y="576" width="1144" height="196" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="62" y="600" font-size="13" font-weight="700" fill="#4A473F">D · 四个函数各是谁调的、各跨过哪一层</text>
+
+  <!-- 表头 -->
+  <rect x="62" y="612" width="1116" height="26" rx="5" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="629" font-size="10.5" font-weight="700" fill="#4A473F">函数</text>
+  <text x="212" y="629" font-size="10.5" font-weight="700" fill="#4A473F">是系统调用吗</text>
+  <text x="352" y="629" font-size="10.5" font-weight="700" fill="#4A473F">谁真正执行它</text>
+  <text x="512" y="629" font-size="10.5" font-weight="700" fill="#4A473F">数据从哪到哪</text>
+  <text x="826" y="629" font-size="10.5" font-weight="700" fill="#4A473F">返回后 kill -9 / 掉电</text>
+
+  <!-- 行 1 -->
+  <line x1="62" y1="638" x2="1178" y2="638" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="657" font-size="10.5" font-weight="700" fill="#2C4460">printf / fwrite</text>
+  <text x="212" y="657" font-size="10.2" fill="#4A473F">不是，用户态库函数</text>
+  <text x="352" y="657" font-size="10.2" fill="#4A473F">glibc，全程用户态</text>
+  <text x="512" y="657" font-size="10.2" fill="#4A473F">应用 buf → FILE 库缓冲</text>
+  <text x="826" y="657" font-size="10.2" fill="#A64B3C">两种都丢</text>
+
+  <!-- 行 2 -->
+  <line x1="62" y1="666" x2="1178" y2="666" stroke="#EDEBE3" stroke-width="1"/>
+  <text x="76" y="685" font-size="10.5" font-weight="700" fill="#2C4460">fflush</text>
+  <text x="212" y="685" font-size="10.2" fill="#4A473F">不是，但内部会调 write</text>
+  <text x="352" y="685" font-size="10.2" fill="#4A473F">glibc 调 write()，才陷入内核</text>
+  <text x="512" y="685" font-size="10.2" fill="#4A473F">FILE 库缓冲 → Page Cache</text>
+  <text x="826" y="685" font-size="10.2" fill="#4A473F">崩溃不丢，掉电丢</text>
+
+  <!-- 行 3 -->
+  <line x1="62" y1="694" x2="1178" y2="694" stroke="#EDEBE3" stroke-width="1"/>
+  <text x="76" y="713" font-size="10.5" font-weight="700" fill="#6B4E28">write</text>
+  <text x="212" y="713" font-size="10.2" fill="#4A473F">是</text>
+  <text x="352" y="713" font-size="10.2" fill="#4A473F">程序自己，或 glibc 代劳</text>
+  <text x="512" y="713" font-size="10.2" fill="#4A473F">用户 buf → Page Cache（标脏页）</text>
+  <text x="826" y="713" font-size="10.2" fill="#4A473F">崩溃不丢，掉电丢</text>
+
+  <!-- 行 4 -->
+  <line x1="62" y1="722" x2="1178" y2="722" stroke="#EDEBE3" stroke-width="1"/>
+  <text x="76" y="741" font-size="10.5" font-weight="700" fill="#24473F">fsync / fdatasync</text>
+  <text x="212" y="741" font-size="10.2" fill="#4A473F">是</text>
+  <text x="352" y="741" font-size="10.2" fill="#4A473F">程序自己（必须显式调）</text>
+  <text x="512" y="741" font-size="10.2" fill="#4A473F">Page Cache → 设备缓存 → 介质</text>
+  <text x="826" y="741" font-size="10.2" fill="#2F6B5E">两种都不丢（盘正确实现 FLUSH）</text>
+
+  <line x1="62" y1="750" x2="1178" y2="750" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="765" font-size="10" fill="#6B675C">一句话：fflush 和 write 都只把数据交到内核为止，区别仅在于「谁调的 write」；只有 fsync 才把数据交给磁盘。</text>
+
+
+</svg>

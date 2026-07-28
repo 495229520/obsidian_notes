@@ -2,7 +2,9 @@
 title: S-Week 20 - 前置知识 - RDMA verbs 入门
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向参考资料/计划
+  - 高性能存储
+  - 存储方向参考资料
+  - 计划
 aliases:
   - 存储 Week 20 前置知识
   - RDMA 前置知识

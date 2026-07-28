@@ -2,7 +2,8 @@
 title: India set to hike biogas prices, subsidies under new program
 source: https://economictimes.indiatimes.com/industry/energy/oil-gas/india-set-to-hike-biogas-prices-subsidies-under-new-program/articleshow/131521213.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # India set to hike biogas prices, subsidies under new program

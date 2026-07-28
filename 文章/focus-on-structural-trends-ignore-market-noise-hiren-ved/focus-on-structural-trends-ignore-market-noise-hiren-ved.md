@@ -2,7 +2,8 @@
 title: "Focus on structural trends, ignore market noise: Hiren Ved"
 source: https://economictimes.indiatimes.com/markets/expert-view/focus-on-structural-trends-ignore-market-noise-hiren-ved/articleshow/131735245.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Focus on structural trends, ignore market noise: Hiren Ved

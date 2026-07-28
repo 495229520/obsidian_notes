@@ -2,7 +2,8 @@
 title: PwC finds accounting lapses in IndusInd treasury operations
 source: https://economictimes.indiatimes.com/industry/banking/finance/banking/pwc-finds-accounting-lapses-in-indusind-treasury-operations/articleshow/131514944.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # PwC finds accounting lapses in IndusInd treasury operations

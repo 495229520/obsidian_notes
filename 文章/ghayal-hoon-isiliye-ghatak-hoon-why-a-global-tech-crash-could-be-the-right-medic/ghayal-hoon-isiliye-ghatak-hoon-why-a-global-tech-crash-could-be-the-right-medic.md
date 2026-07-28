@@ -2,7 +2,8 @@
 title: Ghayal hoon isiliye ghatak hoon! Why a global tech crash could be the right medicine for wounded Nifty bulls
 source: https://economictimes.indiatimes.com/markets/stocks/news/ghayal-hoon-isiliye-ghatak-hoon-why-a-global-tech-crash-could-be-the-right-medicine-for-wounded-nifty-bulls/articleshow/131600482.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Ghayal hoon isiliye ghatak hoon! Why a global tech crash could be the right medicine for wounded Nifty bulls

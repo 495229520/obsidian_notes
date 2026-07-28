@@ -2,7 +2,10 @@
 title: CUDA Week 2 Parallel Reduction 项目解析
 date: 2026-05-12
 tags:
-  - AI-infra/素材库-GPU与推理方向/项目分析/Week02
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 项目分析
+  - Week02
 aliases:
   - CUDA Week2 项目解析
   - CUDA Parallel Reduction 工程解析

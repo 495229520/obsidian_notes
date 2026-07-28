@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>System V 信号量的初始化竞态与正确的两阶段做法</title>
+  <desc>上方是 semget 与 semctl(SETVAL) 不原子导致互斥失效的时序表；左下是用 IPC_EXCL 判定创建者的正确写法；右下是三种信号量的选型与 sem_init 的陷阱。</desc>
+
+  <rect x="0" y="0" width="1240" height="780" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">semget 和 semctl(SETVAL) 之间有一道缝，两个进程会从这里挤进临界区</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">「创建」和「设初值」是两次系统调用，中间不原子。这是 System V 信号量最经典、也最难复现的 bug</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="56" y="112" width="1128" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · 两个进程都写「semget 之后无条件 SETVAL 1」，会发生什么</text>
+
+  <rect x="76" y="148" width="70" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="150" y="148" width="440" height="28" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <rect x="594" y="148" width="440" height="28" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <rect x="1038" y="148" width="126" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="111" y="167" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">时刻</text>
+  <text x="370" y="167" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">进程 A</text>
+  <text x="814" y="167" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">进程 B</text>
+  <text x="1101" y="167" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">信号量的值</text>
+
+  <rect x="76" y="176" width="70" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="150" y="176" width="440" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="594" y="176" width="440" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1038" y="176" width="126" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="111" y="196" font-size="10" fill="#4A473F" text-anchor="middle">t1</text>
+  <text x="162" y="196" font-size="10.5" fill="#2C4460">semget(key, 1, IPC_CREAT | 0666) 创建成功</text>
+  <text x="1101" y="196" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">0（新建时就是 0）</text>
+
+  <rect x="76" y="206" width="70" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="150" y="206" width="440" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="594" y="206" width="440" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1038" y="206" width="126" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="111" y="226" font-size="10" fill="#4A473F" text-anchor="middle">t2</text>
+  <text x="162" y="226" font-size="10.5" fill="#2C4460">semctl(semid, 0, SETVAL, 1)</text>
+  <text x="1101" y="226" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">1</text>
+
+  <rect x="76" y="236" width="70" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="150" y="236" width="440" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="594" y="236" width="440" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1038" y="236" width="126" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="111" y="256" font-size="10" fill="#4A473F" text-anchor="middle">t3</text>
+  <text x="162" y="256" font-size="10.5" font-weight="700" fill="#2C4460">P 操作成功，进入临界区</text>
+  <text x="1101" y="256" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">0</text>
+
+  <rect x="76" y="266" width="70" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="150" y="266" width="440" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="594" y="266" width="440" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1038" y="266" width="126" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="111" y="286" font-size="10" fill="#4A473F" text-anchor="middle">t4</text>
+  <text x="162" y="286" font-size="10.5" fill="#2C4460">正在改共享内存</text>
+  <text x="606" y="286" font-size="10.5" fill="#24473F">semget 拿到同一个 semid（已存在，直接返回）</text>
+  <text x="1101" y="286" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">0</text>
+
+  <rect x="76" y="296" width="70" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="150" y="296" width="440" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="594" y="296" width="440" height="30" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.6"/>
+  <rect x="1038" y="296" width="126" height="30" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="111" y="316" font-size="10" fill="#4A473F" text-anchor="middle">t5</text>
+  <text x="162" y="316" font-size="10.5" fill="#2C4460">正在改共享内存</text>
+  <text x="606" y="316" font-size="10.5" font-weight="700" fill="#A64B3C">semctl(SETVAL, 1)：把 A 拿走的那个许可凭空变了回来</text>
+  <text x="1101" y="316" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">1</text>
+
+  <rect x="76" y="326" width="70" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="150" y="326" width="440" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="594" y="326" width="440" height="30" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.6"/>
+  <rect x="1038" y="326" width="126" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="111" y="346" font-size="10" fill="#4A473F" text-anchor="middle">t6</text>
+  <text x="162" y="346" font-size="10.5" fill="#2C4460">正在改共享内存</text>
+  <text x="606" y="346" font-size="10.5" font-weight="700" fill="#A64B3C">P 操作也成功了，B 同样进入临界区</text>
+  <text x="1101" y="346" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">0</text>
+
+  <rect x="76" y="356" width="1088" height="30" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="620" y="376" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">t7：两个进程同时在写同一块共享内存。互斥彻底失效，而且只在启动时刻恰好撞上才复现</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="56" y="422" width="552" height="290" rx="8" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="72" y="450" font-size="13" font-weight="700" fill="#24473F">B · 正确做法：用 IPC_EXCL 把「谁负责初始化」定死</text>
+
+  <rect x="76" y="462" width="512" height="152" rx="6" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="88" y="480" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">int semid = semget(key, 1, IPC_CREAT | IPC_EXCL | 0666);</text>
+  <text x="88" y="496" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">if (semid &gt;= 0) {              /* 只有一个进程能走到这里 */</text>
+  <text x="88" y="512" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">    union semun arg = { .val = 1 };</text>
+  <text x="88" y="528" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">    semctl(semid, 0, SETVAL, arg);</text>
+  <text x="88" y="544" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">    struct sembuf nop = {0, 0, 0};   /* 一次空操作 */</text>
+  <text x="88" y="560" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">    semop(semid, &amp;nop, 1);           /* 把 sem_otime 置上 */</text>
+  <text x="88" y="576" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">} else if (errno == EEXIST) {   /* 别人先建了 */</text>
+  <text x="88" y="592" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">    semid = semget(key, 1, 0666);</text>
+  <text x="88" y="608" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">    wait_until_otime_nonzero(semid); /* 等它初始化完 */</text>
+
+  <text x="76" y="636" font-size="10.5" fill="#24473F">把两次调用之间的竞争，收敛成一次原子的 IPC_EXCL 判定：</text>
+  <text x="76" y="656" font-size="10.5" fill="#24473F">内核保证只有一个进程能创建成功，其余全部拿到 EEXIST。</text>
+  <text x="76" y="680" font-size="10.5" font-weight="700" fill="#2F6B5E">后到者不能立刻就用：此刻信号量可能还是新建时的 0。</text>
+  <text x="76" y="700" font-size="10.5" fill="#24473F">要轮询 IPC_STAT 里的 sem_otime，它非 0 才说明有人 semop 过。</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="632" y="422" width="552" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="648" y="450" font-size="13" font-weight="700" fill="#4A473F">C · 三种信号量，别选错</text>
+
+  <rect x="648" y="462" width="520" height="72" rx="6" fill="#F6F0E4" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="664" y="482" font-size="11" font-weight="700" fill="#6B4E28">System V：semget / semop / semctl</text>
+  <text x="664" y="500" font-size="9.5" fill="#6B4E28">唯一不可替代的能力：一次 semop 可以原子地操作多个信号量，</text>
+  <text x="664" y="514" font-size="9.5" fill="#6B4E28">用来「一把拿到全部资源，否则一个都不拿」，天然避开死锁。</text>
+  <text x="664" y="528" font-size="9.5" font-weight="700" fill="#8A6A3A">代价：初始化竞态要自己处理，semop 还会被信号打断返回 EINTR。</text>
+
+  <rect x="648" y="542" width="520" height="72" rx="6" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="664" y="562" font-size="11" font-weight="700" fill="#24473F">POSIX 命名信号量：sem_open("/name", O_CREAT, 0666, 1)</text>
+  <text x="664" y="580" font-size="9.5" fill="#24473F">创建和设初值在一次调用里完成，上面那个竞态根本不存在。</text>
+  <text x="664" y="594" font-size="9.5" fill="#24473F">对象在 /dev/shm/sem.name 下看得见，sem_unlink 删掉。</text>
+  <text x="664" y="608" font-size="9.5" font-weight="700" fill="#2F6B5E">跨无关进程做互斥，默认选它。</text>
+
+  <rect x="648" y="622" width="520" height="72" rx="6" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="664" y="642" font-size="11" font-weight="700" fill="#733428">POSIX 无名信号量：sem_init(&amp;sem, 1, 1)</text>
+  <text x="664" y="660" font-size="9.5" fill="#733428">第二个参数非 0 只是「允许跨进程」，前提是 sem_t 这个变量</text>
+  <text x="664" y="674" font-size="9.5" font-weight="700" fill="#A64B3C">本身必须放在共享内存里。放成普通全局变量照样编译运行，</text>
+  <text x="664" y="688" font-size="9.5" font-weight="700" fill="#A64B3C">但两个进程各操作各的副本，完全不互斥，也不会报错。</text>
+
+  <text x="72" y="744" font-size="11" fill="#6B675C">SEM_UNDO 能在进程异常退出时撤销它做过的净调整，救回「持锁时崩溃导致所有人饿死」；但它撤的是计数值，救不回临界区里已经写坏的数据。</text>
+</svg>

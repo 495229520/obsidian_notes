@@ -2,7 +2,9 @@
 title: 存储面试问题清单 - NVMe 与 NVMe-oF
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单/清单
+  - 高性能存储
+  - 存储方向专题清单
+  - 清单
 roadmap_week: 求职全程（S-Week 18-22 逐周沉淀，S-Week 22 收口）
 sort_order: "99.10"
 status: active

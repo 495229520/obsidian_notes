@@ -1,131 +1,118 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with this repository.
+本文件为 Claude Code 在此仓库工作时提供指引。最后核对：2026-07-26。
 
-## Repository Overview
+## 仓库概览
 
-This is an **Obsidian vault** focused on C++ programming and systems programming. Notes are written in **Chinese (简体中文)**.
+这是一个 **Obsidian vault**，主线是 C++ 与系统编程，笔记用**简体中文**写。
 
-**Main directories:**
-- `C++基础/` - C++ fundamentals (13 chapters, ~110 notes)
-- `C++高级/` - Advanced C++ & STL (16 chapters, ~50 notes)
-- `Linux/` - Linux systems programming (15 chapters, ~70 notes)
-- `windows/` - Windows systems programming (5 chapters, ~26 notes)
-- `书籍/` - Reference books (PDF)
+| 目录 | 内容 | 规模 |
+|---|---|---|
+| `0.ai 编程/` | Claude Code、Skills、AI 工具链笔记 | 8 篇 |
+| `1.C++基础/` | C++ 基础，13 章 | 117 篇 |
+| `2.C++高级/` | 高级 C++ 与 STL，17 章 | 50 篇 |
+| `3.Linux/` | Linux 系统编程与网络，17 章 | 97 篇 |
+| `4.windows/` | Windows 系统编程，5 章 | 28 篇 |
+| `5.算法/` | `5.1 STL`、`5.2 算法`、`5.3 力扣` | 87 篇 |
+| `6.项目/` | 项目笔记（含 `03.远控系统`、`06.远控服务端`） | 150 篇 |
+| `7.LLM应用/` | LLM 工程；含 `5.数值分析`、`6.数值分析笔记` | 90 篇 |
+| `8.高性能存储/` | 存储方向主线 | 160 篇 |
+| `12.投资/` | 投资学习 | 102 篇 |
+| `图片/` | 图片资产；`图片/SVG/` 存 SVG，`图片/书籍/` 存 PDF |  |
+| `模版/` | 笔记模板 |  |
 
-> **笔记定位**: 使用 `note-locator` Skill 动态查找笔记，无需记忆目录结构。
+`7.LLM应用/` 和 `12.投资/` 各有一份 `培养方案.md`，新建周笔记前先读它确认主题和周次。
+
+> **笔记定位**：用 `note-locator` Skill 动态查找，不要靠记忆目录结构。目录会变，**以磁盘实际结构为准**。
 
 ---
 
-## Working with This Repository
+## 写作规范
 
 ### Obsidian 语法
-- Internal links: `[[wiki-links]]`
-- Images: `![[filename.png]]`
-- Flowcharts: Mermaid syntax or SVG saved in `D:\obsidian\C++\图片\` with relative reference `![描述](../../图片/文件名.svg)`
+
+- 内部链接 `[[wiki-links]]`，图片 `![[filename.png]]`
+- 流程图用 Mermaid，或用 SVG 存到 `图片/SVG/`，笔记里 `![[文件名.svg|760]]` 引用
+- SVG 命名跟随所在章节编号（如 `8_0_1_1.svg`）或用描述性中文名（如 `全路径-read未命中泳道.svg`）
 
 ### 链接规范
 
-**应该链接的场景:**
-1. 概念首次引用其他笔记中详细定义的术语
-2. 问题笔记引用解决方案笔记 (如: 动态内存风险 → 智能指针)
-3. 基础笔记引用深化笔记 (如: 引用 ↔ 左值引用)
+**该链**：概念首次引用别处定义的术语；问题笔记引向解决方案笔记（动态内存风险 → 智能指针）；基础笔记引向深化笔记（引用 ↔ 左值引用）。
 
-**禁止:**
-- 仅因主题相近就添加链接
-- 在笔记末尾堆砌"相关笔记"
-- 创建空笔记只为建立链接
+**禁止**：仅因主题相近就加链接；在笔记末尾堆砌"相关笔记"；为建链接而创建空笔记；链接不存在的笔记（建之前先确认目标文件在 vault 里）。
 
-### 内容补充规范
+### 内容规范
 
-Only add explanations that improve correctness or learning value:
-- Add missing definitions using standard terminology
-- Add minimal derivations when the note is too terse
-- Add small code examples when they clarify
-- **Do not invent** numeric parameters or platform-specific claims unless clearly standard
-- Mark uncertain content as TODO
+只补真正提高正确性或学习价值的内容：补缺失的标准术语定义、笔记过简时补最小推导、能说清问题时补小段代码示例。
 
-### Quality Gate
+**不要编造**数值参数或平台相关断言，除非确属标准行为。拿不准的标 TODO。
 
-Before finishing each note:
-- [ ] Headings and spacing consistent
-- [ ] Tables readable
-- [ ] Images embedded and captioned
-- [ ] Key takeaways present and concise
+**代码必须配讲解。** 这是本 vault 最重要的一条。禁止大段代码不加说明，每个代码块要说清「为什么这样写」而不只是「代码在做什么」。超过 30 行的代码拆成逻辑块逐段讲。
 
 ---
 
-## Mentorship Role (导师角色)
+## C++ 代码风格
 
-> Claude 在此仓库中扮演 **C++ 系统编程导师** 角色。
-> 详细教学框架见 `cpp-tutor` Skill。
+严格 Modern C++，禁止 "C with Classes"。RAII 优先，用智能指针；优先 `std::` 算法和 lambda；并发遵循 muduo 的 Reactor 模式。
 
-### 核心参考书籍
+| 禁止 | 用 |
+|---|---|
+| `new` / `delete` | `std::make_unique` / `make_shared` |
+| `NULL` | `nullptr` |
+| C 风格数组 | `std::array` / `std::vector` |
+| C 风格强制转换 | `static_cast` / `dynamic_cast` |
+| 裸指针表达所有权 | 智能指针 |
 
-| 书籍 | 用途 |
-|-----|------|
-| `书籍/Effective C++.pdf` | 经典C++准则 |
-| `书籍/Effective Modern C++.pdf` | Modern C++ 最佳实践 |
-| `书籍/Effective STL.pdf` | STL 使用指南 |
-| `书籍/Linux多线程服务端编程.pdf` | 网络/并发 (muduo) |
-| `书籍/Computer Networking A Top-Down Approach.pdf` | 网络理论 |
-| `书籍/Modern Operating Systems.pdf` | 操作系统 |
+### 参考书
 
-### 代码风格要求
+`图片/书籍/` 下有四本 PDF，需要引用原文时读它们：
 
-| 要求 | 说明 |
-|------|------|
-| 风格 | **严格 Modern C++**，禁止 "C with Classes" |
-| 资源管理 | RAII 优先，使用智能指针 |
-| 算法 | 优先 `std::` 算法、lambda |
-| 并发 | 遵循 muduo 的 Reactor 模式 |
+| 文件 | 用途 |
+|---|---|
+| `Effective C++.pdf` | 经典 C++ 准则 |
+| `Effective Modern C++.pdf` | Modern C++ 最佳实践 |
+| `Computer Networking A Top-Down Approach.pdf` | 网络理论 |
+| `Modern Operating Systems.pdf` | 操作系统 |
 
-**禁止:**
-```cpp
-// ❌ 禁止
-new/delete, NULL, C风格数组, C风格类型转换
-
-// ✅ 使用
-std::make_unique, nullptr, std::vector, static_cast
-```
+《Effective STL》和《Linux 多线程服务端编程》vault 里没有 PDF，引用时凭知识写并注明书名条款，不要假装读过文件。
 
 ---
 
-## Git 仓库定位
+## Skills
 
-当需要查找远控系统笔记对应的 git 版本时：
+Skills 位于 **`~/.claude/skills/`**（用户级，全局生效），不在本仓库的 `.claude/` 下。本仓库的 `.claude/` 只有 `settings.local.json` 和 worktrees。
 
-1. **远控系统 git 仓库路径**: `D:\c++\project\remote_ctl\remote_ctl\.git`
-2. **常用命令**:
-   - `git log --oneline -20` - 查看最近提交
-   - `git log --oneline --all | grep -i "关键词"` - 搜索特定提交
-   - `git show <commit>` - 查看提交详情
-   - `git show <commit>:文件路径` - 查看提交时的文件内容
+与本 vault 相关的：
 
-### 笔记与版本关联
+| Skill | 触发场景 | 功能 |
+|---|---|---|
+| `note-locator` | "找一下…"、"搜索…"、"…在哪" | 模糊搜索笔记 + 解析 wiki-link 关联 |
+| `note-creator` | "写一个…"、"创建…"、"出一套题"、"写个题解" | 新建笔记，覆盖 C++/LLM/投资/力扣题解/章节题目汇总 |
+| `note-extender` | "检查笔记"、"补充一下"、"查漏补缺" | 对比权威书籍审查并扩展已有笔记 |
+| `obsidian-svg` | "画图"、"SVG"、"架构图"、"内存布局" | 建图 + 优化 + 验证 + vault 资产管理 |
+| `obsidian-markdown` | wikilink、callout、frontmatter | Obsidian 方言语法 |
+| `obsidian-bases` | `.base`、表格视图、公式 | 笔记的数据库视图 |
+| `numerical-analysis` | "数值分析"、"考点"、"考不考"、"出题" | 讲考点/润色笔记/仿期末出题（内嵌 2020–2024 考频表） |
+| `github-note-push` | 推笔记到 GitHub | 处理 remote、worktree、SSH key 等坑 |
 
-| 笔记章节 | 对应 Commit | 说明 |
-|---------|------------|------|
-| 2.2 网络编程架构设计 | `10d79cd` | 初步的网络编程框架搭建完成，引入单例模式 ServerSocket |
+完整清单和精简记录见 [[skills参考目录]]。
 
 ---
 
-本仓库配置了多个 Skills，Claude 会自动根据上下文调用：
+## 已知的环境事实
 
-| Skill                 | 触发场景                   | 功能                  |
-| --------------------- | ---------------------- | ------------------- |
-| `note-locator`        | "找一下..."、"搜索..."       | 模糊搜索笔记 + 解析关联       |
-| `note-extender`       | "检查笔记"、"补充一下"          | 对比权威书籍，生成扩展建议       |
-| `note-creator`        | "写一个..."、"创建笔记"        | 从零创建C++结构化笔记        |
-| `cpp-tutor`           | "什么是..."、"解释一下"        | 基于笔记库的个性化教学         |
-| `mermaid-to-drawio`   | "用drawio画"、"重绘mermaid" | Mermaid代码转Draw.io图形 |
-| `invest-note-creator` | "投资笔记"、"金融笔记"          | 创建投资学习笔记            |
-| `llm-note-creator`    | "LLM笔记"、"创建LLM笔记"      | 创建LLM应用学习笔记         |
-| `exam-creator`        | "出题"、"题目汇总"、"出一套题"     | 按章节生成 Obsidian 风格练习卷   |
-| `remote-ctrl-note`    | "远控笔记"、"远控系统笔记"        | 远控系统项目专用笔记管理        |
-| `remote-ctrl-tutor`   | "讲解远控"、"分析远控源码"        | 基于 git 源码的远控系统讲解导师   |
-| `obsidian-svg`        | "画图"、"SVG"、"架构图"       | 创建/优化/验证 SVG + vault 资产管理 |
-| `leetcode-solver`     | "题解"、"力扣题解"、"创建题解"   | 在 5.3 力扣下创建结构化题解笔记 + SVG |
-| `numerical-analysis`  | "数值分析"、"考点"、"必看"、"代数精度"、"出题" | 数值分析讲考点/润色笔记/仿期末出题（内嵌历年考频表） |
+- **远控系统源码不在本机。** `6.项目/03.远控系统/` 和 `06.远控服务端/` 的笔记还在，但对应的 git 仓库（原路径 `D:\c++\project\remote_ctl\`）在这台 Mac 上不存在。需要看源码时先问用户要路径，不要去猜或去找。
+- vault 根目录：`~/Documents/C++/obsidian_notes-main`
 
-Skills 位于 `.claude/skills/` 目录。
+---
+
+## 收尾检查
+
+每篇笔记写完确认：
+
+- [ ] 标题层级和空行一致
+- [ ] 表格可读
+- [ ] 图片已嵌入并有说明
+- [ ] 代码都有配套讲解
+- [ ] wiki-link 指向的笔记确实存在
+- [ ] 关键要点简明

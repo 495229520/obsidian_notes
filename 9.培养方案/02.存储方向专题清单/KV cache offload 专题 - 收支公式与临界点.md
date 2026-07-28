@@ -2,7 +2,8 @@
 title: KV cache offload 专题 - 收支公式与临界点
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单
+  - 高性能存储
+  - 存储方向专题清单
 roadmap_week: 阶段 3（S4 gds-kv-offload-lab 核心实验：vLLM + LMCache benchmark）
 sort_order: "06.10"
 status: active

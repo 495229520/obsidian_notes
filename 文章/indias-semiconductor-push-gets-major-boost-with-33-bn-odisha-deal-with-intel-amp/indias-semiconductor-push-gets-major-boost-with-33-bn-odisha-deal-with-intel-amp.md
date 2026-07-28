@@ -2,7 +2,8 @@
 title: India's semiconductor push gets major boost with $3.3 bn Odisha deal with Intel &amp; 3D Glass Solutions
 source: https://economictimes.indiatimes.com/industry/cons-products/electronics/indias-semiconductor-push-gets-major-boost-with-3-3-bn-deal-for-new-odisha-substrate-project/articleshow/131389497.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # India's semiconductor push gets major boost with $3.3 bn Odisha deal with Intel &amp; 3D Glass Solutions

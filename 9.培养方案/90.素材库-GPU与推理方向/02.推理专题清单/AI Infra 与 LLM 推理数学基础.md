@@ -2,7 +2,9 @@
 title: AI Infra 与 LLM 推理数学基础
 date: 2026-05-12
 tags:
-  - AI-infra/素材库-GPU与推理方向/推理专题清单
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 推理专题清单
 aliases:
   - LLM 推理数学基础
   - AI Infra 数学基础

@@ -2,7 +2,8 @@
 title: "Dalal Street Week Ahead: Lower volatility signals calm, but resistance looms large"
 source: https://economictimes.indiatimes.com/markets/stocks/news/dalal-street-week-ahead-lower-volatility-signals-calm-but-resistance-looms-large/articleshow/131876598.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Dalal Street Week Ahead: Lower volatility signals calm, but resistance looms large

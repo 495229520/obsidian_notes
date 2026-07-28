@@ -2,7 +2,8 @@
 title: A ₹3 lakh crore rain check? India’s monsoon now comes with a Hormuz fine print
 source: https://economictimes.indiatimes.com/news/economy/agriculture/a-3-lakh-crore-rain-check-indias-monsoon-now-comes-with-a-hormuz-fine-print/articleshow/131455930.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # A ₹3 lakh crore rain check? India’s monsoon now comes with a Hormuz fine print

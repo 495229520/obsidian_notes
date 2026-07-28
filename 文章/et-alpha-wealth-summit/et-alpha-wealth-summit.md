@@ -2,7 +2,8 @@
 title: ET Alpha Wealth Summit
 source: https://economictimes.indiatimes.com/markets/expert-view/wealthy-indians-are-still-way-underinvested-in-global-stocks-says-ppfass-rajeev-thakkar/articleshow/131787113.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # ET Alpha Wealth Summit

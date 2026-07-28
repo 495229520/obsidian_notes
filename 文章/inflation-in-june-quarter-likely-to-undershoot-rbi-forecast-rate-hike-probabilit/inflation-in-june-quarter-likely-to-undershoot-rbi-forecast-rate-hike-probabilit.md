@@ -2,7 +2,8 @@
 title: Inflation in June quarter likely to undershoot RBI forecast, rate hike probability drops ahead of monsoon risks
 source: https://economictimes.indiatimes.com/news/economy/policy/inflation-in-june-quarter-likely-to-undershoot-rbi-forecast-rate-hike-probability-drops-ahead-of-monsoon-risks/articleshow/131697225.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Inflation in June quarter likely to undershoot RBI forecast, rate hike probability drops ahead of monsoon risks

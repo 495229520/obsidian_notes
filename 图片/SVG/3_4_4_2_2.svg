@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 560" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrFaint" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9B968A"/>
+    </marker>
+  </defs>
+
+  <title>写入路径与 fsync 落盘</title>
+  <desc>数据从进程内存经用户态库缓冲、内核页缓存到硬盘；fflush 刷库缓冲，fsync/fdatasync 强制页缓存落盘。</desc>
+
+  <rect x="0" y="0" width="1240" height="560" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">写入路径：数据从内存到落盘要经过哪几层缓存</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">write() 只保证数据进入内核页缓存就返回；要“掉电不丢”，必须由 fsync()/fdatasync() 强制落盘</text>
+
+  <!-- gate labels above arrows -->
+  <text x="324" y="142" font-size="11.5" fill="#4A473F" text-anchor="middle">printf() / fwrite()</text>
+  <text x="324" y="158" font-size="9.5" fill="#6B675C" text-anchor="middle">数据进入库缓冲</text>
+
+  <text x="628" y="142" font-size="12" font-weight="700" fill="#8A6A3A" text-anchor="middle">fflush() / write()</text>
+  <text x="628" y="158" font-size="9.5" fill="#6B675C" text-anchor="middle">库缓冲 → 内核</text>
+
+  <text x="932" y="142" font-size="11" fill="#9B968A" text-anchor="middle">内核延迟回写（时机不定）</text>
+  <text x="932" y="158" font-size="9.5" fill="#9B968A" text-anchor="middle">默认由内核决定，不保证已落盘</text>
+
+  <!-- pipeline boxes -->
+  <rect x="56" y="176" width="232" height="124" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="172" y="214" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">应用数据</text>
+  <text x="172" y="240" font-size="11" fill="#2C4460" text-anchor="middle">进程内存：buf、变量</text>
+  <text x="172" y="264" font-size="11" fill="#2C4460" text-anchor="middle">写操作的数据来源</text>
+
+  <rect x="360" y="176" width="232" height="124" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="476" y="210" font-size="14" font-weight="700" fill="#7A5518" text-anchor="middle">用户态缓冲区</text>
+  <text x="476" y="234" font-size="11" fill="#7A5518" text-anchor="middle">C 库 FILE* 缓冲（stdio）</text>
+  <text x="476" y="256" font-size="11" fill="#7A5518" text-anchor="middle">printf/fwrite 先写到这</text>
+  <text x="476" y="282" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">进程崩溃即丢</text>
+
+  <rect x="664" y="176" width="232" height="124" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="780" y="210" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">内核页缓存 page cache</text>
+  <text x="780" y="234" font-size="11" fill="#4A3F68" text-anchor="middle">write() 写到这就返回</text>
+  <text x="780" y="256" font-size="11" fill="#4A3F68" text-anchor="middle">由内核统一管理脏页</text>
+  <text x="780" y="282" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">系统掉电即丢</text>
+
+  <rect x="968" y="176" width="232" height="124" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1084" y="210" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">硬盘（持久介质）</text>
+  <text x="1084" y="234" font-size="11" fill="#24473F" text-anchor="middle">数据真正落地</text>
+  <text x="1084" y="256" font-size="11" fill="#24473F" text-anchor="middle">fsync 返回后才保证</text>
+  <text x="1084" y="282" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">掉电安全</text>
+
+  <!-- arrows between boxes -->
+  <line x1="290" y1="238" x2="358" y2="238" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <line x1="594" y1="238" x2="662" y2="238" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <line x1="898" y1="238" x2="966" y2="238" stroke="#9B968A" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrFaint)"/>
+
+  <!-- fsync coverage bracket -->
+  <line x1="664" y1="322" x2="1200" y2="322" stroke="#A64B3C" stroke-width="1.8"/>
+  <line x1="664" y1="322" x2="664" y2="312" stroke="#A64B3C" stroke-width="1.8"/>
+  <line x1="1200" y1="322" x2="1200" y2="312" stroke="#A64B3C" stroke-width="1.8"/>
+  <path d="M928 322 L924 330 L932 330 Z" fill="#A64B3C"/>
+  <text x="932" y="350" font-size="12.5" font-weight="700" fill="#A64B3C" text-anchor="middle">fsync() / fdatasync()：强制写回并等待完成，页缓存脏页落盘后才返回</text>
+
+  <!-- related functions -->
+  <rect x="56" y="378" width="364" height="98" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="78" y="404" font-size="13" font-weight="700" fill="#2B2A26">fsync(fd)</text>
+  <text x="78" y="430" font-size="11" fill="#4A473F">同步数据 + 元数据（文件大小、mtime 等）</text>
+  <text x="78" y="452" font-size="11" fill="#4A473F">最完整，代价最高</text>
+
+  <rect x="440" y="378" width="364" height="98" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="462" y="404" font-size="13" font-weight="700" fill="#2B2A26">fdatasync(fd)</text>
+  <text x="462" y="430" font-size="11" fill="#4A473F">只同步数据（+ 读取必需的元数据）</text>
+  <text x="462" y="452" font-size="11" fill="#4A473F">跳过 mtime，通常更快</text>
+
+  <rect x="824" y="378" width="376" height="98" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="846" y="404" font-size="13" font-weight="700" fill="#2B2A26">sync()</text>
+  <text x="846" y="430" font-size="11" fill="#4A473F">刷新所有文件系统的缓冲区到磁盘</text>
+  <text x="846" y="452" font-size="11" fill="#4A473F">全局操作，不针对单个 fd</text>
+
+  <!-- takeaway -->
+  <rect x="56" y="492" width="1144" height="46" rx="8" fill="#F3EEE4" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="76" y="520" font-size="12.5" font-weight="700" fill="#733428">记住：write() 返回 ≠ 已落盘。只有 fsync() 返回，才保证系统掉电后数据不丢。</text>
+</svg>

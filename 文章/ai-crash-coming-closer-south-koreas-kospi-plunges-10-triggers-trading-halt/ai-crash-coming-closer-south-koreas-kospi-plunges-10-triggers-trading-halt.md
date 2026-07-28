@@ -2,7 +2,8 @@
 title: AI crash coming closer? South Korea’s Kospi plunges 10%, triggers trading halt
 source: https://economictimes.indiatimes.com/markets/us-stocks/news/ai-crash-coming-closer-south-koreas-kospi-down-8-triggers-trading-halt/articleshow/131927498.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # AI crash coming closer? South Korea’s Kospi plunges 10%, triggers trading halt

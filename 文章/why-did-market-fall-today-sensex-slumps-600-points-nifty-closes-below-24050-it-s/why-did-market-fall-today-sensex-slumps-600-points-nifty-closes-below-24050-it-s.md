@@ -2,7 +2,8 @@
 title: Why did market fall today? Sensex slumps 600 points, Nifty closes below 24,050. IT selloff among 5 key triggers
 source: https://economictimes.indiatimes.com/markets/stocks/news/why-is-market-falling-today-sensex-slumps-700-points-nifty-slips-below-24000-it-selloff-among-5-key-triggers/articleshow/131846268.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Why did market fall today? Sensex slumps 600 points, Nifty closes below 24,050. IT selloff among 5 key triggers

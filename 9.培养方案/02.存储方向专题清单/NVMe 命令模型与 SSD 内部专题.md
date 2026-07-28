@@ -2,7 +2,8 @@
 title: NVMe 命令模型与 SSD 内部专题
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单
+  - 高性能存储
+  - 存储方向专题清单
 roadmap_week: 阶段 2（S-Week 18 实验主线；S-Week 19/21 的设备层地基）
 sort_order: "02.00"
 status: active

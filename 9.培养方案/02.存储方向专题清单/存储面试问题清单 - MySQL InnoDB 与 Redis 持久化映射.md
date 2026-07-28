@@ -2,7 +2,9 @@
 title: 存储面试问题清单 - MySQL InnoDB 与 Redis 持久化映射
 date: 2026-07-21
 tags:
-  - 高性能存储/存储方向专题清单/清单
+  - 高性能存储
+  - 存储方向专题清单
+  - 清单
 roadmap_week: 求职全程（12 月投递前八股清账时过一遍）
 sort_order: "99.50"
 status: active

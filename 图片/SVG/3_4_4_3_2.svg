@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>fcntl 记录锁的冲突判定：区间重叠 且 至少一方持写锁</title>
+  <desc>左上为兼容矩阵，右上为 struct flock 的四种区间写法，下方为四个进程在同一字节标尺上的加锁结果。</desc>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">记录锁按字节区间判冲突：区间重叠、且至少一方是写锁，才会被挡住</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">flock 是它的退化情形：相当于永远只会去锁 [0, EOF) 这一个区间</text>
+
+  <!-- ========== Panel A ========== -->
+  <rect x="56" y="112" width="496" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · 兼容矩阵</text>
+
+  <rect x="80" y="158" width="150" height="36" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="230" y="158" width="153" height="36" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="383" y="158" width="153" height="36" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="155" y="181" font-size="10.5" font-weight="700" fill="#6B675C" text-anchor="middle">对方已持有的锁</text>
+  <text x="306" y="181" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">你请求 F_RDLCK</text>
+  <text x="459" y="181" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">你请求 F_WRLCK</text>
+
+  <rect x="80" y="194" width="150" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="230" y="194" width="153" height="42" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="383" y="194" width="153" height="42" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="155" y="220" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">区间根本不重叠</text>
+  <text x="306" y="220" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">允许</text>
+  <text x="459" y="220" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">允许</text>
+
+  <rect x="80" y="236" width="150" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="230" y="236" width="153" height="42" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="383" y="236" width="153" height="42" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="155" y="262" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">重叠 · 对方持 F_RDLCK</text>
+  <text x="306" y="262" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">允许（多读者并存）</text>
+  <text x="459" y="262" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">阻塞</text>
+
+  <rect x="80" y="278" width="150" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="230" y="278" width="153" height="42" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="383" y="278" width="153" height="42" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="155" y="304" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">重叠 · 对方持 F_WRLCK</text>
+  <text x="306" y="304" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">阻塞</text>
+  <text x="459" y="304" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">阻塞</text>
+
+  <text x="80" y="344" font-size="10.5" fill="#6B675C">两把写锁只要区间不碰头就能同时存在，这正是整文件锁做不到的事。</text>
+
+  <!-- ========== Panel B ========== -->
+  <rect x="572" y="112" width="612" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="588" y="140" font-size="13" font-weight="700" fill="#4A473F">B · struct flock 的四种区间写法</text>
+
+  <rect x="596" y="156" width="280" height="28" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="876" y="156" width="292" height="28" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="736" y="175" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">l_whence, l_start, l_len</text>
+  <text x="1022" y="175" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">锁住什么，拿来干什么</text>
+
+  <rect x="596" y="184" width="280" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="876" y="184" width="292" height="42" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="736" y="210" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">SEEK_SET, 0, 0</text>
+  <text x="890" y="202" font-size="10.5" fill="#4A473F">整个文件；文件长大时自动覆盖新字节</text>
+  <text x="890" y="219" font-size="9.5" fill="#6B675C">等价于 flock 的整文件锁</text>
+
+  <rect x="596" y="226" width="280" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="876" y="226" width="292" height="42" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="736" y="252" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">SEEK_SET, 100, 100</text>
+  <text x="890" y="244" font-size="10.5" fill="#4A473F">字节 [100, 200)，共 100 字节</text>
+  <text x="890" y="261" font-size="9.5" fill="#6B675C">定长记录表里的第 2 条记录</text>
+
+  <rect x="596" y="268" width="280" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="876" y="268" width="292" height="42" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="736" y="294" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">SEEK_END, 0, 0</text>
+  <text x="890" y="286" font-size="10.5" fill="#4A473F">从调用当时的 EOF 一直到无穷远</text>
+  <text x="890" y="303" font-size="9.5" fill="#6B675C">保护 O_APPEND 尾部追加</text>
+
+  <rect x="596" y="310" width="280" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="876" y="310" width="292" height="42" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="736" y="336" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">SEEK_SET, 1&lt;&lt;30, 1</text>
+  <text x="890" y="328" font-size="10.5" fill="#4A473F">锁一个文件里压根不存在的字节</text>
+  <text x="890" y="345" font-size="9.5" fill="#6B675C">当纯粹的跨进程互斥量用，不碰数据</text>
+
+  <!-- ========== Panel C ========== -->
+  <rect x="56" y="382" width="1128" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="410" font-size="13" font-weight="700" fill="#4A473F">C · 四个进程同时上锁：谁能并行，谁被挡下</text>
+
+  <!-- 标尺 -->
+  <line x1="180" y1="452" x2="980" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <line x1="180" y1="446" x2="180" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="180" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">0</text>
+  <line x1="280" y1="446" x2="280" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="280" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">100</text>
+  <line x1="380" y1="446" x2="380" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="380" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">200</text>
+  <line x1="480" y1="446" x2="480" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="480" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">300</text>
+  <line x1="580" y1="446" x2="580" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="580" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">400</text>
+  <line x1="680" y1="446" x2="680" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="680" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">500</text>
+  <line x1="780" y1="446" x2="780" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="780" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">600</text>
+  <line x1="880" y1="446" x2="880" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="880" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">700</text>
+  <line x1="980" y1="446" x2="980" y2="452" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="980" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">800</text>
+  <text x="120" y="440" font-size="9.5" fill="#6B675C" text-anchor="middle">字节偏移</text>
+
+  <!-- 冲突带 -->
+  <rect x="330" y="470" width="50" height="162" fill="#A64B3C" fill-opacity="0.13" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="392" y="466" font-size="10" font-weight="700" fill="#A64B3C">① 与 ③ 唯一重叠的 50 字节：[150, 200)</text>
+
+  <!-- 泳道 -->
+  <text x="68" y="497" font-size="10.5" font-weight="700" fill="#4A473F">进程 1</text>
+  <rect x="180" y="478" width="200" height="30" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="280" y="497" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">① F_WRLCK [0, 200)</text>
+  <rect x="1000" y="480" width="170" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1085" y="497" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">允许：先到先得</text>
+
+  <text x="68" y="535" font-size="10.5" font-weight="700" fill="#4A473F">进程 2</text>
+  <rect x="580" y="516" width="200" height="30" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="680" y="535" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">② F_WRLCK [400, 600)</text>
+  <rect x="1000" y="518" width="170" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1085" y="535" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">允许：与 ① 不重叠</text>
+
+  <text x="68" y="573" font-size="10.5" font-weight="700" fill="#4A473F">进程 3</text>
+  <rect x="330" y="554" width="150" height="30" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="405" y="573" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">③ F_RDLCK [150, 300)</text>
+  <rect x="1000" y="556" width="170" height="26" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1085" y="573" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">阻塞 / EAGAIN</text>
+
+  <text x="68" y="611" font-size="10.5" font-weight="700" fill="#4A473F">进程 4</text>
+  <rect x="780" y="592" width="180" height="30" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="870" y="611" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">④ F_RDLCK [600, 780)</text>
+  <rect x="1000" y="594" width="170" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1085" y="611" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">允许：600 不属于 ②</text>
+
+  <text x="72" y="656" font-size="11" fill="#6B675C">③ 只在 [150, 200) 这 50 字节上撞到 ①，整把锁就申请不下来：记录锁没有「锁一半」这种中间状态。</text>
+  <text x="72" y="674" font-size="11" fill="#6B675C">F_GETLK 只报告「此刻」谁挡着你，返回时对方可能已经解锁，它用来诊断，不能拿来做「先查询再加锁」，那中间有竞态。</text>
+</svg>

@@ -2,7 +2,8 @@
 title: "SpaceX IPO: Great business, wrong price? Why Aswath Damodaran is skipping Musk’s mega offering"
 source: https://economictimes.indiatimes.com/markets/us-stocks/news/spacex-ipo-great-business-wrong-price-why-aswath-damodaran-is-skipping-musks-mega-offering/articleshow/131602840.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # SpaceX IPO: Great business, wrong price? Why Aswath Damodaran is skipping Musk’s mega offering

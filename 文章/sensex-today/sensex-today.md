@@ -2,7 +2,8 @@
 title: Sensex Today
 source: https://economictimes.indiatimes.com/markets/stocks/live-blog/bse-sensex-today-nifty50-stock-market-live-updates-gift-nifty-prime-focus-groww-share-price-17-june-2026/liveblog/131784287.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Sensex Today

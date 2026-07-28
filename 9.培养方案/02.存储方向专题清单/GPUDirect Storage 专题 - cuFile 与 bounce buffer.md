@@ -2,7 +2,8 @@
 title: GPUDirect Storage 专题 - cuFile 与 bounce buffer
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单
+  - 高性能存储
+  - 存储方向专题清单
 roadmap_week: 阶段 3（S4 gds-kv-offload-lab 第一块实验；两条培养线的交汇点）
 sort_order: "06.00"
 status: active

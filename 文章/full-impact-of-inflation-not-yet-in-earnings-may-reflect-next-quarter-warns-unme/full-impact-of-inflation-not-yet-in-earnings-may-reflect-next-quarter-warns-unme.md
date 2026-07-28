@@ -2,7 +2,8 @@
 title: Full impact of inflation not yet in earnings; may reflect next quarter, warns Unmesh Sharma
 source: https://economictimes.indiatimes.com/markets/expert-view/full-impact-of-inflation-not-yet-in-earnings-may-reflect-next-quarter-warns-unmesh-sharma/articleshow/131522317.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Full impact of inflation not yet in earnings; may reflect next quarter, warns Unmesh Sharma

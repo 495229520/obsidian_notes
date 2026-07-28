@@ -2,7 +2,8 @@
 title: Has Trump achieved his goals in the war with Iran?
 source: https://economictimes.indiatimes.com/news/defence/has-trump-achieved-his-goals-in-the-war-with-iran/articleshow/131787075.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Has Trump achieved his goals in the war with Iran?

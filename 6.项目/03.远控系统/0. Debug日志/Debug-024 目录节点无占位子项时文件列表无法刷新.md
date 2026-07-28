@@ -1,6 +1,8 @@
 ---
 tags:
-  - 项目/远控系统/Debug日志
+  - 项目
+  - 远控系统
+  - Debug日志
 git: 7278af3
 aliases:
   - Debug-024 File list refresh blocked when a directory node has no placeholder child

@@ -2,7 +2,10 @@
 title: CUDA 学习清单
 date: 2026-05-06
 tags:
-  - AI-infra/素材库-GPU与推理方向/推理专题清单/清单
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 推理专题清单
+  - 清单
 aliases:
   - CUDA checklist
   - CUDA 路线清单

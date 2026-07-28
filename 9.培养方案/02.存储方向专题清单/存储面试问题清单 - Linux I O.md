@@ -2,7 +2,9 @@
 title: 存储面试问题清单 - Linux I O
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单/清单
+  - 高性能存储
+  - 存储方向专题清单
+  - 清单
 roadmap_week: 求职全程（S-Week 7 首次沉淀，阶段 1 后补毛刺定位题）
 sort_order: "99.00"
 status: active

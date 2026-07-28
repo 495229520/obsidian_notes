@@ -2,7 +2,9 @@
 title: S-Week 8 - 前置知识 - 块层与 blktrace
 date: 2026-07-11
 tags:
-  - 高性能存储/存储方向参考资料/计划
+  - 高性能存储
+  - 存储方向参考资料
+  - 计划
 aliases:
   - 存储 Week 8 前置知识
   - 块层与 blktrace 前置知识

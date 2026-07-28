@@ -2,7 +2,8 @@
 title: India restricts sale of high speed diesel and motor spirit from retail outlets
 source: https://economictimes.indiatimes.com/industry/energy/oil-gas/india-restricts-sale-of-high-speed-diesel-and-motor-spirit-from-retail-outlets/articleshow/131668510.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # India restricts sale of high speed diesel and motor spirit from retail outlets

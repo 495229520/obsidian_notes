@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>消息队列的两个实用陷阱与 System V / POSIX 选型</title>
+  <desc>左上是 msgsz 传 sizeof 还是 strlen 对队列容量的影响；右上是接收缓冲区不足时 E2BIG 与 MSG_NOERROR 的区别；下方是 System V 与 POSIX 消息队列的对照。</desc>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">消息队列：一个参数决定容量，一个标志决定消息丢不丢</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">教材例子里那两句 msgsnd / msgrcv 抄进生产代码，会在队列满和消息截断这两处翻车</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="56" y="112" width="552" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · msgsz 传 sizeof 还是 strlen，差 10 倍容量</text>
+
+  <rect x="76" y="150" width="512" height="52" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="88" y="169" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">struct msg_buffer { long msg_type; char msg_text[256]; };</text>
+  <text x="88" y="188" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">strcpy(msg.msg_text, "Hello, Message Queue!");  /* 21 字节 */</text>
+
+  <rect x="76" y="214" width="512" height="86" rx="6" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="88" y="234" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#733428">msgsnd(msqid, &amp;msg, sizeof(msg.msg_text), 0);</text>
+  <text x="88" y="252" font-size="10" fill="#733428">正文只有 21 字节，却按 256 字节整个数组发过去</text>
+  <rect x="92" y="262" width="400" height="14" rx="3" fill="#EDEBE3" stroke="#9B968A" stroke-width="0.8"/>
+  <rect x="92" y="262" width="34" height="14" rx="3" fill="#A64B3C"/>
+  <text x="502" y="273" font-size="10.5" font-weight="700" fill="#733428">64 条就满</text>
+  <text x="88" y="292" font-size="9.5" fill="#733428">MSGMNB 默认 16384 字节，16384 ÷ 256 = 64</text>
+
+  <rect x="76" y="310" width="512" height="86" rx="6" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="88" y="330" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#24473F">msgsnd(msqid, &amp;msg, strlen(msg.msg_text) + 1, 0);</text>
+  <text x="88" y="348" font-size="10" fill="#24473F">只发实际长度，加 1 是为了把结尾的 '\0' 也带上</text>
+  <rect x="92" y="358" width="400" height="14" rx="3" fill="#EDEBE3" stroke="#9B968A" stroke-width="0.8"/>
+  <rect x="92" y="358" width="400" height="14" rx="3" fill="#2F6B5E"/>
+  <text x="502" y="369" font-size="10.5" font-weight="700" fill="#24473F">744 条</text>
+  <text x="88" y="388" font-size="9.5" fill="#24473F">16384 ÷ 22 = 744，同样的队列多装十倍</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="632" y="112" width="552" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="648" y="140" font-size="13" font-weight="700" fill="#4A473F">B · 接收缓冲区不够大，会怎样</text>
+
+  <rect x="652" y="150" width="512" height="46" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="664" y="170" font-size="10.5" font-weight="700" fill="#4A473F">场景：队列里有一条正文 200 字节的消息</text>
+  <text x="664" y="187" font-size="10" fill="#4A473F">接收方却只给了 msgsz = 100</text>
+
+  <rect x="652" y="206" width="512" height="88" rx="6" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="664" y="226" font-size="10.5" font-weight="700" fill="#733428">默认（msgflg 不带 MSG_NOERROR）</text>
+  <text x="664" y="246" font-size="10" fill="#733428">msgrcv 返回 -1，errno = E2BIG，一个字节都没给你。</text>
+  <text x="664" y="264" font-size="10" font-weight="700" fill="#A64B3C">消息仍然原封不动留在队列里。</text>
+  <text x="664" y="282" font-size="10" fill="#733428">不换更大的缓冲区就重试，会变成一个死循环。</text>
+
+  <rect x="652" y="302" width="512" height="88" rx="6" fill="#F6F0E4" stroke="#B07D2B" stroke-width="1.6"/>
+  <text x="664" y="322" font-size="10.5" font-weight="700" fill="#6B4E28">带上 MSG_NOERROR</text>
+  <text x="664" y="342" font-size="10" fill="#6B4E28">截断成 100 字节返回，消息从队列里删掉。</text>
+  <text x="664" y="360" font-size="10" font-weight="700" fill="#8A6A3A">超出的 100 字节直接丢弃，找不回来。</text>
+  <text x="664" y="378" font-size="10" fill="#6B4E28">返回值是 100 而不是 200，你不知道丢了多少。</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="56" y="432" width="1128" height="220" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="460" font-size="13" font-weight="700" fill="#4A473F">C · System V 消息队列与 POSIX 消息队列</text>
+
+  <rect x="76" y="470" width="300" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="380" y="470" width="390" height="28" fill="#F6F0E4" stroke="#B07D2B" stroke-width="1"/>
+  <rect x="774" y="470" width="390" height="28" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="88" y="489" font-size="10.5" font-weight="700" fill="#4A473F">属性</text>
+  <text x="575" y="489" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">System V：msgget / msgsnd / msgrcv</text>
+  <text x="969" y="489" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">POSIX：mq_open / mq_send / mq_receive</text>
+
+  <rect x="76" y="498" width="300" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="380" y="498" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="774" y="498" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="518" font-size="10.5" fill="#4A473F">句柄类型</text>
+  <text x="392" y="518" font-size="10" fill="#4A473F">整数 msqid，不是文件描述符</text>
+  <text x="786" y="518" font-size="10" fill="#4A473F">mqd_t，在 Linux 上就是一个文件描述符</text>
+
+  <rect x="76" y="528" width="300" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="380" y="528" width="390" height="30" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.4"/>
+  <rect x="774" y="528" width="390" height="30" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="88" y="548" font-size="10.5" font-weight="700" fill="#4A473F">能进 epoll / select 吗</text>
+  <text x="392" y="548" font-size="10" font-weight="700" fill="#A64B3C">不能，这一条基本判了它死刑</text>
+  <text x="786" y="548" font-size="10" font-weight="700" fill="#2F6B5E">能，和 socket 放进同一个事件循环</text>
+
+  <rect x="76" y="558" width="300" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="380" y="558" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="774" y="558" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="578" font-size="10.5" fill="#4A473F">优先级</text>
+  <text x="392" y="578" font-size="10" fill="#4A473F">没有，只能拿 msg_type 自己编码</text>
+  <text x="786" y="578" font-size="10" fill="#4A473F">原生支持，收时自动给最高优先级那条</text>
+
+  <rect x="76" y="588" width="300" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="380" y="588" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="774" y="588" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="608" font-size="10.5" fill="#4A473F">按类型挑消息</text>
+  <text x="392" y="608" font-size="10" font-weight="700" fill="#6B4E28">支持，msgtyp 正负零三种规则</text>
+  <text x="786" y="608" font-size="10" fill="#4A473F">不支持，只能按优先级顺序取</text>
+
+  <rect x="76" y="618" width="300" height="30" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="380" y="618" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="774" y="618" width="390" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="638" font-size="10.5" fill="#4A473F">在文件系统里</text>
+  <text x="392" y="638" font-size="10" fill="#4A473F">看不见，只能 ipcs -q / ipcrm -q</text>
+  <text x="786" y="638" font-size="10" fill="#4A473F">挂载 mqueue 后在 /dev/mqueue 下可见</text>
+
+  <text x="72" y="682" font-size="11" fill="#6B675C">「按类型挑消息」是 System V 唯一保留的优势，用来在一条队列上做请求/应答双向通信很顺手。除此之外，进不了 epoll 这一条足以让它在现代事件驱动服务里出局。</text>
+</svg>

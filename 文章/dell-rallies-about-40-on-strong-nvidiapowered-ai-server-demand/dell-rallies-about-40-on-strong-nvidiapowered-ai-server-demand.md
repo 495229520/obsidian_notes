@@ -2,7 +2,8 @@
 title: Dell rallies about 40% on strong Nvidia‑powered AI server demand
 source: https://economictimes.indiatimes.com/tech/technology/dell-rallies-about-40-on-strong-nvidiapowered-ai-server-demand/articleshow/131386634.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Dell rallies about 40% on strong Nvidia‑powered AI server demand

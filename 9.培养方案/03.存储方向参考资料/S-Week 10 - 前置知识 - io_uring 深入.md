@@ -2,7 +2,9 @@
 title: S-Week 10 - 前置知识 - io_uring 深入
 date: 2026-07-11
 tags:
-  - 高性能存储/存储方向参考资料/计划
+  - 高性能存储
+  - 存储方向参考资料
+  - 计划
 aliases:
   - 存储 Week 10 前置知识
   - io_uring 深入前置知识

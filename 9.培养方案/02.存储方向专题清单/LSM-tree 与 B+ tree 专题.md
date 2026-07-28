@@ -2,7 +2,8 @@
 title: LSM-tree 与 B+ tree 专题
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单
+  - 高性能存储
+  - 存储方向专题清单
 roadmap_week: 阶段 2（S-Week 17 RocksDB 对照；DDIA 第 3 章下半）
 sort_order: "03.20"
 status: active

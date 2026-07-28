@@ -2,7 +2,8 @@
 title: Fed officials mull raising rates to curb growing inflation risk
 source: https://economictimes.indiatimes.com/markets/us-stocks/news/fed-officials-mull-raising-rates-to-curb-growing-inflation-risk/articleshow/131396521.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Fed officials mull raising rates to curb growing inflation risk

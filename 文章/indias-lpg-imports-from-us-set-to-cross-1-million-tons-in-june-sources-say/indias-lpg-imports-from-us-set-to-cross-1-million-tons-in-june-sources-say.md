@@ -2,7 +2,8 @@
 title: India's LPG imports from US set to cross 1 million tons in June, sources say
 source: https://economictimes.indiatimes.com/industry/energy/oil-gas/indias-lpg-imports-from-us-set-to-cross-1-million-tons-in-june-sources-say/articleshow/131925385.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # India's LPG imports from US set to cross 1 million tons in June, sources say

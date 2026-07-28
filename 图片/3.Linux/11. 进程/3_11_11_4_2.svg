@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 690" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>共享内存里不能存指针：同一批物理页，两个不同的虚拟基址</title>
+  <desc>上方是进程 P、共享内存段、进程 Q 的映射关系；下方对比存绝对指针（在对方进程里非法）与存相对偏移（两边含义一致）两种写法。</desc>
+  <defs>
+    <marker id="s1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="690" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">共享内存里存指针会段错误：物理页是同一批，虚拟地址不是同一个</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">跨进程的引用只能存「相对段起始处的偏移」，用的时候各自加上本进程的基址</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="56" y="112" width="1128" height="220" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · 同一段共享内存，在两个进程眼里的地址不一样</text>
+
+  <rect x="76" y="158" width="270" height="140" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="211" y="184" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">进程 P 的虚拟地址空间</text>
+  <text x="211" y="212" font-size="10" fill="#2C4460" text-anchor="middle">shmat() 返回</text>
+  <text x="211" y="234" font-size="11.5" font-weight="700" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">base_P = 0x7f3a…a000</text>
+  <text x="211" y="264" font-size="9.5" fill="#2C4460" text-anchor="middle">映射区间 [base_P, base_P + 8192)</text>
+  <text x="211" y="284" font-size="9.5" fill="#6B675C" text-anchor="middle">地址由内核挑，每次运行都可能不同</text>
+
+  <rect x="400" y="158" width="440" height="140" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="620" y="182" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">共享内存段：同一批物理页帧</text>
+  <rect x="416" y="196" width="196" height="66" rx="6" fill="#FBFBF6" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="514" y="216" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">段内偏移 +0</text>
+  <text x="514" y="236" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">node A</text>
+  <text x="514" y="253" font-size="10" fill="#4A473F" text-anchor="middle">value = 7</text>
+  <rect x="628" y="196" width="196" height="66" rx="6" fill="#FBFBF6" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="726" y="216" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">段内偏移 +64</text>
+  <text x="726" y="236" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">node B</text>
+  <text x="726" y="253" font-size="10" fill="#4A473F" text-anchor="middle">value = 9</text>
+  <text x="620" y="286" font-size="9.5" fill="#6B4E28" text-anchor="middle">偏移量是段的内部属性，跟谁映射它无关</text>
+
+  <rect x="894" y="158" width="270" height="140" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1029" y="184" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">进程 Q 的虚拟地址空间</text>
+  <text x="1029" y="212" font-size="10" fill="#24473F" text-anchor="middle">shmat() 返回</text>
+  <text x="1029" y="234" font-size="11.5" font-weight="700" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#24473F" text-anchor="middle">base_Q = 0x7f91…b000</text>
+  <text x="1029" y="264" font-size="9.5" fill="#24473F" text-anchor="middle">映射区间 [base_Q, base_Q + 8192)</text>
+  <text x="1029" y="284" font-size="9.5" fill="#6B675C" text-anchor="middle">和 P 的基址没有任何关系</text>
+
+  <line x1="346" y1="228" x2="396" y2="228" stroke="#5A564B" stroke-width="1.6" marker-end="url(#s1)" marker-start="url(#s1)"/>
+  <line x1="844" y1="228" x2="892" y2="228" stroke="#5A564B" stroke-width="1.6" marker-end="url(#s1)" marker-start="url(#s1)"/>
+
+  <text x="72" y="320" font-size="11" fill="#6B675C">node B 在段里的位置永远是 +64；但它在 P 眼里是 0x7f3a…a040，在 Q 眼里是 0x7f91…b040。写进内存的到底该是哪一个？</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="56" y="352" width="552" height="270" rx="8" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="72" y="380" font-size="13" font-weight="700" fill="#733428">B · 存绝对地址：在对方进程里是个非法值</text>
+
+  <rect x="76" y="392" width="512" height="72" rx="6" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1"/>
+  <text x="90" y="412" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">struct node { int value; struct node *next; };</text>
+  <text x="90" y="431" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#6B675C">/* 进程 P 里： */</text>
+  <text x="90" y="450" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">a-&gt;next = b;   /* 落盘的是 0x7f3a…a040 */</text>
+
+  <text x="76" y="490" font-size="10.5" fill="#733428">① P 把 b 的地址 0x7f3a…a040 原样写进共享内存</text>
+  <text x="76" y="512" font-size="10.5" fill="#733428">② Q 读出来的确实是同一个数值 0x7f3a…a040</text>
+  <text x="76" y="534" font-size="10.5" fill="#733428">③ 这个地址在 Q 的地址空间里根本没有映射</text>
+  <text x="76" y="556" font-size="10.5" font-weight="700" fill="#A64B3C">④ Q 解引用：运气好当场 SIGSEGV</text>
+  <text x="76" y="576" font-size="10.5" font-weight="700" fill="#A64B3C">　 运气坏时它恰好落在 Q 的堆上，静默写坏别人的数据</text>
+
+  <rect x="76" y="586" width="512" height="26" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="332" y="604" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">指针在被写进共享内存的那一刻就已经失效了</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="632" y="352" width="552" height="270" rx="8" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="648" y="380" font-size="13" font-weight="700" fill="#24473F">C · 存相对偏移：两个地址空间里含义相同</text>
+
+  <rect x="652" y="392" width="512" height="72" rx="6" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="666" y="412" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">struct node { int value; size_t next_off; };</text>
+  <text x="666" y="431" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#6B675C">/* 任意进程里，base 是自己 shmat 的返回值： */</text>
+  <text x="666" y="450" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">nxt = (struct node *)((char *)base + n-&gt;next_off);</text>
+
+  <text x="652" y="490" font-size="10.5" fill="#24473F">① P 写 a-&gt;next_off = 64，一个纯粹的数字</text>
+  <text x="652" y="512" font-size="10.5" fill="#24473F">② Q 读出 64</text>
+  <text x="652" y="534" font-size="10.5" fill="#24473F">③ Q 算 base_Q + 64 = 0x7f91…b040</text>
+  <text x="652" y="556" font-size="10.5" font-weight="700" fill="#2F6B5E">④ 正好落在 node B 上，两边指的是同一个对象</text>
+  <text x="652" y="576" font-size="10.5" fill="#24473F">　 约定 next_off == 0 表示空，相当于 NULL</text>
+
+  <rect x="652" y="586" width="512" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="908" y="604" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">偏移是段的内部坐标，跟映射到哪个基址无关</text>
+
+  <text x="72" y="652" font-size="11" fill="#6B675C">同理，std::string、std::vector、带虚函数的对象都不能直接放进共享内存，它们内部都是裸指针（虚表指针同样是进程私有地址）。</text>
+  <text x="72" y="672" font-size="11" fill="#6B675C">真要在共享内存里放容器，得用配了自定义 allocator 的实现，例如 Boost.Interprocess 的 offset_ptr。</text>
+</svg>

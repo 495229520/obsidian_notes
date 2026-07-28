@@ -2,7 +2,8 @@
 title: Nifty, Sensex to rally more on Monday? Iran peace deal among 5 factors to dictate Dalal Street this week
 source: https://economictimes.indiatimes.com/markets/stocks/news/nifty-sensex-to-rally-more-on-monday-iran-peace-deal-among-5-factors-to-dictate-dalal-street-this-week/articleshow/131715480.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Nifty, Sensex to rally more on Monday? Iran peace deal among 5 factors to dictate Dalal Street this week

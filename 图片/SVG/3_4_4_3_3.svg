@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 620" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>建议性锁的两种失效路径与三种锁的选型</title>
+  <desc>左：不加锁的进程照样能写，这是建议性锁的定义；右：无关的 close 清掉本进程在该 inode 上的全部 POSIX 记录锁；下：三种锁的选型条件。</desc>
+  <defs>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="620" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">建议性锁的两种失效：一种是设计使然，一种是不报错的 bug</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">左边只能靠团队约定；右边靠换成 OFD 锁，或者把 fd 的开与关收进同一个函数</text>
+
+  <!-- ========== Panel A ========== -->
+  <rect x="56" y="112" width="552" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · 设计使然：不查锁的进程照样写得进去</text>
+
+  <rect x="72" y="156" width="520" height="94" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="84" y="176" font-size="11" font-weight="700" fill="#2F6B5E">进程 A：守规矩，先加锁</text>
+  <rect x="88" y="184" width="236" height="54" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="206" y="206" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">① flock(fd, LOCK_EX)</text>
+  <text x="206" y="224" font-size="9.5" fill="#24473F" text-anchor="middle">返回 0，自以为独占了文件</text>
+  <rect x="356" y="184" width="236" height="54" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="474" y="206" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">④ write() 写自己那份数据</text>
+  <text x="474" y="224" font-size="9.5" fill="#24473F" text-anchor="middle">把 B 刚写的内容盖掉了</text>
+  <line x1="326" y1="211" x2="354" y2="211" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrG)"/>
+
+  <rect x="72" y="262" width="520" height="94" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="84" y="282" font-size="11" font-weight="700" fill="#A64B3C">进程 B：一次锁函数都没调用</text>
+  <rect x="88" y="290" width="236" height="54" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="206" y="312" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">② 直接 open + write</text>
+  <text x="206" y="330" font-size="9.5" fill="#733428" text-anchor="middle">既不 flock 也不 fcntl</text>
+  <rect x="356" y="290" width="236" height="54" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="474" y="312" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">③ 内核放行，写入成功</text>
+  <text x="474" y="330" font-size="9.5" fill="#733428" text-anchor="middle">write 路径根本不查锁链表</text>
+  <line x1="326" y1="317" x2="354" y2="317" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrR)"/>
+
+  <text x="72" y="378" font-size="10.5" fill="#6B675C">Linux 5.15 起内核已删除强制性锁的实现，挂载选项 -o mand 不再生效，只剩建议性锁一条路。</text>
+
+  <!-- ========== Panel B ========== -->
+  <rect x="632" y="112" width="552" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="648" y="140" font-size="13" font-weight="700" fill="#4A473F">B · 真 bug：一次无关的 close 清空了你的记录锁</text>
+
+  <rect x="648" y="156" width="520" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="664" y="178" font-size="11" font-weight="700" fill="#2C4460">① fcntl(fd3, F_SETLK, [0, 100)) 返回 0</text>
+  <text x="664" y="196" font-size="9.5" fill="#2C4460">此刻 /proc/locks 里确实有你这一行，POSIX ADVISORY WRITE</text>
+
+  <rect x="648" y="216" width="520" height="52" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="664" y="238" font-size="11" font-weight="700" fill="#6B4E28">② 顺手调了个工具函数 load_meta("data.txt")</text>
+  <text x="664" y="256" font-size="9.5" fill="#6B4E28">它内部 open() 拿到 fd7，读完就 close(fd7)，看起来人畜无害</text>
+
+  <rect x="648" y="276" width="520" height="52" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="664" y="298" font-size="11" font-weight="700" fill="#733428">③ 内核规则：关闭指向该文件的任意一个 fd</text>
+  <text x="664" y="316" font-size="9.5" fill="#733428">→ 本进程在这个 inode 上的记录锁被全部释放，fd3 上的也一样</text>
+
+  <rect x="648" y="336" width="520" height="52" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="2.2"/>
+  <text x="664" y="358" font-size="11" font-weight="700" fill="#733428">④ fd3 还开着，代码还在往下跑，锁却没了</text>
+  <text x="664" y="376" font-size="9.5" fill="#733428">没有任何返回值告诉你这件事，直到某天数据对不上</text>
+
+  <line x1="908" y1="208" x2="908" y2="214" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="908" y1="268" x2="908" y2="274" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="908" y1="328" x2="908" y2="334" stroke="#A64B3C" stroke-width="1.5"/>
+
+  <!-- ========== Panel C ========== -->
+  <rect x="56" y="422" width="1128" height="150" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="450" font-size="13" font-weight="700" fill="#4A473F">C · 那么该选哪一个</text>
+
+  <rect x="80" y="462" width="352" height="88" rx="7" fill="#F6F0E4" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="256" y="486" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">flock()</text>
+  <text x="96" y="508" font-size="10" fill="#6B4E28">整个文件同一时刻只允许一个写者，</text>
+  <text x="96" y="526" font-size="10" fill="#6B4E28">不需要区间粒度，且不经过 NFS。</text>
+  <text x="96" y="542" font-size="9.5" fill="#8A6A3A">典型场景：守护进程用 pid 文件防止自己被启动两份。</text>
+
+  <rect x="444" y="462" width="352" height="88" rx="7" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="620" y="486" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">fcntl() POSIX 记录锁</text>
+  <text x="460" y="508" font-size="10" fill="#733428">需要字节区间，同时要兼容老内核</text>
+  <text x="460" y="526" font-size="10" fill="#733428">或其它 Unix。</text>
+  <text x="460" y="542" font-size="9.5" fill="#A64B3C">代价：必须把这个文件的 open / close 收在一处。</text>
+
+  <rect x="808" y="462" width="352" height="88" rx="7" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="984" y="486" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">fcntl() OFD 锁 · Linux ≥ 3.15</text>
+  <text x="824" y="508" font-size="10" fill="#24473F">区间粒度、fork 继承、线程间互斥</text>
+  <text x="824" y="526" font-size="10" fill="#24473F">三件事同时对，没有 close 陷阱。</text>
+  <text x="824" y="542" font-size="9.5" fill="#2F6B5E">代价：Linux 专有，移植到 macOS / BSD 要改。</text>
+
+  <text x="72" y="598" font-size="11" fill="#6B675C">别拿文件锁做进程内的线程同步：一次系统调用比一次无竞争的 futex 贵两个数量级；文件锁解决的是跨进程、跨语言、跨容器的协调。</text>
+</svg>

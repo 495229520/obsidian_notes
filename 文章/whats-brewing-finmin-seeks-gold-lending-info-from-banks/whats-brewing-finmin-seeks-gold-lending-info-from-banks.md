@@ -2,7 +2,8 @@
 title: What's brewing? FinMin seeks gold lending info from banks
 source: https://economictimes.indiatimes.com/news/economy/policy/whats-brewing-finmin-seeks-gold-lending-info-from-banks/articleshow/131596284.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # What's brewing? FinMin seeks gold lending info from banks

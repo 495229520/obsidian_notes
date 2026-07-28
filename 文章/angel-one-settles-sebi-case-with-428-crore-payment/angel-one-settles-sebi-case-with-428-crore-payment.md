@@ -2,7 +2,8 @@
 title: Angel One settles SEBI case with ₹4.28 crore payment
 source: https://economictimes.indiatimes.com/industry/banking/finance/angel-one-settles-sebi-case-with-4-28-crore-payment/articleshow/131754475.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Angel One settles SEBI case with ₹4.28 crore payment

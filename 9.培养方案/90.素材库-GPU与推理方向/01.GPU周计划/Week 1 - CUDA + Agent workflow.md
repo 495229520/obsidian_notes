@@ -1,6 +1,9 @@
 ---
 tags:
-  - AI-infra/素材库-GPU与推理方向/GPU周计划/计划
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - GPU周计划
+  - 计划
 ---
 
 # Week 1 - CUDA + Agent workflow

@@ -2,7 +2,8 @@
 title: India Inc hikes prices, shrinks packs as Iran war squeezes margins
 source: https://economictimes.indiatimes.com/industry/cons-products/fmcg/india-inc-hikes-prices-shrinks-packs-as-iran-war-squeezes-margins/articleshow/131576349.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # India Inc hikes prices, shrinks packs as Iran war squeezes margins

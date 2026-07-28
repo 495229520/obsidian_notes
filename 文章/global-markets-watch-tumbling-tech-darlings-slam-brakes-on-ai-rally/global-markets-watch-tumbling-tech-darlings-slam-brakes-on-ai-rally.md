@@ -2,7 +2,8 @@
 title: "Global Markets Watch: Tumbling tech darlings slam brakes on AI rally"
 source: https://economictimes.indiatimes.com/markets/stocks/news/asia-markets-tumble-as-tech-rout-deepens/articleshow/131576049.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Global Markets Watch: Tumbling tech darlings slam brakes on AI rally

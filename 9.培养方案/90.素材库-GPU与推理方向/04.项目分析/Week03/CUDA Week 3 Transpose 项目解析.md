@@ -2,7 +2,10 @@
 title: CUDA Week 3 Transpose 项目解析
 date: 2026-05-31
 tags:
-  - AI-infra/素材库-GPU与推理方向/项目分析/Week03
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 项目分析
+  - Week03
 aliases:
   - CUDA Week3 项目解析
   - CUDA Transpose 工程解析

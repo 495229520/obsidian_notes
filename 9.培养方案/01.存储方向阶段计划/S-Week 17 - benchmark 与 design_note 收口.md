@@ -2,7 +2,9 @@
 title: S-Week 17 - benchmark 与 design_note 收口
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向阶段计划/总结
+  - 高性能存储
+  - 存储方向阶段计划
+  - 总结
 status: active
 ---
 

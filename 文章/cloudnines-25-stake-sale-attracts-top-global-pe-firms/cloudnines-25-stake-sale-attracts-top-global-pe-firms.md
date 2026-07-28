@@ -2,7 +2,8 @@
 title: Cloudnine's 25% stake sale attracts top global PE firms
 source: https://economictimes.indiatimes.com/industry/healthcare/biotech/healthcare/cloudnines-25-stake-sale-attracts-top-global-pe-firms/articleshow/131780913.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Cloudnine's 25% stake sale attracts top global PE firms

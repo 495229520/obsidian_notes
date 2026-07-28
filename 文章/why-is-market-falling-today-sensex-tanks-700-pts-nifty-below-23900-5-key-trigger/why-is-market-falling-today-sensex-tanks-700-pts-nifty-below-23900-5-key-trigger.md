@@ -2,7 +2,8 @@
 title: Why is market falling today? Sensex tanks 700 pts, Nifty below 23,900; 5 key triggers behind D-St selloff
 source: https://economictimes.indiatimes.com/markets/stocks/news/why-is-market-falling-today-sensex-tanks-550-pts-nifty-tests-23900-key-triggers-behind-nearly-rs-5-lakh-crore-selloff/articleshow/131929692.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Why is market falling today? Sensex tanks 700 pts, Nifty below 23,900; 5 key triggers behind D-St selloff

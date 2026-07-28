@@ -2,7 +2,10 @@
 title: LLM Kernel 专题清单
 date: 2026-05-06
 tags:
-  - AI-infra/素材库-GPU与推理方向/推理专题清单/清单
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 推理专题清单
+  - 清单
 aliases:
   - LLM CUDA Kernel
   - LLM 算子清单

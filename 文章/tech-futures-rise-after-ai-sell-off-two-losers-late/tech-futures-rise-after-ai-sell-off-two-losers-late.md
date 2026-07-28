@@ -2,7 +2,8 @@
 title: Tech Futures Rise After AI Sell-Off; Two Losers Late
 source: https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-nasdaq-ai-sell-off-spacex-fedex-cerebras-micron-earnings/
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Tech Futures Rise After AI Sell-Off; Two Losers Late

@@ -2,7 +2,8 @@
 title: US ban on Anthropic's Fable 5 &amp; Mythos 5 to put Indian IT services firms at competitive disadvantage
 source: https://economictimes.indiatimes.com/tech/artificial-intelligence/us-ban-on-anthropics-fable-5-mythos-5-to-put-indian-it-services-firms-at-competitive-disadvantage/articleshow/131709776.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # US ban on Anthropic's Fable 5 &amp; Mythos 5 to put Indian IT services firms at competitive disadvantage

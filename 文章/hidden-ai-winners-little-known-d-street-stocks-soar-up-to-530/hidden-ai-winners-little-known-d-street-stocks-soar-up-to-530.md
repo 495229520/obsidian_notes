@@ -2,7 +2,8 @@
 title: "Hidden AI Winners: Little-known D-Street stocks soar up to 530%"
 source: https://economictimes.indiatimes.com/markets/stocks/news/a-little-known-indian-stocks-530-rally-shows-hidden-ai-winners/articleshow/131519131.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Hidden AI Winners: Little-known D-Street stocks soar up to 530%

@@ -2,7 +2,9 @@
 title: S-Week 17 - 前置知识 - benchmark 与 design_note 收口
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向参考资料/总结
+  - 高性能存储
+  - 存储方向参考资料
+  - 总结
 aliases:
   - 存储 Week 17 前置知识
   - mini-kv 收口前置知识

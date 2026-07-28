@@ -2,7 +2,8 @@
 title: "Ahead of Market: 10 things that will decide stock market action on Friday"
 source: https://economictimes.indiatimes.com/markets/stocks/news/ahead-of-market-10-things-that-will-decide-stock-market-action-on-friday/articleshow/131663351.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Ahead of Market: 10 things that will decide stock market action on Friday

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>fork 的写时复制与三个由「复制」引出的陷阱</title>
+  <desc>上半部分是 fork 前后页表与物理页帧的三个快照，展示写时复制；下半部分是 stdio 缓冲被复制、父子共享文件偏移、多线程 fork 三个陷阱。</desc>
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="a2" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">fork() 不复制内存，只复制页表：写时复制</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">「子进程拿到父进程内存的一份副本」是语义承诺；实现上要等到某一方真的写下去，那一页才被复制</text>
+
+  <!-- ================= Panel A ================= -->
+  <rect x="56" y="112" width="1128" height="330" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · 三个快照：全局变量 gval 所在的那一页发生了什么</text>
+
+  <!-- sub 1 -->
+  <rect x="76" y="154" width="352" height="272" rx="7" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="252" y="176" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">① fork() 之前</text>
+  <rect x="92" y="190" width="120" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="152" y="207" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">父进程页表项</text>
+  <text x="152" y="223" font-size="9.5" fill="#2C4460" text-anchor="middle">权限 RW</text>
+  <rect x="92" y="246" width="120" height="42" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="152" y="272" font-size="10" fill="#6B675C" text-anchor="middle">子进程尚不存在</text>
+  <rect x="256" y="204" width="140" height="60" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="326" y="226" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">物理页帧 #7</text>
+  <text x="326" y="245" font-size="10.5" fill="#6B4E28" text-anchor="middle">gval = 11</text>
+  <line x1="212" y1="211" x2="254" y2="226" stroke="#5A564B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="92" y="316" font-size="10" fill="#4A473F">物理内存里只有一份 gval。</text>
+  <text x="92" y="334" font-size="10" fill="#4A473F">页表项标记为可写，父进程</text>
+  <text x="92" y="352" font-size="10" fill="#4A473F">直接改就行，不触发任何异常。</text>
+  <rect x="92" y="368" width="304" height="42" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="244" y="385" font-size="10" font-weight="700" fill="#4A473F" text-anchor="middle">物理页数：1 份</text>
+  <text x="244" y="401" font-size="9.5" fill="#6B675C" text-anchor="middle">复制成本：0</text>
+
+  <!-- sub 2 -->
+  <rect x="444" y="154" width="352" height="272" rx="7" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="620" y="176" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">② fork() 刚返回</text>
+  <rect x="460" y="190" width="120" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="520" y="207" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">父进程页表项</text>
+  <text x="520" y="223" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">权限被降为 RO</text>
+  <rect x="460" y="246" width="120" height="42" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="520" y="263" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">子进程页表项</text>
+  <text x="520" y="279" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">权限也是 RO</text>
+  <rect x="624" y="204" width="140" height="60" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="694" y="226" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">物理页帧 #7</text>
+  <text x="694" y="245" font-size="10.5" fill="#6B4E28" text-anchor="middle">gval = 11（共用）</text>
+  <line x1="580" y1="207" x2="622" y2="222" stroke="#5A564B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="580" y1="265" x2="622" y2="248" stroke="#5A564B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="460" y="316" font-size="10" fill="#4A473F">内核只复制了页表，没搬数据。</text>
+  <text x="460" y="334" font-size="10" fill="#4A473F">两边都被改成只读，任何一方</text>
+  <text x="460" y="352" font-size="10" fill="#4A473F">写入都会触发缺页异常。</text>
+  <rect x="460" y="368" width="304" height="42" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="612" y="385" font-size="10" font-weight="700" fill="#4A473F" text-anchor="middle">物理页数：仍是 1 份</text>
+  <text x="612" y="401" font-size="9.5" fill="#6B675C" text-anchor="middle">复制成本：一次页表复制</text>
+
+  <!-- sub 3 -->
+  <rect x="812" y="154" width="352" height="272" rx="7" fill="#F5F4EE" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="988" y="176" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">③ 父进程执行 gval--</text>
+  <rect x="828" y="186" width="120" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="888" y="203" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">父进程页表项</text>
+  <text x="888" y="219" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">改指向新页 · RW</text>
+  <rect x="828" y="248" width="120" height="42" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="888" y="265" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">子进程页表项</text>
+  <text x="888" y="281" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">独占 #7 · 恢复 RW</text>
+  <rect x="992" y="180" width="140" height="52" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="1062" y="199" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">新物理页帧 #9</text>
+  <text x="1062" y="217" font-size="10.5" fill="#733428" text-anchor="middle">gval = 10</text>
+  <rect x="992" y="244" width="140" height="52" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="1062" y="263" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">物理页帧 #7</text>
+  <text x="1062" y="281" font-size="10.5" fill="#6B4E28" text-anchor="middle">gval = 11</text>
+  <line x1="948" y1="203" x2="990" y2="203" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#a2)"/>
+  <line x1="948" y1="269" x2="990" y2="269" stroke="#5A564B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="828" y="316" font-size="10" fill="#4A473F">写只读页触发缺页，内核这时才</text>
+  <text x="828" y="334" font-size="10" fill="#4A473F">分配 #9、拷贝内容、改父页表，</text>
+  <text x="828" y="352" font-size="10" fill="#4A473F">最后重新执行那条写指令。</text>
+  <rect x="828" y="368" width="304" height="42" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="980" y="385" font-size="10" font-weight="700" fill="#4A473F" text-anchor="middle">物理页数：2 份（只有被写的那一页）</text>
+  <text x="980" y="401" font-size="9.5" fill="#6B675C" text-anchor="middle">复制成本：一次缺页 + 4 KB 拷贝</text>
+
+  <!-- ================= Panel B ================= -->
+  <rect x="56" y="462" width="1128" height="272" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="490" font-size="13" font-weight="700" fill="#4A473F">B · 「被复制的不只是内存」引出的三个陷阱</text>
+
+  <rect x="76" y="502" width="352" height="212" rx="7" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="92" y="526" font-size="11.5" font-weight="700" fill="#733428">陷阱一：printf 的内容出现两次</text>
+  <rect x="92" y="536" width="320" height="44" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="104" y="554" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">printf("hi");   // 注意没有 \n</text>
+  <text x="104" y="571" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">fork();</text>
+  <text x="92" y="600" font-size="10" fill="#733428">stdout 接终端时是行缓冲，"hi" 还留在</text>
+  <text x="92" y="618" font-size="10" fill="#733428">用户态缓冲区。fork 把缓冲区连同内容</text>
+  <text x="92" y="636" font-size="10" fill="#733428">一起复制，父子退出时各自 flush 一次。</text>
+  <text x="92" y="654" font-size="10" fill="#733428">重定向到文件时变全缓冲，更容易触发。</text>
+  <rect x="92" y="666" width="320" height="34" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="252" y="687" font-size="10" font-weight="700" fill="#733428" text-anchor="middle">修法：fork 前 fflush(NULL)</text>
+
+  <rect x="444" y="502" width="352" height="212" rx="7" fill="#F6F0E4" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="460" y="526" font-size="11.5" font-weight="700" fill="#6B4E28">陷阱二：父子共用同一个文件偏移</text>
+  <rect x="460" y="536" width="320" height="44" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="472" y="554" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">int fd = open("a.txt", O_RDONLY);</text>
+  <text x="472" y="571" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">fork();  // 父子都拿到 fd</text>
+  <text x="460" y="600" font-size="10" fill="#6B4E28">fork 复制的是 fd 表项，两份 fd 指向同一个</text>
+  <text x="460" y="618" font-size="10" fill="#6B4E28">open file description，f_pos 是共用的。</text>
+  <text x="460" y="636" font-size="10" fill="#6B4E28">父读走前 100 字节，子接着从第 101 字节读，</text>
+  <text x="460" y="654" font-size="10" fill="#6B4E28">而不是各自从头开始。</text>
+  <rect x="460" y="666" width="320" height="34" rx="5" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1"/>
+  <text x="620" y="687" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">要各读各的：fork 后各自重新 open</text>
+
+  <rect x="812" y="502" width="352" height="212" rx="7" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="828" y="526" font-size="11.5" font-weight="700" fill="#733428">陷阱三：多线程程序里调 fork</text>
+  <rect x="828" y="536" width="320" height="44" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="840" y="554" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">// 线程 B 正持有 malloc 内部锁</text>
+  <text x="840" y="571" font-size="10" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460">if (fork() == 0) { malloc(64); }</text>
+  <text x="828" y="600" font-size="10" fill="#733428">子进程里只有调用 fork 的那一个线程活着，</text>
+  <text x="828" y="618" font-size="10" fill="#733428">但所有的锁都保持着 fork 那一刻的状态。</text>
+  <text x="828" y="636" font-size="10" fill="#733428">线程 B 不存在了，它持有的锁永远不会释放，</text>
+  <text x="828" y="654" font-size="10" fill="#733428">子进程里任何 malloc 都会挂死。</text>
+  <rect x="828" y="666" width="320" height="34" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="988" y="687" font-size="10" font-weight="700" fill="#733428" text-anchor="middle">fork 到 exec 之间只能调异步信号安全函数</text>
+
+  <text x="72" y="764" font-size="11" fill="#6B675C">写时复制也解释了为什么 fork + exec 很便宜：exec 会立刻丢掉整个地址空间，那些只读共享的页一次都没被复制过。</text>
+</svg>

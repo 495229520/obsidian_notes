@@ -1,6 +1,9 @@
 ---
 tags:
-  - AI-infra/素材库-GPU与推理方向/项目分析/Week01
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 项目分析
+  - Week01
 ---
 # Week01 Benchmark & Profiling
 

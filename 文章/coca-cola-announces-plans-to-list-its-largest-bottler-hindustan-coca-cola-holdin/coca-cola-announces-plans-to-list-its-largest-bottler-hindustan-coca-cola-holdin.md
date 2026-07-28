@@ -2,7 +2,8 @@
 title: Coca-Cola announces plans to list its largest bottler Hindustan Coca-Cola Holdings
 source: https://economictimes.indiatimes.com/markets/stocks/news/coca-cola-announces-plans-to-list-its-largest-bottler-hindustan-coca-cola-holdings-hcch/articleshow/131454284.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Coca-Cola announces plans to list its largest bottler Hindustan Coca-Cola Holdings

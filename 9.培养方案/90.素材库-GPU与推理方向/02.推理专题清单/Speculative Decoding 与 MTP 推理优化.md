@@ -2,7 +2,9 @@
 title: Speculative Decoding 与 MTP 推理优化
 date: 2026-05-24
 tags:
-  - AI-infra/素材库-GPU与推理方向/推理专题清单
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 推理专题清单
 roadmap_week: Week 8, Week 17+
 sort_order: "08.10"
 status: active

@@ -2,7 +2,8 @@
 title: "Oil Price Today (May 29): Crude oil falls as peace deal hopes offset constant tensions. What are experts saying?"
 source: https://economictimes.indiatimes.com/markets/commodities/news/oil-price-today-may-29-crude-oil-falls-as-peace-deal-hopes-offset-constant-tensions-what-are-experts-saying/articleshow/131380026.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Oil Price Today (May 29): Crude oil falls as peace deal hopes offset constant tensions. What are experts saying?

@@ -2,7 +2,8 @@
 title: Reliance Jio plans 1,650-satellite LEO network for broadband services
 source: https://economictimes.indiatimes.com/industry/telecom/telecom-news/reliance-jio-plans-1650-satellite-leo-network-for-broadband-services/articleshow/131815062.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Reliance Jio plans 1,650-satellite LEO network for broadband services

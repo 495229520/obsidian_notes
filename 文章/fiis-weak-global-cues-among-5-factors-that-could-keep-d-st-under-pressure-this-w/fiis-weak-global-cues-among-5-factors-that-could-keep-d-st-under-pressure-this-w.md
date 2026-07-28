@@ -2,7 +2,8 @@
 title: FIIs, weak global cues among 5 factors that could keep D-St under pressure this week
 source: https://economictimes.indiatimes.com/markets/stocks/news/fiis-weak-global-cues-among-5-factors-that-could-keep-d-st-under-pressure-this-week/articleshow/131561835.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # FIIs, weak global cues among 5 factors that could keep D-St under pressure this week

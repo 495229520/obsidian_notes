@@ -2,7 +2,10 @@
 title: CUDA Week 1 Hello World 项目解析
 date: 2026-05-08
 tags:
-  - AI-infra/素材库-GPU与推理方向/项目分析/Week01
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 项目分析
+  - Week01
 aliases:
   - CUDA Week1 项目解析
   - CUDA Hello World 工程解析

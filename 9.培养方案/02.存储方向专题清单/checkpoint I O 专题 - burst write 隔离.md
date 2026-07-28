@@ -2,7 +2,8 @@
 title: checkpoint I O 专题 - burst write 隔离
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单
+  - 高性能存储
+  - 存储方向专题清单
 roadmap_week: 阶段 3（S4 可选实验；S-Week 9 干扰注入方法论的 AI 场景版）
 sort_order: "06.20"
 status: active

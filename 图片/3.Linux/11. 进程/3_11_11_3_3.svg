@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>管道的四条边界规则与「忘了关不用的那一端」</title>
+  <desc>上半部分对比忘关写端与各关各端两种写法对 EOF 的影响；下半部分是写端归零、读端归零、缓冲区满、PIPE_BUF 原子性四条规则。</desc>
+  <defs>
+    <marker id="p1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="780" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">管道出问题，八成出在两个端点的引用计数上</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">内核只关心「还有几个 fd 指着写端、几个指着读端」，不关心那些 fd 在哪个进程手里</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="56" y="112" width="1128" height="310" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="140" font-size="13" font-weight="700" fill="#4A473F">A · 同一段代码，差一句 close 的两种结局</text>
+
+  <!-- left: wrong -->
+  <rect x="76" y="154" width="540" height="238" rx="7" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="92" y="178" font-size="11.5" font-weight="700" fill="#733428">写法一：fork 之后谁都没关，父进程的 read 永远回不来</text>
+
+  <rect x="96" y="192" width="150" height="70" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="171" y="212" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">父进程</text>
+  <text x="171" y="230" font-size="9.5" fill="#2C4460" text-anchor="middle">fd[0] 读端：在用</text>
+  <text x="171" y="248" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">fd[1] 写端：忘了关</text>
+
+  <rect x="96" y="278" width="150" height="70" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="171" y="298" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">子进程</text>
+  <text x="171" y="316" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">fd[0] 读端：忘了关</text>
+  <text x="171" y="334" font-size="9.5" fill="#24473F" text-anchor="middle">fd[1] 写端：在用</text>
+
+  <rect x="288" y="214" width="150" height="112" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="363" y="236" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">内核管道对象</text>
+  <text x="363" y="262" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle">写端引用计数 = 2</text>
+  <text x="363" y="280" font-size="10" font-weight="700" fill="#A64B3C" text-anchor="middle">读端引用计数 = 2</text>
+  <text x="363" y="306" font-size="9.5" fill="#6B4E28" text-anchor="middle">64 KB 缓冲区</text>
+  <line x1="246" y1="227" x2="286" y2="240" stroke="#5A564B" stroke-width="1.4" marker-end="url(#p1)"/>
+  <line x1="246" y1="313" x2="286" y2="300" stroke="#5A564B" stroke-width="1.4" marker-end="url(#p1)"/>
+
+  <rect x="466" y="228" width="134" height="84" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="533" y="250" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">子进程 exit()</text>
+  <text x="533" y="270" font-size="9.5" fill="#733428" text-anchor="middle">写端计数 2 → 1</text>
+  <text x="533" y="288" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">不为 0，就没有 EOF</text>
+  <text x="533" y="306" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">父进程一直睡在 read</text>
+  <line x1="438" y1="270" x2="464" y2="270" stroke="#5A564B" stroke-width="1.4" marker-end="url(#p1)"/>
+
+  <text x="92" y="374" font-size="10" fill="#733428">父进程自己手里还攥着一个写端，内核当然认为「还可能有人要写」。</text>
+
+  <!-- right: correct -->
+  <rect x="628" y="154" width="540" height="238" rx="7" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="644" y="178" font-size="11.5" font-weight="700" fill="#24473F">写法二：各自关掉用不到的那一端，EOF 如期到达</text>
+
+  <rect x="648" y="192" width="150" height="70" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="723" y="212" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">父进程</text>
+  <text x="723" y="230" font-size="9.5" fill="#2C4460" text-anchor="middle">fd[0] 读端：在用</text>
+  <text x="723" y="248" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">close(fd[1])</text>
+
+  <rect x="648" y="278" width="150" height="70" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="723" y="298" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">子进程</text>
+  <text x="723" y="316" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">close(fd[0])</text>
+  <text x="723" y="334" font-size="9.5" fill="#24473F" text-anchor="middle">fd[1] 写端：在用</text>
+
+  <rect x="840" y="214" width="150" height="112" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="915" y="236" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">内核管道对象</text>
+  <text x="915" y="262" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">写端引用计数 = 1</text>
+  <text x="915" y="280" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">读端引用计数 = 1</text>
+  <text x="915" y="306" font-size="9.5" fill="#6B4E28" text-anchor="middle">64 KB 缓冲区</text>
+  <line x1="798" y1="227" x2="838" y2="240" stroke="#5A564B" stroke-width="1.4" marker-end="url(#p1)"/>
+  <line x1="798" y1="313" x2="838" y2="300" stroke="#5A564B" stroke-width="1.4" marker-end="url(#p1)"/>
+
+  <rect x="1018" y="228" width="134" height="84" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="1085" y="250" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">子进程 exit()</text>
+  <text x="1085" y="270" font-size="9.5" fill="#24473F" text-anchor="middle">写端计数 1 → 0</text>
+  <text x="1085" y="288" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">内核判定：没人会写了</text>
+  <text x="1085" y="306" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">父进程 read 返回 0</text>
+  <line x1="990" y1="270" x2="1016" y2="270" stroke="#5A564B" stroke-width="1.4" marker-end="url(#p1)"/>
+
+  <text x="644" y="374" font-size="10" fill="#24473F">口诀：fork 之后，读的一方立刻关写端，写的一方立刻关读端，一句都不能省。</text>
+
+  <text x="72" y="412" font-size="11" fill="#6B675C">同理，多级 shell 管道里每个子进程都要把所有跟自己无关的管道端关掉，否则中间某一级就收不到 EOF。</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="56" y="442" width="1128" height="282" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="470" font-size="13" font-weight="700" fill="#4A473F">B · 四条边界规则</text>
+
+  <!-- card 1 -->
+  <rect x="76" y="484" width="264" height="200" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="92" y="508" font-size="11" font-weight="700" fill="#2C4460">① 写端归零 → read 返回 0</text>
+  <text x="92" y="534" font-size="10" fill="#2C4460">所有指向写端的 fd 都关掉之后，</text>
+  <text x="92" y="552" font-size="10" fill="#2C4460">read 才返回 0。</text>
+  <text x="92" y="576" font-size="10" fill="#2C4460">返回 0 就是管道版本的 EOF，</text>
+  <text x="92" y="594" font-size="10" fill="#2C4460">和读到普通文件末尾是同一个值。</text>
+  <rect x="92" y="612" width="232" height="56" rx="5" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <text x="104" y="632" font-size="9.5" fill="#2C4460">少关一个写端 fd，read 就永远</text>
+  <text x="104" y="649" font-size="9.5" fill="#2C4460">睡着，看起来像程序卡死。</text>
+
+  <!-- card 2 -->
+  <rect x="352" y="484" width="264" height="200" rx="7" fill="#F7ECE8" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="368" y="508" font-size="11" font-weight="700" fill="#733428">② 读端归零 → SIGPIPE</text>
+  <text x="368" y="534" font-size="10" fill="#733428">读端一个不剩时再 write，内核先</text>
+  <text x="368" y="552" font-size="10" fill="#733428">给写者发 SIGPIPE。</text>
+  <text x="368" y="576" font-size="10" font-weight="700" fill="#A64B3C">它的默认动作是终止进程，</text>
+  <text x="368" y="594" font-size="10" font-weight="700" fill="#A64B3C">进程会一声不吭地没了。</text>
+  <rect x="368" y="612" width="232" height="56" rx="5" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1"/>
+  <text x="380" y="632" font-size="9.5" fill="#733428">忽略它之后 write 返回 -1、</text>
+  <text x="380" y="649" font-size="9.5" fill="#733428">errno = EPIPE，才轮到你处理。</text>
+
+  <!-- card 3 -->
+  <rect x="628" y="484" width="264" height="200" rx="7" fill="#F6F0E4" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="644" y="508" font-size="11" font-weight="700" fill="#6B4E28">③ 缓冲区满 → write 阻塞</text>
+  <text x="644" y="534" font-size="10" fill="#6B4E28">默认容量 65536 字节，也就是 16 页。</text>
+  <text x="644" y="552" font-size="10" fill="#6B4E28">满了 write 就睡，等读端取走一些。</text>
+  <text x="644" y="576" font-size="10" fill="#6B4E28">这正是 shell 管道的反压：下游慢，</text>
+  <text x="644" y="594" font-size="10" fill="#6B4E28">上游自动被拖住，不会撑爆内存。</text>
+  <rect x="644" y="612" width="232" height="56" rx="5" fill="#FBFBF6" stroke="#B07D2B" stroke-width="1"/>
+  <text x="656" y="632" font-size="9.5" fill="#6B4E28">O_NONBLOCK 时改为 -1/EAGAIN；</text>
+  <text x="656" y="649" font-size="9.5" fill="#6B4E28">F_SETPIPE_SZ 可以改容量。</text>
+
+  <!-- card 4 -->
+  <rect x="904" y="484" width="264" height="200" rx="7" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="920" y="508" font-size="11" font-weight="700" fill="#24473F">④ 不超过 PIPE_BUF 的写是原子的</text>
+  <text x="920" y="534" font-size="10" fill="#24473F">Linux 上 PIPE_BUF 是 4096 字节。</text>
+  <text x="920" y="552" font-size="10" fill="#24473F">一次 write 不超过它，内核保证这批</text>
+  <text x="920" y="570" font-size="10" fill="#24473F">字节连续落进缓冲区。</text>
+  <text x="920" y="594" font-size="10" font-weight="700" fill="#2F6B5E">超过就可能被切开，别人的数据插进来。</text>
+  <rect x="920" y="612" width="232" height="56" rx="5" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="932" y="632" font-size="9.5" fill="#24473F">多个进程往同一管道写日志时，</text>
+  <text x="932" y="649" font-size="9.5" fill="#24473F">把每条控制在 4096 字节以内。</text>
+
+  <text x="72" y="756" font-size="11" fill="#6B675C">① 和 ② 是一对：读者靠写端归零知道「说完了」，写者靠读端归零知道「没人听了」。管道的全部生命周期语义就在这两句里。</text>
+</svg>

@@ -2,7 +2,8 @@
 title: "Middle East outages to keep aluminium market tight near-term, but Indonesia-China supply wave caps upside: Goldman Sachs"
 source: https://economictimes.indiatimes.com/industry/indl-goods/svs/metals-mining/iran-war-middle-east-outages-to-keep-aluminium-market-tight-near-term-but-indonesia-china-supply-wave-caps-upside-goldman-sachs/articleshow/131885818.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Middle East outages to keep aluminium market tight near-term, but Indonesia-China supply wave caps upside: Goldman Sachs

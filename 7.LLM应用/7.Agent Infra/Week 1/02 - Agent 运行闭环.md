@@ -1,6 +1,8 @@
 ---
 tags:
-  - LLM应用/Agent-Infra/Week-1
+  - LLM应用
+  - Agent-Infra
+  - Week-1
 ---
 
 # Agent 运行闭环

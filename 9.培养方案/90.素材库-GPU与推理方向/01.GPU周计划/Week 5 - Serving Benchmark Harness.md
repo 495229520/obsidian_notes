@@ -2,7 +2,10 @@
 title: Week 5 - Serving Benchmark Harness
 date: 2026-05-14
 tags:
-  - AI-infra/素材库-GPU与推理方向/GPU周计划/计划
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - GPU周计划
+  - 计划
 status: active
 ---
 

@@ -3,7 +3,9 @@ title: AI Agent Native AI Infra GPU Performance Engineer 培养方案
 date: 2026-05-06
 updated: 2026-07-21
 tags:
-  - AI-infra/素材库-GPU与推理方向/历史总纲
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 历史总纲
 status: reference
 ---
 

@@ -2,7 +2,8 @@
 title: Oil slips 4% as US, Iran reach peace deal to reopen Strait of Hormuz
 source: https://economictimes.indiatimes.com/markets/commodities/news/oil-slips-4-as-us-iran-reach-peace-deal-to-reopen-strait-of-hormuz/articleshow/131730854.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Oil slips 4% as US, Iran reach peace deal to reopen Strait of Hormuz

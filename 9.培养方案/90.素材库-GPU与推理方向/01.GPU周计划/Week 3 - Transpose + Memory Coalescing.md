@@ -2,7 +2,10 @@
 title: Week 3 - Transpose + Memory Coalescing
 date: 2026-05-06
 tags:
-  - AI-infra/素材库-GPU与推理方向/GPU周计划/计划
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - GPU周计划
+  - 计划
 aliases:
   - CUDA Week 3
   - CUDA Transpose

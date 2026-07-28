@@ -1,6 +1,9 @@
 ---
 tags:
-  - AI-infra/素材库-GPU与推理方向/项目分析/Week03
+  - AI-infra
+  - 素材库-GPU与推理方向
+  - 项目分析
+  - Week03
 ---
 # Week03 渐进式练习
 

@@ -2,7 +2,8 @@
 title: O_DIRECT 与持久化语义专题
 date: 2026-07-12
 tags:
-  - 高性能存储/存储方向专题清单
+  - 高性能存储
+  - 存储方向专题清单
 roadmap_week: 阶段 0（S-Week 2；阶段 2 mini-kv-engine WAL 复用）
 sort_order: "01.10"
 status: active

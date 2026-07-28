@@ -2,7 +2,8 @@
 title: "Nifty earnings growth slashed to 8.5% from 14%; no comfort in valuations still: Amish Shah"
 source: https://economictimes.indiatimes.com/markets/expert-view/nifty-earnings-growth-slashed-to-8-5-from-14-no-comfort-in-valuations-still-amish-shah/articleshow/131385359.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Nifty earnings growth slashed to 8.5% from 14%; no comfort in valuations still: Amish Shah

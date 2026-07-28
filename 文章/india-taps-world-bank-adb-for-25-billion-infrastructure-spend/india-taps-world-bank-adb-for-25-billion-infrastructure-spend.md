@@ -2,7 +2,8 @@
 title: India taps World Bank, ADB for $2.5 billion infrastructure spend
 source: https://economictimes.indiatimes.com/news/economy/infrastructure/india-taps-world-bank-adb-for-2-5-billion-infrastructure-spend-iran-war-middle-east-conflict-oil-proc/articleshow/131818477.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # India taps World Bank, ADB for $2.5 billion infrastructure spend

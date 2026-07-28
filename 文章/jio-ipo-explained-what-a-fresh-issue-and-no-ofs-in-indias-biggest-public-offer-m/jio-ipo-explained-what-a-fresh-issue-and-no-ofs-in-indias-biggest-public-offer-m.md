@@ -2,7 +2,8 @@
 title: "Jio IPO explained: What a fresh issue and no OFS in India's biggest public offer means for investors"
 source: https://economictimes.indiatimes.com/markets/ipos/fpos/jio-ipo-explained-what-a-fresh-issue-and-no-ofs-in-indias-biggest-public-offer-mean-for-investors/articleshow/131855331.cms
 tags:
-  - 文章/资讯
+  - 文章
+  - 资讯
 ---
 
 # Jio IPO explained: What a fresh issue and no OFS in India's biggest public offer means for investors
