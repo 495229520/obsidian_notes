@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 620" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>同一主体再加一次锁：改写区间集合，不做冲突判定</title>
+  <desc>上半用字节标尺展示同一主体的写锁被读锁切成三段；下半是三种写法能否让同进程两个线程互斥的对照表。</desc>
+
+  <rect x="0" y="0" width="1240" height="620" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">同一个主体再请求一次锁：改写区间，不做冲突判定</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">锁永远挡不住它自己的主体。认错主体，写出来的互斥代码会一次也不阻塞</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 已持有 [0,300) 写锁，再请求 [100,200) 读锁</text>
+
+  <rect x="56" y="130" width="1128" height="176" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="172" font-size="12" font-weight="700" fill="#4A473F">① 已持有</text>
+  <rect x="240" y="154" width="880" height="30" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="680" y="174" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">写锁 [0, 300)</text>
+
+  <text x="80" y="216" font-size="12" font-weight="700" fill="#4A473F">② 再请求</text>
+  <rect x="533" y="198" width="294" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="680" y="218" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">读锁 [100, 200)</text>
+  <text x="850" y="218" font-size="11" fill="#6B675C">主体相同，直接进入下一步</text>
+
+  <text x="80" y="260" font-size="12" font-weight="700" fill="#4A473F">③ 内核里</text>
+  <rect x="240" y="242" width="293" height="30" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="386" y="262" font-size="12" fill="#6B4E28" text-anchor="middle">写 [0,100)</text>
+  <rect x="533" y="242" width="294" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="680" y="262" font-size="12" fill="#2C4460" text-anchor="middle">读 [100,200)</text>
+  <rect x="827" y="242" width="293" height="30" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="973" y="262" font-size="12" fill="#6B4E28" text-anchor="middle">写 [200,300)</text>
+
+  <line x1="240" y1="284" x2="1120" y2="284" stroke="#9B968A" stroke-width="1"/>
+  <text x="240" y="299" font-size="10.5" fill="#6B675C" text-anchor="middle">0</text>
+  <text x="533" y="299" font-size="10.5" fill="#6B675C" text-anchor="middle">100</text>
+  <text x="827" y="299" font-size="10.5" fill="#6B675C" text-anchor="middle">200</text>
+  <text x="1120" y="299" font-size="10.5" fill="#6B675C" text-anchor="middle">300</text>
+
+  <text x="76" y="336" font-size="11.5" fill="#4A473F">锁没有引用计数：对 [0,300) 调一次 F_UNLCK，三段一起消失。</text>
+
+  <text x="56" y="376" font-size="13" font-weight="700" fill="#4A473F">B · 让同进程的两个线程互斥：三种写法，只有一种成立</text>
+
+  <rect x="56" y="388" width="1128" height="30" rx="6" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="408" font-size="11.5" font-weight="700" fill="#4A473F">写法</text>
+  <text x="400" y="408" font-size="11.5" font-weight="700" fill="#4A473F">主体是什么</text>
+  <text x="700" y="408" font-size="11.5" font-weight="700" fill="#4A473F">结果</text>
+
+  <rect x="56" y="422" width="1128" height="46" rx="6" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="76" y="442" font-size="11.5" font-weight="700" fill="#24473F">各自 open + F_OFD_SETLKW</text>
+  <text x="76" y="459" font-size="10.5" fill="#6B675C">open 写在线程函数里</text>
+  <text x="400" y="450" font-size="11.5" fill="#4A473F">两个 OFD，两个主体</text>
+  <text x="700" y="442" font-size="11.5" font-weight="700" fill="#24473F">后到的线程真的会睡下去</text>
+  <text x="700" y="459" font-size="10.5" fill="#4A473F">代价是每线程多占一个 fd</text>
+
+  <rect x="56" y="472" width="1128" height="46" rx="6" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="492" font-size="11.5" font-weight="700" fill="#733428">共用一个 fd 或 dup()</text>
+  <text x="76" y="509" font-size="10.5" fill="#6B675C">open 提到 main 里</text>
+  <text x="400" y="500" font-size="11.5" fill="#4A473F">同一个 OFD，同一个主体</text>
+  <text x="700" y="492" font-size="11.5" font-weight="700" fill="#733428">立刻返回 0，两个线程一起进临界区</text>
+  <text x="700" y="509" font-size="10.5" fill="#733428">被当成「把已有的锁改一改」，无错误码</text>
+
+  <rect x="56" y="522" width="1128" height="46" rx="6" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="542" font-size="11.5" font-weight="700" fill="#733428">各自 open + 传统 F_SETLKW</text>
+  <text x="76" y="559" font-size="10.5" fill="#6B675C">用错了命令</text>
+  <text x="400" y="550" font-size="11.5" fill="#4A473F">主体是 pid，线程共用一个</text>
+  <text x="700" y="542" font-size="11.5" font-weight="700" fill="#733428">第二次请求覆盖第一次</text>
+  <text x="700" y="559" font-size="10.5" fill="#733428">双方都以为自己拿到了锁</text>
+
+  <text x="48" y="602" font-size="12" fill="#6B675C">两问定主体：这个 fd 背后是哪个 open file description？这种锁认 OFD 还是认 pid？</text>
+</svg>

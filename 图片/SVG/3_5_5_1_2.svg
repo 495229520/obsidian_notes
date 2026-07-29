@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 690" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>exec 六个名字的三个正交开关，与 fork+exec+wait 的时间线</title>
+  <desc>上半是 l/v、p、e 三个维度的对照表，列出各自的写法与坑；下半是父子两条泳道的时间线，标出 exec 替换映像的时刻以及哪些内核状态跨过 exec 存活。</desc>
+  <defs>
+    <marker id="n1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="690" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">exec 的六个名字是三个独立开关拼出来的</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">按「参数怎么给 / 要不要查 PATH / 环境变量谁说了算」各答一次，名字自己就出来了</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 三个正交维度：exec + [l|v] + [p] + [e]</text>
+
+  <rect x="56" y="130" width="1128" height="32" rx="6" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="151" font-size="11.5" font-weight="700" fill="#4A473F">维度</text>
+  <text x="230" y="151" font-size="11.5" font-weight="700" fill="#4A473F">不带这个字母</text>
+  <text x="580" y="151" font-size="11.5" font-weight="700" fill="#4A473F">带这个字母</text>
+  <text x="930" y="151" font-size="11.5" font-weight="700" fill="#4A473F">坑</text>
+
+  <rect x="56" y="166" width="1128" height="52" rx="6" fill="#E3EAF4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="187" font-size="11.5" font-weight="700" fill="#2C4460">① 参数怎么给</text>
+  <text x="76" y="205" font-size="10.5" fill="#6B675C">l 还是 v</text>
+  <text x="230" y="187" font-size="11.5" font-weight="700" fill="#4A473F">l = list，写死在调用处</text>
+  <text x="230" y="205" font-size="10.5" fill="#444441" font-family="'SF Mono','Menlo',monospace">execl(path,"ls","-l",NULL)</text>
+  <text x="580" y="187" font-size="11.5" font-weight="700" fill="#4A473F">v = vector，传数组</text>
+  <text x="580" y="205" font-size="10.5" fill="#444441" font-family="'SF Mono','Menlo',monospace">execv(path, argv)</text>
+  <text x="930" y="187" font-size="11.5" font-weight="700" fill="#733428">l 系列末尾要写 (char *)NULL</text>
+  <text x="930" y="205" font-size="10.5" fill="#733428">裸 NULL 可能是 int，栈宽度不对</text>
+
+  <rect x="56" y="222" width="1128" height="52" rx="6" fill="#F6F0E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="243" font-size="11.5" font-weight="700" fill="#6B4E28">② 要不要查 PATH</text>
+  <text x="76" y="261" font-size="10.5" fill="#6B675C">带不带 p</text>
+  <text x="230" y="243" font-size="11.5" font-weight="700" fill="#4A473F">第一个参数必须是路径</text>
+  <text x="230" y="261" font-size="10.5" fill="#444441" font-family="'SF Mono','Menlo',monospace">execl("/bin/ls", ...)</text>
+  <text x="580" y="243" font-size="11.5" font-weight="700" fill="#4A473F">p = 按 PATH 逐个目录找</text>
+  <text x="580" y="261" font-size="10.5" fill="#444441" font-family="'SF Mono','Menlo',monospace">execlp("ls", ...)</text>
+  <text x="930" y="243" font-size="11.5" fill="#4A473F">名字里含 / 时 p 不生效</text>
+  <text x="930" y="261" font-size="10.5" fill="#6B675C">直接当路径用，不查 PATH</text>
+
+  <rect x="56" y="278" width="1128" height="52" rx="6" fill="#E9F1EC" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="299" font-size="11.5" font-weight="700" fill="#24473F">③ 环境变量谁说了算</text>
+  <text x="76" y="317" font-size="10.5" fill="#6B675C">带不带 e</text>
+  <text x="230" y="299" font-size="11.5" font-weight="700" fill="#4A473F">继承当前的 environ</text>
+  <text x="230" y="317" font-size="10.5" fill="#6B675C">最常见的用法</text>
+  <text x="580" y="299" font-size="11.5" font-weight="700" fill="#4A473F">e = 末尾多一个 envp 参数</text>
+  <text x="580" y="317" font-size="10.5" fill="#444441" font-family="'SF Mono','Menlo',monospace">execle(path,"ls",NULL,envp)</text>
+  <text x="930" y="299" font-size="11.5" font-weight="700" fill="#733428">是整份替换，不是追加</text>
+  <text x="930" y="317" font-size="10.5" fill="#733428">没写进 envp 的变量全看不到</text>
+
+  <text x="76" y="356" font-size="11.5" fill="#4A473F">真正进内核的只有 execve()，其余五个都是 glibc 里替你拼参数的包装函数。</text>
+  <text x="76" y="376" font-size="11.5" fill="#4A473F">第一个可变参数会成为新程序的 argv[0]，不是可选项：ps 和 perror 都靠它显示。</text>
+
+  <text x="56" y="416" font-size="13" font-weight="700" fill="#4A473F">B · fork + exec + wait 的时间线</text>
+
+  <rect x="56" y="428" width="1128" height="146" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="76" y="470" font-size="12" font-weight="700" fill="#2C4460">父 12345</text>
+  <rect x="180" y="454" width="130" height="32" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="245" y="475" font-size="11.5" fill="#2C4460" text-anchor="middle">fork()</text>
+  <rect x="326" y="454" width="530" height="32" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.2"/>
+  <text x="591" y="475" font-size="11.5" fill="#444441" text-anchor="middle">waitpid() 睡着，不占 CPU</text>
+  <rect x="872" y="454" width="248" height="32" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="996" y="475" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">被唤醒，收到退出状态</text>
+
+  <line x1="245" y1="486" x2="245" y2="518" stroke="#5A564B" stroke-width="1.5" marker-end="url(#n1)"/>
+
+  <text x="76" y="546" font-size="12" font-weight="700" fill="#24473F">子 12346</text>
+  <rect x="180" y="530" width="130" height="32" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="245" y="551" font-size="11.5" fill="#24473F" text-anchor="middle">子进程代码</text>
+  <rect x="326" y="530" width="168" height="32" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="410" y="551" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">execlp("ls", ...)</text>
+  <rect x="510" y="530" width="346" height="32" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="683" y="551" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">/bin/ls 在跑，pid 仍是 12346</text>
+  <rect x="872" y="530" width="248" height="32" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.2"/>
+  <text x="996" y="551" font-size="11.5" fill="#444441" text-anchor="middle">exit</text>
+  <path d="M1120,546 L1152,546 L1152,470 L1120,470" fill="none" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#n1)"/>
+
+  <rect x="56" y="592" width="556" height="56" rx="7" fill="#F5F4ED" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="76" y="614" font-size="12" font-weight="700" fill="#733428">exec 换掉</text>
+  <text x="76" y="634" font-size="11.5" fill="#733428">代码段 · 数据段 · 堆 · 栈 · 所有 mmap 映射</text>
+
+  <rect x="628" y="592" width="556" height="56" rx="7" fill="#F5F4ED" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="648" y="614" font-size="12" font-weight="700" fill="#24473F">exec 保留</text>
+  <text x="648" y="634" font-size="11.5" fill="#24473F">pid · ppid · 打开的 fd · cwd · umask · 文件锁</text>
+</svg>

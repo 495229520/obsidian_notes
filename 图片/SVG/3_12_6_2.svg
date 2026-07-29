@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 740" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>跨线程传 fd：栈变量会被下一个连接覆盖</title>
+  <desc>上半是 malloc 版本的生命周期时序，标出谁分配谁释放；下半是传栈变量地址时的竞态三步，以及三种传参写法的对照表。</desc>
+  <defs>
+    <marker id="q1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="q1r" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="740" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">那次 malloc 不是多余的：栈变量会被下一个连接覆盖</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">pthread_create 只把指针值交出去，不复制指向的内容</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 一个连接的生命周期：谁分配、谁释放</text>
+
+  <rect x="56" y="130" width="1128" height="152" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="76" y="172" font-size="12" font-weight="700" fill="#2C4460">主线程</text>
+  <rect x="164" y="156" width="120" height="32" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="224" y="177" font-size="11.5" fill="#2C4460" text-anchor="middle">accept() → fd 7</text>
+  <rect x="298" y="156" width="140" height="32" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="368" y="177" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">malloc 存一份 7</text>
+  <rect x="452" y="156" width="150" height="32" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="527" y="177" font-size="11.5" fill="#2C4460" text-anchor="middle">pthread_create(p)</text>
+  <rect x="616" y="156" width="120" height="32" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="676" y="177" font-size="11.5" fill="#2C4460" text-anchor="middle">detach</text>
+  <rect x="750" y="156" width="200" height="32" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.2"/>
+  <text x="850" y="177" font-size="11.5" fill="#444441" text-anchor="middle">回到 accept 等下一个</text>
+
+  <line x1="527" y1="188" x2="527" y2="218" stroke="#5A564B" stroke-width="1.5" marker-end="url(#q1)"/>
+
+  <text x="76" y="242" font-size="12" font-weight="700" fill="#24473F">工作线程</text>
+  <rect x="452" y="226" width="150" height="32" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="527" y="247" font-size="11.5" fill="#24473F" text-anchor="middle">读出值到局部变量</text>
+  <rect x="616" y="226" width="120" height="32" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="676" y="247" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">free(arg)</text>
+  <rect x="750" y="226" width="200" height="32" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="850" y="247" font-size="11.5" fill="#24473F" text-anchor="middle">read/write 循环 → close</text>
+
+  <path d="M368,190 L368,210 L676,210 L676,222" fill="none" stroke="#8A6A3A" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#q1)"/>
+  <text x="522" y="206" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">堆内存跨线程移交</text>
+
+  <text x="56" y="322" font-size="13" font-weight="700" fill="#4A473F">B · 换成传栈变量地址：两个线程服务同一个客户端</text>
+
+  <rect x="56" y="334" width="524" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="76" y="350" width="484" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="94" y="372" font-size="11.5" fill="#2C4460">① cfd = 7，新线程还在排队等调度</text>
+  <line x1="318" y1="384" x2="318" y2="392" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#q1r)"/>
+  <rect x="76" y="394" width="484" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="94" y="416" font-size="11.5" font-weight="700" fill="#733428">② 第二个连接到达，cfd 被改写成 8</text>
+  <line x1="318" y1="428" x2="318" y2="436" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#q1r)"/>
+  <rect x="76" y="438" width="484" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="94" y="460" font-size="11.5" font-weight="700" fill="#733428">③ 第一个线程才跑，读到 8 不是 7</text>
+
+  <rect x="604" y="334" width="580" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="624" y="360" font-size="12" font-weight="700" fill="#733428">后果</text>
+  <text x="624" y="384" font-size="11.5" fill="#4A473F">两个线程同时读写 fd 8，字节流被两边抢着收</text>
+  <text x="624" y="406" font-size="11.5" fill="#4A473F">fd 7 无人负责，既不会 close 也不在 client_users 里</text>
+  <text x="624" y="428" font-size="11.5" fill="#4A473F">set 里 insert 了两次 8，erase 一次就没了</text>
+  <text x="624" y="456" font-size="11" font-weight="700" fill="#733428">本机单客户端手工测试永远测不出来</text>
+
+  <text x="56" y="514" font-size="13" font-weight="700" fill="#4A473F">C · 三种传参写法</text>
+
+  <rect x="56" y="526" width="1128" height="30" rx="6" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="546" font-size="11.5" font-weight="700" fill="#4A473F">写法</text>
+  <text x="420" y="546" font-size="11.5" font-weight="700" fill="#4A473F">安全？</text>
+  <text x="570" y="546" font-size="11.5" font-weight="700" fill="#4A473F">说明</text>
+
+  <rect x="56" y="560" width="1128" height="34" rx="6" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="582" font-size="11" fill="#444441" font-family="'SF Mono','Menlo',monospace">fn(&amp;cfd)　传栈变量地址</text>
+  <text x="420" y="582" font-size="11.5" font-weight="700" fill="#733428">竞态</text>
+  <text x="570" y="582" font-size="11.5" fill="#4A473F">栈变量每轮循环被复用，见图 B</text>
+
+  <rect x="56" y="598" width="1128" height="34" rx="6" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="76" y="620" font-size="11" fill="#444441" font-family="'SF Mono','Menlo',monospace">fn(malloc 出来的指针)</text>
+  <text x="420" y="620" font-size="11.5" font-weight="700" fill="#24473F">安全</text>
+  <text x="570" y="620" font-size="11.5" fill="#4A473F">要传多个字段时用它；谁接手谁释放，取完值立刻 free</text>
+
+  <rect x="56" y="636" width="1128" height="34" rx="6" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="76" y="658" font-size="11" fill="#444441" font-family="'SF Mono','Menlo',monospace">fn((void *)(intptr_t)cfd)</text>
+  <text x="420" y="658" font-size="11.5" font-weight="700" fill="#24473F">安全</text>
+  <text x="570" y="658" font-size="11.5" fill="#4A473F">值随参数复制，无共享内存；只能传一个整数</text>
+
+  <text x="48" y="706" font-size="12" fill="#6B675C">pthread_create 失败时主线程要自己 close(fd) 并 free，因为这时没有工作线程接手。</text>
+</svg>

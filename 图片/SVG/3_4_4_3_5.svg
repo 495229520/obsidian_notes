@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1060" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>fd 如何落到 inode 与 Page Cache</title>
+  <desc>上半部分用一条水平链展示 task_struct、files_struct、fdtable、fd 数组项和 struct file 指针。下半部分展开 struct file，并用三条竖向泳道分别展示路径与挂载、文件身份、缓存与 I/O 的关系。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="1060" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">fd 如何落到 inode 与 Page Cache</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">第一步查 fd；第二步从 struct file 分成路径、文件身份与数据映射三条线</text>
+
+  <!-- ========== A: fd 查表 ========== -->
+  <rect x="56" y="112" width="1128" height="220" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="142" font-size="13" font-weight="700" fill="#4A473F">A · fd 查表：整数下标如何变成 struct file *</text>
+
+  <rect x="80" y="174" width="170" height="116" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="165" y="204" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">task_struct</text>
+  <text x="165" y="234" font-size="11.5" font-weight="700" fill="#3D5A80" text-anchor="middle">files</text>
+  <text x="165" y="262" font-size="10.5" fill="#6B675C" text-anchor="middle">当前 task</text>
+
+  <rect x="285" y="174" width="175" height="116" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="372.5" y="204" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">files_struct</text>
+  <text x="372.5" y="234" font-size="11.5" font-weight="700" fill="#3D5A80" text-anchor="middle">fdt</text>
+  <text x="372.5" y="262" font-size="10.5" fill="#6B675C" text-anchor="middle">共享的 fd 表容器</text>
+
+  <rect x="495" y="174" width="190" height="116" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="590" y="204" font-size="13.5" font-weight="700" fill="#4A3F68" text-anchor="middle">fdtable</text>
+  <text x="590" y="232" font-size="10.8" fill="#4A3F68" text-anchor="middle">fd · max_fds</text>
+  <text x="590" y="258" font-size="10.2" fill="#6B5B95" text-anchor="middle">open_fds · close_on_exec</text>
+
+  <rect x="720" y="174" width="150" height="116" rx="7" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+  <text x="795" y="204" font-size="13.5" font-weight="700" fill="#444441" text-anchor="middle">fd[fd]</text>
+  <text x="795" y="234" font-size="11.5" fill="#444441" text-anchor="middle">struct file *</text>
+  <text x="795" y="262" font-size="10.2" fill="#6B675C" text-anchor="middle">fd 是数组下标</text>
+
+  <rect x="905" y="174" width="245" height="116" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.6"/>
+  <text x="1027.5" y="202" font-size="13.5" font-weight="700" fill="#6B4E28" text-anchor="middle">struct file *</text>
+  <text x="1027.5" y="228" font-size="10.8" font-weight="700" fill="#8A6A3A" text-anchor="middle">open file description</text>
+  <text x="1027.5" y="255" font-size="10.2" fill="#6B4E28" text-anchor="middle">查表结果，下一块继续展开</text>
+
+  <line x1="250" y1="232" x2="281" y2="232" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="265.5" y="217" font-size="10" fill="#6B675C" text-anchor="middle">files</text>
+  <line x1="460" y1="232" x2="491" y2="232" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="475.5" y="217" font-size="10" fill="#6B675C" text-anchor="middle">fdt</text>
+  <line x1="685" y1="232" x2="716" y2="232" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="700.5" y="217" font-size="10" fill="#6B675C" text-anchor="middle">fd</text>
+  <line x1="870" y1="232" x2="901" y2="232" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="885.5" y="217" font-size="10" fill="#6B675C" text-anchor="middle">[fd]</text>
+
+  <!-- ========== B: 展开 struct file ========== -->
+  <rect x="56" y="352" width="1128" height="650" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="382" font-size="13" font-weight="700" fill="#4A473F">B · 展开 struct file：路径位置、文件身份、缓存与 I/O</text>
+
+  <rect x="430" y="405" width="380" height="120" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.7"/>
+  <text x="620" y="434" font-size="14" font-weight="700" fill="#6B4E28" text-anchor="middle">struct file</text>
+  <text x="620" y="457" font-size="10.8" font-weight="700" fill="#8A6A3A" text-anchor="middle">open file description</text>
+  <line x1="454" y1="470" x2="786" y2="470" stroke="#C7A66E" stroke-width="0.8" stroke-dasharray="4 3"/>
+  <text x="620" y="493" font-size="10.8" fill="#6B4E28" text-anchor="middle">f_pos · f_flags · f_mode</text>
+  <text x="620" y="515" font-size="10.8" fill="#6B4E28" text-anchor="middle">f_path · f_inode · f_mapping · f_op</text>
+
+  <!-- 三条竖向泳道 -->
+  <rect x="76" y="550" width="350" height="440" rx="8" fill="#F6F8F4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="445" y="550" width="305" height="440" rx="8" fill="#FAF7F3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="770" y="550" width="394" height="440" rx="8" fill="#F6F7F8" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="251" y="578" font-size="12.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">路径与挂载</text>
+  <text x="597.5" y="578" font-size="12.5" font-weight="700" fill="#A64B3C" text-anchor="middle">文件身份</text>
+  <text x="967" y="578" font-size="12.5" font-weight="700" fill="#6B5B95" text-anchor="middle">缓存与 I/O</text>
+
+  <!-- struct file 的三条分支 -->
+  <path d="M500 525 L500 590 L251 590 L251 606" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="357" y="578" width="70" height="20" rx="4" fill="#FBFBF6"/>
+  <text x="392" y="592" font-size="10" fill="#6B675C" text-anchor="middle">f_path</text>
+
+  <line x1="620" y1="525" x2="620" y2="606" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="628" y="548" width="70" height="20" rx="4" fill="#FBFBF6"/>
+  <text x="663" y="562" font-size="10" fill="#6B675C" text-anchor="middle">f_inode</text>
+
+  <path d="M740 525 L740 590 L967 590 L967 606" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="824" y="578" width="82" height="20" rx="4" fill="#FBFBF6"/>
+  <text x="865" y="592" font-size="10" fill="#6B675C" text-anchor="middle">f_mapping</text>
+
+  <!-- 左栏：struct path -->
+  <rect x="95" y="610" width="312" height="180" rx="8" fill="#E9F1EC" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="251" y="638" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">f_path：struct path</text>
+  <line x1="115" y1="652" x2="387" y2="652" stroke="#87AA9E" stroke-width="0.8"/>
+
+  <rect x="112" y="667" width="132" height="82" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="178" y="691" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">vfsmount</text>
+  <text x="178" y="714" font-size="10" fill="#4A3F68" text-anchor="middle">mnt_sb</text>
+  <text x="178" y="735" font-size="9.5" fill="#6B675C" text-anchor="middle">mount context</text>
+
+  <rect x="258" y="667" width="132" height="82" rx="6" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="324" y="691" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">dentry</text>
+  <text x="324" y="714" font-size="10" fill="#24473F" text-anchor="middle">d_inode</text>
+  <text x="324" y="735" font-size="9.5" fill="#6B675C" text-anchor="middle">name / dcache</text>
+
+  <text x="251" y="774" font-size="10.2" fill="#2F6B5E" text-anchor="middle">dentry 与 mnt 是并列成员</text>
+
+  <!-- 中栏：inode 与 super_block -->
+  <rect x="475" y="610" width="245" height="150" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="597.5" y="639" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">struct inode</text>
+  <text x="597.5" y="666" font-size="10.5" fill="#733428" text-anchor="middle">i_ino · i_mode · i_size</text>
+  <text x="597.5" y="690" font-size="10.5" fill="#733428" text-anchor="middle">i_mapping · i_sb</text>
+  <text x="597.5" y="714" font-size="10.5" fill="#733428" text-anchor="middle">i_flctx：锁记录</text>
+  <text x="597.5" y="739" font-size="9.8" font-weight="700" fill="#A64B3C" text-anchor="middle">同一文件的身份与元数据</text>
+
+  <rect x="475" y="835" width="245" height="115" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+  <text x="597.5" y="864" font-size="13" font-weight="700" fill="#444441" text-anchor="middle">struct super_block</text>
+  <text x="597.5" y="890" font-size="10.2" fill="#444441" text-anchor="middle">一个文件系统实例</text>
+  <text x="597.5" y="914" font-size="10.2" fill="#444441" text-anchor="middle">s_type · s_bdev · s_blocksize</text>
+  <text x="597.5" y="936" font-size="9.5" fill="#6B675C" text-anchor="middle">由 mnt_sb / i_sb 到达</text>
+
+  <!-- 右栏：address_space、Page Cache 与块映射 -->
+  <rect x="800" y="610" width="334" height="150" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.6"/>
+  <text x="967" y="639" font-size="13.5" font-weight="700" fill="#4A3F68" text-anchor="middle">struct address_space</text>
+  <text x="967" y="666" font-size="10.5" fill="#4A3F68" text-anchor="middle">host → inode</text>
+  <text x="967" y="690" font-size="10.5" fill="#4A3F68" text-anchor="middle">i_pages → Page Cache</text>
+  <text x="967" y="714" font-size="10.5" fill="#4A3F68" text-anchor="middle">a_ops → 文件系统 I/O</text>
+  <text x="967" y="739" font-size="9.8" font-weight="700" fill="#6B5B95" text-anchor="middle">文件偏移的缓存与映射中心</text>
+
+  <rect x="790" y="830" width="165" height="105" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="872.5" y="858" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Page Cache</text>
+  <text x="872.5" y="884" font-size="10" fill="#24473F" text-anchor="middle">i_pages：XArray</text>
+  <text x="872.5" y="908" font-size="9.5" fill="#6B675C" text-anchor="middle">folio 按 pgoff_t 索引</text>
+
+  <rect x="975" y="805" width="170" height="100" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="1060" y="833" font-size="12.2" font-weight="700" fill="#6B4E28" text-anchor="middle">文件系统映射</text>
+  <text x="1060" y="859" font-size="9.7" fill="#6B4E28" text-anchor="middle">a_ops / iomap / extents</text>
+  <text x="1060" y="883" font-size="9.4" fill="#6B675C" text-anchor="middle">文件偏移 → 存储位置</text>
+
+  <rect x="975" y="930" width="170" height="50" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="1060" y="950" font-size="10.8" font-weight="700" fill="#733428" text-anchor="middle">本地块设备路径</text>
+  <text x="1060" y="969" font-size="9.2" fill="#733428" text-anchor="middle">bio → blk-mq → driver</text>
+
+  <!-- 跨栏引用 -->
+  <path d="M390 708 L455 708 L455 680 L471 680" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="394" y="688" width="62" height="20" rx="4" fill="#FBFBF6"/>
+  <text x="425" y="702" font-size="9.8" fill="#6B675C" text-anchor="middle">d_inode</text>
+
+  <path d="M178 749 L178 812 L435 812 L435 887 L471 887" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="423" y="807" font-size="9.8" fill="#6B675C" text-anchor="end">mnt_sb</text>
+
+  <line x1="597.5" y1="760" x2="597.5" y2="831" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr)"/>
+  <text x="611" y="799" font-size="9.8" fill="#6B675C">i_sb</text>
+
+  <line x1="720" y1="680" x2="796" y2="680" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="758" y="667" font-size="9.8" fill="#6B675C" text-anchor="middle">i_mapping</text>
+
+  <line x1="875" y1="760" x2="875" y2="826" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="889" y="797" font-size="9.8" fill="#6B675C">i_pages</text>
+
+  <line x1="1055" y1="760" x2="1055" y2="801" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="1068" y="786" font-size="9.8" fill="#6B675C">a_ops</text>
+
+  <line x1="1060" y1="905" x2="1060" y2="926" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+</svg>

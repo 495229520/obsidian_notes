@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>fork 的写时复制与三类继承关系</title>
+  <desc>上半用三帧展示页表标只读、缺页复制、各自可写的过程；下半是继承关系对照表，分副本、共享同一内核对象、不继承三类，各列出内容与实际后果。</desc>
+  <defs>
+    <marker id="m1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="m1r" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">fork 那一刻一个字节都没搬：只复制了页表</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">真正的复制发生在第一次写，而且只复制被写的那一页；fd 那一栏则根本不是复制</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 写时复制的三帧</text>
+
+  <rect x="56" y="130" width="368" height="196" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="156" font-size="12" font-weight="700" fill="#4A473F">① fork() 刚返回</text>
+  <rect x="76" y="168" width="132" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="142" y="189" font-size="11.5" fill="#2C4460" text-anchor="middle">父页表项 · 只读</text>
+  <rect x="76" y="210" width="132" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="142" y="231" font-size="11.5" fill="#24473F" text-anchor="middle">子页表项 · 只读</text>
+  <line x1="208" y1="185" x2="240" y2="200" stroke="#5A564B" stroke-width="1.4" marker-end="url(#m1)"/>
+  <line x1="208" y1="227" x2="240" y2="212" stroke="#5A564B" stroke-width="1.4" marker-end="url(#m1)"/>
+  <rect x="244" y="190" width="160" height="34" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="324" y="205" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">物理页 X</text>
+  <text x="324" y="219" font-size="10.5" fill="#6B4E28" text-anchor="middle">引用计数 2</text>
+  <text x="76" y="272" font-size="11" fill="#6B675C">原本可写的匿名页，两边都被标成只读</text>
+  <text x="76" y="292" font-size="11" fill="#6B675C">物理页一份没动，只多了一套页表</text>
+  <text x="76" y="312" font-size="11" fill="#6B675C">代码段本来就只读，不受影响</text>
+
+  <rect x="436" y="130" width="368" height="196" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="456" y="156" font-size="12" font-weight="700" fill="#4A473F">② 子进程写这一页</text>
+  <rect x="456" y="168" width="132" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="522" y="189" font-size="11.5" fill="#2C4460" text-anchor="middle">父 · 仍只读</text>
+  <rect x="456" y="210" width="132" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="522" y="231" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">子 · 缺页异常</text>
+  <line x1="588" y1="227" x2="620" y2="227" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#m1r)"/>
+  <rect x="624" y="210" width="160" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="704" y="225" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">复制出新页 Y</text>
+  <text x="704" y="239" font-size="10.5" fill="#733428" text-anchor="middle">只复制这一页</text>
+  <text x="456" y="272" font-size="11" fill="#6B675C">内核认出这是 COW 页，不是越权访问</text>
+  <text x="456" y="292" font-size="11" fill="#6B675C">分配新页 → 拷贝内容 → 改回可写</text>
+  <text x="456" y="312" font-size="11" fill="#6B675C">开销落在第一次写，不在 fork</text>
+
+  <rect x="816" y="130" width="368" height="196" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="836" y="156" font-size="12" font-weight="700" fill="#4A473F">③ 写完之后</text>
+  <rect x="836" y="168" width="132" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="902" y="189" font-size="11.5" fill="#2C4460" text-anchor="middle">父 · 恢复可写</text>
+  <rect x="836" y="210" width="132" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="902" y="231" font-size="11.5" fill="#24473F" text-anchor="middle">子 · 可写</text>
+  <line x1="968" y1="185" x2="1000" y2="185" stroke="#5A564B" stroke-width="1.4" marker-end="url(#m1)"/>
+  <line x1="968" y1="227" x2="1000" y2="227" stroke="#5A564B" stroke-width="1.4" marker-end="url(#m1)"/>
+  <rect x="1004" y="168" width="160" height="34" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="1084" y="189" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">物理页 X · 计数 1</text>
+  <rect x="1004" y="210" width="160" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1084" y="231" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">物理页 Y · 计数 1</text>
+  <text x="836" y="272" font-size="11" fill="#6B675C">此后各写各的，改动彼此不可见</text>
+  <text x="836" y="292" font-size="11" fill="#6B675C">没被写过的页继续共享</text>
+  <text x="836" y="312" font-size="11" font-weight="700" fill="#733428">开销 ≈ 页表大小，与数据量无关</text>
+
+  <text x="56" y="368" font-size="13" font-weight="700" fill="#4A473F">B · 子进程拿到的三类东西</text>
+
+  <rect x="56" y="380" width="1128" height="32" rx="6" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="401" font-size="11.5" font-weight="700" fill="#4A473F">类别</text>
+  <text x="240" y="401" font-size="11.5" font-weight="700" fill="#4A473F">包含什么</text>
+  <text x="700" y="401" font-size="11.5" font-weight="700" fill="#4A473F">写代码时的实际后果</text>
+
+  <rect x="56" y="416" width="1128" height="50" rx="6" fill="#E3EAF4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="437" font-size="11.5" font-weight="700" fill="#2C4460">副本</text>
+  <text x="76" y="455" font-size="10.5" fill="#6B675C">写时才真复制</text>
+  <text x="240" y="437" font-size="11.5" fill="#4A473F">代码段 · 数据段 · BSS · 堆 · 栈</text>
+  <text x="240" y="455" font-size="11.5" fill="#4A473F">mmap 匿名区 · 环境变量 · fd 表本身</text>
+  <text x="700" y="446" font-size="11.5" fill="#4A473F">改全局变量对方看不见，各改各的</text>
+
+  <rect x="56" y="470" width="1128" height="50" rx="6" fill="#F6F0E4" stroke="#8A6A3A" stroke-width="1.6"/>
+  <text x="76" y="491" font-size="11.5" font-weight="700" fill="#6B4E28">共享同一对象</text>
+  <text x="76" y="509" font-size="10.5" fill="#6B675C">最容易踩</text>
+  <text x="240" y="500" font-size="11.5" fill="#4A473F">fd 背后的 open file description，含文件偏移 f_pos</text>
+  <text x="700" y="491" font-size="11.5" font-weight="700" fill="#733428">父子各自 read 同一个 fd，读到的字节是接续的</text>
+  <text x="700" y="509" font-size="10.5" fill="#733428">不是各自从头读；一方 lseek 另一方也受影响</text>
+
+  <rect x="56" y="524" width="1128" height="50" rx="6" fill="#F7ECE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="545" font-size="11.5" font-weight="700" fill="#733428">不继承</text>
+  <text x="76" y="563" font-size="10.5" fill="#6B675C">子进程手上没有</text>
+  <text x="240" y="545" font-size="11.5" fill="#4A473F">挂起的信号 · POSIX 记录锁 · alarm 与 setitimer 定时器</text>
+  <text x="240" y="563" font-size="11.5" fill="#4A473F">除调用 fork 的那个线程之外的所有线程</text>
+  <text x="700" y="545" font-size="11.5" fill="#4A473F">多线程程序里 fork 出来只剩一个线程</text>
+  <text x="700" y="563" font-size="10.5" fill="#733428">别的线程持有的锁还锁着，却没人来解</text>
+
+  <text x="48" y="618" font-size="12" fill="#6B675C">口径：上图画的是匿名可写页。文件映射页与 MAP_SHARED 共享映射不走这套复制，父子改动彼此可见。</text>
+  <text x="48" y="640" font-size="12" fill="#6B675C">fork 之后紧接着 exec 时，这些标只读的页一个都用不上，因为 exec 会换掉整个地址空间。</text>
+</svg>
