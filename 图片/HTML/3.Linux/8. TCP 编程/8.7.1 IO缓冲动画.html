@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IO 缓冲动画 · write→发送缓冲→网络→接收缓冲→read 全链路 / write≠发送 / 关闭时的缓冲区行为</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ===== 场景 1：全链路数据流 ===== */
+.fl-stage{position:relative;width:578px;height:300px;margin:2px auto 0;}
+.fl-zone{position:absolute;top:0;bottom:0;border-radius:10px;}
+.fl-zone.user{background:rgba(24,95,165,.06);}
+.fl-zone.kern{background:rgba(154,91,14,.08);}
+.fl-zlbl{position:absolute;top:7px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--faint);white-space:nowrap;}
+.fl-bound{position:absolute;top:24px;bottom:24px;width:0;border-left:1.5px dashed var(--brown);opacity:.55;}
+.fl-blbl{position:absolute;top:28px;writing-mode:vertical-rl;font-size:8.5px;color:var(--brown);letter-spacing:2px;opacity:.8;}
+.fl-box{position:absolute;top:64px;height:208px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);overflow:hidden;}
+.fl-box.app{border-color:var(--blue);}
+.fl-box.buf{border-color:var(--brown);}
+.fl-box.glow{border-color:var(--green);box-shadow:0 0 0 3px rgba(15,110,86,.25);}
+.fl-fill{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(154,91,14,.13);transition:height var(--dur) var(--ease);}
+.fl-pipe{position:absolute;left:218px;top:112px;width:142px;height:96px;border-top:1.5px dashed var(--line);border-bottom:1.5px dashed var(--line);}
+.fl-under{position:absolute;top:277px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;white-space:nowrap;}
+.fl-under b{color:var(--brown);}
+.fl-chip{position:absolute;top:36px;transform:translateX(-50%);font-family:var(--mono);font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;border:1.5px solid var(--line);background:var(--gray);color:var(--muted);transition:all var(--dur) var(--ease);white-space:nowrap;z-index:3;}
+.fl-chip.on{color:var(--blue);border-color:var(--blue);background:var(--bluebg);box-shadow:0 0 0 3px rgba(24,95,165,.15);}
+.byte{position:absolute;width:64px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;font-weight:700;color:#fff;background:var(--bb,var(--blue));border:1px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(60,55,40,.15);z-index:2;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.byte.fly{box-shadow:0 4px 10px rgba(24,95,165,.3);}
+.byte.dlv{background:var(--green);}
+.fl-anno{position:absolute;left:214px;width:150px;top:32px;text-align:center;font-size:10.5px;font-weight:600;border-radius:8px;border:1.5px solid var(--line);padding:4px 6px;line-height:1.35;opacity:0;transition:opacity var(--dur) var(--ease);z-index:3;}
+.fl-anno.q{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.fl-anno.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.fl-anno.h{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.fl-anno.show{opacity:1;}
+
+/* ===== 场景 2：缓冲为什么存在 ===== */
+.why-panel{border:1.5px solid var(--grid);border-radius:11px;padding:10px 14px 12px;background:var(--paper);margin-top:10px;transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.why-panel.dim{opacity:.35;}
+.why-panel.lit{border-color:var(--ink);box-shadow:0 2px 8px rgba(60,55,40,.1);}
+.wp-h{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:8px;}
+.wp-row{display:flex;align-items:center;gap:5px;margin:7px 0;opacity:.28;transition:opacity var(--dur) var(--ease);}
+.wp-row.show{opacity:1;}
+.wp-lbl{font-family:var(--mono);font-size:10.5px;color:var(--muted);width:52px;text-align:right;flex:none;}
+.wp-hdr{display:inline-block;height:20px;width:34px;background:var(--brownbg);border:1.5px solid var(--brown);border-radius:4px;color:var(--brown);font-size:9px;font-family:var(--mono);text-align:center;line-height:17px;flex:none;}
+.wp-pay{display:inline-block;height:20px;width:5px;background:var(--blue);border-radius:4px;color:#fff;font-size:9px;font-family:var(--mono);text-align:center;line-height:20px;overflow:hidden;white-space:nowrap;flex:none;transition:width var(--dur) var(--ease);}
+.wp-note{font-size:10.5px;color:var(--faint);margin-left:8px;}
+.wp-flow{display:flex;align-items:center;gap:12px;padding:4px 0 12px;}
+.wp-end{font-size:11px;color:var(--muted);text-align:center;flex:none;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.wp-chan{position:relative;flex:1;height:48px;border-left:1.5px dashed var(--line);border-right:1.5px dashed var(--line);}
+.wp-ack{position:absolute;top:13px;left:72%;opacity:0;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--green);background:var(--greenbg);border:1.5px solid var(--green);border-radius:7px;padding:3px 8px;white-space:nowrap;transition:left var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.wp-retx{position:absolute;top:13px;left:2%;opacity:0;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--danger);background:var(--dangerbg);border:1.5px solid var(--danger);border-radius:7px;padding:3px 8px;white-space:nowrap;transition:left var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.wp-bar{width:110px;height:13px;border:1.5px solid var(--brown);border-radius:7px;overflow:hidden;background:var(--panel);}
+.wp-fill{height:100%;width:30%;background:var(--brown);transition:width var(--dur) var(--ease),background var(--dur) var(--ease);}
+.wp-fill.hot{background:var(--danger);}
+.wp-badge{font-size:10px;font-weight:700;color:var(--danger);border:1.5px solid var(--danger);background:var(--dangerbg);border-radius:999px;padding:1px 8px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.wp-badge.on{opacity:1;}
+.wp-blocks{display:flex;gap:6px;padding-bottom:12px;}
+.wp-blk{width:52px;height:26px;border-radius:5px;background:var(--blue);color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;position:relative;transition:background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.wp-blk::after{content:'待确认';position:absolute;top:100%;margin-top:1px;font-size:8.5px;color:var(--faint);font-weight:400;}
+.wp-blk.ok{background:var(--green);opacity:.28;}
+.wp-blk.ok::after{content:'已删除';color:var(--green);}
+.wp-blk.blink{animation:blinkRed .9s var(--ease) 2;}
+@keyframes blinkRed{50%{box-shadow:0 0 0 4px rgba(179,64,47,.45);background:var(--danger);}}
+
+/* ===== 场景 3：关闭时的命运 ===== */
+.cs-stage{position:relative;width:578px;height:268px;margin:2px auto 0;}
+.cs-app{position:absolute;left:50%;transform:translateX(-50%);top:0;display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;}
+.cs-fd{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);border:1.5px solid var(--blue);background:var(--bluebg);border-radius:7px;padding:2px 10px;transition:all var(--dur) var(--ease);}
+.cs-fd.off{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);text-decoration:line-through;}
+.cs-host{position:absolute;left:40px;top:40px;width:498px;height:142px;border:1.5px solid var(--line);border-radius:11px;background:rgba(154,91,14,.05);}
+.cs-hlbl{position:absolute;top:45px;left:50px;font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.cs-buf{position:absolute;top:70px;width:210px;height:96px;border:1.5px solid var(--brown);border-radius:9px;background:var(--paper);}
+.cs-buf .t{position:absolute;top:6px;left:0;right:0;text-align:center;font-size:10.5px;color:var(--brown);font-weight:700;}
+.cs-net{position:absolute;left:40px;top:206px;width:498px;height:56px;border-top:1.5px dashed var(--line);border-bottom:1.5px dashed var(--line);}
+.cs-nlbl{position:absolute;right:46px;top:210px;font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.cs-blk{position:absolute;width:56px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;font-weight:700;color:#fff;background:var(--brown);box-shadow:0 1px 3px rgba(60,55,40,.15);z-index:2;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.cs-blk.sent{background:var(--green);}
+.cs-blk.done{opacity:.3;}
+.cs-blk.drop{background:var(--danger);opacity:0;transform:scale(.35) rotate(12deg);}
+.cs-badge{position:absolute;font-size:10.5px;font-weight:700;border:1.5px solid;border-radius:999px;padding:2px 10px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;z-index:3;}
+.cs-badge.g{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.cs-badge.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.cs-badge.on{opacity:1;}
+.cs-fin{position:absolute;top:222px;left:70px;opacity:0;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brown);background:var(--brownbg);border:1.5px solid var(--brown);border-radius:7px;padding:3px 12px;transition:left 900ms var(--ease),opacity var(--dur) var(--ease);z-index:3;}
+.cs-traits{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:14px;}
+.trait{border:1.5px solid var(--grid);border-radius:9px;padding:7px 10px;font-size:11px;color:var(--muted);opacity:.4;background:var(--paper);transition:all var(--dur) var(--ease);}
+.trait b{display:block;font-size:11.5px;color:var(--ink);margin-bottom:1px;}
+.trait.lit{opacity:1;border-color:var(--green);background:var(--greenbg);}
+.trait.lit.bad{border-color:var(--danger);background:var(--dangerbg);}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .hb{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>IO 缓冲动画 · write→发送缓冲→网络→接收缓冲→read 全链路</h1>
+    <p>配套笔记《8.7 IO缓冲》 · write ≠ 发送、read 读的是缓冲区：一次 write 40B，四次 read 各 10B　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+
+/* ========== 场景 1：全链路数据流（40B 一次写、4 次读） ========== */
+const flowScene=(()=>{
+  const BH=24;
+  // 字节块位置：A=主机A app / S=发送缓冲 / N=网络管道 / R=接收缓冲 / B=主机B app
+  function pos(loc){
+    switch(loc.t){
+      case 'A': return {x:20, y:268-(loc.k+1)*BH};
+      case 'S': return {x:128,y:268-(loc.k+1)*BH};
+      case 'N': return {x:222+loc.k*22,y:118+loc.k*16};
+      case 'R': return {x:386,y:268-(loc.k+1)*BH};
+      case 'B': return {x:490,y:268-(loc.k+1)*23-Math.floor(loc.k/2)*6};
+    }
+  }
+  const L=(t,k)=>({t,k});
+  const all=t=>[0,1,2,3,4,5,6,7].map(k=>L(t,k));
+  const code=codeOf([
+    '<span class="cmt">// ── 服务器端（主机A）──</span>',
+    'write(sock, buf, 40);  <span class="cmt">// 拷入发送缓冲, 立刻返回</span>',
+    '<span class="cmt">// 内核: 按 MSS 分段, 决定何时发/发多少</span>',
+    '<span class="cmt">// ── 客户端（主机B）──</span>',
+    'read(sock, buf, 10);   <span class="cmt">// 取 10B, 剩 30B 在接收缓冲排队</span>',
+    'read(sock, buf, 10);   <span class="cmt">// 水位 30 → 20B</span>',
+    'read(sock, buf, 10);   <span class="cmt">// 水位 20 → 10B</span>',
+    'read(sock, buf, 10);   <span class="cmt">// 取空: 1 次 write 对上 4 次 read</span>',
+    '<span class="cmt">// TCP 只保序, 不保留消息边界</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 原问题：剩下的 30B 在哪等？',chip:'无边界疑问',chipC:'c0',lines:[0,3],
+     blocks:all('A'),lv:[0,0],w:0,r:0,glow:0,anno:{t:'剩下的 30B 在空中盘旋?',c:'q'},
+     desc:'服务器一次 <code>write()</code> 写出 <b>40 字节</b>（8 个 5B 字节块），客户端却分 <b>4 次 read()</b>、每次只收 10 字节。收完第一批 10B 后，剩下的 <b>30B 在哪里等待</b>？难道像飞机等待着陆一样在网络中"盘旋"？带着这个问题走一遍数据的完整旅程——注意两条虚线是<span class="bl">用户态</span>与<span class="hb">内核态</span>的分界。'},
+    {title:'步骤 1 · write(40B)：只是拷贝进发送缓冲',chip:'write ≠ 发送',chipC:'cb',lines:[1],
+     blocks:all('S'),lv:[40,0],w:1,r:0,glow:0,anno:{t:'write() 已返回 · 数据仍在本机内核',c:'ok'},
+     desc:'<code>write()</code> 调用瞬间，40B 从 app 的用户态内存<b>拷贝进内核的发送缓冲区</b>，然后<span class="gr">立刻返回</span>。此刻数据<b>一个字节都还没上网络</b>——write 返回只代表"拷贝完成"，不代表"已发送"，更不代表"已送达"。'},
+    {title:'步骤 2 · 内核按 MSS 分段发出',chip:'内核决定何时发',chipC:'ch',lines:[2],
+     blocks:[L('N',0),L('N',1),L('N',2),L('N',3),L('S',0),L('S',1),L('S',2),L('S',3)],
+     lv:[20,0],w:0,r:0,glow:0,anno:{t:'内核决定何时发 / 每次发多少',c:'h'},
+     desc:'真正把数据发上网络的是<b>内核</b>：它根据 <b>MSS</b>、拥塞窗口、流量控制自行决定<b>何时发、每次发多少</b>，把缓冲区数据打包成一个个 TCP 段分批发出。应用完全插不上手——此刻 app 可能早就去干别的了。'},
+    {title:'步骤 3 · 落入对端接收缓冲区（回答原问题）',chip:'30B 在这里排队',chipC:'cg',lines:[2],
+     blocks:all('R'),lv:[0,40],w:0,r:0,glow:1,anno:{t:'不在空中盘旋, 在接收缓冲排队',c:'ok'},
+     desc:'数据段陆续抵达对端，被内核放进<b>接收缓冲区</b>，水位涨到 <b>40B</b>。原问题揭晓：客户端还没 read 的字节<b>不在网络里盘旋</b>，而是安安静静地在对端内核的<span class="gr">接收缓冲区里排队</span>，等应用来取。'},
+    {title:'步骤 4 · read(10)：从接收缓冲取走 10B',chip:'read ← 缓冲区',chipC:'cb',lines:[4],
+     blocks:[L('B',0),L('B',1),L('R',0),L('R',1),L('R',2),L('R',3),L('R',4),L('R',5)],
+     lv:[0,30],w:0,r:1,glow:0,anno:null,
+     desc:'app 调用 <code>read(sock, buf, 10)</code>，从接收缓冲区头部<b>拷走 10B</b>（2 块）到用户态内存，水位降到 <b>30B</b>。read 读的是<b>缓冲区</b>，不是网络——数据其实早就到了。'},
+    {title:'步骤 5 · 再 read(10) × 2',chip:'水位 30→20→10',chipC:'cb',lines:[5,6],
+     blocks:[L('B',0),L('B',1),L('B',2),L('B',3),L('B',4),L('B',5),L('R',0),L('R',1)],
+     lv:[0,10],w:0,r:1,glow:0,anno:null,
+     desc:'第 2、3 次 read 各取 10B，水位 30 → 20 → <b>10B</b>。每次 read 能拿到多少，只取决于缓冲区里<b>当时有多少</b>和请求长度——与对方 write 了几次<b>毫无关系</b>。'},
+    {title:'步骤 6 · 最后一次 read(10)：缓冲区取空',chip:'水位归零',chipC:'cg',lines:[7],
+     blocks:all('B'),lv:[0,0],w:0,r:1,glow:0,anno:null,
+     desc:'第 4 次 read 取走最后 10B，接收缓冲区<b>清空</b>。若此时再 read，默认阻塞模式下进程会<b>阻塞</b>着等新数据到来。'},
+    {title:'步骤 7 · 1 次 write 对上 4 次 read：无消息边界',chip:'TCP 无边界',chipC:'cd',lines:[8],
+     blocks:all('B'),lv:[0,0],w:0,r:0,glow:0,anno:{t:'1 次 write 对上 4 次 read',c:'q'},
+     desc:'TCP 是<b>字节流</b>：只保证字节<b>顺序不乱、不丢不重</b>，但完全不保留 write 的"消息边界"。1 次 write 可以对上 4 次 read；反过来 4 次 write 也可能被 1 次 read 一口气读走——这正是 8.9 <b>粘包问题</b>的根源。'},
+    {title:'步骤 8 · 全双工：每个套接字一对缓冲区',chip:'自动创建',chipC:'cg',lines:[],
+     blocks:all('B'),lv:[0,0],w:0,r:0,glow:0,anno:{t:'全双工: 每端各有一对缓冲区',c:'ok'},
+     desc:'每个 TCP 套接字在内核里都拥有<b>独立的一对</b>缓冲区：发送缓冲 + 接收缓冲，<b>创建套接字时自动生成</b>。两个方向互不干扰、可同时收发——这就是全双工。图中主机A 其实也有自己的接收缓冲、主机B 也有自己的发送缓冲（此处省略）。'},
+  ];
+  function mount(){
+    const zones=[
+      {x:0,w:104,cls:'user',lbl:'主机A · 用户态'},
+      {x:104,w:112,cls:'kern',lbl:'主机A · 内核态'},
+      {x:216,w:146,cls:'',lbl:'网络'},
+      {x:362,w:112,cls:'kern',lbl:'主机B · 内核态'},
+      {x:474,w:104,cls:'user',lbl:'主机B · 用户态'}
+    ];
+    let h='';
+    zones.forEach(z=>{h+='<div class="fl-zone '+z.cls+'" style="left:'+z.x+'px;width:'+z.w+'px"><span class="fl-zlbl">'+z.lbl+'</span></div>';});
+    h+='<div class="fl-bound" style="left:104px"></div><span class="fl-blbl" style="left:106px">用户态｜内核态</span>';
+    h+='<div class="fl-bound" style="left:474px"></div><span class="fl-blbl" style="left:476px">内核态｜用户态</span>';
+    h+='<div class="fl-box app" style="left:8px;width:88px"></div>';
+    h+='<div class="fl-box buf" id="flBoxS" style="left:120px;width:80px"><div class="fl-fill" id="flFillS"></div></div>';
+    h+='<div class="fl-pipe"></div>';
+    h+='<div class="fl-box buf" id="flBoxR" style="left:378px;width:80px"><div class="fl-fill" id="flFillR"></div></div>';
+    h+='<div class="fl-box app" style="left:482px;width:88px"></div>';
+    h+='<span class="fl-under" style="left:8px;width:88px">app 进程</span>';
+    h+='<span class="fl-under" style="left:104px;width:112px">发送缓冲 <b id="lvS">0</b>/40B</span>';
+    h+='<span class="fl-under" style="left:362px;width:112px">接收缓冲 <b id="lvR">0</b>/40B</span>';
+    h+='<span class="fl-under" style="left:482px;width:88px">app 进程</span>';
+    h+='<span class="fl-chip" id="flW" style="left:104px">write()</span>';
+    h+='<span class="fl-chip" id="flR" style="left:474px">read()</span>';
+    h+='<div class="fl-anno q" id="flAnno"></div>';
+    for(let k=0;k<8;k++)h+='<div class="byte" id="fb'+k+'" style="--bb:hsl(208 72% '+(30+k*3)+'%)">5B</div>';
+    viz.innerHTML='<div class="vcap"><b>全链路数据流</b>：write 只是拷进内核，read 只从缓冲区取——两端缓冲区才是数据中转站</div>'+
+      '<div class="fl-stage">'+h+'</div>';
+  }
+  function paint(s){
+    s.blocks.forEach((loc,k)=>{
+      const p=pos(loc),b=el('fb'+k);
+      b.style.left=p.x+'px';b.style.top=p.y+'px';
+      b.className='byte'+(loc.t==='N'?' fly':'')+(loc.t==='B'?' dlv':'');
+    });
+    el('lvS').textContent=s.lv[0];el('lvR').textContent=s.lv[1];
+    el('flFillS').style.height=(s.lv[0]/40*205)+'px';
+    el('flFillR').style.height=(s.lv[1]/40*205)+'px';
+    el('flW').className='fl-chip'+(s.w?' on':'');
+    el('flR').className='fl-chip'+(s.r?' on':'');
+    el('flBoxR').className='fl-box buf'+(s.glow?' glow':'');
+    const a=el('flAnno');
+    if(s.anno){a.innerHTML=s.anno.t;a.className='fl-anno show '+s.anno.c;}
+    else a.className='fl-anno q';
+  }
+  return {id:'flow',label:'全链路数据流',sub:'1 次 write · 4 次 read',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：缓冲区为什么存在（效率 / 流控 / 可靠性） ========== */
+const whyScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// ① 效率: 内核攒批, 按 MSS 打包</span>',
+    'write(sock, buf, 1);   <span class="cmt">// 无缓冲: 1B 也要 ~40B 包头</span>',
+    '<span class="cmt">// 有缓冲: 攒成大段一次发, 摊薄包头</span>',
+    '<span class="cmt">// ② 流控: win = 接收缓冲剩余空间</span>',
+    'send_ack(win = rwnd);  <span class="cmt">// 快满 → win 小 → 对方减速</span>',
+    '<span class="cmt">// ③ 可靠: 收到 ACK 前不删除</span>',
+    '<span class="kw">if</span> (acked)   erase_from_sndbuf();',
+    '<span class="kw">if</span> (timeout) retransmit_from_sndbuf();'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 缓冲区解耦"应用速度"与"网络速度"',chip:'为什么要缓冲',chipC:'c0',lines:[],
+     lit:null,a1:0,a2:0,bw:30,hot:0,ackB:{o:0,l:'72%'},slow:0,cAck:{o:0,l:'72%'},b0:'',b1blink:0,retx:{o:0,l:'2%'},
+     desc:'应用想什么时候写就什么时候写，网络该什么速度传就什么速度传——中间靠内核缓冲区<b>解耦</b>。这层"临时存储区"换来三大好处：<b>效率、流量控制、可靠性</b>，下面逐个点亮演示。'},
+    {title:'步骤 1 · 无缓冲：1B 数据也要背 40B 包头',chip:'头重脚轻',chipC:'cd',lines:[1],
+     lit:'a',a1:1,a2:0,bw:30,hot:0,ackB:{o:0,l:'72%'},slow:0,cAck:{o:0,l:'72%'},b0:'',b1blink:0,retx:{o:0,l:'2%'},
+     desc:'假设没有发送缓冲：应用每 write 1 字节，内核就得立刻为它套上 <b>IP 头 + TCP 头约 40B</b> 发出去——发 4B 有效数据要烧掉 <b>160B</b> 包头，有效载荷占比不到 3%，网络全在搬包头。'},
+    {title:'步骤 2 · 有缓冲：攒成大段一次发',chip:'按 MSS 打包',chipC:'cg',lines:[2],
+     lit:'a',a1:1,a2:1,bw:30,hot:0,ackB:{o:0,l:'72%'},slow:0,cAck:{o:0,l:'72%'},b0:'',b1blink:0,retx:{o:0,l:'2%'},
+     desc:'有了缓冲区，应用尽管小口写，内核把数据<b>攒起来</b>，按 <b>MSS</b>（最大段长）打包成饱满的大段一次发出——40B 数据只花 <b>1 个包头</b>。看下排载荷条撑大的过程：同样的数据，开销骤降。'},
+    {title:'步骤 3 · 流控：接收缓冲快满 → win 小 → 发送减速',chip:'win 字段',chipC:'ch',lines:[3,4],
+     lit:'b',a1:1,a2:1,bw:85,hot:1,ackB:{o:1,l:'10%'},slow:1,cAck:{o:0,l:'72%'},b0:'',b1blink:0,retx:{o:0,l:'2%'},
+     desc:'接收缓冲的<b>剩余空间</b>就是接收窗口 rwnd。缓冲快满时（红色水位），接收方在 ACK 的 <b>win 字段</b>里通告一个小窗口，发送方立刻<span class="dg">收油门</span>——不至于把对方灌爆丢数据。详见笔记 8.8 流控制。'},
+    {title:'步骤 4 · 可靠性①：收到 ACK 前，数据不删除',chip:'ACK 才删',chipC:'cb',lines:[5,6],
+     lit:'c',a1:1,a2:1,bw:85,hot:1,ackB:{o:1,l:'10%'},slow:1,cAck:{o:1,l:'6%'},b0:'ok',b1blink:0,retx:{o:0,l:'2%'},
+     desc:'发出去的段并<b>不会</b>马上从发送缓冲删除，而是标着<b>"待确认"</b>留在原地。对端的 <span class="gr">ACK 段1</span> 到达后，内核才把段1 从缓冲区删掉、腾出空间。'},
+    {title:'步骤 5 · 可靠性②：超时未确认 → 原地重传',chip:'超时重传',chipC:'cd',lines:[7],
+     lit:'c',a1:1,a2:1,bw:85,hot:1,ackB:{o:1,l:'10%'},slow:1,cAck:{o:1,l:'6%'},b0:'ok',b1blink:1,retx:{o:1,l:'58%'},
+     desc:'段2 迟迟等不到 ACK（超时），内核直接<b>从发送缓冲区取出原数据重传</b>——不需要应用重新 write。这就是"确认前不删除"的意义：<b>发送缓冲就是重传的底稿</b>。'},
+    {title:'步骤 6 · 小结：一层缓冲，三重收益',chip:'效率·流控·可靠',chipC:'cg',lines:[0,3,5],
+     lit:'all',a1:1,a2:1,bw:85,hot:1,ackB:{o:1,l:'10%'},slow:1,cAck:{o:1,l:'6%'},b0:'ok',b1blink:0,retx:{o:1,l:'58%'},
+     desc:'① <b>效率</b>：攒批发送，摊薄包头开销；② <b>流控</b>：接收缓冲水位驱动 win 通告；③ <b>可靠</b>：未确认数据常驻缓冲，随时可重传。TCP 的"可靠字节流"体验，一大半是这两块内核缓冲区撑起来的。'},
+  ];
+  function mount(){
+    let pk1='';for(let i=0;i<4;i++)pk1+='<span class="wp-hdr">头40B</span><span class="wp-pay"></span>';
+    viz.innerHTML='<div class="vcap"><b>缓冲区为什么存在</b>：效率 / 流量控制 / 可靠性 三联演示</div>'+
+      '<div class="why-panel" id="wpA"><div class="wp-h">① 效率 · 攒批发送</div>'+
+        '<div class="wp-row" id="wpA1"><span class="wp-lbl">无缓冲</span>'+pk1+'<span class="wp-note">发 4B 有效数据 = 4 个包 · 160B 包头</span></div>'+
+        '<div class="wp-row" id="wpA2"><span class="wp-lbl">有缓冲</span><span class="wp-hdr">头40B</span><span class="wp-pay" id="wpA2pay">40B 数据</span><span class="wp-note">攒成 1 段 · 1 个包头搞定</span></div>'+
+      '</div>'+
+      '<div class="why-panel" id="wpB"><div class="wp-h">② 流量控制 · 别把接收方灌满</div>'+
+        '<div class="wp-flow">'+
+          '<span class="wp-end">发送方<span class="wp-badge" id="wpBslow">收到小窗口 → 减速</span></span>'+
+          '<div class="wp-chan"><span class="wp-ack" id="wpBack">ACK win=1000</span></div>'+
+          '<span class="wp-end">接收缓冲<span class="wp-bar"><span class="wp-fill" id="wpBfill"></span></span><span class="wp-note" id="wpBpct" style="margin:0">占用 30%</span></span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="why-panel" id="wpC"><div class="wp-h">③ 可靠性 · ACK 前不删除，超时原地重传</div>'+
+        '<div class="wp-flow">'+
+          '<span class="wp-end">发送缓冲<span class="wp-blocks"><span class="wp-blk" id="wpCb0">段1</span><span class="wp-blk" id="wpCb1">段2</span><span class="wp-blk" id="wpCb2">段3</span></span></span>'+
+          '<div class="wp-chan"><span class="wp-ack" id="wpCack">ACK 段1</span><span class="wp-retx" id="wpCretx">重传 段2 ↻</span></div>'+
+          '<span class="wp-end">对端</span>'+
+        '</div>'+
+      '</div>';
+  }
+  function paint(s){
+    [['wpA','a'],['wpB','b'],['wpC','c']].forEach(p=>{
+      const box=el(p[0]);
+      box.classList.toggle('lit',s.lit===p[1]||s.lit==='all');
+      box.classList.toggle('dim',s.lit!==null&&s.lit!=='all'&&s.lit!==p[1]);
+    });
+    el('wpA1').classList.toggle('show',!!s.a1);
+    el('wpA2').classList.toggle('show',!!s.a2);
+    el('wpA2pay').style.width=(s.a2?128:5)+'px';
+    const f=el('wpBfill');f.style.width=s.bw+'%';f.classList.toggle('hot',!!s.hot);
+    el('wpBpct').textContent='占用 '+s.bw+'%';
+    const ab=el('wpBack');ab.style.left=s.ackB.l;ab.style.opacity=s.ackB.o;
+    el('wpBslow').classList.toggle('on',!!s.slow);
+    const ac=el('wpCack');ac.style.left=s.cAck.l;ac.style.opacity=s.cAck.o;
+    el('wpCb0').className='wp-blk '+s.b0;
+    const b1=el('wpCb1');
+    b1.classList.remove('blink');
+    if(s.b1blink){void b1.offsetWidth;b1.classList.add('blink');}
+    const rx=el('wpCretx');rx.style.left=s.retx.l;rx.style.opacity=s.retx.o;
+  }
+  return {id:'why',label:'缓冲为什么存在',sub:'效率 / 流控 / 可靠',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：关闭套接字时缓冲区的命运 ========== */
+const closeScene=(()=>{
+  const code=codeOf([
+    'close(sock);  <span class="cmt">// fd 作废, 但内核缓冲区还在善后</span>',
+    '<span class="cmt">// 输出缓冲: 遗留数据继续发送</span>',
+    '<span class="cmt">//   → 尽量送达对端（优雅关闭）</span>',
+    '<span class="cmt">// 全部送达后, 内核才发 FIN</span>',
+    '<span class="cmt">// 输入缓冲: 未读数据直接丢弃</span>',
+    '<span class="cmt">//   → close 前没 read 的就没了</span>',
+    '<span class="cmt">// 缓冲区: 每套接字独立, 创建时自动生成</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 前情：关闭时两个缓冲区都还有数据',chip:'遗留数据',chipC:'c0',lines:[],
+     fd:0,sp:'buf',scls:'',rdrop:0,grace:0,drop:0,fin:{o:0,x:70},traits:0,
+     desc:'连接用了一阵后 app 决定关闭：此刻<b>发送缓冲</b>还剩 <b>3 块</b>（30B）没发完的数据，<b>接收缓冲</b>里还躺着 <b>2 块</b>（20B）app 一直没 read 的数据。close() 之后，它们的命运截然不同。'},
+    {title:'步骤 1 · app 调用 close(sock)',chip:'fd 作废',chipC:'cb',lines:[0],
+     fd:1,sp:'buf',scls:'',rdrop:0,grace:0,drop:0,fin:{o:0,x:70},traits:0,
+     desc:'<code>close()</code> 返回后，文件描述符<b>立刻作废</b>（sockfd 划掉），app 再也无法对这个套接字 read / write。但注意：<b>内核里的缓冲区并没有立刻消失</b>——内核还要替 app 做完收尾工作。'},
+    {title:'步骤 2 · 输出缓冲：遗留数据继续发送',chip:'优雅关闭',chipC:'cg',lines:[1,2],
+     fd:1,sp:'net',scls:'sent',rdrop:0,grace:1,drop:0,fin:{o:0,x:70},traits:0,
+     desc:'内核把发送缓冲里的 3 块遗留数据<span class="gr">继续逐个发出</span>（变绿滑入网络），尽量送达对端——这就是<b>优雅关闭</b>：close 不会吞掉你已经 write 成功的数据。'},
+    {title:'步骤 3 · 全部送达后，才发 FIN',chip:'衔接四次挥手',chipC:'cg',lines:[3],
+     fd:1,sp:'net',scls:'sent done',rdrop:0,grace:1,drop:0,fin:{o:1,x:430},traits:0,
+     desc:'遗留数据全部送达并确认后，内核才发送 <b>FIN</b>，启动四次挥手（见 7.5）。FIN 在字节流里排在所有数据<b>之后</b>——对端会先收完数据，再收到"我不再发了"的通知。'},
+    {title:'步骤 4 · 输入缓冲：未读数据直接丢弃',chip:'数据丢失',chipC:'cd',lines:[4,5],
+     fd:1,sp:'net',scls:'sent done',rdrop:1,grace:1,drop:1,fin:{o:1,x:430},traits:0,
+     desc:'接收缓冲里那 2 块 app 没来得及 read 的数据被<span class="dg">直接丢弃</span>（变红碎裂消失），且<b>没有任何通知</b>。教训：close 之前没 read 出来的数据就永远没了——应用协议要保证"读完该读的再关"。'},
+    {title:'步骤 5 · 特点表：IO 缓冲四条铁律',chip:'汇总',chipC:'cg',lines:[6],
+     fd:1,sp:'net',scls:'sent done',rdrop:1,grace:1,drop:1,fin:{o:1,x:430},traits:1,
+     desc:'<b>① 独立存在</b>：每个 TCP 套接字单独一对；<b>② 自动创建</b>：创建套接字时自动生成；<b>③ 输出缓冲继续发送</b>：关闭后遗留数据尽量送达；<b>④ 输入缓冲数据丢失</b>：关闭时未读数据被丢弃。'},
+  ];
+  function mount(){
+    let h='<div class="cs-app">应用进程 <span class="cs-fd" id="csFd">sockfd = 3</span> 调用 close()</div>';
+    h+='<div class="cs-host"></div><span class="cs-hlbl">内核态</span>';
+    h+='<div class="cs-buf" style="left:64px"><span class="t">接收缓冲区（输入）</span></div>';
+    h+='<div class="cs-buf" style="left:304px"><span class="t">发送缓冲区（输出）</span></div>';
+    h+='<div class="cs-net"></div><span class="cs-nlbl">网络 → 对端</span>';
+    for(let i=0;i<2;i++)h+='<div class="cs-blk" id="cs-r'+i+'" style="left:'+(78+i*66)+'px;top:112px">10B</div>';
+    for(let i=0;i<3;i++)h+='<div class="cs-blk" id="cs-s'+i+'" style="left:'+(318+i*64)+'px;top:112px">10B</div>';
+    h+='<span class="cs-badge g" id="csGrace" style="left:330px;top:46px">遗留数据继续发送 · 尽量送达</span>';
+    h+='<span class="cs-badge d" id="csDrop" style="left:80px;top:46px">未读数据直接丢弃</span>';
+    h+='<span class="cs-fin" id="csFin">FIN</span>';
+    let t='<div class="trait" id="csT0"><b>① 独立存在</b>每个 TCP 套接字单独拥有一对</div>';
+    t+='<div class="trait" id="csT1"><b>② 自动创建</b>创建套接字时自动生成</div>';
+    t+='<div class="trait" id="csT2"><b>③ 输出缓冲继续发送</b>关闭后遗留数据尽量送达</div>';
+    t+='<div class="trait bad" id="csT3"><b>④ 输入缓冲数据丢失</b>关闭时未读数据被丢弃</div>';
+    viz.innerHTML='<div class="vcap"><b>关闭套接字时缓冲区的命运</b>：输出缓冲发完再走，输入缓冲当场丢弃</div>'+
+      '<div class="cs-stage">'+h+'</div><div class="cs-traits">'+t+'</div>';
+  }
+  function paint(s){
+    el('csFd').className='cs-fd'+(s.fd?' off':'');
+    for(let i=0;i<3;i++){
+      const b=el('cs-s'+i);
+      if(s.sp==='buf'){b.style.left=(318+i*64)+'px';b.style.top='112px';}
+      else{b.style.left=(70+i*150)+'px';b.style.top='218px';}
+      b.className='cs-blk '+s.scls;
+    }
+    for(let i=0;i<2;i++)el('cs-r'+i).className='cs-blk'+(s.rdrop?' drop':'');
+    el('csGrace').classList.toggle('on',!!s.grace);
+    el('csDrop').classList.toggle('on',!!s.drop);
+    const f=el('csFin');f.style.left=s.fin.x+'px';f.style.opacity=s.fin.o;
+    for(let i=0;i<4;i++)el('csT'+i).classList.toggle('lit',!!s.traits);
+  }
+  return {id:'close',label:'关闭时的命运',sub:'输出发完 · 输入丢弃',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[flowScene,whyScene,closeScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

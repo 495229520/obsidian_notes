@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E">
+<title>IOCP动画</title>
+<!--
+Visual system: 22 / 17 / 15 / 13 / 11px type scale; warm paper #F5F4ED and panel #FBFBF6;
+blue = 应用/投递, amber = 内核/执行, green = 完成队列/worker, red = 失败完成;
+all transitions share the 520ms cubic-bezier motion language.
+Engine: build-once + mutate（与 17.2.1 同一套步进引擎），#scene=xxx&step=n 深链。
+-->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;--gray:#F1EFE8;
+  --blue:#2467A6;--bluebg:#E1EFFA;--bluetx:#1A4F84;
+  --green:#087A5C;--greenbg:#DCF3E9;--greentx:#075A43;
+  --amber:#A66408;--amberbg:#FFF0D7;--ambertx:#764600;
+  --danger:#C34935;--dangerbg:#FAE1DC;--dangertx:#8F2B1C;
+  --code:#2E2C27;--codetext:#E8E3D6;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;line-height:1.3;text-wrap:balance;}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{min-height:48px;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.35);outline-offset:2px;}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1280px){.layout{grid-template-columns:minmax(0,1fr);}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;}.viz .vcap b{font-weight:700;color:var(--ink);}
+.stage-frame{position:relative;width:min(632px,100%);height:420px;margin:0 auto;}
+.stage{position:absolute;left:0;top:0;width:632px;height:420px;transform-origin:top left;}
+.layout > .right{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+#stDesc{font-size:14px;color:var(--muted);margin-top:11px;}.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{background:var(--code);border:1px solid #24231F;border-radius:10px;padding:12px 0;color:var(--codetext);font-family:var(--mono);font-size:13px;line-height:1.55;overflow:hidden;box-shadow:0 1px 3px rgba(60,55,40,.08);}
+.codebox .cl{min-height:24px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background .3s var(--ease),color .3s var(--ease),box-shadow .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}.codebox .cl.hl .cmt{color:#CCC8BA;}
+.codebox .kw{color:#D9B177;}.codebox .type{color:#8EB5DC;}.codebox .ord{color:#A7D7BF;}.codebox .num{color:#E0A797;}.codebox .str{color:#C8B694;}.codebox .cmt{color:#9A968B;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{min-height:40px;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector language. */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.wire{--wc:var(--arrow);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.warrow{--wc:var(--arrow);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wport{--wc:var(--arrow);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire.on,.warrow.on,.wport.on{opacity:1;}.wire.hint{stroke-width:2;opacity:.1;}.warrow.hint,.wport.hint{opacity:.1;}.warrow.drawing{transition-delay:200ms;}
+.wire.blue,.warrow.blue,.wport.blue{--wc:var(--blue);}.wire.green,.warrow.green,.wport.green{--wc:var(--green);}.wire.amber,.warrow.amber,.wport.amber{--wc:var(--amber);}.wire.danger,.warrow.danger,.wport.danger{--wc:var(--danger);}
+
+/* Shared bottom note bar. */
+.snote{position:absolute;left:16px;top:352px;width:600px;min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);padding:8px 14px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.snote.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.snote.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.snote.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.snote.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+/* Generic cards / op rows. */
+.gcard{position:absolute;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:10px 12px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.gcard.bl{border-color:var(--blue);}.gcard.gr{border-color:var(--green);}.gcard.am{border-color:var(--amber);}.gcard.ik{border-color:var(--ink);}
+.gcard.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.gcard.dim{opacity:.5;}
+.gcard.badbg{border-color:var(--danger);background:var(--dangerbg);}.gcard.okbg{border-color:var(--green);background:var(--greenbg);}.gcard.warnbg{border-color:var(--amber);background:var(--amberbg);}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:700;}
+.ghead span{font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.gsub{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:3px;transition:color var(--dur) var(--ease);}
+.gop{margin-top:8px;min-height:30px;border:1px solid var(--grid);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);padding:5px 8px;display:flex;align-items:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gop.active{color:var(--ink);border-color:var(--ink);background:var(--paper);}
+.gop.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.gop.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.gop.bad{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.gop.off{opacity:.35;border-style:dashed;}
+.glab{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);margin-top:9px;}
+
+/* Branch cards for the failure scene. */
+.branch{position:absolute;width:220px;min-height:88px;border:1.5px solid var(--line);border-radius:11px;background:var(--paper);padding:10px 12px;transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.branch .bt{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink);}
+.branch .bs{font-size:10.5px;color:var(--muted);margin-top:4px;}
+.branch.mute{opacity:.42;}
+.branch.ok{border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 2px rgba(8,122,92,.1);}.branch.ok .bt,.branch.ok .bs{color:var(--greentx);}
+.branch.warn{border-color:var(--amber);background:var(--amberbg);box-shadow:0 0 0 2px rgba(166,100,8,.1);}.branch.warn .bt,.branch.warn .bs{color:var(--ambertx);}
+.branch.bad{border-color:var(--danger);background:var(--dangerbg);box-shadow:0 0 0 2px rgba(195,73,53,.1);}.branch.bad .bt,.branch.bad .bs{color:var(--dangertx);}
+
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:16px;}.desc-card{padding:16px;}.controls{padding:12px 14px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 142px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>IOCP · 投递-完成模型全流程</h1>
+    <p>配套笔记《4.4 IOCP》 · 请求投递 · 完成包 · CompletionKey/OVERLAPPED · worker 取包 · 失败完成　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts ? parts[1] : line;
+  const comment=parts && parts[2] ? parts[2] : '';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{
+    strings.push(escapeHtml(value));
+    return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';
+  });
+  code=escapeHtml(code)
+    .replace(/\b(BOOL|DWORD|HANDLE|ULONG_PTR|OVERLAPPED|WSABUF|SOCKET|IoCtx|ConnCtx|IoType|struct|char|auto|if|else|while|void|int|bool|return)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(WSA_IO_PENDING|INFINITE|nullptr|TRUE|FALSE|SOCKET_ERROR|Recv|Send)\b/g,'<span class="ord">$1</span>')
+    .replace(/\b(WSARecv|WSASend|GetQueuedCompletionStatus|CreateIoCompletionPort|PostQueuedCompletionStatus|PostSend|PostRecv|CloseConn|WSAGetLastError|GetLastError|delete|new|break|continue)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(0x[0-9a-fA-F]+)\b/g,'<span class="num">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment ? '<span class="cmt">'+escapeHtml(comment)+'</span>' : '');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="cl'+index+'">'+(line ? highlightCpp(line) : '&nbsp;')+'</div>').join('');}
+function stageFrame(id,classes,html){return '<div class="stage-frame" id="'+id+'Frame"><div class="stage '+classes+'" id="'+id+'Stage">'+html+'</div></div>';}
+function fitStage(id){
+  const base=id.endsWith('Stage')?id.slice(0,-5):id;
+  const stage=el(id),frame=el(base+'Frame');
+  if(!stage||!frame)return;
+  const scale=Math.min(1,frame.clientWidth/632);
+  stage.style.transform='scale('+scale+')';
+  frame.style.height=(420*scale)+'px';
+}
+
+function wireHTML(id){return '<path id="'+id+'" class="wire"></path><path id="'+id+'-head" class="warrow"></path><circle id="'+id+'-port" class="wport" r="4"></circle>';}
+function wireNodes(id){return [el(id),el(id+'-head'),el(id+'-port')];}
+function setWire(id,state,color){
+  const [path,head,port]=wireNodes(id);
+  if(!path||!head||!port)return;
+  const suffix=(state?' '+state:'')+(color?' '+color:'');
+  path.setAttribute('class','wire'+suffix);
+  head.setAttribute('class','warrow'+suffix);
+  port.setAttribute('class','wport'+suffix);
+  if(state!=='on'){
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    path.style.transition='';
+    head.classList.remove('drawing');
+  }
+}
+function drawWire(id,color,timers){
+  setWire(id,'on',color);
+  const [path,head]=wireNodes(id);
+  if(!path||reducedMotion())return;
+  const length=path.getTotalLength();
+  path.style.transition='none';
+  path.style.strokeDasharray=length;
+  path.style.strokeDashoffset=length;
+  head.classList.add('drawing');
+  void path.getBoundingClientRect();
+  path.style.transition='';
+  path.style.strokeDashoffset='0';
+  const timer=setTimeout(()=>{
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    head.classList.remove('drawing');
+  },560);
+  timers.push(timer);
+}
+function wireController(ids,colors){
+  let active=new Set();
+  let timers=[];
+  return {
+    sync(nextIds,hints=false){
+      timers.forEach(clearTimeout);timers=[];
+      const next=new Set(nextIds);
+      const any=next.size>0;
+      ids.forEach(id=>{
+        const state=next.has(id)?'on':(!any&&hints?'hint':'');
+        if(next.has(id)&&!active.has(id))drawWire(id,colors[id],timers);
+        else setWire(id,state,colors[id]);
+      });
+      active=next;
+    },
+    destroy(){timers.forEach(clearTimeout);timers=[];active.clear();}
+  };
+}
+function relRect(stageRect,id){
+  const rect=el(id).getBoundingClientRect();
+  return {left:rect.left-stageRect.left,right:rect.right-stageRect.left,top:rect.top-stageRect.top,bottom:rect.bottom-stageRect.top,cx:(rect.left+rect.right)/2-stageRect.left,cy:(rect.top+rect.bottom)/2-stageRect.top};
+}
+function point(rect,side,offset=0){
+  if(side==='left')return {x:rect.left,y:rect.cy+offset};
+  if(side==='right')return {x:rect.right,y:rect.cy+offset};
+  return {x:rect.cx,y:rect.cy+offset};
+}
+function bezierArrow(id,from,to){
+  const path=el(id),head=el(id+'-head'),port=el(id+'-port');
+  if(!path||!head||!port)return;
+  const direction=to.x>=from.x?1:-1;
+  const baseX=to.x-direction*9;
+  const gap=Math.max(1,Math.abs(baseX-from.x));
+  const c1=from.x+direction*gap*.45;
+  const c2=baseX-direction*gap*.45;
+  path.setAttribute('d','M '+from.x+' '+from.y+' C '+c1+' '+from.y+', '+c2+' '+to.y+', '+baseX+' '+to.y);
+  head.setAttribute('d','M '+to.x+' '+to.y+' L '+baseX+' '+(to.y-5)+' L '+baseX+' '+(to.y+5)+' Z');
+  port.setAttribute('cx',from.x);port.setAttribute('cy',from.y);
+}
+function classes(id,value){el(id).className=value;}
+function setOps(prefix,states){states.forEach((state,index)=>classes(prefix+index,'gop '+state));}
+
+/* ---------- Scene 1 · 请求投递与完成包 ---------- */
+const postScene=(()=>{
+  const code=[
+    'auto* io = new IoCtx{};           // 每次 I/O 独立一个',
+    'io->wsabuf = {kBufferSize, io->buffer};',
+    'int rc = WSARecv(conn->s, &io->wsabuf, 1,',
+    '                 nullptr,   // 字节数从完成通知里拿',
+    '                 &flags, &io->ol, nullptr);',
+    'if (rc == SOCKET_ERROR &&',
+    '    WSAGetLastError() != WSA_IO_PENDING)',
+    '    { delete io; return false; } // 真失败: 无完成通知',
+    '// 数据到达: 内核写入 io->buffer (可省一次拷贝)',
+    '// 然后完成包按 FIFO 进入完成端口队列'
+  ];
+  const wires=['pk','kq'];
+  const colors={pk:'blue',kq:'green'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · IOCP：问"哪次 I/O 完成了"',chip:'心智模型',chipC:'c0',lines:[0],w:[],hint:true,app:['','','off','off'],appC:'',kbuf:['（未挂 buffer）','off'],kst:['等待投递…','off'],kC:'',q:[['—','off'],['—','off'],['—','off']],qC:'',note:'select/epoll 问"谁就绪了，你自己去读"；IOCP 问"这次异步读已经完成，数据在你 buffer 里"。先投递，后完成。',noteC:''},
+    {title:'步骤 1 · 投递：buffer 先挂进内核',chip:'WSARecv',chipC:'cb',lines:[0,1,2,3,4],w:['pk'],hint:false,app:['active','active','off','off'],appC:'active',kbuf:['io->buffer (4KB) 已挂入','active'],kst:['等待数据到达…','warn'],kC:'active',q:[['—','off'],['—','off'],['—','off']],qC:'',note:'WSARecv 把 buffer 和 OVERLAPPED 先交给内核——这是 overlapped I/O 的核心动作：不是"有数据再读"，而是"先挂好等它填"。',noteC:'blue'},
+    {title:'步骤 2 · 立即返回：WSA_IO_PENDING 不是失败!',chip:'返回语义',chipC:'ca',lines:[5,6,7],w:[],hint:false,app:['done','done','warn','off'],appC:'active',kbuf:['io->buffer (4KB) 已挂入','active'],kst:['等待数据到达…','warn'],kC:'',q:[['—','off'],['—','off'],['—','off']],qC:'',note:'三种返回：0=立即完成；SOCKET_ERROR+WSA_IO_PENDING=请求已成功发起、稍后完成；其他错误=真失败，不会再有完成通知。',noteC:'amber'},
+    {title:'步骤 3 · 数据到达：内核直接写进你的 buffer',chip:'零拷贝路径',chipC:'cb',lines:[8],w:[],hint:false,app:['done','done','warn','off'],appC:'dim',kbuf:['io->buffer ← "Hello" (5B)','done'],kst:['I/O 执行完毕 ✓','done'],kC:'active',q:[['—','off'],['—','off'],['—','off']],qC:'',note:'因为 buffer 提前挂好，网络数据可能直接进入用户 buffer，省掉一次内核缓冲到用户缓冲的拷贝。',noteC:'blue'},
+    {title:'步骤 4 · 完成包按 FIFO 入队',chip:'completion packet',chipC:'cg',lines:[9],w:['kq'],hint:false,app:['done','done','warn','off'],appC:'dim',kbuf:['（buffer 已交还应用）','off'],kst:['I/O 执行完毕 ✓','done'],kC:'dim',q:[['完成包①: bytes=5 + key + ol','done'],['—','off'],['—','off']],qC:'active',note:'完成包携带三样东西：传输字节数、CompletionKey、OVERLAPPED*。包按 FIFO 入队，等待线程按 LIFO 被释放（热线程优先）。',noteC:'green'},
+    {title:'步骤 5 · 收口：四段流水',chip:'全景',chipC:'cg',lines:[0,2,8,9],w:['pk','kq'],hint:false,app:['done','done','done','done'],appC:'',kbuf:['随时可再挂下一个 buffer','off'],kst:['空闲','off'],kC:'',q:[['完成包①: bytes=5 + key + ol','done'],['—','off'],['—','off']],qC:'',note:'投递(应用) → 执行(内核) → 完成入队(IOCP) → 取包处理(worker，见场景③)。大量连接与少量线程在这里解耦。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('psStage');
+    const stage=el('psStage'),svg=el('psSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const app=relRect(sr,'psApp'),k=relRect(sr,'psK'),q=relRect(sr,'psQ');
+    bezierArrow('pk',point(app,'right',-30),point(k,'left',-30));
+    bezierArrow('kq',point(k,'right',10),point(q,'left',10));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>请求投递与完成包</b>：先挂 buffer，完成后系统来通知</div>'+stageFrame('ps','post-stage',
+      '<div class="gcard bl" id="psApp" style="left:16px;top:40px;width:180px;min-height:190px;"><div class="ghead">应用 · 投递线程 <span>user</span></div>'+
+        '<div class="gop" id="psApp0">new IoCtx{ol, buffer}</div><div class="gop" id="psApp1">WSARecv(s, &wsabuf, &ol)</div><div class="gop off" id="psApp2">→ WSA_IO_PENDING</div><div class="gop off" id="psApp3">继续干别的事…</div></div>'+
+      '<div class="gcard am" id="psK" style="left:236px;top:40px;width:160px;min-height:190px;"><div class="ghead">内核 <span>执行 I/O</span></div>'+
+        '<div class="glab">挂入的接收 buffer</div><div class="gop off" id="psKbuf">（未挂 buffer）</div>'+
+        '<div class="glab">状态</div><div class="gop off" id="psKst">等待投递…</div></div>'+
+      '<div class="gcard gr" id="psQ" style="left:436px;top:40px;width:180px;min-height:190px;"><div class="ghead">IOCP 完成队列 <span>FIFO</span></div>'+
+        '<div class="gop off" id="psQ0">—</div><div class="gop off" id="psQ1">—</div><div class="gop off" id="psQ2">—</div></div>'+
+      '<svg class="arr-layer" id="psSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="psNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('psFrame'));
+  }
+  function paint(s){
+    layout();
+    classes('psApp','gcard bl '+s.appC);classes('psK','gcard am '+s.kC);classes('psQ','gcard gr '+s.qC);
+    setOps('psApp',s.app);
+    el('psKbuf').textContent=s.kbuf[0];classes('psKbuf','gop '+s.kbuf[1]);
+    el('psKst').textContent=s.kst[0];classes('psKst','gop '+s.kst[1]);
+    s.q.forEach((slot,i)=>{el('psQ'+i).textContent=slot[0];classes('psQ'+i,'gop '+slot[1]);});
+    classes('psNote','snote '+s.noteC);el('psNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'post',label:'请求投递',sub:'overlapped · 完成包',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 2 · CompletionKey 与 OVERLAPPED ---------- */
+const ctxScene=(()=>{
+  const code=[
+    'CreateIoCompletionPort((HANDLE)s, iocp,',
+    '    (ULONG_PTR)conn, 0); // key: 连接级, 关联时绑一次',
+    'struct IoCtx {',
+    '    OVERLAPPED ol;       // 请求级: 每次 I/O 独立一个',
+    '    WSABUF wsabuf; char buffer[4096];',
+    '    IoType type;         // Recv 还是 Send',
+    '};',
+    'GetQueuedCompletionStatus(iocp,&bytes,&key,&ol,INFINITE);',
+    'auto* conn = (ConnCtx*)key;  // ① 谁的完成包',
+    'auto* io   = (IoCtx*)ol;     // ② 哪一次请求'
+  ];
+  const wires=['kc','oi','oi2'];
+  const colors={kc:'green',oi:'blue',oi2:'danger'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 两层上下文：连接级 vs 请求级',chip:'心智模型',chipC:'c0',lines:[0,2],w:[],hint:true,g:['bytes = ?','key = ?','ol = ?'],gC:'',c1:'',c2:'dim',i1:['IoCtx · Recv（独立 ol）',''],i2:['IoCtx · Send（独立 ol）',''],i1C:'',i2C:'dim',note:'最容易乱的就是把"连接状态"和"这一次 I/O 的状态"混在一起——IOCP 的 API 契约天然帮你分成两层。',noteC:''},
+    {title:'步骤 1 · 关联：key 绑定连接，只绑一次',chip:'CompletionKey',chipC:'cg',lines:[0,1],w:['kc'],hint:false,g:['bytes = —','key = &conn1','ol = —'],gC:'',c1:'active',c2:'dim',i1:['IoCtx · Recv（独立 ol）',''],i2:['IoCtx · Send（独立 ol）',''],i1C:'dim',i2C:'dim',note:'key 是 per-handle 的：关联时传入，此后随这个句柄的每一个完成包原样返回。最经典做法就是放 ConnCtx*。',noteC:'green'},
+    {title:'步骤 2 · 投递：每个请求独立 OVERLAPPED',chip:'OVERLAPPED',chipC:'cb',lines:[2,3,4,5,6],w:[],hint:false,g:['bytes = —','key = &conn1','ol = —'],gC:'',c1:'',c2:'dim',i1:['IoCtx · Recv pending','active'],i2:['IoCtx · Send pending','active'],i1C:'active',i2C:'active',note:'一次异步读、一次异步写、一次 AcceptEx——各有自己的 IoCtx。把 OVERLAPPED 放首字段，指针即可互转。',noteC:'blue'},
+    {title:'步骤 3 · 完成包回来：key 找连接，ol 找请求',chip:'定位',chipC:'cg',lines:[7,8,9],w:['kc','oi'],hint:false,g:['bytes = 5','key = &conn1','ol = &recvIo'],gC:'okbg',c1:'active',c2:'dim',i1:['IoCtx · Recv 完成 ✓','done'],i2:['IoCtx · Send pending','active'],i1C:'active',i2C:'dim',note:'一包在手：先 (ConnCtx*)key 定位哪条连接，再 (IoCtx*)ol 定位哪一次操作——类型、buffer 位置全都找回来了。',noteC:'green'},
+    {title:'步骤 4 · 官方点名错误：复用同一个 OVERLAPPED',chip:'高危',chipC:'cd',lines:[3],w:['oi','oi2'],hint:false,g:['bytes = ?','key = &conn1','ol = &sharedOl ✗'],gC:'badbg',c1:'dim',c2:'dim',i1:['Recv pending（用 sharedOl）','bad'],i2:['Send pending（也用 sharedOl!）','bad'],i1C:'active',i2C:'active',note:'上一次操作还没完成就复用同一个 OVERLAPPED → 两个完成包指向同一块状态，相互践踏。必须每个 outstanding I/O 一个独立结构。',noteC:'danger'},
+    {title:'步骤 5 · 收口：一句话记住两层',chip:'铁律',chipC:'cg',lines:[8,9],w:['kc','oi'],hint:false,g:['bytes = 5','key = &conn1','ol = &recvIo'],gC:'',c1:'',c2:'',i1:['IoCtx · Recv（独立 ol）','done'],i2:['IoCtx · Send（独立 ol）','done'],i1C:'',i2C:'',note:'CompletionKey 找连接，OVERLAPPED* 找请求——这句没乱，IOCP 代码结构就不会乱。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('cxStage');
+    const stage=el('cxStage'),svg=el('cxSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const g=relRect(sr,'cxG'),c1=relRect(sr,'cxC1'),i1=relRect(sr,'cxI1'),i2=relRect(sr,'cxI2');
+    bezierArrow('kc',point(g,'left',-14),point(c1,'right',0));
+    bezierArrow('oi',point(g,'right',-14),point(i1,'left',0));
+    bezierArrow('oi2',point(g,'right',14),point(i2,'left',0));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>两层上下文</b>：CompletionKey 找连接，OVERLAPPED* 找请求</div>'+stageFrame('cx','ctx-stage',
+      '<div class="gcard ik" id="cxG" style="left:216px;top:140px;width:200px;min-height:136px;"><div class="ghead">GQCS 返回 <span>一包三样</span></div>'+
+        '<div class="gop" id="cxG0">bytes = ?</div><div class="gop" id="cxG1">key = ?</div><div class="gop" id="cxG2">ol = ?</div></div>'+
+      '<div class="gcard gr" id="cxC1" style="left:16px;top:70px;width:160px;min-height:74px;"><div class="ghead">ConnCtx #1 <span>连接级</span></div><div class="gsub">sock=101 · 协议状态</div></div>'+
+      '<div class="gcard" id="cxC2" style="left:16px;top:250px;width:160px;min-height:74px;"><div class="ghead">ConnCtx #2 <span>连接级</span></div><div class="gsub">sock=102 · 协议状态</div></div>'+
+      '<div class="gcard bl" id="cxI1" style="left:456px;top:70px;width:160px;min-height:74px;"><div class="ghead">请求 ① <span>请求级</span></div><div class="gop" id="cxI1r" style="font-size:9.5px;">IoCtx · Recv（独立 ol）</div></div>'+
+      '<div class="gcard bl" id="cxI2" style="left:456px;top:250px;width:160px;min-height:74px;"><div class="ghead">请求 ② <span>请求级</span></div><div class="gop" id="cxI2r" style="font-size:9.5px;">IoCtx · Send（独立 ol）</div></div>'+
+      '<svg class="arr-layer" id="cxSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="cxNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('cxFrame'));
+  }
+  function paint(s){
+    layout();
+    classes('cxG','gcard ik '+s.gC);
+    s.g.forEach((txt,i)=>{el('cxG'+i).textContent=txt;});
+    classes('cxC1','gcard gr '+s.c1);classes('cxC2','gcard '+s.c2);
+    el('cxI1r').textContent=s.i1[0];classes('cxI1r','gop '+s.i1[1]);el('cxI1r').style.fontSize='9.5px';
+    el('cxI2r').textContent=s.i2[0];classes('cxI2r','gop '+s.i2[1]);el('cxI2r').style.fontSize='9.5px';
+    classes('cxI1','gcard bl '+s.i1C);classes('cxI2','gcard bl '+s.i2C);
+    classes('cxNote','snote '+s.noteC);el('cxNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'ctx',label:'两层上下文',sub:'Key · OVERLAPPED',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 3 · worker 取包循环 ---------- */
+const loopScene=(()=>{
+  const code=[
+    'while (true) {',
+    '  BOOL ok = GetQueuedCompletionStatus(',
+    '      iocp, &bytes, &key, &ol, INFINITE);',
+    '  auto* conn = (ConnCtx*)key;',
+    '  auto* io   = (IoCtx*)ol;',
+    '  if (io->type == IoType::Recv) {',
+    '    PostSend(conn, io->buffer, bytes); // Echo 回去',
+    '    delete io;',
+    '  } else {              // Send 完成',
+    '    delete io;',
+    '    PostRecv(conn);     // 再补下一次 Recv!',
+    '  }',
+    '}'
+  ];
+  const wires=['qw','wk','kq'];
+  const colors={qw:'green',wk:'blue',kq:'amber'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 初始：Recv 已投递，worker 阻塞取包',chip:'待命',chipC:'c0',lines:[0,1,2],w:[],hint:true,wOps:['active','off','off','off'],wC:'',q0:['—','off'],qC:'',kr:['Recv pending（buffer 已挂）','warn'],ks:['—','off'],kC:'',note:'worker 数量通常 ≈ CPU 核数；concurrency value 限制同时运行的关联线程数（传 0 = 处理器数）。',noteC:''},
+    {title:'步骤 1 · Recv 完成包入队，worker 被唤醒',chip:'取包',chipC:'cg',lines:[1,2,3,4],w:['kq','qw'],hint:false,wOps:['done','off','off','off'],wC:'active',q0:['完成包: Recv "Hello" 5B','done'],qC:'active',kr:['Recv 完成 ✓','done'],ks:['—','off'],kC:'',note:'数据到达 → 完成包入队 → GQCS 返回 bytes=5 + key + ol。worker 从阻塞中醒来，拿到完整上下文。',noteC:'green'},
+    {title:'步骤 2 · 处理业务，投递 WSASend',chip:'echo',chipC:'cb',lines:[5,6,7],w:['wk'],hint:false,wOps:['done','active','active','off'],wC:'active',q0:['—','off'],qC:'',kr:['—','off'],ks:['Send pending（echo "Hello"）','warn'],kC:'active',note:'把收到的内容原样发回。注意：发送 buffer 在这次 Send 真正完成之前不能改写。',noteC:'blue'},
+    {title:'步骤 3 · Send 完成包回来 → delete io',chip:'回收请求',chipC:'cg',lines:[8,9],w:['kq','qw'],hint:false,wOps:['done','done','done','off'],wC:'active',q0:['完成包: Send 5B ✓','done'],qC:'active',kr:['—','off'],ks:['Send 完成 ✓','done'],kC:'',note:'一个完成包对应一次请求的 IoCtx，处理完就释放。连接级的 ConnCtx 继续活着。',noteC:'green'},
+    {title:'步骤 4 · 关键一步：再补投下一次 WSARecv',chip:'补投!',chipC:'ca',lines:[10],w:['wk'],hint:false,wOps:['done','done','done','active'],wC:'active',q0:['—','off'],qC:'',kr:['Recv pending（新 IoCtx）','warn'],ks:['—','off'],kC:'active',note:'IOCP 不会自动持续接收（初学错误③）——每完成一次，你自己决定下一次投什么。写丢这一步，连接就"安静死"了。',noteC:'amber'},
+    {title:'步骤 5 · 循环骨架跑起来',chip:'闭环',chipC:'cg',lines:[0,5,6,10],w:['kq','qw','wk'],hint:false,wOps:['done','done','done','done'],wC:'',q0:['…持续流动…','active'],qC:'',kr:['Recv pending','warn'],ks:['—','off'],kC:'',note:'投 Recv→完成→处理→投 Send→完成→再投 Recv。完成包 FIFO 入队、空闲线程 LIFO 释放——热线程缓存更热。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('lpStage');
+    const stage=el('lpStage'),svg=el('lpSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const w=relRect(sr,'lpW'),q=relRect(sr,'lpQ'),k=relRect(sr,'lpK');
+    bezierArrow('qw',point(q,'left',-20),point(w,'right',-20));
+    bezierArrow('wk',point(w,'right',40),point(k,'left',40));
+    bezierArrow('kq',point(k,'left',-20),point(q,'right',-20));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>worker 取包循环</b>：完成一次，就要补投下一次</div>'+stageFrame('lp','loop-stage',
+      '<div class="gcard bl" id="lpW" style="left:16px;top:40px;width:180px;min-height:196px;"><div class="ghead">Worker 线程 <span>×N</span></div>'+
+        '<div class="gop" id="lpW0">GQCS 阻塞等待…</div><div class="gop off" id="lpW1">处理业务（echo）</div><div class="gop off" id="lpW2">PostSend 投递</div><div class="gop off" id="lpW3">PostRecv 再投递!</div></div>'+
+      '<div class="gcard gr" id="lpQ" style="left:236px;top:40px;width:160px;min-height:196px;"><div class="ghead">完成队列 <span>FIFO</span></div>'+
+        '<div class="gop off" id="lpQ0">—</div><div class="glab">线程释放顺序</div><div class="gop" id="lpQl" style="font-size:9.5px;">LIFO · 热线程优先</div></div>'+
+      '<div class="gcard am" id="lpK" style="left:436px;top:40px;width:180px;min-height:196px;"><div class="ghead">内核 <span>outstanding I/O</span></div>'+
+        '<div class="gop off" id="lpKr">—</div><div class="gop off" id="lpKs">—</div></div>'+
+      '<svg class="arr-layer" id="lpSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="lpNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('lpFrame'));
+  }
+  function paint(s){
+    layout();
+    classes('lpW','gcard bl '+s.wC);classes('lpQ','gcard gr '+s.qC);classes('lpK','gcard am '+s.kC);
+    setOps('lpW',s.wOps);
+    el('lpQ0').textContent=s.q0[0];classes('lpQ0','gop '+s.q0[1]);
+    el('lpKr').textContent=s.kr[0];classes('lpKr','gop '+s.kr[1]);
+    el('lpKs').textContent=s.ks[0];classes('lpKs','gop '+s.ks[1]);
+    classes('lpNote','snote '+s.noteC);el('lpNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'loop',label:'worker 取包',sub:'GQCS · echo loop',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 4 · 失败完成与退出包 ---------- */
+const failScene=(()=>{
+  const code=[
+    'BOOL ok = GetQueuedCompletionStatus(',
+    '    iocp, &bytes, &key, &ol, INFINITE);',
+    'if (key == 0 && ol == nullptr) break; // 自定义退出包',
+    'if (ol == nullptr) continue;  // 没取到包: 超时/端口关闭',
+    'auto* conn = (ConnCtx*)key;',
+    'auto* io   = (IoCtx*)ol;',
+    'if (!ok) {                    // 取到"失败完成"的 I/O 包',
+    '    delete io; CloseConn(conn); continue;',
+    '}',
+    'if (io->type==IoType::Recv && bytes==0) {',
+    '    delete io; CloseConn(conn); continue; // 对端关闭',
+    '}',
+    '// 退出: PostQueuedCompletionStatus(iocp, 0, 0, nullptr)'
+  ];
+  const steps=[
+    {title:'步骤 0 · 判定顺序：先看 ol，再看 ok，再看 bytes',chip:'返回值',chipC:'c0',lines:[0,1],g:['ok = ?','ol = ?','bytes = ?'],gC:'',b:['mute','mute','mute','mute'],x:['off',''],note:'GQCS 返回 FALSE ≠ "IOCP 坏了"。四种情形对应四个分支，判定顺序是关键。',noteC:''},
+    {title:'步骤 1 · 正常完成：ok=TRUE 且 bytes>0',chip:'正常路径',chipC:'cg',lines:[4,5],g:['ok = TRUE','ol = &recvIo','bytes = 5'],gC:'okbg',b:['ok','mute','mute','mute'],x:['off',''],note:'最常见的一支：key 找连接、ol 找请求，处理业务后补投下一次 I/O（场景③）。',noteC:'green'},
+    {title:'步骤 2 · bytes==0：对端优雅关闭',chip:'半路收 0',chipC:'ca',lines:[9,10,11],g:['ok = TRUE','ol = &recvIo','bytes = 0'],gC:'warnbg',b:['mute','warn','mute','mute'],x:['off',''],note:'TCP 字节流：I/O 成功完成但读到 0 字节 = 对端优雅关闭，不会再有数据 → 清理这次请求、关闭连接。',noteC:'amber'},
+    {title:'步骤 3 · ok=FALSE 且 ol!=NULL：失败完成包',chip:'失败完成',chipC:'cd',lines:[6,7,8],g:['ok = FALSE','ol = &recvIo','bytes = 0'],gC:'badbg',b:['mute','mute','bad','mute'],x:['off',''],note:'取到了一个"失败完成"的 I/O 包（对端 RST、句柄被关…）。看 GetLastError()，清理该请求并关连接——端口本身没坏。',noteC:'danger'},
+    {title:'步骤 4 · ol==NULL：根本没取到完成包',chip:'没取到',chipC:'c0',lines:[3],g:['ok = FALSE','ol = NULL','bytes = —'],gC:'',b:['mute','mute','mute','warn'],x:['off',''],note:'等待超时（非 INFINITE）或完成端口句柄被关闭。用 INFINITE 等待时走到这里，通常意味着端口正在关停。',noteC:''},
+    {title:'步骤 5 · 退出包：手动塞一个自定义完成包',chip:'PostQCS',chipC:'cb',lines:[2,12],g:['ok = TRUE','ol = NULL','key = 0'],gC:'',b:['mute','mute','mute','mute'],x:['active','PostQueuedCompletionStatus(iocp, 0, 0, nullptr) ×N'],note:'三个值原样返回、系统不校验——worker 判 key==0 && ol==NULL 即退出。给每个 worker 各发一包。',noteC:'blue'},
+    {title:'步骤 6 · 收口：closesocket 之后别急着清资源',chip:'清理时机',chipC:'ca',lines:[6,7],g:['—','—','—'],gC:'',b:['mute','mute','mute','mute'],x:['off',''],note:'closesocket 只是发起取消：未完成 I/O 不保证立即结束——OVERLAPPED / buffer 要等它们的完成包（成功或失败）都回来后再释放。',noteC:'amber'}
+  ];
+  let observer=null;
+  const bBase=['branch','branch','branch','branch'];
+  function mount(){
+    const html='<div class="vcap"><b>失败完成与退出包</b>：GQCS 返回 FALSE 时先看 lpOverlapped</div>'+stageFrame('fl','fail-stage',
+      '<div class="gcard ik" id="flG" style="left:186px;top:14px;width:260px;min-height:78px;padding:8px 12px;"><div class="ghead">GQCS 返回 <span>判定</span></div>'+
+        '<div style="display:flex;gap:6px;margin-top:7px;"><div class="gop" id="flG0" style="flex:1;margin-top:0;min-height:26px;font-size:9.5px;">ok = ?</div><div class="gop" id="flG1" style="flex:1;margin-top:0;min-height:26px;font-size:9.5px;">ol = ?</div><div class="gop" id="flG2" style="flex:1;margin-top:0;min-height:26px;font-size:9.5px;">bytes = ?</div></div></div>'+
+      '<div class="branch" id="flB0" style="left:86px;top:116px;"><div class="bt">① ok && bytes&gt;0</div><div class="bs">正常完成 → 处理业务，补投下一次 I/O</div></div>'+
+      '<div class="branch" id="flB1" style="left:326px;top:116px;"><div class="bt">② ok && bytes==0</div><div class="bs">对端优雅关闭 → delete io + 关连接</div></div>'+
+      '<div class="branch" id="flB2" style="left:86px;top:218px;"><div class="bt">③ !ok && ol != NULL</div><div class="bs">失败完成的 I/O 包 → GetLastError() 清理</div></div>'+
+      '<div class="branch" id="flB3" style="left:326px;top:218px;"><div class="bt">④ ol == NULL</div><div class="bs">没取到包：超时 / 端口已关闭</div></div>'+
+      '<div class="gop off" id="flX" style="position:absolute;left:126px;top:314px;width:380px;justify-content:center;">—</div>'+
+      '<div class="snote" id="flNote"></div>');
+    viz.innerHTML=html;
+    fitStage('flStage');
+    observer=new ResizeObserver(()=>fitStage('flStage'));observer.observe(el('flFrame'));
+  }
+  function paint(s){
+    s.g.forEach((txt,i)=>{el('flG'+i).textContent=txt;});
+    classes('flG','gcard ik '+s.gC);
+    s.b.forEach((state,i)=>classes('flB'+i,'branch '+state));
+    el('flX').textContent=s.x[1]||'—';
+    el('flX').className='gop '+(s.x[0]==='active'?'active':'off');
+    el('flX').style.cssText='position:absolute;left:126px;top:314px;width:380px;justify-content:center;margin-top:0;';
+    classes('flNote','snote '+s.noteC);el('flNote').textContent=s.note;
+  }
+  function destroy(){observer?.disconnect();}
+  return {id:'fail',label:'失败完成',sub:'FALSE · 退出包',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- 步进引擎 ---------- */
+const SCENES=[postScene,ctxScene,loopScene,failScene];
+const tabsBox=el('tabs');
+const stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc');
+const codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots');
+const btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{
+  const tab=document.createElement('button');
+  tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';
+  tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);
+});
+
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();
+  sceneIndex=index;stepIndex=0;
+  [...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));
+  const scene=SCENES[sceneIndex];
+  scene.mount();
+  codeBox.innerHTML=codePanel(scene.code);
+  dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,index)=>{
+    const dot=document.createElement('button');
+    dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);
+    dot.addEventListener('click',()=>{stop();go(index);});dotsBox.appendChild(dot);dotEls.push(dot);
+  });
+  go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;
+  stepIndex=Math.max(0,Math.min(steps.length-1,index));
+  const step=steps[stepIndex];
+  SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.classList.toggle('hl',Boolean(step.lines&&step.lines.includes(i))));
+  stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;
+  stDesc.textContent=step.desc||step.note||'从初始状态开始，跟着一个完成包走完整条流水线。';
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});
+  readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}
+  if(stepIndex===steps.length-1)stop();
+}
+function play(){
+  const steps=SCENES[sceneIndex].steps;
+  if(stepIndex===steps.length-1)go(0);
+  btnPlay.textContent='暂停';
+  timer=setInterval(()=>{stepIndex<steps.length-1?go(stepIndex+1):stop();},2700);
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());
+btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});
+btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{
+  if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}
+});
+const hashScene=location.hash.match(/scene=(\w+)/);const hashStep=location.hash.match(/step=(\d+)/);
+let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}
+switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

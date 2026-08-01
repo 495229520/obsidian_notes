@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>四个退出出口分别从哪一段插进终止流程，以及 fork 之后 stdio 缓冲区被复制的陷阱</title>
+  <desc>上半把 libc 的三段清理画成一条流水线，标出 return、exit、_exit、abort 四个出口各自从哪里进入；下半用三帧说明 printf 的数据留在缓冲区时 fork，缓冲区会连同内存一起复制，子进程走 exit 会导致同一段输出出现两次。</desc>
+  <defs>
+    <marker id="e1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">四个出口的区别，是从这条流水线的哪一段插进去</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">前三段清理全是 libc 自己做的，内核一无所知；_exit(2) 之后的收尾，谁走都少不了</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 从用户代码到内核 do_exit 的整条路</text>
+
+  <rect x="300" y="158" width="624" height="100" rx="8" fill="#EFEEE6" stroke="#B8B3A4" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="612" y="150" font-size="11.5" font-weight="700" fill="#6B675C" text-anchor="middle">exit() 负责的三段清理，_exit() 一段都不做</text>
+
+  <rect x="310" y="170" width="196" height="76" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="408" y="194" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">① atexit / on_exit</text>
+  <text x="408" y="214" font-size="10.5" fill="#2C4460" text-anchor="middle">按注册的逆序清理资源，遵循 LIFO</text>
+  <text x="408" y="232" font-size="10.5" fill="#2C4460" text-anchor="middle">glibc 不设 32 个上限</text>
+
+  <rect x="522" y="170" width="210" height="76" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="2"/>
+  <text x="627" y="194" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 刷新并关闭 stdio 流</text>
+  <text x="627" y="214" font-size="10.5" fill="#2C4460" text-anchor="middle">缓冲区的数据这时才落盘</text>
+  <text x="627" y="232" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">下半场的坑就在这一格</text>
+
+  <rect x="748" y="170" width="166" height="76" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="831" y="194" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ 删临时文件</text>
+  <text x="831" y="214" font-size="10.5" fill="#2C4460" text-anchor="middle">tmpfile() 建的那些</text>
+  <text x="831" y="232" font-size="10.5" fill="#2C4460" text-anchor="middle">自己 open 的不算</text>
+
+  <rect x="930" y="170" width="118" height="76" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="989" y="194" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">_exit(2)</text>
+  <text x="989" y="214" font-size="10.5" fill="#6B4E28" text-anchor="middle">唯一的真系统调用</text>
+  <text x="989" y="232" font-size="10.5" fill="#6B4E28" text-anchor="middle">用户态到此为止</text>
+
+  <rect x="1064" y="170" width="120" height="76" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1124" y="194" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">内核 do_exit</text>
+  <text x="1124" y="214" font-size="10.5" fill="#24473F" text-anchor="middle">关 fd、还内存</text>
+  <text x="1124" y="232" font-size="10.5" fill="#24473F" text-anchor="middle">发 SIGCHLD</text>
+
+  <rect x="56" y="160" width="230" height="38" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="171" y="184" font-size="11.5" fill="#2C4460" text-anchor="middle">return 0;（从 main 返回）</text>
+  <rect x="56" y="206" width="230" height="38" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="171" y="230" font-size="11.5" fill="#2C4460" text-anchor="middle">exit(0)</text>
+  <rect x="56" y="286" width="230" height="38" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="171" y="310" font-size="11.5" fill="#6B4E28" text-anchor="middle">_exit(0) 或 _Exit(0)</text>
+  <rect x="56" y="332" width="230" height="38" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="171" y="356" font-size="11.5" fill="#733428" text-anchor="middle">abort()</text>
+
+  <path d="M286,179 L298,179 L298,204 L306,204" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#e1)"/>
+  <path d="M286,225 L298,225 L298,210 L306,210" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#e1)"/>
+  <line x1="506" y1="208" x2="518" y2="208" stroke="#5A564B" stroke-width="1.6" marker-end="url(#e1)"/>
+  <line x1="732" y1="208" x2="744" y2="208" stroke="#5A564B" stroke-width="1.6" marker-end="url(#e1)"/>
+  <line x1="914" y1="208" x2="926" y2="208" stroke="#5A564B" stroke-width="1.6" marker-end="url(#e1)"/>
+  <line x1="1048" y1="208" x2="1060" y2="208" stroke="#5A564B" stroke-width="1.6" marker-end="url(#e1)"/>
+
+  <path d="M286,305 L1005,305 L1005,250" fill="none" stroke="#8A6A3A" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#e1)"/>
+  <text x="640" y="299" font-size="10.5" fill="#6B4E28" text-anchor="middle">跳过三段清理，直接进系统调用</text>
+
+  <path d="M286,351 L1124,351 L1124,250" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#e1)"/>
+  <text x="700" y="345" font-size="10.5" fill="#733428" text-anchor="middle">走信号那条路：raise(SIGABRT)，可能留下 core</text>
+
+  <text x="56" y="410" font-size="13" font-weight="700" fill="#4A473F">B · 第 ② 格的坑：fork() 会把没刷出去的缓冲区一起复制</text>
+
+  <rect x="56" y="426" width="356" height="190" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="452" font-size="12" font-weight="700" fill="#4A473F">① printf 之后数据还在缓冲区</text>
+  <rect x="76" y="466" width="160" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="156" y="486" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">stdout 缓冲区</text>
+  <text x="156" y="503" font-size="10.5" fill="#2C4460" text-anchor="middle">里面存着 hi</text>
+  <text x="76" y="540" font-size="11" fill="#4A473F">重定向到文件时 stdout 是全缓冲</text>
+  <text x="76" y="562" font-size="11" fill="#4A473F">写了换行也照样留在缓冲区里</text>
+  <text x="76" y="584" font-size="11" fill="#6B675C">终端是行缓冲，换行就刷，看不出问题</text>
+
+  <rect x="428" y="426" width="356" height="190" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="448" y="452" font-size="12" font-weight="700" fill="#4A473F">② fork() 连缓冲区一起复制</text>
+  <rect x="448" y="466" width="150" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="523" y="486" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">父进程</text>
+  <text x="523" y="503" font-size="10.5" fill="#2C4460" text-anchor="middle">缓冲区里有 hi</text>
+  <rect x="614" y="466" width="150" height="46" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="689" y="486" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">子进程</text>
+  <text x="689" y="503" font-size="10.5" fill="#6B4E28" text-anchor="middle">缓冲区里也有 hi</text>
+  <text x="448" y="540" font-size="11" fill="#4A473F">缓冲区就在内存里，跟着一起被复制</text>
+  <text x="448" y="562" font-size="11" fill="#4A473F">现在系统里有两份没刷的 hi</text>
+  <text x="448" y="584" font-size="11" fill="#6B675C">谁退出谁刷自己那一份</text>
+
+  <rect x="800" y="426" width="384" height="190" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="820" y="452" font-size="12" font-weight="700" fill="#4A473F">③ 子进程怎么退，结局不同</text>
+  <rect x="820" y="466" width="344" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="838" y="486" font-size="11" font-weight="700" fill="#24473F">子进程走 _exit()：副本直接丢掉</text>
+  <text x="838" y="503" font-size="10.5" fill="#24473F">文件里只出现一次 hi，符合预期</text>
+  <rect x="820" y="522" width="344" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="838" y="542" font-size="11" font-weight="700" fill="#733428">子进程走 exit()：副本也被刷出去</text>
+  <text x="838" y="559" font-size="10.5" fill="#733428">文件里出现 hihi，多打了一遍</text>
+  <text x="820" y="592" font-size="11" fill="#4A473F">这就是 exec 失败后必须用 _exit() 的原因</text>
+
+  <text x="68" y="660" font-size="11.5" fill="#4A473F">三段清理只有 libc 管，内核一无所知。走到 _exit(2) 之后，关 fd、还内存、发 SIGCHLD、留下退出状态这四件事，四个出口一件都不会少。</text>
+  <text x="68" y="684" font-size="11.5" fill="#4A473F">abort() 是唯一走信号那条路的：它先把 SIGABRT 解除阻塞再自己 raise，就算你装了处理函数并从里面返回，进程照样会死。</text>
+</svg>

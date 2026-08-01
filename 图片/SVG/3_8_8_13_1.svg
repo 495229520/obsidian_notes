@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="600" viewBox="0 0 1240 600" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrN" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>一条连接建立路上的四道闸口，各自卡在哪个上限</title>
+  <desc>从客户端取源端口、服务端半连接队列、全连接队列到 accept 取文件描述符，四个环节各自的上限参数、满了之后的现象和观测命令。</desc>
+
+  <rect x="0" y="0" width="1240" height="600" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">一条连接建立路上的四道闸口</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">"连不上"可能卡在其中任何一道。先定位是哪一道，再谈调哪个参数——两个队列本身的机制见 7.7</text>
+
+  <rect x="48" y="104" width="1144" height="296" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- gates -->
+  <rect x="170" y="124" width="230" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="285" y="146" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① 客户端拿源端口</text>
+  <text x="285" y="166" font-size="9.5" fill="#6B675C" text-anchor="middle">SYN 出发之前</text>
+
+  <rect x="430" y="124" width="230" height="56" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="545" y="146" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">② 服务端半连接队列</text>
+  <text x="545" y="166" font-size="9.5" fill="#6B675C" text-anchor="middle">SYN → SYN+ACK</text>
+
+  <rect x="690" y="124" width="230" height="56" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="805" y="146" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 服务端全连接队列</text>
+  <text x="805" y="166" font-size="9.5" fill="#6B675C" text-anchor="middle">第三次 ACK 之后</text>
+
+  <rect x="950" y="124" width="230" height="56" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1065" y="146" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">④ accept() 拿 fd</text>
+  <text x="1065" y="166" font-size="9.5" fill="#6B675C" text-anchor="middle">应用层取走连接</text>
+
+  <line x1="400" y1="152" x2="426" y2="152" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+  <line x1="660" y1="152" x2="686" y2="152" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+  <line x1="920" y1="152" x2="946" y2="152" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+
+  <line x1="72" y1="196" x2="1168" y2="196" stroke="#D8D5C8" stroke-width="1"/>
+
+  <!-- row 1 -->
+  <text x="56" y="228" font-size="11" font-weight="700" fill="#6B675C">上限来自</text>
+  <text x="170" y="222" font-size="10.5" fill="#4A473F">ip_local_port_range</text>
+  <text x="170" y="240" font-size="10.5" fill="#8A8578">再减去 TIME_WAIT 占着的</text>
+  <text x="430" y="222" font-size="10.5" fill="#4A473F">tcp_max_syn_backlog</text>
+  <text x="430" y="240" font-size="10.5" fill="#8A8578">开了 syncookies 就不是硬上限</text>
+  <text x="690" y="222" font-size="10.5" fill="#4A473F">min(backlog, somaxconn)</text>
+  <text x="690" y="240" font-size="10.5" fill="#8A8578">两个都得改，只改一个白搭</text>
+  <text x="950" y="222" font-size="10.5" fill="#4A473F">ulimit -n（进程）</text>
+  <text x="950" y="240" font-size="10.5" fill="#8A8578">fs.file-max、fs.nr_open（系统）</text>
+
+  <line x1="72" y1="256" x2="1168" y2="256" stroke="#E3E0D6" stroke-width="1"/>
+
+  <!-- row 2 -->
+  <text x="56" y="288" font-size="11" font-weight="700" fill="#6B675C">满了会怎样</text>
+  <text x="170" y="282" font-size="10.5" font-weight="700" fill="#733428">connect() 返 EADDRNOTAVAIL</text>
+  <text x="170" y="300" font-size="10.5" fill="#8A8578">只对同一目的地址成立</text>
+  <text x="430" y="282" font-size="10.5" font-weight="700" fill="#733428">丢掉新来的 SYN</text>
+  <text x="430" y="300" font-size="10.5" fill="#8A8578">客户端 connect 超时重试</text>
+  <text x="690" y="282" font-size="10.5" font-weight="700" fill="#733428">默认丢掉第三次 ACK</text>
+  <text x="690" y="300" font-size="10.5" fill="#8A8578">客户端以为连上了，服务端没有</text>
+  <text x="950" y="282" font-size="10.5" font-weight="700" fill="#733428">accept 返 EMFILE / ENFILE</text>
+  <text x="950" y="300" font-size="10.5" fill="#8A8578">连接留在队列里，事件反复触发</text>
+
+  <line x1="72" y1="316" x2="1168" y2="316" stroke="#E3E0D6" stroke-width="1"/>
+
+  <!-- row 3 -->
+  <text x="56" y="348" font-size="11" font-weight="700" fill="#6B675C">怎么看</text>
+  <text x="170" y="342" font-size="10" fill="#2C4460">sysctl net.ipv4.ip_local_port_range</text>
+  <text x="170" y="360" font-size="10" fill="#2C4460">ss -tan state time-wait | wc -l</text>
+  <text x="430" y="342" font-size="10" fill="#2C4460">ss -ant state syn-recv | wc -l</text>
+  <text x="430" y="360" font-size="10" fill="#2C4460">nstat -az TcpExtTCPReqQFullDrop</text>
+  <text x="690" y="342" font-size="10" fill="#2C4460">ss -lnt　（看监听行的 Recv-Q）</text>
+  <text x="690" y="360" font-size="10" fill="#2C4460">nstat -az TcpExtListenOverflows</text>
+  <text x="950" y="342" font-size="10" fill="#2C4460">ls /proc/&lt;pid&gt;/fd | wc -l</text>
+  <text x="950" y="360" font-size="10" fill="#2C4460">cat /proc/sys/fs/file-nr</text>
+
+  <text x="72" y="388" font-size="10" fill="#8A8578">①④ 是本机资源，②③ 是服务端队列。前两道满了客户端会明确失败，第三道满了客户端会"以为成功"，最难查</text>
+
+  <!-- card -->
+  <rect x="48" y="420" width="1144" height="122" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="446" font-size="13" font-weight="700" fill="#4A473F">第 ④ 道最坑：EMFILE 会变成死循环</text>
+  <text x="72" y="470" font-size="11" fill="#4A473F">fd 用光时 accept() 返回 EMFILE，但那条连接还好好挂在全连接队列里。LT 模式下监听 fd 于是一直可读，事件循环空转烧 CPU。</text>
+  <text x="72" y="492" font-size="11" fill="#4A473F">常用解法是先占一个"备用 fd"：启动时 open("/dev/null") 拿一个存着。遇到 EMFILE 就把它 close 掉腾出名额，用这个名额 accept 一下，</text>
+  <text x="72" y="514" font-size="11" fill="#4A473F">立刻 close 掉这条连接，再重新 open 占回备用 fd。这样至少能把连接从队列里摘掉、给客户端一个明确的关闭，而不是让它一直干等。</text>
+
+  <text x="48" y="574" font-size="11" fill="#6B675C">调参数之前先把闸口定位出来：四道闸口的现象各不相同，认准现象比背参数表有用得多</text>
+</svg>

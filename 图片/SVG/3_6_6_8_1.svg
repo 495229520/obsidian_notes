@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 736" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <title>权限位的排布与内核的判定顺序</title>
+  <desc>mode 低 12 位的组成（特殊位 + owner/group/other 三组 rwx）、内核 owner→group→other 命中即停的判定规则与 0466 反例、以及目录 rwx 三位各自的含义。</desc>
+
+  <rect x="0" y="0" width="1240" height="736" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">权限位怎么排，内核怎么读</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">mode 的低 12 位 · 判定三选一命中即停 · 目录的 rwx 与文件不是一回事</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="104" width="1144" height="210" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · mode 的低 12 位：0644 最前面那个 0 不是八进制装饰</text>
+
+  <text x="72" y="182" font-size="11.5" fill="#6B675C">st_mode 低 12 位</text>
+
+  <!-- 特殊位组 -->
+  <rect x="250" y="154" width="62" height="46" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="312" y="154" width="62" height="46" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="374" y="154" width="62" height="46" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="281" y="182" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">SUID</text>
+  <text x="343" y="182" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">SGID</text>
+  <text x="405" y="182" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">Sticky</text>
+  <text x="281" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">4000</text>
+  <text x="343" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">2000</text>
+  <text x="405" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">1000</text>
+  <text x="343" y="238" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">特殊位</text>
+
+  <!-- owner -->
+  <rect x="452" y="154" width="62" height="46" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="514" y="154" width="62" height="46" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="576" y="154" width="62" height="46" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="483" y="183" font-size="15" font-weight="700" fill="#2C4460" text-anchor="middle">r</text>
+  <text x="545" y="183" font-size="15" font-weight="700" fill="#2C4460" text-anchor="middle">w</text>
+  <text x="607" y="183" font-size="15" font-weight="700" fill="#2C4460" text-anchor="middle">x</text>
+  <text x="483" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">400</text>
+  <text x="545" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">200</text>
+  <text x="607" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">100</text>
+  <text x="545" y="238" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">属主 owner</text>
+
+  <!-- group -->
+  <rect x="654" y="154" width="62" height="46" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="716" y="154" width="62" height="46" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="778" y="154" width="62" height="46" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="685" y="183" font-size="15" font-weight="700" fill="#24473F" text-anchor="middle">r</text>
+  <text x="747" y="183" font-size="15" font-weight="700" fill="#24473F" text-anchor="middle">w</text>
+  <text x="809" y="183" font-size="15" font-weight="700" fill="#24473F" text-anchor="middle">x</text>
+  <text x="685" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">40</text>
+  <text x="747" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">20</text>
+  <text x="809" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">10</text>
+  <text x="747" y="238" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">同组 group</text>
+
+  <!-- other -->
+  <rect x="856" y="154" width="62" height="46" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="918" y="154" width="62" height="46" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="980" y="154" width="62" height="46" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="887" y="183" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">r</text>
+  <text x="949" y="183" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">w</text>
+  <text x="1011" y="183" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">x</text>
+  <text x="887" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">4</text>
+  <text x="949" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">2</text>
+  <text x="1011" y="216" font-size="10.5" fill="#6B675C" text-anchor="middle">1</text>
+  <text x="949" y="238" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">其他 other</text>
+
+  <text x="1074" y="183" font-size="11" fill="#6B675C">八进制</text>
+  <text x="1074" y="199" font-size="11" fill="#6B675C">四位数</text>
+
+  <!-- 三个例子 -->
+  <rect x="72" y="252" width="340" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="88" y="271" font-size="13.5" font-weight="700" fill="#4A473F">0755</text>
+  <text x="152" y="271" font-size="12.5" fill="#4A473F">rwxr-xr-x</text>
+  <text x="88" y="289" font-size="10.5" fill="#6B675C">可执行文件与目录的常规值</text>
+
+  <rect x="444" y="252" width="340" height="44" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="460" y="271" font-size="13.5" font-weight="700" fill="#6B4E28">04755</text>
+  <text x="532" y="271" font-size="12.5" fill="#6B4E28">rwsr-xr-x</text>
+  <text x="460" y="289" font-size="10.5" fill="#6B4E28">SUID：执行时取文件属主身份</text>
+
+  <rect x="816" y="252" width="340" height="44" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="832" y="271" font-size="13.5" font-weight="700" fill="#6B4E28">01777</text>
+  <text x="904" y="271" font-size="12.5" fill="#6B4E28">rwxrwxrwt</text>
+  <text x="832" y="289" font-size="10.5" fill="#6B4E28">Sticky：/tmp 只能删自己的条目</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="326" width="1144" height="236" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="356" font-size="15" font-weight="700" fill="#4A473F">B · 内核只挑一档看：owner → group → other，命中即停</text>
+
+  <!-- 判定梯 -->
+  <rect x="72" y="376" width="520" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="88" y="405" font-size="12.5" font-weight="700" fill="#2C4460">① euid == 文件 st_uid</text>
+  <text x="300" y="405" font-size="11.5" fill="#2C4460">→ 只看 owner 三位，不再往下</text>
+
+  <rect x="72" y="434" width="520" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="88" y="463" font-size="12.5" font-weight="700" fill="#24473F">② st_gid 在进程组集合里</text>
+  <text x="300" y="463" font-size="11.5" fill="#24473F">→ 只看 group 三位</text>
+
+  <rect x="72" y="492" width="520" height="48" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="88" y="521" font-size="12.5" font-weight="700" fill="#4A473F">③ 两者都不是</text>
+  <text x="300" y="521" font-size="11.5" fill="#4A473F">→ 只看 other 三位</text>
+
+  <path d="M332 424 L332 434" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M332 482 L332 492" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 反例 -->
+  <text x="620" y="380" font-size="12.5" font-weight="700" fill="#733428">反直觉：0466 的属主写不了自己的文件</text>
+
+  <rect x="620" y="394" width="42" height="36" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <rect x="662" y="394" width="42" height="36" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <rect x="704" y="394" width="42" height="36" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="641" y="418" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">r</text>
+  <text x="683" y="418" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">-</text>
+  <text x="725" y="418" font-size="14" font-weight="700" fill="#733428" text-anchor="middle">-</text>
+  <text x="683" y="446" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">owner</text>
+
+  <rect x="756" y="394" width="42" height="36" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="798" y="394" width="42" height="36" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="840" y="394" width="42" height="36" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="777" y="418" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">r</text>
+  <text x="819" y="418" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">w</text>
+  <text x="861" y="418" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">-</text>
+  <text x="819" y="446" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">group</text>
+
+  <rect x="892" y="394" width="42" height="36" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="934" y="394" width="42" height="36" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="976" y="394" width="42" height="36" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="913" y="418" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">r</text>
+  <text x="955" y="418" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">w</text>
+  <text x="997" y="418" font-size="14" font-weight="700" fill="#4A473F" text-anchor="middle">-</text>
+  <text x="955" y="446" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">other</text>
+
+  <text x="1036" y="418" font-size="11.5" fill="#6B675C">owner=alice</text>
+
+  <path d="M700 452 L700 470" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrRed)"/>
+  <text x="620" y="486" font-size="11.5" fill="#733428">alice 写它 → 命中 ① → owner 是 r-- → EACCES</text>
+  <text x="620" y="510" font-size="11.5" fill="#24473F">bob 同组写它 → 命中 ② → group 是 rw- → 成功</text>
+  <text x="620" y="538" font-size="12" font-weight="700" fill="#733428">三档不取并集，属主反而最先被判死</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="578" width="1144" height="120" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="606" font-size="15" font-weight="700" fill="#4A473F">C · 目录的 rwx：位相同，含义完全不同</text>
+
+  <rect x="72" y="620" width="340" height="62" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="88" y="645" font-size="12.5" font-weight="700" fill="#2C4460">r · 列出名字</text>
+  <text x="88" y="667" font-size="11" fill="#2C4460">opendir + readdir 能拿到条目名</text>
+
+  <rect x="444" y="620" width="340" height="62" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="460" y="645" font-size="12.5" font-weight="700" fill="#6B4E28">w · 增删条目</text>
+  <text x="460" y="667" font-size="11" fill="#6B4E28">create / unlink / rename 看这一位</text>
+
+  <rect x="816" y="620" width="340" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="832" y="645" font-size="12.5" font-weight="700" fill="#24473F">x · 穿过去</text>
+  <text x="832" y="667" font-size="11" fill="#24473F">cd 进去、路径解析经过它时</text>
+
+  <text x="48" y="722" font-size="12" fill="#6B675C">所以 unlink 只看所在目录的 w：只读文件照样删得掉，而目录没有 w 时，文件给到 0777 也删不了</text>
+</svg>

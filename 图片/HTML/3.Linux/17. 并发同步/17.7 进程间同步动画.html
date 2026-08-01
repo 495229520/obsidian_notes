@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>进程间同步动画 · pshared mutex · robust · EOWNERDEAD · OFD 锁</title>
+<!-- Visual system: warm paper #F5F4ED, quiet panels #FBFBF6, saturated semantic blue/green/amber/red, 8px rhythm. -->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#625F56;--faint:#918D83;
+  --line:#D8D5C8;--grid:#E4E1D6;--gray:#F0EEE6;
+  --blue:#2467A6;--bluebg:#E1EEF9;--bluetx:#1C4D7A;
+  --green:#087A5C;--greenbg:#DAF0E7;--greentx:#075B45;
+  --amber:#A66408;--amberbg:#F7E9D4;--ambertx:#7C4A05;
+  --danger:#C34935;--dangerbg:#F7DFDA;--dangertx:#913025;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:0;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:10px 16px;cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.14);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.78;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(300px,1fr);gap:28px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:13px;color:var(--muted);margin-bottom:15px;}.vcap b{color:var(--ink);font-weight:700;}
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:18px 20px;min-height:206px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:9px 12px;}
+#stDesc{margin-top:10px;font-size:14px;color:var(--muted);}.blue{color:var(--blue);font-weight:700;}.green{color:var(--green);font-weight:700;}.amber{color:var(--amber);font-weight:700;}.danger{color:var(--danger);font-weight:700;}
+.chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1.5px solid;}.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.chip.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{align-self:flex-start;width:100%;background:#2E2C27;border-radius:8px;padding:10px 0;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#D8D5CC;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.codebox .cl{min-height:22px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}.codebox .cmt{color:#918D83;}.codebox .kw{color:#E9AC50;}.codebox .type{color:#95C7EF;}.codebox .fn{color:#83C9B2;}.codebox .num{color:#F0BE7E;}.codebox .str{color:#D9CE9F;}
+.codebox .cl.hl-blue{background:rgba(52,122,198,.54);box-shadow:inset 4px 0 0 #91C7F5;color:#F7F4EA;}.codebox .cl.hl-green{background:rgba(22,143,107,.54);box-shadow:inset 4px 0 0 #90DFC2;color:#F7F4EA;}.codebox .cl.hl-amber{background:rgba(185,112,16,.58);box-shadow:inset 4px 0 0 #FFD08A;color:#F7F4EA;}.codebox .cl.hl-danger{background:rgba(198,73,53,.58);box-shadow:inset 4px 0 0 #FFAA98;color:#F7F4EA;}.codebox .cl[class*="hl-"] .cmt{color:#D5D0C1;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:8px 15px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}.btn:hover:not(:disabled){background:var(--gray);border-color:var(--ink);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:86px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector layer: paths and arrow heads stay mounted; endpoints come from live element rectangles. */
+.stage{position:relative;width:100%;height:450px;min-height:450px;margin:0 auto;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;}
+.wire-line{--wc:var(--muted);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}.wire-head{--wc:var(--muted);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wire-port{--wc:var(--muted);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}.wire-line.on,.wire-head.on,.wire-port.on{opacity:1;}.wire-line.hint{stroke-width:2;opacity:.1;}.wire-head.hint,.wire-port.hint{opacity:.1;}.wire-head.drawing{transition-delay:200ms;}.wire-line.blue,.wire-head.blue,.wire-port.blue{--wc:var(--blue);}.wire-line.green,.wire-head.green,.wire-port.green{--wc:var(--green);}.wire-line.amber,.wire-head.amber,.wire-port.amber{--wc:var(--amber);}.wire-line.danger,.wire-head.danger,.wire-port.danger{--wc:var(--danger);}
+
+/* Generic cards, status pill, checklist rows. */
+.gcard{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:12px 13px;display:flex;flex-direction:column;justify-content:center;gap:3px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.gcard .k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.gcard .n{font-size:14px;font-weight:700;}.gcard .s{font-size:11px;color:var(--muted);}
+.gcard.blue{border-color:var(--blue);}.gcard.blue .k{color:var(--blue);}
+.gcard.green{border-color:var(--green);}.gcard.green .k{color:var(--green);}
+.gcard.amber{border-color:var(--amber);}.gcard.amber .k{color:var(--amber);}
+.gcard.active{transform:scale(1.012);box-shadow:0 0 0 2px rgba(43,42,38,.08);}
+.gcard.blue.active{background:var(--bluebg);}.gcard.green.active{background:var(--greenbg);}.gcard.amber.active{background:var(--amberbg);}
+.gcard.warn{border-color:var(--amber);background:var(--amberbg);}
+.gcard.bad{border-color:var(--danger);background:var(--dangerbg);}
+.gcard.dead{border-style:dashed;border-color:var(--danger);background:var(--gray);opacity:.55;}
+.gcard.dim{opacity:.42;}
+.pstate{margin-top:7px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);padding:5px 8px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);text-align:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.pstate.good{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.pstate.hold{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.pstate.wait{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.pstate.fail{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.pill{position:absolute;left:50%;bottom:8px;z-index:3;transform:translateX(-50%);width:max-content;max-width:95%;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 12px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);white-space:nowrap;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.pill.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.pill.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.pill.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.pill.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.rrow{min-height:30px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-size:11px;color:var(--muted);display:flex;align-items:center;padding:4px 10px;gap:8px;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.rrow b{font-family:var(--mono);font-size:10.5px;flex:0 0 auto;white-space:nowrap;}
+.rrow.on{border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateX(2px);}
+.rrow.warn{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.rrow.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.rrow.dim{opacity:.35;}
+.panel-box{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.panel-title{position:absolute;left:14px;top:9px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}
+.mtxbox{border:1.5px solid var(--line);border-radius:7px;background:var(--gray);padding:8px 10px;display:flex;flex-direction:column;gap:3px;align-items:center;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.mtxbox .ma{font-family:var(--mono);font-size:11px;font-weight:700;}
+.mtxbox .mb{font-family:var(--mono);font-size:9.5px;color:var(--muted);}
+.mtxbox.ok{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.mtxbox.ok .mb{color:var(--greentx);}
+.mtxbox.held{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.mtxbox.held .mb{color:var(--bluetx);}
+.mtxbox.dead{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.mtxbox.dead .mb{color:var(--dangertx);}
+.mtxbox.warn{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.mtxbox.warn .mb{color:var(--ambertx);}
+
+/* Scene 1: two address spaces converge on one physical page that hosts the mutex. */
+.ps-stage{display:grid;grid-template-columns:1fr 1.18fr 1fr;grid-template-rows:1fr 138px;column-gap:30px;row-gap:28px;height:450px;min-height:450px;}
+.ps-page{padding:32px 13px 12px;display:flex;flex-direction:column;gap:8px;justify-content:center;}
+.ps-page .panel-title{color:var(--amber);}
+.ps-page.on{border-color:var(--amber);background:#FCFAF6;}
+.ps-attrs{grid-column:1 / span 3;grid-row:2;display:flex;flex-direction:column;gap:7px;padding:30px 14px 40px;}
+.ps-attrs.on{border-color:var(--green);background:#F8FCF9;}
+.ps-attrs .panel-title{color:var(--green);}
+
+/* Scene 2 & 3: holder, mutex, waiter; the shared invariant sits under the mutex. */
+.cr-stage{display:grid;grid-template-columns:1fr 1.18fr 1fr;grid-template-rows:1fr 132px;column-gap:30px;row-gap:28px;height:450px;min-height:450px;}
+.cr-mid{padding:32px 13px 12px;display:flex;flex-direction:column;gap:8px;justify-content:center;}
+.cr-mid .panel-title{color:var(--amber);}
+.cr-notes{grid-column:1 / span 3;grid-row:2;display:flex;flex-direction:column;gap:7px;padding:30px 14px 40px;}
+.cr-notes .panel-title{color:var(--danger);}
+.rb-notes .panel-title{color:var(--green);}
+
+/* Scene 4: one process, two fds, one inode; classic locks die with any close. */
+.of-stage{display:grid;grid-template-columns:1.05fr 1fr 1.15fr;grid-template-rows:1fr;column-gap:28px;height:450px;min-height:450px;padding-bottom:40px;}
+.of-proc{padding:32px 13px 12px;display:flex;flex-direction:column;gap:8px;justify-content:center;}
+.of-proc .panel-title{color:var(--blue);}
+.of-proc.trap{border-color:var(--danger);background:#FDF7F5;}
+.of-file{display:flex;flex-direction:column;justify-content:center;gap:8px;padding:13px;}
+.of-cmp{padding:32px 13px 12px;display:flex;flex-direction:column;gap:7px;justify-content:center;}
+.of-cmp .panel-title{color:var(--green);}
+.lockbadge{min-height:32px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);display:flex;align-items:center;justify-content:center;opacity:.45;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.lockbadge.on{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.lockbadge.gone{opacity:1;border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);border-style:dashed;}
+
+@media(max-width:1040px){.layout{grid-template-columns:1fr;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.codebox{grid-column:2;}.desc-card{grid-column:1;grid-row:1 / span 2;}}
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:15px;min-height:0;}.right{display:flex;}.desc-card{min-height:0;padding:16px;}.controls{padding:12px 13px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 138px;}.btn{padding:8px 12px;}
+.ps-stage,.cr-stage{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;height:auto;min-height:620px;column-gap:14px;row-gap:14px;}
+.ps-stage .gcard:nth-child(1),.cr-stage .gcard:nth-child(1){grid-column:1;grid-row:1;}
+.ps-page,.cr-mid{grid-column:1 / span 2;grid-row:2;}
+.ps-stage .gcard:nth-child(3),.cr-stage .gcard:nth-child(3){grid-column:2;grid-row:1;}
+.ps-attrs,.cr-notes{grid-column:1 / span 2;grid-row:3;}
+.of-stage{grid-template-columns:1fr;grid-template-rows:auto auto auto;height:auto;min-height:640px;row-gap:14px;padding-bottom:46px;}
+.pill{font-size:9.5px;white-space:normal;text-align:center;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>进程间同步 · 共享内存里的锁与崩溃善后</h1>
+    <p>配套笔记《17.7 进程间同步》 · PTHREAD_PROCESS_SHARED · robust mutex · EOWNERDEAD · OFD 锁　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SENTINEL=String.fromCharCode(1);
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightC(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts?parts[1]:line;
+  const comment=parts&&parts[2]?parts[2]:'';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{strings.push(escapeHtml(value));return SENTINEL+String.fromCharCode(65+strings.length-1)+SENTINEL;});
+  code=escapeHtml(code)
+    .replace(/\b(int|auto|void|struct|if|sizeof|ssize_t|off_t|pthread_mutexattr_t|pthread_mutex_t|Shared)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(shm_open|ftruncate|mmap|pthread_mutexattr_init|pthread_mutexattr_setpshared|pthread_mutexattr_setrobust|pthread_mutex_init|pthread_mutex_lock|pthread_mutex_unlock|pthread_mutex_consistent|repair_invariants|fcntl|close|open|dup)\b/g,'<span class="fn">$1</span>')
+    .replace(/\b(sh|ma|fl|fd3|fd7|fd|rc|balance|mtx|EOWNERDEAD|ENOTRECOVERABLE|PTHREAD_PROCESS_SHARED|PTHREAD_MUTEX_ROBUST|F_SETLK|F_OFD_SETLK|F_WRLCK|SEEK_SET|O_CREAT|O_RDWR|O_RDONLY|MAP_SHARED|PROT_READ|PROT_WRITE|nullptr)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(0|100|1024|0600)\b/g,'<span class="num">$1</span>')
+    .replace(new RegExp(SENTINEL+'([A-Z])'+SENTINEL,'g'),(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment?'<span class="cmt">'+escapeHtml(comment)+'</span>':'');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="codeLine'+index+'">'+highlightC(line||' ')+'</div>').join('');}
+function classes(id,value){const node=el(id);if(node)node.className=value;}
+function setPill(id,text,tone){const node=el(id);if(!node)return;node.textContent=text;node.className='pill'+(tone?' '+tone:'');}
+function setState(id,text,tone){const node=el(id);if(!node)return;node.textContent=text;node.className='pstate'+(tone?' '+tone:'');}
+function setMtx(id,a,b,tone){const node=el(id);if(!node)return;node.querySelector('.ma').textContent=a;node.querySelector('.mb').textContent=b;node.className='mtxbox'+(tone?' '+tone:'');}
+
+/* A persistent arrow controller: a path, filled triangle, and source port are created once per scene. */
+function createWires(stageId,specs){
+  const stage=el(stageId);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id=stageId+'-svg';svg.classList.add('wire-svg');svg.setAttribute('preserveAspectRatio','none');stage.appendChild(svg);
+  const entries=specs.map(spec=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const head=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const port=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    line.id=stageId+'-'+spec.id;head.id=line.id+'-head';port.id=line.id+'-port';port.setAttribute('r','4');
+    line.classList.add('wire-line',spec.color);head.classList.add('wire-head',spec.color);port.classList.add('wire-port',spec.color);
+    svg.append(line,head,port);return {...spec,line,head,port};
+  });
+  let active=new Set();let timers=[];
+  function geometry(item){
+    const sr=stage.getBoundingClientRect(),source=el(item.from)?.getBoundingClientRect(),target=el(item.to)?.getBoundingClientRect();
+    if(!source||!target)return;
+    const sx=source.left-sr.left,sy=source.top-sr.top,sw=source.width,sh=source.height;
+    const tx=target.left-sr.left,ty=target.top-sr.top,tw=target.width,th=target.height;
+    const scx=sx+sw/2,scy=sy+sh/2,tcx=tx+tw/2,tcy=ty+th/2;
+    const horizontal=Math.abs(tcx-scx)>=Math.abs(tcy-scy);
+    let x1,y1,x2,y2;
+    if(horizontal){const right=tcx>=scx;x1=right?sx+sw:sx;y1=scy;x2=right?tx:tx+tw;y2=tcy;}
+    else{const down=tcy>=scy;x1=scx;y1=down?sy+sh:sy;x2=tcx;y2=down?ty:ty+th;}
+    const dx=x2-x1,dy=y2-y1,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,baseX=x2-ux*9,baseY=y2-uy*9;
+    const d=horizontal?`M ${x1} ${y1} C ${x1+dx*.45} ${y1}, ${baseX-dx*.45} ${baseY}, ${baseX} ${baseY}`:`M ${x1} ${y1} C ${x1} ${y1+dy*.45}, ${baseX} ${baseY-dy*.45}, ${baseX} ${baseY}`;
+    const px=-uy*5,py=ux*5;
+    item.line.setAttribute('d',d);item.head.setAttribute('d',`M ${x2} ${y2} L ${baseX+px} ${baseY+py} L ${baseX-px} ${baseY-py} Z`);item.port.setAttribute('cx',x1);item.port.setAttribute('cy',y1);
+  }
+  function layout(){const rect=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);entries.forEach(geometry);}
+  function draw(item){
+    const length=item.line.getTotalLength();item.line.style.transition='none';item.line.style.strokeDasharray=length;item.line.style.strokeDashoffset=length;void item.line.getBoundingClientRect();item.line.style.transition='';item.line.style.strokeDashoffset='0';
+    const timeout=setTimeout(()=>{item.line.style.strokeDasharray='';item.line.style.strokeDashoffset='';},560);timers.push(timeout);
+  }
+  function setClass(item,state){
+    const suffix=' '+item.color+(state?' '+state:'');item.line.className.baseVal='wire-line'+suffix;item.head.className.baseVal='wire-head'+suffix;item.port.className.baseVal='wire-port'+suffix;
+    if(state==='on')item.head.classList.add('drawing');
+  }
+  function sync(ids){
+    layout();const wanted=new Set(ids),hasAny=wanted.size>0;let stagger=0;
+    entries.forEach(item=>{
+      if(wanted.has(item.id)){setClass(item,'on');if(!active.has(item.id)&&!reducedMotion()){const delay=stagger++*160;timers.push(setTimeout(()=>draw(item),delay));}}
+      else setClass(item,hasAny?'':'hint');
+    });active=wanted;
+  }
+  const observer=new ResizeObserver(layout);observer.observe(stage);window.addEventListener('resize',layout);layout();
+  return {sync,layout,destroy(){observer.disconnect();window.removeEventListener('resize',layout);timers.forEach(clearTimeout);timers=[];}};
+}
+
+const psharedScene=(()=>{
+  const code=[
+    'int fd = shm_open("/demo_sync", O_CREAT | O_RDWR, 0600);',
+    'ftruncate(fd, sizeof(Shared));',
+    'auto* sh = (Shared*)mmap(nullptr, sizeof(Shared),',
+    '    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);',
+    'pthread_mutexattr_setpshared(&ma, PTHREAD_PROCESS_SHARED);',
+    'pthread_mutexattr_setrobust(&ma, PTHREAD_MUTEX_ROBUST);',
+    'pthread_mutex_init(&sh->mtx, &ma);  // once, by creator',
+    'pthread_mutex_lock(&sh->mtx);       // any process'
+  ];
+  const steps=[
+    {chip:'隔离',chipC:'c0',title:'各自的地址空间互不相通',desc:'普通 mutex 活在 P1 的私有堆里，它的地址在 P2 眼中<b>毫无意义</b>。线程能共享锁，只因它们共享地址空间——进程没有这个前提。',lines:[],hl:'blue',p1:['active','mtx 在私有堆中'],p2:['','看不见 P1 的 mtx'],page:'',mtx:['pthread_mutex_t','P1 私有 · P2 不可达',''],attrs:-1,wires:[],pill:'private address spaces',pillC:''},
+    {chip:'mmap',chipC:'ca',title:'两个进程映射同一块物理页',desc:'shm_open + mmap 之后，P1、P2 的<b>虚拟地址不同</b>，但页表都指向同一物理页。锁对象就安置在这块共享页里。',lines:[0,1,2,3],hl:'amber',p1:['active','va 0x7f3a…000'],p2:['active','va 0x7f9c…000'],page:'on',mtx:['pthread_mutex_t','已放入共享页',''],attrs:-1,wires:['p1','p2'],pill:'one physical page, two mappings',pillC:'amber'},
+    {chip:'反例',chipC:'cd',title:'默认属性下它仍然不能跨进程',desc:'`pthread_mutex_t` 默认 <span class="danger">PTHREAD_PROCESS_PRIVATE</span>——就算放进共享内存，不改属性也无法跨进程工作。位置对了，属性没对。',lines:[6],hl:'danger',p1:['active','lock 行为未定义'],p2:['warn','跨进程使用出错'],page:'on',mtx:['pshared: PRIVATE','跨进程 · 不可用','dead'],attrs:-1,wires:['p1','p2'],pill:'in shm but still PROCESS_PRIVATE',pillC:'danger'},
+    {chip:'设属性',chipC:'cg',title:'PROCESS_SHARED + ROBUST，创建者 init 一次',desc:'两行属性是全部关键：<span class="green">setpshared</span> 让锁跨进程生效，<span class="green">setrobust</span> 为崩溃兜底。其他进程 mmap 后<b>直接用</b>，不再重复 init。',lines:[4,5,6],hl:'green',p1:['active','creator: init 一次'],p2:['active','直接 lock 即可'],page:'on',mtx:['pshared: SHARED · robust','初始化完毕 · 可跨进程','ok'],attrs:2,wires:['p1','p2'],pill:'setpshared + setrobust + init once',pillC:'green'},
+    {chip:'互斥',chipC:'cb',title:'像两个线程一样竞争这把锁',desc:'P1 lock 成功进入临界区；P2 lock 在同一把锁上<b>真实地阻塞</b>——futex 排队发生在内核，跨进程互斥成立。',lines:[7],hl:'blue',p1:['hold','holds mtx'],p2:['wait','blocked in lock()'],page:'on',mtx:['owner: P1','P2 排队等待','held'],attrs:2,wires:['p1'],pill:'cross-process mutual exclusion',pillC:'blue'},
+    {chip:'交接',chipC:'cg',title:'P1 unlock，P2 被唤醒获得锁',desc:'解锁唤醒等待队列中的 P2。到这里，共享内存 + pshared 原语已复刻线程编程的心智模型——<b>直到某个进程崩溃</b>（下一幕）。',lines:[7],hl:'green',p1:['','released'],p2:['hold','holds mtx'],page:'on',mtx:['owner: P2','正常交接','held'],attrs:2,wires:['p2'],pill:'unlock -> next process wakes',pillC:'green'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>共享内存 + pshared 锁</b>：位置放对（共享页）+ 属性设对（PROCESS_SHARED），两个进程才像两个线程。</div><div class="stage ps-stage" id="psStage">'+
+      '<section class="gcard blue" id="psP1"><span class="k">process P1</span><span class="n">creator</span><div class="pstate" id="psT1">idle</div></section>'+
+      '<section class="panel-box ps-page" id="psPage"><span class="panel-title">共享物理页 /demo_sync</span><div class="mtxbox" id="psMtx"><span class="ma"></span><span class="mb"></span></div><div class="mtxbox" id="psData"><span class="ma">int ready = 0</span><span class="mb">受 mtx 保护的业务数据</span></div></section>'+
+      '<section class="gcard green" id="psP2"><span class="k">process P2</span><span class="n">attacher</span><div class="pstate" id="psT2">idle</div></section>'+
+      '<section class="panel-box ps-attrs" id="psAttrs"><span class="panel-title">跨进程锁的三个前提</span>'+
+        '<div class="rrow" id="psA0"><b>位置</b>锁对象放进两个进程都 mmap 的共享内存</div>'+
+        '<div class="rrow" id="psA1"><b>属性</b>PTHREAD_PROCESS_SHARED（默认 PRIVATE 不生效）+ ROBUST 兜底</div>'+
+        '<div class="rrow" id="psA2"><b>初始化</b>创建者 init 一次；其他进程 mmap 后直接 lock</div></section>'+
+      '<span class="pill" id="psPill"></span></div>';
+    wires=createWires('psStage',[{id:'p1',from:'psP1',to:'psPage',color:'blue'},{id:'p2',from:'psP2',to:'psPage',color:'green'}]);
+  }
+  function paint(s){
+    classes('psP1','gcard blue'+(s.p1[0]==='active'?' active':s.p1[0]==='hold'?' active':s.p1[0]==='warn'?' warn':''));
+    classes('psP2','gcard green'+(s.p2[0]==='active'||s.p2[0]==='hold'?' active':s.p2[0]==='wait'?' warn':s.p2[0]==='warn'?' warn':''));
+    setState('psT1',s.p1[1],s.p1[0]==='hold'?'hold':s.p1[0]==='active'?'good':s.p1[0]==='warn'?'fail':'');
+    setState('psT2',s.p2[1],s.p2[0]==='hold'?'hold':s.p2[0]==='active'?'good':s.p2[0]==='wait'?'wait':s.p2[0]==='warn'?'fail':'');
+    classes('psPage','panel-box ps-page'+(s.page?' on':''));
+    setMtx('psMtx',s.mtx[0],s.mtx[1],s.mtx[2]);
+    classes('psAttrs','panel-box ps-attrs'+(s.attrs>=0?' on':''));
+    ['psA0','psA1','psA2'].forEach((id,i)=>classes(id,'rrow '+(s.attrs<0?'dim':i<=s.attrs?'on':'')));
+    setPill('psPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'pshared',label:'共享内存 + pshared 锁',sub:'mmap · PROCESS_SHARED · init once',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const crashScene=(()=>{
+  const code=[
+    'pthread_mutex_lock(&sh->mtx);   // P1 enters',
+    'sh->balance -= 100;             // half-done...',
+    '// P1 crashes here (SIGSEGV / kill -9)',
+    '// the mutex stays locked forever',
+    'pthread_mutex_lock(&sh->mtx);   // P2: blocks',
+    '// no robust attr -> permanent deadlock'
+  ];
+  const steps=[
+    {chip:'进入',chipC:'cb',title:'P1 持锁进入临界区',desc:'P1 lock 成功，开始一笔跨两个字段的转账：先扣 A，再加 B。<b>不变量 A+B=2000</b> 在中途会临时被打破——这正是临界区存在的意义。',lines:[0],hl:'blue',p1:['hold','holds mtx · 转账中'],p2:['','等待时机'],mtx:['owner: P1','locked','held'],data:['A=1000 · B=1000','不变量 A+B=2000 成立',''],notes:0,wires:['p1'],pill:'P1 in critical section',pillC:'blue'},
+    {chip:'中间态',chipC:'ca',title:'改到一半：A 扣了，B 还没加',desc:'A 已扣 100、B 尚未加上——共享数据处于<span class="amber">不一致的中间态</span>。只要 P1 活着走完临界区，没人会看到这一幕。',lines:[1],hl:'amber',p1:['hold','A -= 100 完成'],p2:['','等待时机'],mtx:['owner: P1','locked','held'],data:['A=900 · B=1000','A+B=1900 · 不变量被打破','warn'],notes:0,wires:['p1'],pill:'invariant temporarily broken',pillC:'amber'},
+    {chip:'崩溃',chipC:'cd',title:'P1 死在临界区里',desc:'SIGSEGV、OOM kill、运维误杀——进程是<b>独立的失败单元</b>。锁没人释放，数据停在中间态，而内核对这把用户态锁一无所知。',lines:[2,3],hl:'danger',p1:['dead','SIGSEGV · 进程消失'],p2:['','还不知情'],mtx:['owner: 尸体','locked · 无人能解','dead'],data:['A=900 · B=1000','中间态被永久定格','warn'],notes:0,wires:[],pill:'holder died; lock stays locked',pillC:'danger'},
+    {chip:'死锁',chipC:'cd',title:'P2 lock：永久阻塞',desc:'普通锁没有任何机制知道持有者已死。P2（以及之后的所有进程）在这把锁上<span class="danger">永远等下去</span>——这是进程间同步最经典的事故。',lines:[4,5],hl:'danger',p1:['dead','已消失'],p2:['fail','blocked forever'],mtx:['owner: 尸体','permanent deadlock','dead'],data:['A=900 · B=1000','没人能来修复','warn'],notes:1,wires:['p2'],pill:'permanent deadlock',pillC:'danger'},
+    {chip:'认知',chipC:'ca',title:'为什么线程间没有这个问题',desc:'线程崩溃通常整个进程一起退出，锁和数据同归于尽、无人再等；进程各自独立存亡，<b>“持有者突然消失”是常态</b>——所以跨进程锁必须考虑善后（下一幕 robust）。',lines:[5],hl:'amber',p1:['dead','已消失'],p2:['fail','blocked forever'],mtx:['owner: 尸体','需要 robust 兜底','dead'],data:['A=900 · B=1000','等待有人修复','warn'],notes:2,wires:[],pill:'processes fail independently',pillC:'amber'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>持锁进程崩溃</b>：普通 pshared 锁的持有者死亡后，锁被永久锁死——没有任何人能解开。</div><div class="stage cr-stage" id="crStage">'+
+      '<section class="gcard blue" id="crP1"><span class="k">process P1</span><span class="n">holder</span><div class="pstate" id="crT1">idle</div></section>'+
+      '<section class="panel-box cr-mid" id="crMid"><span class="panel-title">共享物理页</span><div class="mtxbox" id="crMtx"><span class="ma"></span><span class="mb"></span></div><div class="mtxbox" id="crData"><span class="ma"></span><span class="mb"></span></div></section>'+
+      '<section class="gcard green" id="crP2"><span class="k">process P2</span><span class="n">next locker</span><div class="pstate" id="crT2">idle</div></section>'+
+      '<section class="panel-box cr-notes" id="crNotes"><span class="panel-title">线程 vs 进程：失败单元不同</span>'+
+        '<div class="rrow" id="crN0"><b>线程</b>线程崩溃通常整个进程退出——锁与等待者同归于尽，无“遗留锁”问题</div>'+
+        '<div class="rrow" id="crN1"><b>进程</b>持锁进程死亡后锁留在共享内存里，其余进程照常运行、照常阻塞</div></section>'+
+      '<span class="pill" id="crPill"></span></div>';
+    wires=createWires('crStage',[{id:'p1',from:'crP1',to:'crMid',color:'blue'},{id:'p2',from:'crP2',to:'crMid',color:'danger'}]);
+  }
+  function paint(s){
+    classes('crP1','gcard blue'+(s.p1[0]==='hold'?' active':s.p1[0]==='dead'?' dead':''));
+    classes('crP2','gcard green'+(s.p2[0]==='fail'?' bad':s.p2[0]==='active'?' active':''));
+    setState('crT1',s.p1[1],s.p1[0]==='hold'?'hold':s.p1[0]==='dead'?'fail':'');
+    setState('crT2',s.p2[1],s.p2[0]==='fail'?'fail':'');
+    setMtx('crMtx',s.mtx[0],s.mtx[1],s.mtx[2]);
+    setMtx('crData',s.data[0],s.data[1],s.data[2]);
+    classes('crNotes','panel-box cr-notes'+(s.notes?' on':''));
+    ['crN0','crN1'].forEach((id,i)=>classes(id,'rrow '+(s.notes===0?'dim':i<s.notes?(i===0?'on':'bad'):'')));
+    setPill('crPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'crash',label:'持锁进程崩溃',sub:'crash in critical section',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const robustScene=(()=>{
+  const code=[
+    'int rc = pthread_mutex_lock(&sh->mtx);',
+    'if (rc == EOWNERDEAD) {',
+    '  repair_invariants(sh);   // fix half-done state',
+    '  pthread_mutex_consistent(&sh->mtx);',
+    '}',
+    '// ... critical section ...',
+    'pthread_mutex_unlock(&sh->mtx);',
+    '// skip consistent -> ENOTRECOVERABLE'
+  ];
+  const steps=[
+    {chip:'前情',chipC:'ca',title:'robust 锁记住了持有者之死',desc:'因为创建时设了 <code>PTHREAD_MUTEX_ROBUST</code>，内核在 P1 退出时把锁标记为 <span class="amber">owner-dead</span>——锁没有被永久锁死，而是等着下一个人来善后。',lines:[],hl:'amber',p2:['','准备 lock'],mtx:['owner died','robust · 等待善后','warn'],data:['A=900 · B=1000','中间态 · 待修复','warn'],seq:-1,wires:[],pill:'kernel marked: owner dead',pillC:'amber'},
+    {chip:'EOWNERDEAD',chipC:'ca',title:'P2 lock 返回 EOWNERDEAD：拿到锁 + 得知真相',desc:'这个返回值的含义很特别：<b>你已经持有锁</b>，但上一任死在临界区里——共享数据可能是中间态，先别当它是好的。',lines:[0,1],hl:'amber',p2:['warn','holds mtx · EOWNERDEAD'],mtx:['owner: P2','inconsistent 状态','warn'],data:['A=900 · B=1000','必须先修复再使用','warn'],seq:0,wires:['p2'],pill:'lock() == EOWNERDEAD',pillC:'amber'},
+    {chip:'修复',chipC:'cg',title:'repair_invariants：把中间态修完整',desc:'凭业务知识恢复不变量：这笔转账要么补完（B += 100），要么回滚（A += 100）。<b>修什么由业务决定</b>，robust 锁只负责给你机会。',lines:[2],hl:'green',p2:['hold','修复共享数据'],mtx:['owner: P2','数据修复中','warn'],data:['A=900 · B=1100','A+B=2000 · 不变量恢复','ok'],seq:1,wires:['p2'],pill:'invariants restored',pillC:'green'},
+    {chip:'consistent',chipC:'cg',title:'pthread_mutex_consistent：声明锁重新可用',desc:'告诉内核“烂摊子收拾完了”。锁从 inconsistent 恢复为普通状态，之后的 lock/unlock 一切如常。',lines:[3],hl:'green',p2:['hold','holds mtx · 正常'],mtx:['owner: P2','consistent · 恢复可用','ok'],data:['A=900 · B=1100','不变量成立','ok'],seq:2,wires:['p2'],pill:'lock is consistent again',pillC:'green'},
+    {chip:'如常',chipC:'cb',title:'正常 unlock，后续进程无感',desc:'P2 走完临界区解锁。P3 再来 lock 时返回 0——它<b>完全不知道</b>这里发生过一次崩溃与修复。这就是 robust 锁的全部使命。',lines:[5,6],hl:'blue',p2:['','released'],mtx:['unlocked','后续进程照常使用','ok'],data:['A=900 · B=1100','稳定','ok'],seq:3,wires:[],pill:'business as usual',pillC:'blue'},
+    {chip:'反例',chipC:'cd',title:'跳过 consistent 直接 unlock：锁报废',desc:'不调用 consistent 就 unlock，锁进入<span class="danger">不可恢复态</span>——此后所有 lock 一律返回 <code>ENOTRECOVERABLE</code>，只能销毁重建。修复步骤不能省。',lines:[7],hl:'danger',p2:['fail','忘了 consistent'],mtx:['NOT RECOVERABLE','所有 lock 都失败','dead'],data:['A=900 · B=1100','数据修了，锁废了','warn'],seq:1,wires:[],pill:'ENOTRECOVERABLE: destroy & re-init',pillC:'danger'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>EOWNERDEAD 修复</b>：robust 锁把“永久死锁”变成一次有章可循的善后——修数据、声明恢复、继续用。</div><div class="stage cr-stage" id="rbStage">'+
+      '<section class="gcard blue dead" id="rbP1"><span class="k">process P1</span><span class="n">crashed</span><div class="pstate fail" id="rbT1">死于临界区</div></section>'+
+      '<section class="panel-box cr-mid" id="rbMid"><span class="panel-title">共享物理页</span><div class="mtxbox" id="rbMtx"><span class="ma"></span><span class="mb"></span></div><div class="mtxbox" id="rbData"><span class="ma"></span><span class="mb"></span></div></section>'+
+      '<section class="gcard green" id="rbP2"><span class="k">process P2</span><span class="n">inheritor</span><div class="pstate" id="rbT2">idle</div></section>'+
+      '<section class="panel-box cr-notes rb-notes" id="rbSeq"><span class="panel-title">善后四步</span>'+
+        '<div class="rrow" id="rbS0"><b>1</b>lock() 返回 EOWNERDEAD——已持锁，但上一任死在里面</div>'+
+        '<div class="rrow" id="rbS1"><b>2</b>repair_invariants()——按业务语义修复中间态</div>'+
+        '<div class="rrow" id="rbS2"><b>3</b>pthread_mutex_consistent()——声明锁恢复可用</div>'+
+        '<div class="rrow" id="rbS3"><b>4</b>正常 unlock——后续进程完全无感</div></section>'+
+      '<span class="pill" id="rbPill"></span></div>';
+    wires=createWires('rbStage',[{id:'p2',from:'rbP2',to:'rbMid',color:'green'}]);
+  }
+  function paint(s){
+    classes('rbP2','gcard green'+(s.p2[0]==='hold'?' active':s.p2[0]==='warn'?' warn':s.p2[0]==='fail'?' bad':''));
+    setState('rbT2',s.p2[1],s.p2[0]==='hold'?'hold':s.p2[0]==='warn'?'wait':s.p2[0]==='fail'?'fail':'');
+    setMtx('rbMtx',s.mtx[0],s.mtx[1],s.mtx[2]);
+    setMtx('rbData',s.data[0],s.data[1],s.data[2]);
+    ['rbS0','rbS1','rbS2','rbS3'].forEach((id,i)=>{
+      let cls='rrow ';
+      if(s.seq<0)cls+='dim';
+      else if(i<=s.seq)cls+=(s.pillC==='danger'&&i===s.seq+1?'bad':'on');
+      classes(id,cls);
+    });
+    if(s.pillC==='danger')classes('rbS2','rrow bad');
+    setPill('rbPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'robust',label:'EOWNERDEAD 修复',sub:'repair · consistent · unlock',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const ofdScene=(()=>{
+  const code=[
+    'struct flock fl = {F_WRLCK, SEEK_SET, 0, 1024};',
+    'fcntl(fd3, F_SETLK, &fl);      // classic lock',
+    'int fd7 = open("data.db", O_RDONLY);',
+    'close(fd7);          // ALL classic locks lost!',
+    'fcntl(fd3, F_OFD_SETLK, &fl);  // OFD lock',
+    'close(fd7);          // OFD lock survives',
+    '// OFD: lock owned by the open file description'
+  ];
+  const steps=[
+    {chip:'传统锁',chipC:'cb',title:'fd3 加记录锁：锁挂在「进程 + inode」名下',desc:'传统 fcntl 记录锁的归属是<b>进程和文件（inode）的组合</b>，而不是加锁用的那个 fd。这个归属方式就是陷阱的根源。',lines:[0,1],hl:'blue',fds:[['on','fd3 · 持有 [0,1024) 写锁'],['','']],proc:'',badge:['on','locked by P1 · [0,1024)'],cmp:0,wires:['f3'],pill:'lock owner = (process, inode)',pillC:'blue'},
+    {chip:'无辜操作',chipC:'ca',title:'库代码顺手打开同一文件读配置',desc:'某个第三方库 open 了同一个文件得到 fd7，读完准备 close——它<b>完全不知道</b>这个进程在这个文件上持有锁。',lines:[2],hl:'amber',fds:[['on','fd3 · 持有 [0,1024) 写锁'],['on','fd7 · 库代码只是读一下']],proc:'',badge:['on','locked by P1 · [0,1024)'],cmp:0,wires:['f7'],pill:'a library opens the same file',pillC:'amber'},
+    {chip:'陷阱',chipC:'cd',title:'close(fd7)：进程在该文件上的所有锁蒸发',desc:'关闭<b>任意一个</b>指向该 inode 的 fd，就释放该进程在它上面的<b>全部</b>传统记录锁——fd3 的锁也没了，而你的代码毫无察觉。',lines:[3],hl:'danger',fds:[['bad','fd3 · 锁已被释放!'],['bad','fd7 · close 触发了释放']],proc:'trap',badge:['gone','unlocked · 保护消失'],cmp:0,wires:[],pill:'close ANY fd -> all locks gone',pillC:'danger'},
+    {chip:'OFD 锁',chipC:'cg',title:'F_OFD_SETLK：锁挂在「打开文件描述」上',desc:'OFD（open file description）锁把归属改为<b>打开文件描述本身</b>——就是 open 返回、可被 dup 共享的那个内核对象。命令换成 <code>F_OFD_SETLK</code>，其余用法不变。',lines:[4,6],hl:'green',fds:[['on','fd3 · OFD 锁 [0,1024)'],['on','fd7 · 与锁无关']],proc:'',badge:['on','OFD-locked · [0,1024)'],cmp:0,wires:['f3'],pill:'owner = open file description',pillC:'green'},
+    {chip:'免疫',chipC:'cg',title:'再 close(fd7)：锁安然无恙',desc:'关闭 fd7 与 fd3 的打开文件描述<b>无关</b>，锁纹丝不动。只有 fd3（及其 dup 副本）全部关闭，锁才随描述一起释放——行为终于符合直觉。',lines:[5],hl:'green',fds:[['on','fd3 · OFD 锁仍然持有'],['','fd7 · 已关闭，无影响']],proc:'',badge:['on','OFD-locked · [0,1024)'],cmp:0,wires:['f3'],pill:'unrelated close cannot kill it',pillC:'green'},
+    {chip:'收口',chipC:'c0',title:'新代码一律用 OFD 锁',desc:'dup 出的 fd 共享同一打开文件描述，因此<b>共享同一把 OFD 锁</b>；fork 后父子同理。传统记录锁仅为兼容而存在——新代码没有理由再踩这个坑。',lines:[4,6],hl:'blue',fds:[['on','fd3 · OFD 锁'],['','dup(fd3) 共享同一把锁']],proc:'',badge:['on','OFD-locked'],cmp:3,wires:[],pill:'prefer F_OFD_SETLK in new code',pillC:'blue'}
+  ];
+  let wires;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>OFD 锁</b>：传统记录锁死于“关闭任一 fd”；OFD 锁把归属改到打开文件描述上，陷阱随之消失。</div><div class="stage of-stage" id="ofStage">'+
+      '<section class="panel-box of-proc" id="ofProc"><span class="panel-title">process P1 · fd 表</span><div class="rrow" id="ofF0"> </div><div class="rrow" id="ofF1"> </div></section>'+
+      '<section class="gcard amber of-file" id="ofFile"><span class="k">inode</span><span class="n">data.db</span><div class="lockbadge" id="ofBadge">unlocked</div></section>'+
+      '<section class="panel-box of-cmp" id="ofCmp"><span class="panel-title">传统记录锁 vs OFD 锁</span>'+
+        '<div class="rrow" id="ofC0"><b>归属</b>传统：进程 + inode　·　OFD：打开文件描述</div>'+
+        '<div class="rrow" id="ofC1"><b>释放</b>传统：关任一 fd 全掉　·　OFD：描述全部关闭才释放</div>'+
+        '<div class="rrow" id="ofC2"><b>共享</b>dup / fork 共享同一描述 → 共享同一把 OFD 锁</div></section>'+
+      '<span class="pill" id="ofPill"></span></div>';
+    wires=createWires('ofStage',[{id:'f3',from:'ofProc',to:'ofFile',color:'green'},{id:'f7',from:'ofProc',to:'ofFile',color:'amber'}]);
+  }
+  function paint(s){
+    classes('ofProc','panel-box of-proc'+(s.proc==='trap'?' trap':''));
+    s.fds.forEach((spec,i)=>{
+      const[state,text]=spec;const node=el('ofF'+i);node.textContent=text||' ';
+      node.className='rrow'+(text?'':' dim')+(state==='on'?' on':state==='bad'?' bad':'');
+    });
+    const badge=el('ofBadge');badge.textContent=s.badge[1];badge.className='lockbadge '+s.badge[0];
+    classes('ofFile','gcard amber of-file'+(s.badge[0]==='gone'?' bad':s.badge[0]==='on'?' active':''));
+    classes('ofCmp','panel-box of-cmp');
+    ['ofC0','ofC1','ofC2'].forEach((id,i)=>classes(id,'rrow '+(s.cmp===0?'dim':i<s.cmp?'on':'')));
+    setPill('ofPill',s.pill,s.pillC);wires.sync(s.wires);
+  }
+  return {id:'ofd',label:'OFD 锁',sub:'F_OFD_SETLK · close-safe',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+const SCENES=[psharedScene,crashScene,robustScene,ofdScene];
+const tabsBox=el('tabs'),stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc'),codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots'),btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{const tab=document.createElement('button');tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);});
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();sceneIndex=index;stepIndex=0;[...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));const scene=SCENES[sceneIndex];scene.mount();codeBox.innerHTML=codePanel(scene.code);dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,i)=>{const dot=document.createElement('button');dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);dot.addEventListener('click',()=>{stop();go(i);});dotsBox.appendChild(dot);dotEls.push(dot);});go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;stepIndex=Math.max(0,Math.min(steps.length-1,index));const step=steps[stepIndex];SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.className='cl '+(step.lines.includes(i)?'hl-'+step.hl:''));stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}if(stepIndex===steps.length-1)stop();
+}
+function play(){if(stepIndex===SCENES[sceneIndex].steps.length-1)go(0);btnPlay.textContent='暂停';timer=setInterval(()=>{stepIndex<SCENES[sceneIndex].steps.length-1?go(stepIndex+1):stop();},3000);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}});
+const hashScene=location.hash.match(/scene=(\w+)/),hashStep=location.hash.match(/step=(\d+)/);let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

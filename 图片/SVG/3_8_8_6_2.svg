@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>一次远程计算的完整往返</title>
+  <desc>请求 12 字节、响应 8 字节，两端都用「收够 sizeof 就停」作为循环退出条件；配错误码的设计理由，以及定长协议的适用边界与演进方向。</desc>
+
+  <rect x="0" y="0" width="1240" height="780" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">一次远程计算：12 字节出去，8 字节回来</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">请求和响应都是定长，所以两端都能拿 sizeof 当循环的退出条件——这是这个案例能成立的全部前提</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="104" width="1144" height="360" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · 计算 10 + 5 的完整往返</text>
+
+  <text x="340" y="164" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">客户端</text>
+  <text x="900" y="164" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">服务器</text>
+  <path d="M340 174 L340 442" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 4"/>
+  <path d="M900 174 L900 442" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 4"/>
+
+  <path d="M340 198 L896 198" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="618" y="192" font-size="11" fill="#4A473F" text-anchor="middle">connect() 三次握手</text>
+
+  <rect x="72" y="212" width="252" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="88" y="234" font-size="11" font-weight="700" fill="#2C4460">① 填三个字段</text>
+  <text x="88" y="253" font-size="10.5" fill="#2C4460">两个 operand 走 htonl，op 单字节不转</text>
+
+  <path d="M340 284 L896 284" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="618" y="278" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">send(&amp;req, sizeof(CalcRequest))　12 字节</text>
+
+  <rect x="916" y="298" width="252" height="70" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="932" y="320" font-size="11" font-weight="700" fill="#24473F">② 循环 recv 到满 12 字节</text>
+  <text x="932" y="339" font-size="10.5" fill="#24473F">③ ntohl 还原，calculate(10, 5, '+')</text>
+  <text x="932" y="358" font-size="10.5" font-weight="700" fill="#24473F">④ result = 15，error = 0</text>
+
+  <path d="M896 388 L344 388" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="618" y="382" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">send(&amp;resp, sizeof(CalcResponse))　8 字节</text>
+
+  <rect x="72" y="398" width="252" height="46" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="88" y="418" font-size="11" font-weight="700" fill="#6B4E28">⑤ 循环 recv 到满 8 字节</text>
+  <text x="88" y="436" font-size="10.5" font-weight="700" fill="#6B4E28">⑥ 先看 error，为 0 才读 result</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="480" width="560" height="240" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="510" font-size="15" font-weight="700" fill="#4A473F">B · 错误为什么要单独占一个字段</text>
+
+  <text x="88" y="536" font-size="11" font-weight="700" fill="#6B675C">情况</text>
+  <text x="330" y="536" font-size="11" font-weight="700" fill="#6B675C">error</text>
+  <text x="420" y="536" font-size="11" font-weight="700" fill="#6B675C">result</text>
+  <path d="M72 544 L560 544" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="72" y="550" width="488" height="30" fill="#DCE9E3"/>
+  <text x="88" y="570" font-size="11.5" fill="#24473F">算出来了</text>
+  <text x="330" y="570" font-size="11.5" font-weight="700" fill="#24473F">0</text>
+  <text x="420" y="570" font-size="11.5" fill="#24473F">可以读</text>
+
+  <rect x="72" y="582" width="488" height="30" fill="#F0E0DB"/>
+  <text x="88" y="602" font-size="11.5" fill="#733428">除数是 0</text>
+  <text x="330" y="602" font-size="11.5" font-weight="700" fill="#733428">1</text>
+  <text x="420" y="602" font-size="11.5" fill="#733428">无意义，别读</text>
+
+  <rect x="72" y="614" width="488" height="30" fill="#F0E0DB"/>
+  <text x="88" y="634" font-size="11.5" fill="#733428">运算符不认识</text>
+  <text x="330" y="634" font-size="11.5" font-weight="700" fill="#733428">2</text>
+  <text x="420" y="634" font-size="11.5" fill="#733428">无意义，别读</text>
+
+  <rect x="72" y="654" width="488" height="52" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="88" y="676" font-size="11" font-weight="700" fill="#6B5B95">不能拿 result = −1 表示出错</text>
+  <text x="88" y="695" font-size="11" fill="#6B5B95">因为 −1 本身是合法结果，客户端分不清哪种</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="624" y="480" width="568" height="240" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="648" y="510" font-size="15" font-weight="700" fill="#4A473F">C · 定长协议能撑到哪一步</text>
+
+  <rect x="648" y="524" width="520" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="664" y="546" font-size="11.5" font-weight="700" fill="#24473F">现在够用</text>
+  <text x="664" y="566" font-size="11" fill="#24473F">帧长写死在 sizeof 里，两端都不用长度头</text>
+
+  <rect x="648" y="592" width="520" height="58" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="664" y="614" font-size="11.5" font-weight="700" fill="#733428">加一个字段就崩</text>
+  <text x="664" y="634" font-size="11" fill="#733428">老客户端仍按 12 字节切，之后每一帧都错位</text>
+
+  <rect x="648" y="660" width="520" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="664" y="680" font-size="11.5" font-weight="700" fill="#2C4460">下一步：长度头 + 版本号</text>
+  <text x="664" y="698" font-size="11" fill="#2C4460">再往上就交给 Protocol Buffers 或 gRPC</text>
+
+  <text x="48" y="756" font-size="12" fill="#6B675C">口径：图中 12 / 8 字节按 x86-64 常见对齐算出；换平台或加 #pragma pack 后数值会变，代码里始终用 sizeof 而不是写死常量</text>
+</svg>

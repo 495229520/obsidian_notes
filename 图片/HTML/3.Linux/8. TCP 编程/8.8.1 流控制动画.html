@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>流控制动画 · 滑动窗口 / rwnd 动态变化 / 零窗口探测</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ===== 场景 1：发送方滑动窗口 ===== */
+.sw-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:4px;}
+.sw-legend span{display:inline-flex;align-items:center;gap:5px;}
+.sw-legend i{width:13px;height:13px;border-radius:3px;border:1.5px solid var(--line);display:inline-block;}
+.sw-legend i.l-ack{background:var(--greenbg);border-color:var(--green);}
+.sw-legend i.l-sent{background:var(--blue);border-color:var(--blue);}
+.sw-legend i.l-avail{background:var(--bluebg);border-color:var(--blue);}
+.sw-legend i.l-out{background:var(--gray);}
+.sw-stage{position:relative;width:558px;margin:18px auto 0;padding:48px 0 64px;}
+.sw-row{display:flex;gap:2px;}
+.swc{width:26px;height:40px;border:1.5px solid var(--line);border-radius:5px;background:var(--gray);color:var(--faint);font-family:var(--mono);font-size:9px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;transition:all var(--dur) var(--ease);}
+.swc.ack{background:var(--greenbg);border-color:var(--green);color:var(--green);}
+.swc.sent{background:var(--blue);border-color:var(--blue);color:#fff;}
+.swc.avail{background:var(--bluebg);border-color:var(--blue);color:var(--blue);}
+.swc.out{background:var(--gray);border-color:var(--line);color:var(--faint);opacity:.65;}
+.sw-br{position:absolute;top:26px;height:18px;border:2px solid var(--brown);border-bottom:none;border-radius:7px 7px 0 0;transition:left var(--dur) var(--ease),width var(--dur) var(--ease);}
+.sw-brlbl{position:absolute;top:-22px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brown);}
+.sw-ptr{position:absolute;top:44px;width:2px;height:56px;transition:left var(--dur) var(--ease);}
+.sw-ptr span{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:2px;font-family:var(--mono);font-size:10px;font-weight:700;white-space:nowrap;}
+.sw-ptr.una{background:var(--ink);}
+.sw-ptr.una span{color:var(--ink);}
+.sw-ptr.edge{background:var(--danger);}
+.sw-ptr.edge span{color:var(--danger);margin-top:18px;}
+.sw-stats{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:auto;padding-top:12px;}
+.sw-stats b{color:var(--ink);font-size:15px;}
+
+/* ===== 场景 2 / 3：报文通道 ===== */
+.fc-stage{display:flex;gap:16px;margin-top:8px;flex:1;}
+.fc-side{width:152px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.fc-title{font-weight:600;font-size:13.5px;}
+.fc-pause{font-size:11px;font-weight:700;color:var(--danger);border:1.5px solid var(--danger);background:var(--dangerbg);border-radius:999px;padding:2px 12px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.fc-pause.on{opacity:1;}
+.fc-sub{font-size:10.5px;color:var(--faint);margin-top:8px;font-family:var(--mono);}
+.fc-credit{width:132px;height:14px;border:1.5px solid var(--line);border-radius:7px;background:var(--paper);overflow:hidden;}
+.fc-creditfill{height:100%;width:0;background:var(--blue);transition:width var(--dur) var(--ease);}
+.fc-creditnum{font-family:var(--mono);font-size:12px;color:var(--blue);font-weight:700;min-height:19px;}
+.fc-chan{flex:1;position:relative;border-left:1.5px dashed var(--line);border-right:1.5px dashed var(--line);min-height:290px;}
+.fc-lanelbl{position:absolute;left:0;right:0;text-align:center;font-family:var(--mono);font-size:10px;color:var(--faint);}
+.fc-chip{position:absolute;font-family:var(--mono);font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;border:1.5px solid;white-space:nowrap;opacity:0;box-shadow:0 2px 6px rgba(60,55,40,.1);transition:left var(--dur) var(--ease),opacity 380ms var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),border-color var(--dur) var(--ease);}
+.fc-chip.data{top:20%;color:#fff;background:var(--blue);border-color:var(--blue);}
+.fc-chip.ackc{top:58%;color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.fc-chip.danger{color:var(--danger);background:var(--dangerbg);border-color:var(--danger);}
+.fc-buf{position:relative;width:68px;height:190px;border:2px solid var(--brown);border-radius:8px;background:var(--paper);overflow:hidden;transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.fc-buf.full{border-color:var(--danger);box-shadow:0 0 0 3px rgba(179,64,47,.2);}
+.fc-buffill{position:absolute;left:0;right:0;bottom:0;height:0;background:var(--brown);opacity:.85;transition:height var(--dur) var(--ease),background var(--dur) var(--ease);}
+.fc-buffill.full{background:var(--danger);}
+.fc-bufcap{position:absolute;top:4px;left:0;right:0;text-align:center;font-size:9.5px;color:var(--faint);font-family:var(--mono);}
+.fc-bufnum{font-family:var(--mono);font-size:11.5px;color:var(--brown);font-weight:700;}
+.fc-read{font-size:11px;color:var(--muted);border:1.5px solid var(--line);border-radius:8px;padding:3px 11px;transition:all var(--dur) var(--ease);}
+.fc-read.on{color:var(--green);border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 3px rgba(15,110,86,.15);}
+
+/* ===== 场景 3：零窗口探测 ===== */
+.zp-badge{font-size:11px;font-weight:700;border:1.5px solid var(--line);color:var(--muted);background:var(--gray);border-radius:999px;padding:3px 12px;text-align:center;transition:all var(--dur) var(--ease);white-space:nowrap;}
+.zp-badge.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.zp-badge.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.zp-badge.warm{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.zp-timer{width:132px;height:12px;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);overflow:hidden;}
+.zp-timerfill{height:100%;width:0;background:var(--brown);transition:width 900ms var(--ease),background var(--dur) var(--ease);}
+.zp-timerfill.fired{background:var(--danger);}
+.fc-chip.upd{top:14%;color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.fc-chip.probe{top:58%;color:var(--brown);background:var(--brownbg);border-color:var(--brown);}
+.fc-chip.reply{top:78%;color:var(--green);background:var(--greenbg);border-color:var(--green);}
+.zp-dead{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:12px;font-weight:700;color:var(--danger);background:var(--dangerbg);border:1.5px solid var(--danger);border-radius:9px;padding:6px 14px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;}
+.zp-dead.on{opacity:1;}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>流控制动画 · 滑动窗口 / rwnd 动态变化 / 零窗口探测</h1>
+    <p>配套笔记《8.8 流控制》 · 别淹没接收方：窗口由 ACK 的 win 字段驱动　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+
+/* ========== 场景 1：发送方滑动窗口 ========== */
+const winScene=(()=>{
+  const N=20,CW=28; // 20 格，每格 26px + 2px 间距
+  const code=codeOf([
+    '<span class="cmt">// 发送方视角的滑动窗口</span>',
+    'win      = ack.window;            <span class="cmt">// 接收方通告的窗口</span>',
+    'inflight = SND.NXT - SND.UNA;     <span class="cmt">// 在途未确认</span>',
+    'usable   = win - inflight;        <span class="cmt">// 实际可发送</span>',
+    '<span class="kw">if</span> (usable == 0) pause();         <span class="cmt">// 窗口用尽，停发</span>',
+    '<span class="cmt">// ACK 到达: SND.UNA 右移 → 窗口向右滑动</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 初始：窗口 = 8 格，四区就位',chip:'四区划分',chipC:'c0',una:0,nxt:0,wnd:8,lines:[0],
+     desc:'发送方的字节流被切成一排格子（每格视作一小段字节）。两条边界把它分成四区：<span class="gr">已确认</span>（对方收到了）、<span class="bl">已发送未确认</span>（在途）、浅蓝<b>可发送</b>（窗口内还没发的）、灰色<b>窗口外</b>（暂时禁止发送）。左边界是 <b>SND.UNA</b>（最早未确认字节），右边界 = SND.UNA + win。当前 win = <b>8 格</b>，全部可发送。'},
+    {title:'步骤 1 · 发送 3 格：可发送 → 在途',chip:'在途 = 3',chipC:'cb',una:0,nxt:3,wnd:8,lines:[2],
+     desc:'发送方发出 3 格数据，它们从<b>可发送</b>区变成<span class="bl">已发送未确认</span>（在途）。注意两条边界都<b>没有动</b>——发送只是在窗口内部消耗额度：在途 3 格，还能再发 5 格。'},
+    {title:'步骤 2 · 再发 2 格',chip:'在途 = 5',chipC:'cb',una:0,nxt:5,wnd:8,lines:[2],
+     desc:'又发出 2 格，在途累计 <b>5</b> 格，剩余额度 8 − 5 = <b>3</b> 格。窗口仍然原地不动——<b>窗口要滑动，必须等 ACK</b>。'},
+    {title:'步骤 3 · ACK 确认前 3 格 → 窗口右滑',chip:'窗口滑动',chipC:'cg',una:3,nxt:5,wnd:8,lines:[5],
+     desc:'ACK 到达，确认前 3 格。<b>SND.UNA 右移 3 格</b>，它们变<span class="gr">绿</span>；窗口右沿 = SND.UNA + win 同步右移——原本在窗口外的 3 格进入<b>可发送</b>区。这就是"滑动"窗口：<b>确认驱动整个窗口向右滑</b>。'},
+    {title:'步骤 4 · ACK 确认 2 格，但通告 win 缩小到 6',chip:'win 8→6',chipC:'ch',una:5,nxt:5,wnd:6,lines:[1],
+     desc:'新 ACK 又确认 2 格，但接收方缓冲区吃紧，这次通告 <b>win = 6</b>。左边界右移 2 格，右沿却停在原地——窗口从 8 格<b>收缩</b>到 6 格。窗口多大，完全由接收方 ACK 里的 <b>win 字段</b>说了算。'},
+    {title:'步骤 5 · 连发 6 格，窗口用尽',chip:'可发送 = 0',chipC:'cd',una:5,nxt:11,wnd:6,lines:[4],
+     desc:'发送方把 6 格额度一口气用完：在途 6 格，可发送 <span class="dg">0</span> 格。SND.NXT 撞上窗口右沿——<b>发送方必须停下</b>，哪怕它还有数据想发。'},
+    {title:'步骤 6 · ACK + 更大窗口 → 窗口扩大右滑',chip:'win = 8 恢复',chipC:'cg',una:11,nxt:11,wnd:8,lines:[5],
+     desc:'ACK 确认了全部在途数据，且接收方腾出了空间，通告 <b>win = 8</b>。窗口整体右滑并重新张开，8 格<b>可发送</b>额度回来了，发送恢复。'},
+    {title:'步骤 7 · 小结：可发送 = win − 在途',chip:'滑动窗口本质',chipC:'cg',una:11,nxt:11,wnd:8,lines:[3],
+     desc:'两条铁律：<b>实际可发送 = 接收方通告的 win − 在途未确认</b>；窗口的位置被 ACK 推着右滑，大小由 ACK 里的 win 字段动态调整。发送速度的"油门"握在<b>接收方</b>手里——这正是流控制。'},
+  ];
+  function mount(){
+    let cells='';for(let i=0;i<N;i++)cells+='<div class="swc" id="sw-'+i+'">'+i+'</div>';
+    viz.innerHTML='<div class="vcap"><b>发送方滑动窗口</b>：字节流四区 + 两条会滑动的边界</div>'+
+      '<div class="sw-legend">'+
+        '<span><i class="l-ack"></i>已确认</span><span><i class="l-sent"></i>已发送未确认</span>'+
+        '<span><i class="l-avail"></i>可发送</span><span><i class="l-out"></i>窗口外</span></div>'+
+      '<div class="sw-stage">'+
+        '<div class="sw-br" id="swBr"><span class="sw-brlbl" id="swBrLbl"></span></div>'+
+        '<div class="sw-row">'+cells+'</div>'+
+        '<div class="sw-ptr una" id="swUna"><span>SND.UNA</span></div>'+
+        '<div class="sw-ptr edge" id="swEdge"><span>窗口右沿</span></div>'+
+      '</div>'+
+      '<div class="sw-stats">在途 <b id="swInf">0</b> 格　·　可发送 <b id="swAva">8</b> 格</div>';
+  }
+  function paint(s){
+    const wr=s.una+s.wnd;
+    for(let i=0;i<N;i++){
+      const c=el('sw-'+i);
+      if(i<s.una)c.className='swc ack';
+      else if(i<s.nxt)c.className='swc sent';
+      else if(i<wr)c.className='swc avail';
+      else c.className='swc out';
+    }
+    el('swUna').style.left=(s.una*CW-1)+'px';
+    el('swEdge').style.left=(wr*CW-1)+'px';
+    const br=el('swBr');
+    br.style.left=(s.una*CW)+'px';br.style.width=(s.wnd*CW-2)+'px';
+    el('swBrLbl').textContent='窗口 win = '+s.wnd+' 格';
+    el('swInf').textContent=s.nxt-s.una;
+    el('swAva').textContent=wr-s.nxt;
+  }
+  return {id:'window',label:'滑动窗口',sub:'发送方四区滑动',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：rwnd 动态变化（接收缓冲区视角） ========== */
+const rwndScene=(()=>{
+  const CAP=9000,L='10px',R='calc(100% - 112px)';
+  const code=codeOf([
+    '<span class="cmt">// 接收方: rwnd = 缓冲区剩余空间</span>',
+    'rwnd = 9000 - buffered;           <span class="cmt">// 已占用越多, rwnd 越小</span>',
+    'send_ack(win = rwnd);             <span class="cmt">// 随 ACK 通告给发送方</span>',
+    '<span class="cmt">// 发送方: 按 win 收放发送额度</span>',
+    '<span class="kw">if</span> (win == 0) pause();            <span class="cmt">// 零窗口 → 暂停发送</span>',
+    '<span class="kw">else</span> resume();                    <span class="cmt">// 恢复发送</span>'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 初始：接收缓冲区 9000B 全空',chip:'rwnd 概念',chipC:'c0',lines:[0],
+     buf:0,win:null,pause:false,read:false,
+     d:{t:'DATA 1000B',l:L,o:0},a:{t:'ACK',l:R,o:0},
+     desc:'<b>rwnd（接收窗口）= 接收缓冲区的剩余空间</b>。右侧竖槽是接收方 9000B 的缓冲区：数据到达先堆在这里，等应用层 <code>read()</code> 取走。接收方每次回 ACK，都把当前剩余空间写进 <b>win 字段</b>告诉发送方。'},
+    {title:'步骤 1 · 发送 1000B',chip:'DATA 1000B',chipC:'cb',lines:[1],
+     buf:1000,win:null,pause:false,read:false,
+     d:{t:'DATA 1000B',l:R,o:1},a:{t:'ACK win=8000',l:R,o:0},
+     desc:'发送方发出 <b>1000B</b>，数据进入接收缓冲区，已占用 1000B。应用层此刻没在读，数据先躺在缓冲区里。'},
+    {title:'步骤 2 · 回 ACK win=8000',chip:'win=8000',chipC:'cg',lines:[2],
+     buf:1000,win:8000,pause:false,read:false,
+     d:{t:'DATA 1000B',l:L,o:0},a:{t:'ACK win=8000',l:L,o:1},
+     desc:'接收方回 ACK：9000 − 1000 = <b>8000</b>，写进 win 字段。发送方读到后把左侧的"可发额度"条设为 <span class="bl">8000B</span>——还可以放心发这么多。'},
+    {title:'步骤 3 · 发送 5000B，缓冲区堆积到 6000',chip:'堆积',chipC:'cb',lines:[1],
+     buf:6000,win:8000,pause:false,read:false,
+     d:{t:'DATA 5000B',l:R,o:1},a:{t:'ACK win=3000',l:R,o:0},
+     desc:'发送方又发 <b>5000B</b>。应用层仍然没读，缓冲区涨到 <b>6000B</b>——生产比消费快，数据开始<b>堆积</b>。水位（棕色）就是堆积量。'},
+    {title:'步骤 4 · 回 ACK win=3000：反压发送方',chip:'win=3000',chipC:'ch',lines:[2],
+     buf:6000,win:3000,pause:false,read:false,
+     d:{t:'DATA 5000B',l:L,o:0},a:{t:'ACK win=3000',l:L,o:1},
+     desc:'接收方回 ACK：9000 − 6000 = <b>3000</b>。发送方额度条被压缩到 3000B——接收方正是<b>通过 win 字段反压发送方</b>："我快满了，你只能再发 3000B"。'},
+    {title:'步骤 5 · 发送 3000B，缓冲区满',chip:'9000 / 9000',chipC:'cd',lines:[1],
+     buf:9000,win:3000,pause:false,read:false,
+     d:{t:'DATA 3000B',l:R,o:1},a:{t:'ACK win=0',l:R,o:0,x:1},
+     desc:'发送方把剩余 3000B 额度用完，缓冲区 <span class="dg">9000 / 9000 满</span>。此后再来的数据只能被丢弃——流控制必须在这一步之前踩住刹车。'},
+    {title:'步骤 6 · 回 ACK win=0 → 暂停发送',chip:'零窗口',chipC:'cd',lines:[4],
+     buf:9000,win:0,pause:true,read:false,
+     d:{t:'DATA 3000B',l:L,o:0},a:{t:'ACK win=0',l:L,o:1,x:1},
+     desc:'接收方通告 <span class="dg">win = 0</span>（零窗口）。发送方额度归零、打上<span class="dg">暂停</span>标记——无论还有多少数据要发，都必须停下等待。'},
+    {title:'步骤 7 · 应用层 read() 读走 4000B',chip:'腾出空间',chipC:'cg',lines:[1],
+     buf:5000,win:0,pause:true,read:true,
+     d:{t:'DATA 3000B',l:L,o:0},a:{t:'ACK win=4000',l:R,o:0},
+     desc:'应用层终于调用 <code>read()</code> 取走 4000B，水位降到 <b>5000B</b>，腾出 4000B 空间。注意：此刻<b>发送方还不知道</b>，仍处于暂停状态。'},
+    {title:'步骤 8 · 回 ACK win=4000 → 恢复发送',chip:'恢复发送',chipC:'cg',lines:[5],
+     buf:5000,win:4000,pause:false,read:false,
+     d:{t:'DATA 3000B',l:L,o:0},a:{t:'ACK win=4000',l:L,o:1},
+     desc:'接收方发出窗口更新 ACK <b>win = 4000</b>，发送方额度恢复、继续发送。小结：流控制解决"<b>别淹没接收方</b>"（端到端）；拥塞控制解决"别淹没网络"（网络路径），实际发送窗口 = <b>min(rwnd, cwnd)</b>。'},
+  ];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>rwnd 动态变化</b>：接收缓冲区水位决定 win 通告（数字与笔记时序一致）</div>'+
+      '<div class="fc-stage">'+
+        '<div class="fc-side"><div class="fc-title">发送方</div>'+
+          '<div class="fc-pause" id="fcPause">已暂停</div>'+
+          '<div class="fc-sub">可发额度（来自 win）</div>'+
+          '<div class="fc-credit"><div class="fc-creditfill" id="fcCreditFill"></div></div>'+
+          '<div class="fc-creditnum" id="fcCreditNum">尚未通告</div></div>'+
+        '<div class="fc-chan">'+
+          '<div class="fc-lanelbl" style="top:10%">数据 →</div>'+
+          '<div class="fc-chip data" id="fcData"></div>'+
+          '<div class="fc-lanelbl" style="top:48%">← ACK（携带 win）</div>'+
+          '<div class="fc-chip ackc" id="fcAck"></div></div>'+
+        '<div class="fc-side"><div class="fc-title">接收方</div>'+
+          '<div class="fc-buf" id="fcBufBox"><div class="fc-buffill" id="fcBufFill"></div><div class="fc-bufcap">缓冲区 9000B</div></div>'+
+          '<div class="fc-bufnum" id="fcBufNum"></div>'+
+          '<div class="fc-read" id="fcRead">应用层 read()</div></div>'+
+      '</div>';
+  }
+  function paint(s){
+    const d=el('fcData'),a=el('fcAck');
+    d.textContent=s.d.t;d.style.left=s.d.l;d.style.opacity=s.d.o;
+    a.textContent=s.a.t;a.className='fc-chip ackc'+(s.a.x?' danger':'');
+    a.style.left=s.a.l;a.style.opacity=s.a.o;
+    el('fcBufFill').style.height=(s.buf/CAP*100)+'%';
+    el('fcBufFill').classList.toggle('full',s.buf>=CAP);
+    el('fcBufBox').classList.toggle('full',s.buf>=CAP);
+    el('fcBufNum').textContent='已占用 '+s.buf+' / 9000 B';
+    el('fcCreditFill').style.width=s.win===null?'0%':(s.win/CAP*100)+'%';
+    el('fcCreditNum').textContent=s.win===null?'尚未通告':'win = '+s.win+' B';
+    el('fcPause').classList.toggle('on',s.pause);
+    el('fcRead').classList.toggle('on',s.read);
+  }
+  return {id:'rwnd',label:'rwnd 动态变化',sub:'接收缓冲区反压',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：零窗口探测（persist timer） ========== */
+const probeScene=(()=>{
+  const L='10px',R='calc(100% - 130px)';
+  const code=codeOf([
+    '<span class="cmt">// 零窗口探测（persist timer）</span>',
+    '<span class="kw">while</span> (window_size == 0) {',
+    '    sleep(probe_interval);        <span class="cmt">// 等待一段时间</span>',
+    '    send_zero_window_probe();     <span class="cmt">// 发送 1 字节探测</span>',
+    '    <span class="cmt">// 接收方在 ACK 中回复当前 win</span>',
+    '}'
+  ]);
+  const steps=[
+    {title:'步骤 0 · 前情：win=0，发送方停发',chip:'零窗口',chipC:'cd',lines:[1],
+     u:{l:R,o:0},p:{l:L,o:0},k:{l:R,o:0},timer:0,dead:false,
+     sb:{t:'win=0 · 暂停发送',c:'bad'},rb:{t:'缓冲区满',c:'warm'},
+     desc:'接上一幕：接收方通告 <span class="dg">win = 0</span>，发送方停发、进入等待。此时唯一能解锁它的，是接收方之后发来的<b>窗口更新 ACK</b>。'},
+    {title:'步骤 1 · 接收方腾出空间，发出窗口更新',chip:'win=4000 发出',chipC:'cg',lines:[],
+     u:{l:'42%',o:1},p:{l:L,o:0},k:{l:R,o:0},timer:0,dead:false,
+     sb:{t:'win=0 · 暂停发送',c:'bad'},rb:{t:'读走数据 · 腾出 4000B',c:'ok'},
+     desc:'接收方应用读走了数据，立刻发出<b>窗口更新 ACK win=4000</b>，通知发送方可以继续。报文正在网络中传输……'},
+    {title:'步骤 2 · 窗口更新 ACK 在网络中丢失',chip:'丢包',chipC:'cd',lines:[],
+     u:{l:'42%',o:.28,x:1},p:{l:L,o:0},k:{l:R,o:0},timer:0,dead:false,
+     sb:{t:'win=0 · 暂停发送',c:'bad'},rb:{t:'以为已通知对方',c:'warm'},
+     desc:'不巧，这个 ACK <span class="dg">在网络中丢失</span>了。它是纯 ACK，<b>不会被重传</b>——接收方并不知道它没有送达。'},
+    {title:'步骤 3 · 双方互等：死锁风险',chip:'死锁',chipC:'cd',lines:[1],
+     u:{l:'42%',o:0,x:1},p:{l:L,o:0},k:{l:R,o:0},timer:0,dead:true,
+     sb:{t:'等待窗口更新…',c:'bad'},rb:{t:'等待新数据…',c:'bad'},
+     desc:'发送方在等窗口更新才敢发；接收方以为已经通知过、在等新数据。<b>谁都不会先动</b>——如果没有额外机制，连接就永远卡死在这里。'},
+    {title:'步骤 4 · persist timer 到期',chip:'坚持定时器',chipC:'ch',lines:[2],
+     u:{l:'42%',o:0,x:1},p:{l:L,o:0},k:{l:R,o:0},timer:100,dead:true,
+     sb:{t:'定时器到期',c:'warm'},rb:{t:'等待新数据…',c:'bad'},
+     desc:'发送方并没有干等：进入零窗口状态时它就启动了<b>坚持定时器（persist timer）</b>。倒计时走完——打破僵局的时刻到了。'},
+    {title:'步骤 5 · 发出零窗口探测报文（1 字节）',chip:'probe 1B',chipC:'ch',lines:[3],
+     u:{l:'42%',o:0,x:1},p:{l:R,o:1},k:{l:R,o:0},timer:0,dead:false,
+     sb:{t:'发出探测 1B',c:'warm'},rb:{t:'等待新数据…',c:'bad'},
+     desc:'发送方发出<b>零窗口探测报文</b>——只携带 <b>1 字节</b>数据：既能强迫接收方重新表态，又几乎不占用对方缓冲区。'},
+    {title:'步骤 6 · 接收方收到探测，回 ACK win=4000',chip:'窗口恢复',chipC:'cg',lines:[4],
+     u:{l:'42%',o:0,x:1},p:{l:R,o:0},k:{l:L,o:1},timer:0,dead:false,
+     sb:{t:'收到 win=4000',c:'ok'},rb:{t:'回复当前 win=4000',c:'ok'},
+     desc:'接收方收到探测，在 ACK 里回复当前窗口 <b>win = 4000</b>。丢失的信息被发送方主动"问"回来了。'},
+    {title:'步骤 7 · 死锁解除，恢复发送',chip:'恢复发送',chipC:'cg',lines:[5],
+     u:{l:'42%',o:0,x:1},p:{l:L,o:0},k:{l:L,o:0},timer:0,dead:false,
+     sb:{t:'恢复发送 ✓',c:'ok'},rb:{t:'继续接收数据',c:'ok'},
+     desc:'发送方拿到非零窗口，恢复发送，死锁解除。要点：探测由<b>发送方驱动</b>，不依赖接收方重发；若对方仍回 win=0，就按<b>指数退避</b>拉长间隔继续探测，直到窗口重新打开。'},
+  ];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>零窗口探测</b>：窗口更新丢失 → 互等死锁 → persist timer 打破僵局</div>'+
+      '<div class="fc-stage">'+
+        '<div class="fc-side"><div class="fc-title">发送方</div>'+
+          '<div class="zp-badge" id="zpSBadge"></div>'+
+          '<div class="fc-sub">persist timer</div>'+
+          '<div class="zp-timer"><div class="zp-timerfill" id="zpTimer"></div></div></div>'+
+        '<div class="fc-chan">'+
+          '<div class="fc-lanelbl" style="top:6%">← 窗口更新</div>'+
+          '<div class="fc-chip upd" id="zpUpd">窗口更新 win=4000</div>'+
+          '<div class="zp-dead" id="zpDead">⚠ 互相等待 · 死锁风险</div>'+
+          '<div class="fc-lanelbl" style="top:50%">探测 →</div>'+
+          '<div class="fc-chip probe" id="zpProbe">探测 1B</div>'+
+          '<div class="fc-chip reply" id="zpAck">ACK win=4000</div></div>'+
+        '<div class="fc-side"><div class="fc-title">接收方</div>'+
+          '<div class="zp-badge" id="zpRBadge"></div></div>'+
+      '</div>';
+  }
+  function paint(s){
+    const u=el('zpUpd'),p=el('zpProbe'),k=el('zpAck');
+    u.className='fc-chip upd'+(s.u.x?' danger':'');
+    u.style.left=s.u.l;u.style.opacity=s.u.o;
+    p.style.left=s.p.l;p.style.opacity=s.p.o;
+    k.style.left=s.k.l;k.style.opacity=s.k.o;
+    const t=el('zpTimer');
+    t.style.width=s.timer+'%';t.classList.toggle('fired',s.timer>=100);
+    el('zpDead').classList.toggle('on',s.dead);
+    const sb=el('zpSBadge');sb.textContent=s.sb.t;sb.className='zp-badge '+s.sb.c;
+    const rb=el('zpRBadge');rb.textContent=s.rb.t;rb.className='zp-badge '+s.rb.c;
+  }
+  return {id:'probe',label:'零窗口探测',sub:'persist timer 防死锁',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[winScene,rwndScene,probeScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

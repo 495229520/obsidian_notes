@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>epoll LT 与 ET 动画 · 水平触发反复通知 / 边缘触发只提醒一次</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;
+  --blue:#3D5A80;--bluebg:#E3EAF4;--bluetx:#2C4460;
+  --green:#2F6B5E;--greenbg:#DCE9E3;--greentx:#24473F;
+  --amber:#8A6A3A;--amberbg:#EFE7DA;--ambertx:#6B4E28;
+  --danger:#A64B3C;--dangerbg:#F0E0DB;--dangertx:#733428;
+  --gray:#F1EFE8;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:.2px;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:10px 18px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:680px 1fr;gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1280px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;}
+.viz .vcap b{color:var(--ink);font-weight:700;}
+.stage{position:relative;width:632px;height:420px;margin:0 auto;}
+
+/* ===== 统一连线系统 ===== */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.wire{--wc:var(--arrow);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.warrow{--wc:var(--arrow);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}
+.wport{--wc:var(--arrow);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire.on,.warrow.on,.wport.on{opacity:1;}
+.wire.hint{stroke-width:2;opacity:.1;}
+.warrow.hint,.wport.hint{opacity:.1;}
+.warrow.drawing{transition-delay:200ms;}
+.wire.blue,.warrow.blue,.wport.blue{--wc:var(--blue);}
+.wire.green,.warrow.green,.wport.green{--wc:var(--green);}
+.wire.amber,.warrow.amber,.wport.amber{--wc:var(--amber);}
+.wire.danger,.warrow.danger,.wport.danger{--wc:var(--danger);}
+.wlabel{position:absolute;z-index:3;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--line);padding:2px 7px;border-radius:6px;opacity:0;transform:translate(-50%,-50%);transition:opacity var(--dur) var(--ease);white-space:nowrap;pointer-events:none;}
+.wlabel.on{opacity:1;}
+.wlabel.blue{color:var(--bluetx);border-color:var(--blue);}
+.wlabel.green{color:var(--greentx);border-color:var(--green);}
+.wlabel.amber{color:var(--ambertx);border-color:var(--amber);}
+.wlabel.danger{color:var(--dangertx);border-color:var(--danger);}
+
+/* ===== 缓冲区 + 通知布局（LT / ET / EAGAIN 共用） ===== */
+.lt-box{position:absolute;border:1.5px solid var(--grid);border-radius:12px;background:var(--paper);transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);opacity:.45;}
+.lt-box.lit{opacity:1;}
+.lt-box .hdr{position:absolute;top:8px;left:14px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);white-space:nowrap;transition:color var(--dur) var(--ease);}
+#bufBox.lit{border-color:var(--amber);background:#FBF9F5;}
+#bufBox.lit .hdr{color:var(--amber);}
+#waitBox.lit{border-color:var(--blue);background:#F8FAFC;}
+#waitBox.lit .hdr{color:var(--blue);}
+#readBox.lit{border-color:var(--green);background:#F7FAF8;}
+#readBox.lit .hdr{color:var(--green);}
+.buf-track{position:absolute;left:50%;transform:translateX(-50%);bottom:36px;width:100px;height:196px;border:1.5px solid var(--line);border-radius:9px;background:var(--gray);overflow:hidden;}
+.buf-fill{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,#E8D9BC 0%,var(--amberbg) 100%);border-top:2.5px solid var(--amber);transition:height var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease);}
+.buf-fill.stale{background:linear-gradient(180deg,#EAC9BF 0%,var(--dangerbg) 100%);border-top-color:var(--danger);}
+.buf-bytes{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ambertx);transition:color var(--dur) var(--ease);white-space:nowrap;}
+.buf-bytes.stale{color:var(--dangertx);}
+.arrive{position:absolute;top:34px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--ambertx);border:1px solid var(--amber);background:var(--amberbg);border-radius:6px;padding:2px 8px;opacity:0;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);white-space:nowrap;z-index:3;}
+.arrive.on{opacity:1;transform:translateX(-50%) translateY(3px);}
+.arrive.edge{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.wstate{position:absolute;left:16px;right:16px;top:34px;height:34px;border:1.5px solid var(--line);border-radius:8px;background:var(--gray);font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all var(--dur) var(--ease);white-space:nowrap;}
+.wstate.run{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.wstate.stuck{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.rounds{position:absolute;left:16px;right:16px;top:78px;display:flex;gap:8px;}
+.rd{flex:1;height:44px;border:1.5px dashed var(--line);border-radius:8px;background:transparent;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all var(--dur) var(--ease);}
+.rd .rn{font-size:9px;opacity:.8;}
+.rd.fire{border-style:solid;border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.rd.fire2{border-style:solid;border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);transform:scale(1.05);}
+.rd.mute{border-style:solid;border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.rd.idle{border-style:solid;border-color:var(--line);background:var(--gray);color:var(--muted);}
+.rrow{position:absolute;left:16px;right:16px;height:32px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:space-between;padding:0 12px;opacity:0;transform:translateX(-6px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease);white-space:nowrap;}
+.rrow.on{opacity:1;transform:translateX(0);}
+.rrow.act{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.rrow.ok{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.rrow.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+.lt-note{position:absolute;left:50%;top:392px;transform:translateX(-50%);font-size:12px;font-weight:700;border:1.5px solid var(--line);border-radius:999px;padding:5px 14px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;color:var(--muted);background:var(--panel);z-index:4;}
+.lt-note.on{opacity:1;}
+.lt-note.b{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.lt-note.g{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.lt-note.h{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.lt-note.d{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+/* ===== 对照总结 ===== */
+.vs-head{position:absolute;top:6px;font-family:var(--mono);font-size:11.5px;font-weight:700;padding:3px 14px;border-radius:999px;border:1.5px solid;}
+.vs-head.lt{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.vs-head.et{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.vs-row{position:absolute;left:8px;right:8px;height:76px;}
+.vs-lab{position:absolute;left:0;top:8px;bottom:8px;width:114px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);display:flex;align-items:center;transition:color var(--dur) var(--ease);}
+.vs-row.lit .vs-lab{color:var(--ink);}
+.vs-c{position:absolute;top:8px;bottom:8px;border:1.5px solid var(--line);border-radius:10px;background:var(--gray);opacity:.3;transform:translateY(3px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease);padding:0 14px;font-size:12.5px;line-height:1.45;display:flex;align-items:center;color:var(--muted);}
+.vs-c.lt{left:122px;width:240px;}
+.vs-c.et{left:376px;width:240px;}
+.vs-row.lit .vs-c{opacity:1;transform:translateY(0);}
+.vs-row.lit .vs-c.lt{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.vs-row.lit .vs-c.et{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.vs-row.was .vs-c{opacity:.72;transform:translateY(0);}
+.vs-row.was .vs-c.lt{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.vs-row.was .vs-c.et{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.vs-note{position:absolute;left:50%;top:392px;transform:translateX(-50%);font-size:12px;font-weight:700;border:1.5px solid var(--green);border-radius:999px;padding:5px 14px;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;color:var(--greentx);background:var(--greenbg);}
+.vs-note.on{opacity:1;}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:700;}
+.desc-body .gr{color:var(--green);font-weight:700;}
+.desc-body .dg{color:var(--danger);font-weight:700;}
+.desc-body .hb{color:var(--amber);font-weight:700;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:13px;line-height:1.6;color:#D8D5CC;white-space:pre;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 16px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>epoll LT 与 ET · 水平触发反复通知 / 边缘触发只提醒一次</h1>
+    <p>配套笔记《13.4 epoll模型》§8 · LT 只要有数据就一直提醒 · ET 必须非阻塞循环读到 EAGAIN　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+
+/* ===== 共享连线引擎 ===== */
+const trioHTML=id=>`<path id="${id}" class="wire"/><path id="${id}-head" class="warrow"/><circle id="${id}-port" class="wport" r="4"/>`;
+const trio=id=>[el(id),el(id+'-head'),el(id+'-port')];
+function motionKit(){
+  let timers=[],token=0;
+  const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return {
+    reduced,
+    schedule(fn,delay){const t=token;if(reduced())fn();else timers.push(setTimeout(()=>{if(t===token)fn();},delay));},
+    later(fn,delay){const t=token;timers.push(setTimeout(()=>{if(t===token)fn();},delay));},
+    clear(){token++;timers.forEach(clearTimeout);timers=[];}
+  };
+}
+function setW(id,state='',color=''){
+  const sfx=(state?' '+state:'')+(color?' '+color:'');
+  const [p,a,o]=trio(id);
+  p.setAttribute('class','wire'+sfx);a.setAttribute('class','warrow'+sfx);o.setAttribute('class','wport'+sfx);
+  p.style.strokeDasharray='';p.style.strokeDashoffset='';p.style.transition='';a.classList.remove('drawing');
+}
+function drawW(motion,id,color){
+  setW(id,'on',color);
+  const [p,a]=trio(id);
+  if(motion.reduced())return;
+  const L=p.getTotalLength();
+  p.style.transition='none';p.style.strokeDasharray=L;p.style.strokeDashoffset=L;
+  a.classList.add('drawing');void p.getBoundingClientRect();
+  p.style.transition='';p.style.strokeDashoffset='0';
+  motion.later(()=>{p.style.strokeDasharray='';p.style.strokeDashoffset='';a.classList.remove('drawing');},560);
+}
+function polyArrow(id,points){
+  const p=el(id),a=el(id+'-head'),o=el(id+'-port');
+  const start=points[0],tip=points[points.length-1],prev=points[points.length-2];
+  let base={x:tip.x,y:tip.y},dHead;
+  const horizontal=Math.abs(tip.x-prev.x)>=Math.abs(tip.y-prev.y);
+  if(horizontal){const dir=Math.sign(tip.x-prev.x)||1;base.x=tip.x-dir*9;dHead=`M ${tip.x} ${tip.y} L ${base.x} ${tip.y-5} L ${base.x} ${tip.y+5} Z`;}
+  else{const dir=Math.sign(tip.y-prev.y)||1;base.y=tip.y-dir*9;dHead=`M ${tip.x} ${tip.y} L ${tip.x-5} ${base.y} L ${tip.x+5} ${base.y} Z`;}
+  const pts=[...points.slice(0,-1),base];
+  let d=`M ${pts[0].x} ${pts[0].y}`;for(let i=1;i<pts.length;i++)d+=` L ${pts[i].x} ${pts[i].y}`;
+  p.setAttribute('d',d);a.setAttribute('d',dHead);o.setAttribute('cx',start.x);o.setAttribute('cy',start.y);
+}
+function bezierArrow(id,x1,y1,tipX,tipY){
+  const baseX=tipX-9,gap=Math.max(1,baseX-x1),c1=x1+gap*.45,c2=x1+gap*.55;
+  el(id).setAttribute('d',`M ${x1} ${y1} C ${c1} ${y1}, ${c2} ${tipY}, ${baseX} ${tipY}`);
+  el(id+'-head').setAttribute('d',`M ${tipX} ${tipY} L ${baseX} ${tipY-5} L ${baseX} ${tipY+5} Z`);
+  el(id+'-port').setAttribute('cx',x1);el(id+'-port').setAttribute('cy',y1);
+}
+const relRect=(stageR,id)=>{
+  const q=el(id).getBoundingClientRect();
+  return {l:q.left-stageR.left,r:q.right-stageR.left,t:q.top-stageR.top,b:q.bottom-stageR.top,
+          cx:(q.left+q.right)/2-stageR.left,cy:(q.top+q.bottom)/2-stageR.top};
+};
+const placeLabel=(id,x,y)=>{const n=el(id);n.style.left=x+'px';n.style.top=y+'px';};
+
+/* ===== LT / ET / EAGAIN 共用舞台 =====
+   左：内核接收缓冲（fill 高度真实 tween）
+   右上：epoll_wait（4 个轮次槽）
+   右下：应用 read/recv（行逐条出现） */
+const PXPB=3.2; /* 每字节像素高 */
+function mountBufStage(motion,litW,capRead,readHdr){
+  litW.clear();
+  let h='';
+  h+='<div class="lt-box" id="bufBox" style="left:24px;top:36px;width:172px;height:296px"><span class="hdr">内核接收缓冲</span><span class="arrive" id="bufArrive"></span><div class="buf-track"><div class="buf-fill" id="bufFill"></div></div><span class="buf-bytes" id="bufBytes">0B</span></div>';
+  h+='<div class="lt-box" id="waitBox" style="left:252px;top:36px;width:364px;height:138px"><span class="hdr">epoll_wait</span><div class="wstate" id="wState">阻塞等待…</div><div class="rounds">'
+    +[1,2,3,4].map(i=>`<div class="rd" id="rd${i}"><span class="rn">round ${i}</span><span id="rdTx${i}">—</span></div>`).join('')+'</div></div>';
+  h+='<div class="lt-box" id="readBox" style="left:252px;top:198px;width:364px;height:134px"><span class="hdr">'+readHdr+'</span>';
+  for(let i=0;i<capRead;i++)h+=`<div class="rrow" id="rr${i}" style="top:${34+i*36}px"><span id="rrL${i}"></span><span id="rrR${i}"></span></div>`;
+  h+='</div>';
+  h+='<span class="lt-note" id="ltNote"></span>';
+  h+='<svg class="arr-layer" id="ltSvg" preserveAspectRatio="none">'+['wN','wR'].map(trioHTML).join('')+'</svg>';
+  h+='<span class="wlabel blue" id="lblN">EPOLLIN 通知</span>';
+  h+='<span class="wlabel green" id="lblR">返回后处理</span>';
+  return h;
+}
+function layoutBufStage(){
+  const stage=el('ltStage'),svg=el('ltSvg');if(!stage||!svg)return;
+  const sr=stage.getBoundingClientRect();
+  svg.setAttribute('viewBox',`0 0 ${sr.width} ${sr.height}`);
+  const buf=relRect(sr,'bufBox'),w=relRect(sr,'waitBox'),r=relRect(sr,'readBox');
+  bezierArrow('wN',buf.r,w.cy,w.l,w.cy);
+  polyArrow('wR',[{x:w.cx,y:w.b},{x:w.cx,y:r.t}]);
+  placeLabel('lblN',(buf.r+w.l)/2,w.cy-24);
+  placeLabel('lblR',w.cx+96,(w.b+r.t)/2);
+}
+function bufSet(bytes,stale){
+  el('bufFill').style.height=(bytes*PXPB)+'px';
+  el('bufFill').classList.toggle('stale',!!stale);
+  el('bufBytes').textContent=bytes+'B';
+  el('bufBytes').classList.toggle('stale',!!stale);
+}
+function roundSet(i,cls,tx){
+  el('rd'+i).className='rd'+(cls?' '+cls:'');
+  el('rdTx'+i).textContent=tx||'—';
+}
+function readRow(i,cls,left,right){
+  el('rr'+i).className='rrow'+(cls?' '+cls:'');
+  el('rrL'+i).textContent=left||'';el('rrR'+i).textContent=right||'';
+}
+function note(text,kind){
+  const n=el('ltNote');n.textContent=text;n.className='lt-note'+(text?' on':'')+(kind?' '+kind:'');
+}
+function bufBaseline(motion,litW,capRead){
+  motion.clear();layoutBufStage();
+  ['bufBox','waitBox','readBox'].forEach(id=>el(id).classList.remove('lit'));
+  el('bufArrive').className='arrive';el('bufArrive').textContent='';
+  el('wState').className='wstate';el('wState').textContent='阻塞等待…';
+  for(let i=1;i<=4;i++)roundSet(i,'','—');
+  for(let i=0;i<capRead;i++)readRow(i,'','','');
+  note('');
+  ['wN','wR'].forEach(id=>setW(id));
+  ['lblN','lblR'].forEach(id=>el(id).classList.remove('on'));
+}
+/* 通知线：每次通知都重新画入（先归零再 draw） */
+function fireNotify(motion,litW,color,delay){
+  setW('wN');litW.delete('wN');
+  motion.schedule(()=>{drawW(motion,'wN',color);el('lblN').classList.add('on');litW.add('wN');},delay);
+}
+
+/* ========== 场景 1：LT 水平触发 ========== */
+const ltScene=(()=>{
+  const code=codeOf([
+    'ev.events = EPOLLIN;  <span class="cmt">// 默认 LT</span>',
+    'epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);',
+    'n = epoll_wait(...);  <span class="cmt">// 有数据 → 返回</span>',
+    'read(fd, buf, 10);    <span class="cmt">// 只读 10B, 剩 30B</span>',
+    'n = epoll_wait(...);  <span class="cmt">// LT: 再次返回!</span>',
+    'read(fd, buf, 30);    <span class="cmt">// 读空 → 下轮阻塞</span>'
+  ]);
+  const steps=[
+    {k:'idle',title:'步骤 0 · 接收缓冲空，epoll_wait 阻塞',chip:'空闲',chipC:'c0',lines:[0,1],
+     desc:'LT（Level Triggered，水平触发）是 epoll <b>默认模式</b>。此刻内核接收缓冲为空，<code>epoll_wait</code> 阻塞等待。记忆：<span class="bl">LT = 只要还有数据，就一直提醒你</span>。'},
+    {k:'arrive',title:'步骤 1 · 对端发来 40B 数据',chip:'数据到达',chipC:'ch',lines:[],
+     desc:'40B 进入内核接收缓冲，fd 变为可读。「缓冲区有数据」这个<span class="hb">水平状态</span>成立——LT 关心的就是这个状态本身。'},
+    {k:'n1',title:'步骤 2 · epoll_wait 返回 EPOLLIN ①',chip:'通知 ①',chipC:'cb',lines:[2],
+     desc:'round 1：<code>epoll_wait</code> 返回，报告 fd 可读。应用拿到通知，准备去读。'},
+    {k:'read1',title:'步骤 3 · 只读 10B，缓冲还剩 30B',chip:'部分读取',chipC:'cg',lines:[3],
+     desc:'应用只 <code>read</code> 了 10B（缓冲小 / 有意少读都行）。缓冲还剩 30B——<b>「有数据」这个水平状态仍然成立</b>。'},
+    {k:'n2',title:'步骤 4 · LT 关键帧：下一轮再次返回 ②',chip:'再次通知',chipC:'ch',lines:[4],
+     desc:'round 2：因为缓冲仍有数据，<code>epoll_wait</code> <span class="hb">又一次返回</span>。没读完不会丢事件——这就是 LT 编程简单、不易出错的原因。'},
+    {k:'drain',title:'步骤 5 · 读完 30B，缓冲空，重新阻塞',chip:'读空',chipC:'cg',lines:[5],
+     desc:'把剩余 30B 读完，水平状态消失，round 3 起 <code>epoll_wait</code> 重新阻塞。结论：<span class="bl">LT 允许分多次读，每轮都会再提醒，直到读空</span>。'},
+  ];
+  let motion=motionKit(),litW=new Set(),observer=null;
+  function mount(){
+    cancel();
+    viz.innerHTML='<div class="vcap"><b>LT 水平触发</b>：缓冲有数据 → 反复通知，直到读空</div><div class="stage" id="ltStage">'+mountBufStage(motion,litW,3,'应用 read()')+'</div>';
+    layoutBufStage();observer=new ResizeObserver(layoutBufStage);observer.observe(el('ltStage'));
+  }
+  function paint(s){
+    bufBaseline(motion,litW,3);
+    const schedule=motion.schedule;
+    ['bufBox','waitBox'].forEach(id=>el(id).classList.add('lit'));
+    if(s.k==='idle'){bufSet(0);litW.clear();return;}
+    if(s.k==='arrive'){
+      bufSet(0);schedule(()=>{bufSet(40);el('bufArrive').textContent='+40B 到达';el('bufArrive').classList.add('on');},200);
+      litW.clear();return;
+    }
+    if(s.k==='n1'){
+      bufSet(40);el('bufArrive').textContent='+40B 到达';el('bufArrive').classList.add('on');
+      el('wState').className='wstate run';el('wState').textContent='返回 EPOLLIN';
+      roundSet(1,'fire','返回 ①');
+      fireNotify(motion,litW,'blue',160);
+      note('缓冲有数据 → 水平状态成立 → 返回','b');return;
+    }
+    if(s.k==='read1'){
+      el('readBox').classList.add('lit');
+      bufSet(40);roundSet(1,'fire','返回 ①');
+      el('wState').className='wstate run';el('wState').textContent='已通知 · 应用处理中';
+      setW('wN','on','blue');el('lblN').classList.add('on');litW.add('wN');
+      schedule(()=>{drawW(motion,'wR','green');el('lblR').classList.add('on');},140);
+      schedule(()=>{readRow(0,'on act','read(fd,buf,10)','→ 10B');bufSet(30);},480);
+      note('只读 10B · 缓冲还剩 30B','g');return;
+    }
+    if(s.k==='n2'){
+      el('readBox').classList.add('lit');
+      bufSet(30);roundSet(1,'fire','返回 ①');readRow(0,'on ok','read(fd,buf,10)','→ 10B');
+      setW('wR','on','green');el('lblR').classList.add('on');
+      el('wState').className='wstate run';el('wState').textContent='仍有 30B → 又返回';
+      schedule(()=>roundSet(2,'fire2','再次返回 ②'),300);
+      fireNotify(motion,litW,'amber',360);
+      note('LT：没读完？下一轮接着提醒','h');return;
+    }
+    if(s.k==='drain'){
+      el('readBox').classList.add('lit');
+      bufSet(30);roundSet(1,'fire','返回 ①');roundSet(2,'fire2','返回 ②');
+      readRow(0,'on ok','read(fd,buf,10)','→ 10B');
+      setW('wN','on','amber');el('lblN').classList.add('on');litW.add('wN');
+      setW('wR','on','green');el('lblR').classList.add('on');
+      schedule(()=>{readRow(1,'on act','read(fd,buf,30)','→ 30B');bufSet(0);},300);
+      schedule(()=>{readRow(1,'on ok','read(fd,buf,30)','→ 30B');roundSet(3,'idle','阻塞');el('wState').className='wstate';el('wState').textContent='缓冲空 · 重新阻塞';setW('wN');litW.delete('wN');el('lblN').classList.remove('on');},900);
+      schedule(()=>note('读空 → 状态消失 → 不再通知','b'),1200);return;
+    }
+  }
+  function cancel(){motion.clear();if(observer){observer.disconnect();observer=null;}}
+  return {id:'lt',label:'LT 水平触发',sub:'有数据就反复通知',steps,mount,paint,cancel,code};
+})();
+
+/* ========== 场景 2：ET 边缘触发 ========== */
+const etScene=(()=>{
+  const code=codeOf([
+    'ev.events = EPOLLIN | EPOLLET;',
+    'epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);',
+    'n = epoll_wait(...);  <span class="cmt">// 空→有: 边沿, 返回</span>',
+    'read(fd, buf, 10);    <span class="cmt">// 只读 10B, 剩 30B</span>',
+    'n = epoll_wait(...);  <span class="cmt">// 无新边沿: 不返回!</span>',
+    '<span class="cmt">// 30B 滞留, 新数据到达才有下次通知</span>'
+  ]);
+  const steps=[
+    {k:'idle',title:'步骤 0 · ET 注册：EPOLLIN | EPOLLET',chip:'ET 模式',chipC:'c0',lines:[0,1],
+     desc:'ET（Edge Triggered，边缘触发）只在<b>状态发生变化的边沿</b>通知一次：空→有数据、少→更多。注册时按位或上 <code>EPOLLET</code>。'},
+    {k:'edge1',title:'步骤 1 · 40B 到达：边沿 → 通知 ①',chip:'边沿触发',chipC:'ch',lines:[2],
+     desc:'缓冲从<b>空变为有</b>——这是一个边沿事件，<code>epoll_wait</code> 返回一次。注意：通知的是「变化」，不是「有数据」这个状态。'},
+    {k:'read1',title:'步骤 2 · 只读 10B，剩 30B',chip:'部分读取',chipC:'cg',lines:[3],
+     desc:'应用只读走 10B，缓冲还剩 30B。在 LT 下这没关系；但 ET 下，<b>危险已经埋下</b>——'},
+    {k:'stuck',title:'步骤 3 · 陷阱：无新边沿，不再通知',chip:'事件丢失',chipC:'cd',lines:[4],
+     desc:'round 2：缓冲一直「有 30B」，状态<span class="dg">没有再变化</span>，ET 不会再通知。<code>epoll_wait</code> 永远阻塞，30B <span class="dg">滞留缓冲</span>——对端还在等响应，这就是 ET 读不干净的事故现场。'},
+    {k:'edge2',title:'步骤 4 · 又来 20B：新边沿才救回来',chip:'新边沿',chipC:'ch',lines:[5],
+     desc:'只有对端<b>再发数据</b>（30B→50B，又一个边沿），才会有通知 ②。靠对方发数据来解围是不可靠的——正确做法是当初就读干净。'},
+    {k:'verdict',title:'步骤 5 · 结论：ET 必须一次读干净',chip:'铁律',chipC:'cd',lines:[5],
+     desc:'ET 通知一次就必须把缓冲<span class="dg">全部读完</span>，且 fd 必须<b>非阻塞</b>。怎么知道读完了？循环读到 <code>EAGAIN</code>——看下一场景。'},
+  ];
+  let motion=motionKit(),litW=new Set(),observer=null;
+  function mount(){
+    cancel();
+    viz.innerHTML='<div class="vcap"><b>ET 边缘触发</b>：只报状态变化 · 读不干净就没有下一次</div><div class="stage" id="ltStage">'+mountBufStage(motion,litW,3,'应用 read()')+'</div>';
+    layoutBufStage();observer=new ResizeObserver(layoutBufStage);observer.observe(el('ltStage'));
+  }
+  function paint(s){
+    bufBaseline(motion,litW,3);
+    const schedule=motion.schedule;
+    ['bufBox','waitBox'].forEach(id=>el(id).classList.add('lit'));
+    if(s.k==='idle'){bufSet(0);litW.clear();return;}
+    if(s.k==='edge1'){
+      bufSet(0);
+      schedule(()=>{bufSet(40);el('bufArrive').textContent='边沿：空 → 40B';el('bufArrive').classList.add('edge');el('bufArrive').classList.add('on');},160);
+      schedule(()=>{el('wState').className='wstate run';el('wState').textContent='边沿 → 返回 EPOLLIN';roundSet(1,'fire','返回 ①');},520);
+      fireNotify(motion,litW,'amber',560);
+      note('通知的是「变化」，不是「有数据」','h');return;
+    }
+    if(s.k==='read1'){
+      el('readBox').classList.add('lit');
+      bufSet(40);el('bufArrive').textContent='边沿：空 → 40B';el('bufArrive').classList.add('edge','on');
+      roundSet(1,'fire','返回 ①');
+      setW('wN','on','amber');el('lblN').classList.add('on');litW.add('wN');
+      el('wState').className='wstate run';el('wState').textContent='已通知一次';
+      schedule(()=>{drawW(motion,'wR','green');el('lblR').classList.add('on');},140);
+      schedule(()=>{readRow(0,'on act','read(fd,buf,10)','→ 10B');bufSet(30);},480);
+      note('只读 10B · 剩 30B','g');return;
+    }
+    if(s.k==='stuck'){
+      el('readBox').classList.add('lit');
+      bufSet(30,true);roundSet(1,'fire','返回 ①');
+      readRow(0,'on ok','read(fd,buf,10)','→ 10B');
+      setW('wR','on','green');el('lblR').classList.add('on');
+      setW('wN');litW.delete('wN');el('lblN').classList.remove('on');
+      schedule(()=>{roundSet(2,'mute','不返回');el('wState').className='wstate stuck';el('wState').textContent='无新边沿 · 一直阻塞';},300);
+      schedule(()=>note('30B 滞留缓冲 · 事件已丢失','d'),700);return;
+    }
+    if(s.k==='edge2'){
+      el('readBox').classList.add('lit');
+      bufSet(30,true);roundSet(1,'fire','返回 ①');roundSet(2,'mute','不返回');
+      readRow(0,'on ok','read(fd,buf,10)','→ 10B');
+      setW('wR','on','green');el('lblR').classList.add('on');
+      schedule(()=>{bufSet(50);el('bufArrive').textContent='新边沿：30B → 50B';el('bufArrive').classList.add('edge','on');},240);
+      schedule(()=>{roundSet(3,'fire2','返回 ②');el('wState').className='wstate run';el('wState').textContent='新边沿 → 才又返回';},640);
+      fireNotify(motion,litW,'amber',680);
+      note('靠对端再发数据解围 · 不可靠','h');return;
+    }
+    if(s.k==='verdict'){
+      el('readBox').classList.add('lit');
+      bufSet(50,true);roundSet(1,'fire','返回 ①');roundSet(2,'mute','不返回');roundSet(3,'fire2','返回 ②');
+      readRow(0,'on ok','read(fd,buf,10)','→ 10B');
+      readRow(1,'on bad','正确做法','循环读到 EAGAIN');
+      readRow(2,'on bad','fd 要求','必须非阻塞');
+      note('ET 铁律：通知一次 → 读干净 → 非阻塞','d');return;
+    }
+  }
+  function cancel(){motion.clear();if(observer){observer.disconnect();observer=null;}}
+  return {id:'et',label:'ET 边缘触发',sub:'只通知一次 · 必须读尽',steps,mount,paint,cancel,code};
+})();
+
+/* ========== 场景 3：非阻塞读到 EAGAIN ========== */
+const eagainScene=(()=>{
+  const code=codeOf([
+    'setnonblock(fd);  <span class="cmt">// ET 前提: 非阻塞</span>',
+    '<span class="kw">for</span> (;;) {',
+    '  n = recv(fd, buf, 16, 0);',
+    '  <span class="kw">if</span> (n > 0) { consume(buf, n); <span class="kw">continue</span>; }',
+    '  <span class="kw">if</span> (n < 0 && errno == EAGAIN) <span class="kw">break</span>;',
+    '}  <span class="cmt">// 阻塞 fd 会卡死在最后一次 recv !</span>'
+  ]);
+  const steps=[
+    {k:'notify',title:'步骤 0 · ET 通知到达，缓冲 40B',chip:'开始',chipC:'ch',lines:[0],
+     desc:'ET 只报一次，所以拿到通知就要把缓冲读干净。前提：fd 已设<span class="hb">非阻塞</span>（<code>O_NONBLOCK</code>）。'},
+    {k:'r1',title:'步骤 1 · recv #1 → 16B',chip:'循环读',chipC:'cg',lines:[1,2],
+     desc:'第一次 <code>recv</code> 读走 16B，缓冲剩 24B。<code>n&gt;0</code>，继续循环。'},
+    {k:'r2',title:'步骤 2 · recv #2 → 16B',chip:'循环读',chipC:'cg',lines:[2,3],
+     desc:'再读 16B，剩 8B。仍然 <code>n&gt;0</code>，不能停——<b>你不知道这是不是最后一批</b>。'},
+    {k:'r3',title:'步骤 3 · recv #3 → 8B，缓冲空',chip:'循环读',chipC:'cg',lines:[2,3],
+     desc:'读走最后 8B，缓冲已空。但循环还要<b>再试一次</b>才能确认读完。'},
+    {k:'eagain',title:'步骤 4 · recv #4 → -1, EAGAIN：安全退出',chip:'EAGAIN',chipC:'cb',lines:[4],
+     desc:'缓冲空时非阻塞 <code>recv</code> 立即返回 <code>-1</code> 且 <code>errno==EAGAIN</code>（或 EWOULDBLOCK）——这就是「本轮读完」的信号，<span class="bl">break 回到 epoll_wait</span>，EventLoop 继续跑。'},
+    {k:'block',title:'步骤 5 · 反例：阻塞 fd 卡死 EventLoop',chip:'反例',chipC:'cd',lines:[5],
+     desc:'若 fd 是<span class="dg">阻塞的</span>：缓冲空时最后一次 <code>recv</code> 不返回 EAGAIN，而是<span class="dg">睡着等数据</span>——单线程 EventLoop 被这一个连接卡死，其他所有连接全部饿死。<b>ET 必须配非阻塞 fd</b>。'},
+  ];
+  let motion=motionKit(),litW=new Set(),observer=null;
+  function mount(){
+    cancel();
+    viz.innerHTML='<div class="vcap"><b>非阻塞读到 EAGAIN</b>：循环 recv · EAGAIN 才算本轮读完</div><div class="stage" id="ltStage">'+mountBufStage(motion,litW,4,'非阻塞循环 recv')+'</div>';
+    layoutBufStage();observer=new ResizeObserver(layoutBufStage);observer.observe(el('ltStage'));
+  }
+  function paint(s){
+    bufBaseline(motion,litW,4);
+    const schedule=motion.schedule;
+    ['bufBox','waitBox','readBox'].forEach(id=>el(id).classList.add('lit'));
+    el('wState').className='wstate run';el('wState').textContent='ET 已通知 · 开始循环读';
+    roundSet(1,'fire','返回 ①');
+    const rows=[['recv #1 → 16B',24],['recv #2 → 16B',8],['recv #3 → 8B',0]];
+    const doneRows=n=>{for(let i=0;i<n;i++){readRow(i,'on ok',rows[i][0],'n>0 继续');}};
+    if(s.k==='notify'){
+      bufSet(40);
+      setW('wN','on','amber');el('lblN').classList.add('on');litW.add('wN');
+      note('通知只有一次 → 必须读干净','h');return;
+    }
+    setW('wN','on','amber');el('lblN').classList.add('on');litW.add('wN');
+    setW('wR','on','green');el('lblR').classList.add('on');
+    if(s.k==='r1'){
+      bufSet(40);
+      schedule(()=>{readRow(0,'on act','recv #1 → 16B','n>0 继续');bufSet(24);},260);
+      return;
+    }
+    if(s.k==='r2'){
+      bufSet(24);doneRows(1);
+      schedule(()=>{readRow(1,'on act','recv #2 → 16B','n>0 继续');bufSet(8);},260);
+      return;
+    }
+    if(s.k==='r3'){
+      bufSet(8);doneRows(2);
+      schedule(()=>{readRow(2,'on act','recv #3 → 8B','n>0 继续');bufSet(0);},260);
+      return;
+    }
+    if(s.k==='eagain'){
+      bufSet(0);doneRows(3);
+      schedule(()=>{readRow(3,'on act','recv #4 → -1','EAGAIN · break');},260);
+      schedule(()=>{readRow(3,'on ok','recv #4 → -1','EAGAIN · break');el('wState').className='wstate';el('wState').textContent='本轮读完 · 回到 epoll_wait';roundSet(2,'idle','下一轮');note('EAGAIN = 读完信号 · EventLoop 继续跑','b');},900);
+      return;
+    }
+    if(s.k==='block'){
+      bufSet(0);doneRows(3);
+      readRow(3,'on bad','recv #4（阻塞 fd）','睡着等数据…');
+      el('wState').className='wstate stuck';el('wState').textContent='EventLoop 被卡死';
+      roundSet(2,'mute','其他连接饿死');
+      setW('wR','on','danger');
+      note('阻塞 fd + ET = 单线程事故 · 必须 O_NONBLOCK','d');return;
+    }
+  }
+  function cancel(){motion.clear();if(observer){observer.disconnect();observer=null;}}
+  return {id:'eagain',label:'非阻塞读循环',sub:'读到 EAGAIN 才停',steps,mount,paint,cancel,code};
+})();
+
+/* ========== 场景 4：LT vs ET 对照 ========== */
+const versusScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// LT: 有数据就每轮提醒, 可分多次读</span>',
+    '<span class="cmt">//     阻塞/非阻塞 fd 均可, 不易出错</span>',
+    '<span class="cmt">// ET: 变化边沿只报一次</span>',
+    '<span class="cmt">//     必须非阻塞 + 循环读到 EAGAIN</span>',
+    '<span class="cmt">// 拿不准就用 LT(默认, muduo 亦用 LT)</span>'
+  ]);
+  const ROWS=[
+    {lab:'通知条件',lt:'缓冲还有数据 → 每轮都报',et:'仅状态变化边沿 → 只报一次'},
+    {lab:'读策略',lt:'可只读一部分，下轮还会提醒',et:'必须循环读到 EAGAIN 清空'},
+    {lab:'fd 要求',lt:'阻塞 / 非阻塞均可',et:'必须非阻塞，否则可能卡死'},
+    {lab:'选型',lt:'默认模式 · 简单不易错',et:'唤醒次数更少 · 纪律要求高'},
+  ];
+  const steps=[
+    {k:0,title:'步骤 0 · 四条差异总览',chip:'对照',chipC:'c0',lines:[0,2],
+     desc:'LT 与 ET 不是「谁更好」，而是<b>通知语义不同</b>：一个报状态，一个报变化。由此推出读策略、fd 要求、选型四条差异。'},
+    {k:1,title:'步骤 1 · 通知条件：状态 vs 变化',chip:'通知条件',chipC:'cb',lines:[0,2],
+     desc:'LT 报「<span class="bl">现在有数据</span>」这个水平状态，成立就反复报；ET 报「<span class="hb">刚刚发生变化</span>」这个边沿，报完即止。'},
+    {k:2,title:'步骤 2 · 读策略：随意 vs 必须读尽',chip:'读策略',chipC:'ch',lines:[1,3],
+     desc:'LT 下少读了下轮还有提醒；ET 下通知只有一次，必须<span class="hb">循环 recv 直到 EAGAIN</span>，否则剩余数据滞留、事件丢失。'},
+    {k:3,title:'步骤 3 · fd 要求：ET 必须非阻塞',chip:'fd 要求',chipC:'cd',lines:[1,3],
+     desc:'循环读的最后一次必然把缓冲读空：非阻塞 fd 返回 EAGAIN 收尾；<span class="dg">阻塞 fd 则睡在 recv 里卡死 EventLoop</span>。所以 ET 必须配 <code>O_NONBLOCK</code>。'},
+    {k:4,title:'步骤 4 · 选型：拿不准就 LT',chip:'选型',chipC:'cg',lines:[4],
+     desc:'ET 减少重复唤醒、性能上限更高（nginx 用 ET）；LT 语义宽容、不易写错（<b>muduo 用 LT</b>）。学习与业务开发首选 LT；用 ET 就必须严格执行「非阻塞 + 读到 EAGAIN」。'},
+  ];
+  let motion=motionKit();
+  function mount(){
+    let h='<span class="vs-head lt" style="left:214px">LT 水平</span><span class="vs-head et" style="left:462px">ET 边缘</span>';
+    ROWS.forEach((r,i)=>{
+      h+=`<div class="vs-row" id="vr${i}" style="top:${44+i*84}px">`;
+      h+=`<span class="vs-lab">${r.lab}</span>`;
+      h+=`<div class="vs-c lt">${r.lt}</div>`;
+      h+=`<div class="vs-c et">${r.et}</div>`;
+      h+='</div>';
+    });
+    h+='<span class="vs-note" id="vsNote">拿不准用 LT · 用 ET 必须「非阻塞 + 读到 EAGAIN」</span>';
+    viz.innerHTML='<div class="vcap"><b>LT vs ET 对照</b>：通知条件 · 读策略 · fd 要求 · 选型</div><div class="stage" id="vsStage">'+h+'</div>';
+  }
+  function paint(s){
+    motion.clear();
+    ROWS.forEach((_,i)=>{
+      el('vr'+i).className='vs-row'+(s.k>0&&i===s.k-1?' lit':(s.k>0&&i<s.k-1?' was':''));
+    });
+    el('vsNote').className='vs-note'+(s.k===4?' on':'');
+  }
+  return {id:'versus',label:'LT vs ET 对照',sub:'语义 · 策略 · 选型',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[ltScene,etScene,eagainScene,versusScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  SCENES[si]?.cancel?.();
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2500;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E">
+<title>无锁编程与并发队列动画</title>
+<!--
+Visual system: 22 / 17 / 15 / 13 / 11px type scale; warm paper #F5F4ED and panel #FBFBF6;
+8px rhythm with 14px framed surfaces; blue = 线程A/生产者, green = 线程B/消费者/读者,
+amber = 插队/复用/回收警示, red = 失败/悬垂; all transitions share the 520ms cubic-bezier motion language.
+Engine: build-once + mutate（与 17.2.1 同一套步进引擎），#scene=xxx&step=n 深链。
+-->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;--gray:#F1EFE8;
+  --blue:#2467A6;--bluebg:#E1EFFA;--bluetx:#1A4F84;
+  --green:#087A5C;--greenbg:#DCF3E9;--greentx:#075A43;
+  --amber:#A66408;--amberbg:#FFF0D7;--ambertx:#764600;
+  --danger:#C34935;--dangerbg:#FAE1DC;--dangertx:#8F2B1C;
+  --code:#2E2C27;--codetext:#E8E3D6;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;line-height:1.3;text-wrap:balance;}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{min-height:48px;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.35);outline-offset:2px;}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1280px){.layout{grid-template-columns:minmax(0,1fr);}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;}.viz .vcap b{font-weight:700;color:var(--ink);}
+.stage-frame{position:relative;width:min(632px,100%);height:420px;margin:0 auto;}
+.stage{position:absolute;left:0;top:0;width:632px;height:420px;transform-origin:top left;}
+.layout > .right{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+#stDesc{font-size:14px;color:var(--muted);margin-top:11px;}.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{background:var(--code);border:1px solid #24231F;border-radius:10px;padding:12px 0;color:var(--codetext);font-family:var(--mono);font-size:13px;line-height:1.55;overflow:hidden;box-shadow:0 1px 3px rgba(60,55,40,.08);}
+.codebox .cl{min-height:24px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background .3s var(--ease),color .3s var(--ease),box-shadow .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}.codebox .cl.hl .cmt{color:#CCC8BA;}
+.codebox .kw{color:#D9B177;}.codebox .type{color:#8EB5DC;}.codebox .ord{color:#A7D7BF;}.codebox .num{color:#E0A797;}.codebox .str{color:#C8B694;}.codebox .cmt{color:#9A968B;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{min-height:40px;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector language: persistent path, quiet hints, filled triangle heads. */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.wire{--wc:var(--arrow);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.warrow{--wc:var(--arrow);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wport{--wc:var(--arrow);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire.on,.warrow.on,.wport.on{opacity:1;}.wire.hint{stroke-width:2;opacity:.1;}.warrow.hint,.wport.hint{opacity:.1;}.warrow.drawing{transition-delay:200ms;}
+.wire.blue,.warrow.blue,.wport.blue{--wc:var(--blue);}.wire.green,.warrow.green,.wport.green{--wc:var(--green);}.wire.amber,.warrow.amber,.wport.amber{--wc:var(--amber);}.wire.danger,.warrow.danger,.wport.danger{--wc:var(--danger);}
+
+/* Shared bottom note bar. */
+.snote{position:absolute;left:16px;top:352px;width:600px;min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);padding:8px 14px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.snote.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.snote.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.snote.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.snote.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+/* Scene 1: CAS retry loop. */
+.value-pod{position:absolute;left:241px;top:12px;width:150px;min-height:64px;border:1.5px solid var(--line);border-radius:11px;background:var(--paper);display:flex;align-items:center;justify-content:center;gap:8px;transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.value-pod .n{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1;transition:color var(--dur) var(--ease);}.value-pod .l{font-family:var(--mono);font-size:11px;color:var(--faint);}
+.value-pod.warn{border-color:var(--amber);background:var(--amberbg);}.value-pod.warn .n{color:var(--amber);}
+.value-pod.bad{border-color:var(--danger);background:var(--dangerbg);}.value-pod.bad .n{color:var(--danger);}
+.value-pod.ok{border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 2px rgba(8,122,92,.12);}.value-pod.ok .n{color:var(--green);}
+.cas-thread{position:absolute;top:92px;width:226px;min-height:252px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:12px 14px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.cas-thread.a{left:36px;border-color:var(--blue);}.cas-thread.b{left:370px;border-color:var(--green);}.cas-thread.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.cas-thread.dim{opacity:.5;}
+.thread-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;}.thread-head span{font-family:var(--mono);font-size:10.5px;color:var(--faint);}.cas-thread.a .thread-head span{color:var(--blue);}.cas-thread.b .thread-head span{color:var(--green);}
+.op-stack{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+.cas-op{min-height:34px;border:1px solid var(--grid);border-radius:7px;background:var(--gray);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);padding:7px 9px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.cas-op.active{color:var(--ink);border-color:var(--ink);background:var(--paper);transform:scale(1.025);box-shadow:0 0 0 1px rgba(43,42,38,.1);}
+.cas-op.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.cas-op.fail{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.cas-regs{display:flex;gap:8px;margin-top:11px;}
+.cas-reg{flex:1;border:1px solid var(--grid);border-radius:6px;background:var(--panel);padding:5px 8px;font-family:var(--mono);font-size:10px;color:var(--faint);transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.cas-reg b{display:block;font-size:13px;color:var(--ink);transition:color var(--dur) var(--ease);}
+.cas-reg.lit{border-color:var(--blue);background:var(--bluebg);}.cas-reg.lit b{color:var(--bluetx);}
+.cas-reg.warn{border-color:var(--amber);background:var(--amberbg);}.cas-reg.warn b{color:var(--ambertx);}
+.cas-summary{position:absolute;left:95px;top:358px;width:442px;min-height:48px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:7px 14px;font-size:12px;font-weight:700;color:var(--muted);text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.cas-summary.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}.cas-summary.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}.cas-summary.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+
+/* Scene 2: ABA on a lock-free stack. */
+.ab-headpod{position:absolute;left:22px;top:44px;width:100px;min-height:56px;border:1.5px solid var(--ink);border-radius:10px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.ab-headpod .l{font-family:var(--mono);font-size:10px;color:var(--faint);}.ab-headpod .v{font-family:var(--mono);font-size:13px;font-weight:700;transition:color var(--dur) var(--ease);}
+.ab-headpod.bad{border-color:var(--danger);background:var(--dangerbg);}.ab-headpod.bad .v{color:var(--danger);}
+.ab-headpod.safe{border-color:var(--green);background:var(--greenbg);}.ab-headpod.safe .v{color:var(--greentx);}
+.ab-node{position:absolute;top:40px;width:128px;min-height:64px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.ab-node .addr{font-family:var(--mono);font-size:10px;color:var(--faint);}.ab-node .nm{font-size:15px;font-weight:700;transition:color var(--dur) var(--ease);}.ab-node .st{font-family:var(--mono);font-size:9.5px;color:var(--faint);transition:color var(--dur) var(--ease);}
+.ab-node.dim{opacity:.45;}
+.ab-node.freed{border-style:dashed;border-color:var(--danger);background:var(--dangerbg);opacity:.75;}.ab-node.freed .nm{color:var(--dangertx);text-decoration:line-through;}.ab-node.freed .st{color:var(--dangertx);}
+.ab-node.reused{border-color:var(--amber);background:var(--amberbg);transform:scale(1.03);}.ab-node.reused .nm{color:var(--ambertx);}.ab-node.reused .st{color:var(--ambertx);}
+.ab-node.okv{border-color:var(--green);background:var(--greenbg);}.ab-node.okv .nm{color:var(--greentx);}.ab-node.okv .st{color:var(--greentx);}
+.ab-thread{position:absolute;top:180px;width:290px;min-height:152px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:11px 13px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.ab-thread.t1{left:16px;border-color:var(--blue);}.ab-thread.t2{left:326px;border-color:var(--green);}
+.ab-thread.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.ab-thread.dim{opacity:.5;}
+.ab-thread .thread-head span{font-family:var(--mono);font-size:10px;}
+.ab-thread.t1 .thread-head span{color:var(--blue);}.ab-thread.t2 .thread-head span{color:var(--green);}
+.pausechip{font-size:9.5px;font-weight:700;font-family:var(--mono);color:var(--ambertx);border:1px solid var(--amber);background:var(--amberbg);border-radius:999px;padding:1px 8px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.pausechip.on{opacity:1;}
+.ab-op{min-height:30px;border:1px solid var(--grid);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);padding:5px 8px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.ab-op.active{color:var(--ink);border-color:var(--ink);background:var(--paper);}
+.ab-op.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.ab-op.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.ab-op.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.ab-thread .op-stack{gap:7px;margin-top:10px;}
+
+/* Scene 3: SPSC ring buffer. */
+.sp-card{position:absolute;top:14px;width:290px;min-height:84px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:11px 14px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.sp-card.prod{left:16px;border-color:var(--blue);}.sp-card.cons{left:326px;border-color:var(--green);}
+.sp-card.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.sp-card.dim{opacity:.55;}
+.sp-card .thread-head span{font-family:var(--mono);font-size:10px;}
+.sp-card.prod .thread-head span{color:var(--blue);}.sp-card.cons .thread-head span{color:var(--green);}
+.sp-op{margin-top:9px;min-height:32px;border:1px solid var(--grid);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);padding:6px 9px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.sp-op.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.sp-op.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.sp-op.bad{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.sp-array{position:absolute;left:56px;top:196px;display:flex;gap:8px;}
+.sp-slot{width:58px;height:56px;border:1.5px dashed var(--line);border-radius:9px;background:var(--gray);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.sp-slot.fill{border-style:solid;border-color:var(--ink);background:var(--panel);color:var(--ink);}
+.sp-slot.writing{border-style:solid;border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);transform:translateY(-3px);}
+.sp-slot.reading{border-style:solid;border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateY(3px);}
+.sp-slot.guard{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);font-size:9.5px;}
+.sp-idx{position:absolute;left:56px;top:258px;display:flex;gap:8px;}
+.sp-idx span{width:58px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--faint);}
+.sp-ptr{position:absolute;width:86px;min-height:26px;border-radius:999px;border:1.5px solid;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10.5px;font-weight:700;transition:left var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.sp-ptr.tail{top:158px;color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.sp-ptr.head{top:290px;color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.sp-ptr.lit{box-shadow:0 0 0 2px rgba(36,103,166,.18);}
+
+/* Scene 4: MPMC Michael-Scott queue. */
+.mq-card{position:absolute;top:14px;width:195px;min-height:88px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:10px 12px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.mq-card.p1{left:10px;border-color:var(--blue);}.mq-card.p2{left:218px;border-color:var(--amber);}.mq-card.co{left:426px;border-color:var(--green);}
+.mq-card.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.mq-card.dim{opacity:.55;}
+.mq-card .thread-head{font-size:12px;}
+.mq-card .thread-head span{font-family:var(--mono);font-size:9.5px;}
+.mq-card.p1 .thread-head span{color:var(--blue);}.mq-card.p2 .thread-head span{color:var(--amber);}.mq-card.co .thread-head span{color:var(--green);}
+.mq-op{margin-top:8px;min-height:36px;border:1px solid var(--grid);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);padding:5px 8px;display:flex;align-items:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.mq-op.active{color:var(--ink);border-color:var(--ink);background:var(--paper);}
+.mq-op.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.mq-op.fail{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.mq-op.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.mq-node{position:absolute;top:192px;width:120px;min-height:60px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.mq-node .nm{font-size:14px;font-weight:700;transition:color var(--dur) var(--ease);}.mq-node .st{font-family:var(--mono);font-size:9.5px;color:var(--faint);transition:color var(--dur) var(--ease);}
+.mq-node.ghost{border-style:dashed;background:var(--gray);opacity:.55;}.mq-node.ghost .nm{color:var(--faint);}
+.mq-node.sentinel{border-color:var(--ink);}
+.mq-node.live{border-color:var(--blue);background:var(--bluebg);}.mq-node.live .nm{color:var(--bluetx);}
+.mq-node.live2{border-color:var(--amber);background:var(--amberbg);}.mq-node.live2 .nm{color:var(--ambertx);}
+.mq-node.retired{border-style:dashed;opacity:.45;}
+.mq-node.newsent{border-color:var(--green);background:var(--greenbg);}.mq-node.newsent .nm{color:var(--greentx);}
+.mq-ptr{position:absolute;width:84px;min-height:26px;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink);transition:left var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.mq-ptr.hd{top:148px;}.mq-ptr.tl{top:268px;}
+.mq-ptr.lit{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+
+/* Scene 5: safe memory reclamation with hazard pointers. */
+.rc-node{position:absolute;left:246px;top:26px;width:140px;min-height:58px;border:1.5px solid var(--ink);border-radius:10px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.rc-node .nm{font-size:14px;font-weight:700;transition:color var(--dur) var(--ease);}.rc-node .st{font-family:var(--mono);font-size:9.5px;color:var(--faint);transition:color var(--dur) var(--ease);}
+.rc-node.prot{border-color:var(--green);background:var(--greenbg);}.rc-node.prot .nm{color:var(--greentx);}.rc-node.prot .st{color:var(--greentx);}
+.rc-node.retired{border-style:dashed;border-color:var(--amber);background:var(--amberbg);}.rc-node.retired .nm{color:var(--ambertx);}.rc-node.retired .st{color:var(--ambertx);}
+.rc-node.freed{border-style:dashed;border-color:var(--line);background:var(--gray);opacity:.5;}.rc-node.freed .nm{color:var(--faint);text-decoration:line-through;}
+.rc-table{position:absolute;left:246px;top:128px;width:140px;min-height:112px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:10px;}
+.rc-table .tt{text-align:center;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);}
+.rc-hp{margin-top:8px;min-height:34px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);display:flex;align-items:center;justify-content:space-between;padding:5px 9px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.rc-hp b{font-size:11.5px;color:var(--ink);transition:color var(--dur) var(--ease);}
+.rc-hp.lit{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}.rc-hp.lit b{color:var(--greentx);}
+.rc-side{position:absolute;top:104px;width:200px;min-height:206px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:11px 13px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.rc-side.rd{left:16px;border-color:var(--green);}.rc-side.wr{left:416px;border-color:var(--amber);}
+.rc-side.active{box-shadow:0 0 0 2px rgba(8,122,92,.12);}.rc-side.dim{opacity:.55;}
+.rc-side .thread-head span{font-family:var(--mono);font-size:10px;}
+.rc-side.rd .thread-head span{color:var(--green);}.rc-side.wr .thread-head span{color:var(--amber);}
+.rc-side .op-stack{gap:7px;margin-top:10px;}
+.rc-retire{margin-top:9px;border:1.5px dashed var(--line);border-radius:7px;background:var(--gray);min-height:30px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.rc-retire.hold{border-style:solid;border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:16px;}.desc-card{padding:16px;}.controls{padding:12px 14px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 142px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>无锁编程与并发队列 · 从 CAS 重试到安全回收</h1>
+    <p>配套笔记《17.5 无锁编程》《17.6 并发队列》 · CAS 重试 · ABA · SPSC 环形缓冲 · MPMC 队列 · hazard pointer　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts ? parts[1] : line;
+  const comment=parts && parts[2] ? parts[2] : '';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{
+    strings.push(escapeHtml(value));
+    return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';
+  });
+  code=escapeHtml(code)
+    .replace(/\b(std|atomic|bool|int|size_t|Node|T|void|const|while|if|do|for|return|break|else|struct)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(memory_order_relaxed|memory_order_release|memory_order_acquire|relaxed|release|acquire|nullptr|true|false)\b/g,'<span class="ord">$1</span>')
+    .replace(/\b(load|store|compare_exchange_weak|compare_exchange_strong|fetch_add|CAS|push|pop|use|retire|inHazard|delete|new)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(0x[0-9a-fA-F]+)\b/g,'<span class="num">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment ? '<span class="cmt">'+escapeHtml(comment)+'</span>' : '');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="cl'+index+'">'+(line ? highlightCpp(line) : '&nbsp;')+'</div>').join('');}
+function stageFrame(id,classes,html){return '<div class="stage-frame" id="'+id+'Frame"><div class="stage '+classes+'" id="'+id+'Stage">'+html+'</div></div>';}
+function fitStage(id){
+  const base=id.endsWith('Stage')?id.slice(0,-5):id;
+  const stage=el(id),frame=el(base+'Frame');
+  if(!stage||!frame)return;
+  const scale=Math.min(1,frame.clientWidth/632);
+  stage.style.transform='scale('+scale+')';
+  frame.style.height=(420*scale)+'px';
+}
+
+function wireHTML(id){return '<path id="'+id+'" class="wire"></path><path id="'+id+'-head" class="warrow"></path><circle id="'+id+'-port" class="wport" r="4"></circle>';}
+function wireNodes(id){return [el(id),el(id+'-head'),el(id+'-port')];}
+function setWire(id,state,color){
+  const [path,head,port]=wireNodes(id);
+  if(!path||!head||!port)return;
+  const suffix=(state?' '+state:'')+(color?' '+color:'');
+  path.setAttribute('class','wire'+suffix);
+  head.setAttribute('class','warrow'+suffix);
+  port.setAttribute('class','wport'+suffix);
+  if(state!=='on'){
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    path.style.transition='';
+    head.classList.remove('drawing');
+  }
+}
+function drawWire(id,color,timers){
+  setWire(id,'on',color);
+  const [path,head]=wireNodes(id);
+  if(!path||reducedMotion())return;
+  const length=path.getTotalLength();
+  path.style.transition='none';
+  path.style.strokeDasharray=length;
+  path.style.strokeDashoffset=length;
+  head.classList.add('drawing');
+  void path.getBoundingClientRect();
+  path.style.transition='';
+  path.style.strokeDashoffset='0';
+  const timer=setTimeout(()=>{
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    head.classList.remove('drawing');
+  },560);
+  timers.push(timer);
+}
+function wireController(ids,colors){
+  let active=new Set();
+  let timers=[];
+  return {
+    sync(nextIds,hints=false){
+      timers.forEach(clearTimeout);timers=[];
+      const next=new Set(nextIds);
+      const any=next.size>0;
+      ids.forEach(id=>{
+        const state=next.has(id)?'on':(!any&&hints?'hint':'');
+        if(next.has(id)&&!active.has(id))drawWire(id,colors[id],timers);
+        else setWire(id,state,colors[id]);
+      });
+      active=next;
+    },
+    destroy(){timers.forEach(clearTimeout);timers=[];active.clear();}
+  };
+}
+function relRect(stageRect,id){
+  const rect=el(id).getBoundingClientRect();
+  return {left:rect.left-stageRect.left,right:rect.right-stageRect.left,top:rect.top-stageRect.top,bottom:rect.bottom-stageRect.top,cx:(rect.left+rect.right)/2-stageRect.left,cy:(rect.top+rect.bottom)/2-stageRect.top};
+}
+function point(rect,side,offset=0){
+  if(side==='left')return {x:rect.left,y:rect.cy+offset};
+  if(side==='right')return {x:rect.right,y:rect.cy+offset};
+  return {x:rect.cx,y:rect.cy+offset};
+}
+function bezierArrow(id,from,to){
+  const path=el(id),head=el(id+'-head'),port=el(id+'-port');
+  if(!path||!head||!port)return;
+  const direction=to.x>=from.x?1:-1;
+  const baseX=to.x-direction*9;
+  const gap=Math.max(1,Math.abs(baseX-from.x));
+  const c1=from.x+direction*gap*.45;
+  const c2=baseX-direction*gap*.45;
+  path.setAttribute('d','M '+from.x+' '+from.y+' C '+c1+' '+from.y+', '+c2+' '+to.y+', '+baseX+' '+to.y);
+  head.setAttribute('d','M '+to.x+' '+to.y+' L '+baseX+' '+(to.y-5)+' L '+baseX+' '+(to.y+5)+' Z');
+  port.setAttribute('cx',from.x);port.setAttribute('cy',from.y);
+}
+function classes(id,value){el(id).className=value;}
+
+/* ---------- Scene 1 · CAS 重试循环 ---------- */
+const casScene=(()=>{
+  const code=[
+    'T expected = a.load(std::memory_order_relaxed);',
+    'T desired;',
+    'do {',
+    '    desired = f(expected);        // 基于旧值计算',
+    '} while (!a.compare_exchange_weak(',
+    '    expected, desired,            // 失败时 expected 自动刷新',
+    '    std::memory_order_release,    // 成功: 发布本次修改',
+    '    std::memory_order_relaxed));  // 失败: 只需重新读取'
+  ];
+  const steps=[
+    {title:'步骤 0 · CAS 范式：读 → 算 → 提交',chip:'lock-free',chipC:'c0',lines:[0,2,4],a:['','',''],b:['','',''],aC:'',bC:'',value:'5',valueC:'',aExp:'?',aDes:'?',aRegC:['',''],bExp:'?',bDes:'?',summary:'任何"读-改-写"都能改成这个无锁范式：提交失败就用刷新后的当前值重算。',summaryC:''},
+    {title:'步骤 1 · Thread A 读取 expected = 5',chip:'load',chipC:'cb',lines:[0],a:['active','',''],b:['','',''],aC:'active',bC:'dim',value:'5',valueC:'',aExp:'5',aDes:'?',aRegC:['lit',''],bExp:'?',bDes:'?',summary:'A 的快照拿到旧值 5，之后的一切计算都基于它。',summaryC:''},
+    {title:'步骤 2 · Thread A 计算 desired = 6',chip:'compute',chipC:'cb',lines:[3],a:['done','active',''],b:['','',''],aC:'active',bC:'dim',value:'5',valueC:'',aExp:'5',aDes:'6',aRegC:['lit','lit'],bExp:'?',bDes:'?',summary:'计算发生在本地，不加任何锁——这正是"乐观"：先干活，提交时再查冲突。',summaryC:''},
+    {title:'步骤 3 · Thread B 插队，先提交成功 a = 6',chip:'被插队',chipC:'ca',lines:[4],a:['done','done',''],b:['done','done','done'],aC:'dim',bC:'active',value:'6',valueC:'warn',aExp:'5',aDes:'6',aRegC:['warn','lit'],bExp:'5',bDes:'6',summary:'就在 A 计算期间，B 完成了自己的 CAS(5→6)。A 手里的 expected=5 已经过期。',summaryC:'warn'},
+    {title:'步骤 4 · A 提交 CAS(5→6)：失败',chip:'CAS fail',chipC:'cd',lines:[4,5],a:['done','done','fail'],b:['done','done','done'],aC:'active',bC:'dim',value:'6',valueC:'',aExp:'5→6',aDes:'6',aRegC:['warn','lit'],bExp:'5',bDes:'6',summary:'内存值 6 ≠ expected 5，硬件拒绝写入。关键副作用：expected 被自动刷新成当前值 6，无需再手动 load。',summaryC:'bad'},
+    {title:'步骤 5 · A 用刷新值重算 desired = 7',chip:'retry',chipC:'ca',lines:[2,3],a:['done','active',''],b:['done','done','done'],aC:'active',bC:'dim',value:'6',valueC:'',aExp:'6',aDes:'7',aRegC:['lit','lit'],bExp:'5',bDes:'6',summary:'循环里用 _weak：即使 LL/SC 平台伪失败，再转一圈就是——反正循环本来就要重试。',summaryC:''},
+    {title:'步骤 6 · A 再次 CAS(6→7)：成功，a = 7',chip:'lock-free 推进',chipC:'cg',lines:[4,6],a:['done','done','done'],b:['done','done','done'],aC:'active',bC:'',value:'7',valueC:'ok',aExp:'6',aDes:'7',aRegC:['lit','lit'],bExp:'5',bDes:'6',summary:'A 的失败恰恰证明 B 成功了——整个系统总有线程在推进，这就是 lock-free（但单个线程可能被饿死）。',summaryC:'ok'}
+  ];
+  let observer=null;
+  function mount(){
+    const html='<div class="vcap"><b>CAS 重试循环</b>：乐观提交，失败拿最新值重算</div>'+stageFrame('cs','cas-stage',
+      '<div class="value-pod" id="csValue"><span class="l">atomic a</span><span class="n" id="csNum">5</span></div>'+
+      '<div class="cas-thread a" id="csA"><div class="thread-head">Thread A <span>retry loop</span></div>'+
+        '<div class="op-stack"><div class="cas-op" id="csA0">① expected = a.load()</div><div class="cas-op" id="csA1">② desired = f(expected)</div><div class="cas-op" id="csA2">③ CAS(expected → desired)</div></div>'+
+        '<div class="cas-regs"><div class="cas-reg" id="csARegE">expected<b id="csAExp">?</b></div><div class="cas-reg" id="csARegD">desired<b id="csADes">?</b></div></div></div>'+
+      '<div class="cas-thread b" id="csB"><div class="thread-head">Thread B <span>competitor</span></div>'+
+        '<div class="op-stack"><div class="cas-op" id="csB0">① expected = a.load()</div><div class="cas-op" id="csB1">② desired = f(expected)</div><div class="cas-op" id="csB2">③ CAS(expected → desired)</div></div>'+
+        '<div class="cas-regs"><div class="cas-reg" id="csBRegE">expected<b id="csBExp">?</b></div><div class="cas-reg" id="csBRegD">desired<b id="csBDes">?</b></div></div></div>'+
+      '<div class="cas-summary" id="csSummary"></div>');
+    viz.innerHTML=html;
+    fitStage('csStage');
+    observer=new ResizeObserver(()=>fitStage('csStage'));observer.observe(el('csFrame'));
+  }
+  function paint(s){
+    classes('csA','cas-thread a '+s.aC);classes('csB','cas-thread b '+s.bC);
+    s.a.forEach((state,index)=>classes('csA'+index,'cas-op '+state));
+    s.b.forEach((state,index)=>classes('csB'+index,'cas-op '+state));
+    classes('csValue','value-pod '+s.valueC);el('csNum').textContent=s.value;
+    el('csAExp').textContent=s.aExp;el('csADes').textContent=s.aDes;
+    classes('csARegE','cas-reg '+s.aRegC[0]);classes('csARegD','cas-reg '+s.aRegC[1]);
+    el('csBExp').textContent=s.bExp;el('csBDes').textContent=s.bDes;
+    classes('csSummary','cas-summary '+s.summaryC);el('csSummary').textContent=s.summary;
+  }
+  function destroy(){observer?.disconnect();}
+  return {id:'cas',label:'CAS 重试',sub:'compare_exchange_weak',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 2 · ABA 问题（无锁栈） ---------- */
+const abaScene=(()=>{
+  const code=[
+    '// 无锁栈 pop —— 简化版（有 ABA 隐患）',
+    'Node* old  = head.load();            // A (0x100)',
+    'Node* next = old->next;              // B (0x200)',
+    '// …被抢占期间: pop A, pop B, push D(复用 0x100)',
+    'head.compare_exchange_strong(old, next);',
+    '// 0x100 == 0x100 → 成功, head 指向已释放的 0x200',
+    '// 解法: {指针,版本号} 双字 CAS · hazard pointer · RCU'
+  ];
+  const wires=['hA','hB','hB2','hC','ab','bc','dc'];
+  const colors={hA:'blue',hB:'green',hB2:'danger',hC:'blue',ab:'',bc:'',dc:'amber'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 初始栈 head → A → B → C',chip:'无锁栈',chipC:'c0',lines:[0],head:'0x100',headC:'',n1:['0x100','A','in stack',''],n2:['0x200','B','in stack',''],n3:['0x300','C','in stack',''],w:['hA','ab','bc'],t1C:'',t2C:'dim',t1:['','',''],t1o2:'③ CAS(head, 0x100 → 0x200)',pause:false,t2:['','',''],note:'三个节点地址 0x100 / 0x200 / 0x300。线程 1 准备 pop，线程 2 也要动这个栈。',noteC:''},
+    {title:'步骤 1 · 线程 1 读完 old 与 next，随即被抢占',chip:'快照',chipC:'cb',lines:[1,2],head:'0x100',headC:'',n1:['0x100','A','in stack',''],n2:['0x200','B','in stack',''],n3:['0x300','C','in stack',''],w:['hA','ab','bc'],t1C:'active',t2C:'dim',t1:['done','done',''],t1o2:'③ CAS(head, 0x100 → 0x200)',pause:true,t2:['','',''],note:'线程 1 的快照：old = 0x100，next = 0x200。还没来得及 CAS 就被调度器切走。',noteC:'blue'},
+    {title:'步骤 2 · 线程 2 pop A：head → B',chip:'pop',chipC:'cg',lines:[3],head:'0x200',headC:'',n1:['0x100','A','已弹出','dim'],n2:['0x200','B','in stack',''],n3:['0x300','C','in stack',''],w:['hB','bc'],t1C:'dim',t2C:'active',t1:['done','done',''],t1o2:'③ CAS(head, 0x100 → 0x200)',pause:true,t2:['done','',''],note:'A 被弹出，head 指向 0x200。线程 1 对这一切毫不知情。',noteC:''},
+    {title:'步骤 3 · 线程 2 pop B，并 delete A、delete B',chip:'内存释放',chipC:'ca',lines:[3],head:'0x300',headC:'',n1:['0x100','A','已释放','freed'],n2:['0x200','B','已释放','freed'],n3:['0x300','C','in stack',''],w:['hC'],t1C:'dim',t2C:'active',t1:['done','done',''],t1o2:'③ CAS(head, 0x100 → 0x200)',pause:true,t2:['done','done',''],note:'两块内存归还给分配器——0x100 随时可能被再次分配出去。',noteC:'amber'},
+    {title:'步骤 4 · 线程 2 push D：分配器复用了 0x100！',chip:'地址复用',chipC:'ca',lines:[3],head:'0x100',headC:'',n1:['0x100','D','新节点·地址复用','reused'],n2:['0x200','B','已释放','freed'],n3:['0x300','C','in stack',''],w:['hA','dc'],t1C:'dim',t2C:'active',t1:['done','done',''],t1o2:'③ CAS(head, 0x100 → 0x200)',pause:true,t2:['done','done','done'],note:'新节点 D 恰好拿到旧地址 0x100。栈变成 head → D(0x100) → C。值绕了一圈回到 A 的地址——ABA 就绪。',noteC:'amber'},
+    {title:'步骤 5 · 线程 1 恢复：CAS(0x100→0x200) 竟然成功',chip:'ABA!',chipC:'cd',lines:[4,5],head:'0x200',headC:'bad',n1:['0x100','D','被悄悄丢弃','dim'],n2:['0x200','B','悬垂指针!','freed'],n3:['0x300','C','不可达','dim'],w:['hB2'],t1C:'active',t2C:'dim',t1:['done','done','bad'],t1o2:'③ CAS 成功?! head=0x200',pause:false,t2:['done','done','done'],note:'CAS 只比较值：head==0x100 匹配 → 写入 0x200。但 0x200 早已释放——head 悬垂，新节点 D 也被一并丢掉。',noteC:'danger'},
+    {title:'步骤 6 · 解法：给指针配版本号（tagged pointer）',chip:'tagged CAS',chipC:'cg',lines:[6],head:'0x100 · v3',headC:'safe',n1:['0x100','D','v3 · 版本已变','okv'],n2:['0x200','B','已释放','dim'],n3:['0x300','C','in stack',''],w:['hA','dc'],t1C:'active',t2C:'dim',t1:['done','done','warn'],t1o2:'③ CAS{0x100,v1} ≠ {0x100,v3} → 失败重试 ✓',pause:false,t2:['done','done','done'],note:'把 {指针, 版本} 打包用双字 CAS 一起比较：地址相同但 v1 ≠ v3 → CAS 失败、安全重试。hazard pointer / RCU 则从根上阻止地址被复用（见场景⑤）。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('abStage');
+    const stage=el('abStage'),svg=el('abSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const head=relRect(sr,'abHead'),a=relRect(sr,'abN1'),b=relRect(sr,'abN2'),c=relRect(sr,'abN3');
+    bezierArrow('hA',point(head,'right'),point(a,'left'));
+    bezierArrow('hB',point(head,'right',-6),point(b,'left',-10));
+    bezierArrow('hB2',point(head,'right',6),point(b,'left',10));
+    bezierArrow('hC',point(head,'right'),point(c,'left',-14));
+    bezierArrow('ab',point(a,'right'),point(b,'left'));
+    bezierArrow('bc',point(b,'right'),point(c,'left'));
+    bezierArrow('dc',point(a,'right',14),point(c,'left',14));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>ABA 问题</b>：值绕回原值，CAS 便看不见中间的变化</div>'+stageFrame('ab','aba-stage',
+      '<div class="ab-headpod" id="abHead"><span class="l">head</span><span class="v" id="abHeadV">0x100</span></div>'+
+      '<div class="ab-node" id="abN1" style="left:176px;"><span class="addr" id="abN1a">0x100</span><span class="nm" id="abN1n">A</span><span class="st" id="abN1s">in stack</span></div>'+
+      '<div class="ab-node" id="abN2" style="left:330px;"><span class="addr" id="abN2a">0x200</span><span class="nm" id="abN2n">B</span><span class="st" id="abN2s">in stack</span></div>'+
+      '<div class="ab-node" id="abN3" style="left:484px;"><span class="addr" id="abN3a">0x300</span><span class="nm" id="abN3n">C</span><span class="st" id="abN3s">in stack</span></div>'+
+      '<div class="ab-thread t1" id="abT1"><div class="thread-head">Thread 1 · pop 中 <span class="pausechip" id="abPause">⏸ 被抢占</span><span>blue</span></div>'+
+        '<div class="op-stack"><div class="ab-op" id="abT1o0">① old = head　→ 0x100</div><div class="ab-op" id="abT1o1">② next = old-&gt;next　→ 0x200</div><div class="ab-op" id="abT1o2">③ CAS(head, 0x100 → 0x200)</div></div></div>'+
+      '<div class="ab-thread t2" id="abT2"><div class="thread-head">Thread 2 · 改栈 <span>green</span></div>'+
+        '<div class="op-stack"><div class="ab-op" id="abT2o0">① pop A　→ head = B</div><div class="ab-op" id="abT2o1">② pop B，delete A、delete B</div><div class="ab-op" id="abT2o2">③ push D —— 复用地址 0x100</div></div></div>'+
+      '<svg class="arr-layer" id="abSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="abNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('abFrame'));
+  }
+  function setNode(id,data){
+    el(id+'a').textContent=data[0];el(id+'n').textContent=data[1];el(id+'s').textContent=data[2];
+    el(id).className='ab-node '+data[3];
+  }
+  function paint(s){
+    layout();
+    classes('abHead','ab-headpod '+s.headC);el('abHeadV').textContent=s.head;
+    setNode('abN1',s.n1);setNode('abN2',s.n2);setNode('abN3',s.n3);
+    el('abN1').style.left='176px';el('abN2').style.left='330px';el('abN3').style.left='484px';
+    classes('abT1','ab-thread t1 '+s.t1C);classes('abT2','ab-thread t2 '+s.t2C);
+    classes('abPause','pausechip'+(s.pause?' on':''));
+    s.t1.forEach((state,index)=>classes('abT1o'+index,'ab-op '+state));
+    el('abT1o2').textContent=s.t1o2;
+    s.t2.forEach((state,index)=>classes('abT2o'+index,'ab-op '+state));
+    classes('abNote','snote '+s.noteC);el('abNote').textContent=s.note;
+    controller.sync(s.w,false);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'aba',label:'ABA 问题',sub:'pointer reuse',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 3 · SPSC 环形缓冲 ---------- */
+const spscScene=(()=>{
+  const code=[
+    'bool push(const T& v) {',
+    '  size_t t = tail.load(relaxed);',
+    '  size_t next = (t + 1) % N;',
+    '  if (next == head.load(acquire)) return false; // 满',
+    '  buffer[t] = v;                 // ① 先写数据',
+    '  tail.store(next, release);     // ② 再发布 tail',
+    '}                // head/tail 各占一个缓存行 alignas(64)',
+    'bool pop(T& out) {',
+    '  size_t h = head.load(relaxed);',
+    '  if (h == tail.load(acquire)) return false;   // 空',
+    '  out = buffer[h];               // 读数据',
+    '  head.store((h + 1) % N, release);',
+    '}'
+  ];
+  const E='';
+  const steps=[
+    {title:'步骤 0 · 空环：head == tail == 0',chip:'ring buffer',chipC:'c0',lines:[0,7],slots:[[E,''],[E,''],[E,''],[E,''],[E,''],[E,''],[E,''],[E,'']],tail:0,head:0,tailLit:false,headLit:false,prodOp:'—',prodC:'',consOp:'—',consC:'',prodCard:'',consCard:'',note:'定长数组 + 两个下标：head 读位、tail 写位，走到尾部回绕。判空 head==tail；留一格判满，实际容量 N−1 = 7。',noteC:''},
+    {title:'步骤 1 · push(A) ①：先写数据 buffer[0] = A',chip:'① 写数据',chipC:'cb',lines:[4],slots:[['A','writing'],[E,''],[E,''],[E,''],[E,''],[E,''],[E,''],[E,'']],tail:0,head:0,tailLit:false,headLit:false,prodOp:'buffer[0] = A',prodC:'blue',consOp:'—',consC:'',prodCard:'active',consCard:'dim',note:'此刻 tail 还是 0——消费者完全看不到这条数据，槽位还是生产者的"私有草稿"。',noteC:'blue'},
+    {title:'步骤 2 · push(A) ②：tail.store(1, release) 发布',chip:'② release 发布',chipC:'ca',lines:[5],slots:[['A','fill'],[E,''],[E,''],[E,''],[E,''],[E,''],[E,''],[E,'']],tail:1,head:0,tailLit:true,headLit:false,prodOp:'tail.store(1, release)',prodC:'blue',consOp:'—',consC:'',prodCard:'active',consCard:'dim',note:'release 保证：①的数据写不会重排到②之后。消费者一旦 acquire 到 tail=1，槽 0 的数据必然已写完——绝不会读到半成品。',noteC:'amber'},
+    {title:'步骤 3 · 再 push B、C：tail 推进到 3',chip:'push ×2',chipC:'cb',lines:[4,5],slots:[['A','fill'],['B','fill'],['C','fill'],[E,''],[E,''],[E,''],[E,''],[E,'']],tail:3,head:0,tailLit:true,headLit:false,prodOp:'push(B) · push(C)',prodC:'blue',consOp:'—',consC:'',prodCard:'active',consCard:'dim',note:'每次都是同样的两拍：先写槽位、再发布 tail。生产者只写 tail，从不碰 head。',noteC:''},
+    {title:'步骤 4 · pop ①：acquire 读 tail，判非空',chip:'acquire',chipC:'cg',lines:[8,9],slots:[['A','fill'],['B','fill'],['C','fill'],[E,''],[E,''],[E,''],[E,''],[E,'']],tail:3,head:0,tailLit:true,headLit:true,prodOp:'—',prodC:'',consOp:'head=0 ≠ tail=3 → 非空',consC:'green',prodCard:'dim',consCard:'active',note:'消费者 acquire 读 tail，与生产者的 release 配对建立 happens-before——这是整个结构正确性的基石。',noteC:'green'},
+    {title:'步骤 5 · pop ②：读出 A，head.store(1, release)',chip:'pop',chipC:'cg',lines:[10,11],slots:[[E,'reading'],['B','fill'],['C','fill'],[E,''],[E,''],[E,''],[E,''],[E,'']],tail:3,head:1,tailLit:false,headLit:true,prodOp:'—',prodC:'',consOp:'out = A · head.store(1)',consC:'green',prodCard:'dim',consCard:'active',note:'head 只被消费者写、tail 只被生产者写——各自独占一端，天然没有写写冲突，所以完全不需要 CAS。',noteC:''},
+    {title:'步骤 6 · 生产者狂写到"满"：(tail+1)%8 == head',chip:'满 · 拒绝写入',chipC:'cd',lines:[2,3],slots:[[E,'guard'],['B','fill'],['C','fill'],['D','fill'],['E','fill'],['F','fill'],['G','fill'],['H','fill']],tail:0,head:1,tailLit:true,headLit:true,prodOp:'push(I) → false（满）',prodC:'bad',consOp:'—',consC:'',prodCard:'active',consCard:'dim',note:'tail 回绕到 0，下一格 (0+1)=1 撞上 head → 返回 false。0 号格故意留空：不留这一格，"满"和"空"都是 head==tail，无法区分。',noteC:'danger'},
+    {title:'步骤 7 · 为什么 SPSC 不需要 CAS？',chip:'收口',chipC:'cg',lines:[6],slots:[[E,'guard'],['B','fill'],['C','fill'],['D','fill'],['E','fill'],['F','fill'],['G','fill'],['H','fill']],tail:0,head:1,tailLit:false,headLit:false,prodOp:'只写 tail',prodC:'blue',consOp:'只写 head',consC:'green',prodCard:'',consCard:'',note:'一端一个写者，唯一的跨线程交互就是 acquire/release 配对的下标。工程上再用 alignas(64) 把 head/tail 分开缓存行，避免伪共享互相拖累。',noteC:'green'}
+  ];
+  let observer=null;
+  const slotCX=i=>56+i*66+29;
+  function mount(){
+    let slots='',idx='';
+    for(let i=0;i<8;i++){slots+='<div class="sp-slot" id="spS'+i+'"></div>';idx+='<span>'+i+'</span>';}
+    const html='<div class="vcap"><b>SPSC 环形缓冲</b>：一读一写各占一端，acquire / release 就够了</div>'+stageFrame('sp','spsc-stage',
+      '<div class="sp-card prod" id="spProd"><div class="thread-head">生产者 Producer <span>writes tail</span></div><div class="sp-op" id="spProdOp">—</div></div>'+
+      '<div class="sp-card cons" id="spCons"><div class="thread-head">消费者 Consumer <span>writes head</span></div><div class="sp-op" id="spConsOp">—</div></div>'+
+      '<div class="sp-ptr tail" id="spTail">tail = 0</div>'+
+      '<div class="sp-array">'+slots+'</div>'+
+      '<div class="sp-idx">'+idx+'</div>'+
+      '<div class="sp-ptr head" id="spHead">head = 0</div>'+
+      '<div class="snote" id="spNote"></div>');
+    viz.innerHTML=html;
+    el('spTail').style.left=(slotCX(0)-43)+'px';
+    el('spHead').style.left=(slotCX(0)-43)+'px';
+    fitStage('spStage');
+    observer=new ResizeObserver(()=>fitStage('spStage'));observer.observe(el('spFrame'));
+  }
+  function paint(s){
+    s.slots.forEach((slot,i)=>{
+      const node=el('spS'+i);
+      node.textContent=slot[1]==='guard'?'留空':slot[0];
+      node.className='sp-slot '+slot[1];
+    });
+    el('spTail').textContent='tail = '+s.tail;el('spTail').style.left=(slotCX(s.tail)-43)+'px';
+    el('spHead').textContent='head = '+s.head;el('spHead').style.left=(slotCX(s.head)-43)+'px';
+    el('spTail').classList.toggle('lit',s.tailLit);el('spHead').classList.toggle('lit',s.headLit);
+    classes('spProd','sp-card prod '+s.prodCard);classes('spCons','sp-card cons '+s.consCard);
+    el('spProdOp').textContent=s.prodOp;classes('spProdOp','sp-op '+s.prodC);
+    el('spConsOp').textContent=s.consOp;classes('spConsOp','sp-op '+s.consC);
+    classes('spNote','snote '+s.noteC);el('spNote').textContent=s.note;
+  }
+  function destroy(){observer?.disconnect();}
+  return {id:'spsc',label:'SPSC 环形缓冲',sub:'acquire / release',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 4 · MPMC 队列（Michael-Scott） ---------- */
+const mpmcScene=(()=>{
+  const code=[
+    '// 入队 enqueue(v) —— Michael-Scott',
+    'Node* n = new Node{v};',
+    'while (true) {',
+    '  Node* t = tail.load();',
+    '  Node* next = t->next.load();',
+    '  if (next == nullptr) {',
+    '    if (CAS(t->next, nullptr, n)) break; // 接上',
+    '  } else CAS(tail, t, next); // 帮忙推进落后的 tail',
+    '}',
+    'CAS(tail, t, n);             // 推进 tail',
+    '// 出队: 取 head->next 的数据, CAS(head, h, h->next)',
+    '// CAS 失败 = 别人成功 = 系统仍在推进 (lock-free)'
+  ];
+  const nodeCX=[136,316,496];
+  const wires=['w01','w12'];
+  const colors={w01:'blue',w12:'amber'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 初始：Head = Tail = dummy 哨兵',chip:'Michael-Scott',chipC:'c0',lines:[0,1],n0:['dummy','哨兵节点','sentinel'],n1:['n1','P1 待入队','ghost'],n2:['n2','P2 待入队','ghost'],w:[],hd:0,tl:0,hdLit:false,tlLit:false,p1:['准备 enqueue(n1)',''],p2:['准备 enqueue(n2)',''],co:['—',''],p1C:'',p2C:'',coC:'dim',note:'链表始终保留一个空哨兵：空队列与非空队列逻辑统一，出队永远看 head->next，无需特判。',noteC:''},
+    {title:'步骤 1 · P1、P2 同时读到 tail = dummy',chip:'竞争开始',chipC:'ca',lines:[3,4],n0:['dummy','哨兵节点','sentinel'],n1:['n1','P1 待入队','ghost'],n2:['n2','P2 待入队','ghost'],w:[],hd:0,tl:0,hdLit:false,tlLit:true,p1:['t=dummy, next=null','active'],p2:['t=dummy, next=null','active'],co:['—',''],p1C:'active',p2C:'active',coC:'dim',note:'两个生产者都准备 CAS(tail->next, null → 自己的节点)。同一个 next 槽位，只有一个能赢。',noteC:'amber'},
+    {title:'步骤 2 · P1 的 CAS 成功接上 n1；P2 失败',chip:'CAS 仲裁',chipC:'cb',lines:[6],n0:['dummy','哨兵节点','sentinel'],n1:['n1','已入队','live'],n2:['n2','P2 待入队','ghost'],w:['w01'],hd:0,tl:0,hdLit:false,tlLit:false,p1:['CAS 成功 ✓','done'],p2:['CAS 失败 → 重试','fail'],co:['—',''],p1C:'active',p2C:'active',coC:'dim',note:'dummy->next 从 null 变成 n1。P2 再看 next 已非 null → 失败。注意：没有任何线程被阻塞，失败者立即重试。',noteC:'blue'},
+    {title:'步骤 3 · CAS 推进 Tail → n1',chip:'advance tail',chipC:'cb',lines:[9],n0:['dummy','哨兵节点','sentinel'],n1:['n1','已入队','live'],n2:['n2','P2 待入队','ghost'],w:['w01'],hd:0,tl:1,hdLit:false,tlLit:true,p1:['CAS(tail, dummy, n1)','done'],p2:['等待重试','warn'],co:['—',''],p1C:'active',p2C:'dim',coC:'dim',note:'接节点、推 Tail 是两步独立的 CAS。若发现 Tail 落后（next≠null），任何线程都会顺手帮忙推进——这正是第 7 行。',noteC:''},
+    {title:'步骤 4 · P2 重试成功：n2 入队，Tail → n2',chip:'retry 成功',chipC:'ca',lines:[3,4,6],n0:['dummy','哨兵节点','sentinel'],n1:['n1','已入队','live'],n2:['n2','已入队','live2'],w:['w01','w12'],hd:0,tl:2,hdLit:false,tlLit:true,p1:['完成','done'],p2:['CAS(n1->next, null, n2) ✓','done'],co:['—',''],p1C:'dim',p2C:'active',coC:'dim',note:'P2 的重试对着新 tail=n1 再来一轮，这次成功。CAS 循环就是无锁世界的"排队"方式。',noteC:'amber'},
+    {title:'步骤 5 · 消费者出队：CAS(Head, dummy → n1)',chip:'dequeue',chipC:'cg',lines:[10],n0:['dummy','已退休 · 待回收','retired'],n1:['n1','新哨兵（数据已取走）','newsent'],n2:['n2','队中','live2'],w:['w01','w12'],hd:1,tl:2,hdLit:true,tlLit:false,p1:['完成','done'],p2:['完成','done'],co:['取 n1 数据, CAS(Head→n1) ✓','done'],p1C:'dim',p2C:'dim',coC:'active',note:'取走 head->next(n1) 的数据后把 Head CAS 过去，n1 变成新哨兵。旧哨兵何时能 delete？——这就是场景⑤的内存回收问题。',noteC:'green'},
+    {title:'步骤 6 · 收口：CAS 失败 = 别人成功 = 系统在推进',chip:'lock-free',chipC:'cg',lines:[11],n0:['dummy','已退休 · 待回收','retired'],n1:['n1','新哨兵','newsent'],n2:['n2','队中','live2'],w:['w01','w12'],hd:1,tl:2,hdLit:false,tlLit:false,p1:['—',''],p2:['—',''],co:['—',''],p1C:'',p2C:'',coC:'',note:'无锁 ≠ 无等待：单个线程可能反复重试（理论上会饿死），但整体永不停摆。剩下两大坑：ABA（场景②）与安全回收（场景⑤）。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('mqStage');
+    const stage=el('mqStage'),svg=el('mqSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const n0=relRect(sr,'mqN0'),n1=relRect(sr,'mqN1'),n2=relRect(sr,'mqN2');
+    bezierArrow('w01',point(n0,'right'),point(n1,'left'));
+    bezierArrow('w12',point(n1,'right'),point(n2,'left'));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>MPMC 无锁队列</b>：两端并发写，全靠 CAS 仲裁</div>'+stageFrame('mq','mpmc-stage',
+      '<div class="mq-card p1" id="mqP1"><div class="thread-head">生产者 P1 <span>enqueue</span></div><div class="mq-op" id="mqP1op">—</div></div>'+
+      '<div class="mq-card p2" id="mqP2"><div class="thread-head">生产者 P2 <span>enqueue</span></div><div class="mq-op" id="mqP2op">—</div></div>'+
+      '<div class="mq-card co" id="mqCo"><div class="thread-head">消费者 C <span>dequeue</span></div><div class="mq-op" id="mqCoop">—</div></div>'+
+      '<div class="mq-ptr hd" id="mqHd">Head</div>'+
+      '<div class="mq-node" id="mqN0" style="left:76px;"><span class="nm" id="mqN0n">dummy</span><span class="st" id="mqN0s">哨兵节点</span></div>'+
+      '<div class="mq-node" id="mqN1" style="left:256px;"><span class="nm" id="mqN1n">n1</span><span class="st" id="mqN1s">待入队</span></div>'+
+      '<div class="mq-node" id="mqN2" style="left:436px;"><span class="nm" id="mqN2n">n2</span><span class="st" id="mqN2s">待入队</span></div>'+
+      '<div class="mq-ptr tl" id="mqTl">Tail</div>'+
+      '<svg class="arr-layer" id="mqSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="mqNote"></div>');
+    viz.innerHTML=html;
+    el('mqHd').style.left=(nodeCX[0]-42)+'px';el('mqTl').style.left=(nodeCX[0]-42)+'px';
+    layout();observer=new ResizeObserver(layout);observer.observe(el('mqFrame'));
+  }
+  function setNode(id,data){el(id+'n').textContent=data[0];el(id+'s').textContent=data[1];el(id).className='mq-node '+data[2];}
+  function paint(s){
+    layout();
+    setNode('mqN0',s.n0);setNode('mqN1',s.n1);setNode('mqN2',s.n2);
+    el('mqHd').style.left=(nodeCX[s.hd]-42)+'px';el('mqTl').style.left=(nodeCX[s.tl]-42)+'px';
+    el('mqHd').className='mq-ptr hd'+(s.hdLit?' lit':'');el('mqTl').className='mq-ptr tl'+(s.tlLit?' lit':'');
+    classes('mqP1','mq-card p1 '+s.p1C);classes('mqP2','mq-card p2 '+s.p2C);classes('mqCo','mq-card co '+s.coC);
+    el('mqP1op').textContent=s.p1[0];classes('mqP1op','mq-op '+s.p1[1]);
+    el('mqP2op').textContent=s.p2[0];classes('mqP2op','mq-op '+s.p2[1]);
+    el('mqCoop').textContent=s.co[0];classes('mqCoop','mq-op '+s.co[1]);
+    classes('mqNote','snote '+s.noteC);el('mqNote').textContent=s.note;
+    controller.sync(s.w,false);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'mpmc',label:'MPMC 队列',sub:'Michael-Scott',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 5 · 无锁内存回收（hazard pointer） ---------- */
+const reclaimScene=(()=>{
+  const code=[
+    '// 何时才能 delete? —— 裸 delete = use-after-free',
+    'Node* p = head.load();',
+    'hp[me].store(p);              // ① 登记: 我在用 p',
+    'if (p == head.load()) use(p); // ② 复核后安全访问',
+    'hp[me].store(nullptr);        // ③ 用完撤销保护',
+    '// —— 回收线程 ——',
+    'retireList.push(node);        // 摘下的节点先入链',
+    'for (Node* n : retireList)',
+    '  if (!inHazard(n)) delete n; // 无人登记才真正释放'
+  ];
+  const wires=['wReg','wUse','wScan','wDel','wFree'];
+  const colors={wReg:'green',wUse:'green',wScan:'amber',wDel:'danger',wFree:'green'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 难题：摘下的节点何时能 delete？',chip:'内存回收',chipC:'c0',lines:[0],node:['A · 0x100','在链表中',''],hpR:'∅',hpRC:'',retire:'retire 链：空',retireC:'',w:[],rC:'',wC:'dim',r:['','',''],wo:['','',''],note:'W 想把 A 摘下并释放，但 R 可能仍拿着指向 A 的指针——直接 delete 就是 use-after-free。这是无锁结构最难的一环。',noteC:''},
+    {title:'步骤 1 · R 发布保护：hp[R] = 0x100',chip:'登记',chipC:'cg',lines:[1,2],node:['A · 0x100','在链表中',''],hpR:'0x100',hpRC:'lit',retire:'retire 链：空',retireC:'',w:['wReg'],rC:'active',wC:'dim',r:['done','',''],wo:['','',''],note:'读者先把"我正在用 0x100"写进全局 hazard 表，复核指针仍有效后才访问。这张表所有线程可见。',noteC:'green'},
+    {title:'步骤 2 · R 正在遍历访问节点 A',chip:'访问中',chipC:'cg',lines:[3],node:['A · 0x100','被 R 保护中','prot'],hpR:'0x100',hpRC:'lit',retire:'retire 链：空',retireC:'',w:['wReg','wUse'],rC:'active',wC:'dim',r:['done','active',''],wo:['','',''],note:'只要 hazard 表里登记着 0x100，这块内存就不许被任何人释放——保护由约定 + 扫描共同兑现。',noteC:''},
+    {title:'步骤 3 · W 把 A 摘下，放入 retire 链',chip:'retire',chipC:'ca',lines:[5,6],node:['A · 0x100','已摘下 · retire 链中','retired'],hpR:'0x100',hpRC:'lit',retire:'retire 链：A(0x100)',retireC:'hold',w:['wReg','wUse'],rC:'dim',wC:'active',r:['done','active',''],wo:['done','',''],note:'摘除（逻辑删除）用 CAS 完成，链表里已经看不到 A；但物理释放被推迟——先挂进 W 自己的 retire 链。',noteC:'amber'},
+    {title:'步骤 4 · W 扫描 hazard 表：0x100 被保护 → 不能删',chip:'推迟释放',chipC:'cd',lines:[7,8],node:['A · 0x100','已摘下 · 仍被保护','retired'],hpR:'0x100',hpRC:'lit',retire:'retire 链：A(0x100)',retireC:'hold',w:['wScan','wDel'],rC:'dim',wC:'active',r:['done','active',''],wo:['done','bad',''],note:'扫描发现 R 登记了 0x100 → 本轮跳过，A 继续留在 retire 链。delete 被挡下，use-after-free 不可能发生。',noteC:'danger'},
+    {title:'步骤 5 · R 用完，清空 hp[R] = ∅',chip:'解除保护',chipC:'cg',lines:[4],node:['A · 0x100','已摘下 · 无人引用','retired'],hpR:'∅',hpRC:'',retire:'retire 链：A(0x100)',retireC:'hold',w:[],rC:'active',wC:'dim',r:['done','done','done'],wo:['done','bad',''],note:'读者退出临界区，撤下保护。此后不会再有新读者拿到 A——它早已从链表摘除，不可达。',noteC:'green'},
+    {title:'步骤 6 · W 再扫：无人保护 → 安全 delete',chip:'safe free',chipC:'cg',lines:[7,8],node:['A · 0x100','已安全释放','freed'],hpR:'∅',hpRC:'',retire:'retire 链：空',retireC:'',w:['wScan','wFree'],rC:'dim',wC:'active',r:['done','done','done'],wo:['done','done','done'],note:'hazard pointer 按指针精确保护；RCU 则用"宽限期"整体等所有读者退出再回收。同一思想：读者在场，绝不释放。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('rcStage');
+    const stage=el('rcStage'),svg=el('rcSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const rcard=relRect(sr,'rcR'),wcard=relRect(sr,'rcW'),node=relRect(sr,'rcNode'),hpr=relRect(sr,'rcHpR'),table=relRect(sr,'rcTable');
+    bezierArrow('wReg',point(rcard,'right',-24),point(hpr,'left'));
+    bezierArrow('wUse',point(rcard,'right',-72),point(node,'left'));
+    bezierArrow('wScan',point(wcard,'left',-24),point(table,'right',10));
+    bezierArrow('wDel',point(wcard,'left',-72),point(node,'right',-8));
+    bezierArrow('wFree',point(wcard,'left',-72),point(node,'right',8));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>无锁内存回收</b>：读者在场，绝不释放 —— hazard pointer</div>'+stageFrame('rc','reclaim-stage',
+      '<div class="rc-node" id="rcNode"><span class="nm" id="rcNodeN">A · 0x100</span><span class="st" id="rcNodeS">在链表中</span></div>'+
+      '<div class="rc-table" id="rcTable"><div class="tt">hazard 表（全局）</div><div class="rc-hp" id="rcHpR">HP[R]<b id="rcHpRv">∅</b></div><div class="rc-hp" id="rcHpW">HP[W]<b>∅</b></div></div>'+
+      '<div class="rc-side rd" id="rcR"><div class="thread-head">读者线程 R <span>reader</span></div>'+
+        '<div class="op-stack"><div class="ab-op" id="rcR0">① hp[R] = 0x100 登记</div><div class="ab-op" id="rcR1">② 安全访问节点 A</div><div class="ab-op" id="rcR2">③ hp[R] = ∅ 撤销</div></div></div>'+
+      '<div class="rc-side wr" id="rcW"><div class="thread-head">回收线程 W <span>reclaimer</span></div>'+
+        '<div class="op-stack"><div class="ab-op" id="rcW0">① 摘下 A → retire 链</div><div class="ab-op" id="rcW1">② 扫描 hazard 表</div><div class="ab-op" id="rcW2">③ 无人保护才 delete</div></div>'+
+        '<div class="rc-retire" id="rcRetire">retire 链：空</div></div>'+
+      '<svg class="arr-layer" id="rcSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="rcNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('rcFrame'));
+  }
+  function paint(s){
+    layout();
+    el('rcNodeN').textContent=s.node[0];el('rcNodeS').textContent=s.node[1];classes('rcNode','rc-node '+s.node[2]);
+    el('rcHpRv').textContent=s.hpR;classes('rcHpR','rc-hp '+s.hpRC);
+    el('rcRetire').textContent=s.retire;classes('rcRetire','rc-retire '+s.retireC);
+    classes('rcR','rc-side rd '+s.rC);classes('rcW','rc-side wr '+s.wC);
+    s.r.forEach((state,index)=>classes('rcR'+index,'ab-op '+state));
+    s.wo.forEach((state,index)=>classes('rcW'+index,'ab-op '+state));
+    classes('rcNote','snote '+s.noteC);el('rcNote').textContent=s.note;
+    controller.sync(s.w,false);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'reclaim',label:'内存回收',sub:'hazard pointer',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- 步进引擎 ---------- */
+const SCENES=[casScene,abaScene,spscScene,mpmcScene,reclaimScene];
+const tabsBox=el('tabs');
+const stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc');
+const codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots');
+const btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{
+  const tab=document.createElement('button');
+  tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';
+  tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);
+});
+
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();
+  sceneIndex=index;stepIndex=0;
+  [...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));
+  const scene=SCENES[sceneIndex];
+  scene.mount();
+  codeBox.innerHTML=codePanel(scene.code);
+  dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,index)=>{
+    const dot=document.createElement('button');
+    dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);
+    dot.addEventListener('click',()=>{stop();go(index);});dotsBox.appendChild(dot);dotEls.push(dot);
+  });
+  go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;
+  stepIndex=Math.max(0,Math.min(steps.length-1,index));
+  const step=steps[stepIndex];
+  SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.classList.toggle('hl',Boolean(step.lines&&step.lines.includes(i))));
+  stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;
+  stDesc.textContent=step.desc||step.note||step.summary||'从初始状态开始，逐步观察每一次 CAS 的成败与指针的走向。';
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});
+  readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}
+  if(stepIndex===steps.length-1)stop();
+}
+function play(){
+  const steps=SCENES[sceneIndex].steps;
+  if(stepIndex===steps.length-1)go(0);
+  btnPlay.textContent='暂停';
+  timer=setInterval(()=>{stepIndex<steps.length-1?go(stepIndex+1):stop();},2700);
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());
+btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});
+btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{
+  if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}
+});
+const hashScene=location.hash.match(/scene=(\w+)/);const hashStep=location.hash.match(/step=(\d+)/);
+let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}
+switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

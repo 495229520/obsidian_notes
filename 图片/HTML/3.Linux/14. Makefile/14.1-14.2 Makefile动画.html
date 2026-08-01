@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Makefile 动画 · 时间戳、依赖图与自动依赖</title>
+<style>
+/* 视觉系统：22 / 15 / 12px 字阶；暖白纸面、近白面板；蓝=构建对象，绿=已满足，琥珀=需要判断，红=缺失或过期。图中卡片间使用 48px 以上的连线槽。 */
+:root{
+  --paper:#F5F4ED;
+  --panel:#FBFBF6;
+  --ink:#2C2B27;
+  --muted:#66645E;
+  --faint:#8A887F;
+  --line:#C9C7BC;
+  --grid:#E2E0D6;
+  --soft:#F0EFE7;
+  --blue:#2467A6;
+  --blue-text:#19517F;
+  --blue-bg:#E0EDF8;
+  --green:#087A5C;
+  --green-text:#075E47;
+  --green-bg:#DDF3EA;
+  --amber:#A66408;
+  --amber-text:#7E4B05;
+  --amber-bg:#FAECD2;
+  --danger:#C34935;
+  --danger-text:#963524;
+  --danger-bg:#F8E2DC;
+  --dark:#292824;
+  --code:#DCD8CD;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);
+  --dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{padding:28px 32px 44px;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.55;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1320px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;letter-spacing:0;}
+header p{margin-top:5px;color:var(--muted);font-size:13px;}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;background:var(--panel);padding:0 5px;color:var(--muted);font-family:var(--mono);font-size:11px;}
+code{border-radius:4px;background:var(--soft);padding:1px 4px;font-family:var(--mono);font-size:.9em;}
+
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;}
+.tab{min-width:176px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:9px 13px;color:var(--muted);text-align:left;cursor:pointer;transition:transform 180ms var(--ease),border-color 180ms var(--ease),background 180ms var(--ease),color 180ms var(--ease);}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.34);outline-offset:2px;}
+.tab-title{display:block;color:var(--ink);font-size:13px;font-weight:700;}
+.tab-sub{display:block;margin-top:1px;color:var(--faint);font-family:var(--mono);font-size:10.5px;}
+.tab.is-active{border-color:var(--ink);background:var(--ink);box-shadow:0 3px 9px rgba(44,43,39,.16);}
+.tab.is-active .tab-title{color:var(--paper);}.tab.is-active .tab-sub{color:#D8D5CA;}
+
+.layout{display:grid;grid-template-columns:minmax(0,1.27fr) minmax(335px,.73fr);gap:26px;align-items:start;margin-top:22px;}
+.visual-card,.detail-card,.fact-card,.controls{border:1px solid var(--grid);border-radius:8px;background:var(--panel);box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.visual-card{min-height:534px;padding:19px;}
+.visual-caption{min-height:21px;margin-bottom:14px;color:var(--muted);font-size:12.5px;}
+.visual-caption b{color:var(--ink);}
+.scene{display:none;}.scene.is-active{display:block;}
+.stage{position:relative;min-height:438px;isolation:isolate;}
+.stage > :not(.wires){position:relative;z-index:2;}
+.wires{position:absolute;z-index:1;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.wire-line{fill:none;stroke:var(--line);stroke-width:2;opacity:0;transition:opacity 220ms var(--ease),stroke-width 220ms var(--ease),stroke-dashoffset 520ms var(--ease);}
+.wire-line.metadata{stroke-dasharray:6 5;}
+.wire-line.order-only{stroke-dasharray:7 5;}
+.wire-head{fill:var(--line);stroke:none;opacity:0;transition:opacity 180ms var(--ease) 190ms;}
+.wire-port{fill:var(--panel);stroke:var(--line);stroke-width:2;opacity:0;transition:opacity 180ms var(--ease);}
+.wire-line.is-hint{opacity:.1;}.wire-line.is-active{opacity:1;stroke-width:3;}
+.wire-head.is-active,.wire-port.is-active{opacity:1;}
+.wire-line.blue{stroke:var(--blue);}.wire-head.blue{fill:var(--blue);}.wire-port.blue{stroke:var(--blue);}
+.wire-line.green{stroke:var(--green);}.wire-head.green{fill:var(--green);}.wire-port.green{stroke:var(--green);}
+.wire-line.amber{stroke:var(--amber);}.wire-head.amber{fill:var(--amber);}.wire-port.amber{stroke:var(--amber);}
+.wire-line.danger{stroke:var(--danger);}.wire-head.danger{fill:var(--danger);}.wire-port.danger{stroke:var(--danger);}
+
+.build-node{position:relative;min-width:0;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:11px 12px;transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.build-node.is-blue{border-color:var(--blue);background:var(--blue-bg);box-shadow:0 0 0 2px rgba(36,103,166,.11);}
+.build-node.is-green{border-color:var(--green);background:var(--green-bg);box-shadow:0 0 0 2px rgba(8,122,92,.11);}
+.build-node.is-amber{border-color:var(--amber);background:var(--amber-bg);box-shadow:0 0 0 2px rgba(166,100,8,.12);}
+.build-node.is-danger{border-color:var(--danger);background:var(--danger-bg);box-shadow:0 0 0 2px rgba(195,73,53,.12);}
+.build-node.is-muted{opacity:.42;transform:scale(.985);}
+.build-node.is-pop{transform:scale(1.025);}
+.node-kicker{color:var(--faint);font-family:var(--mono);font-size:10px;font-weight:750;}
+.node-name{margin-top:4px;color:var(--ink);font-family:var(--mono);font-size:14px;font-weight:800;}
+.node-meta{min-height:17px;margin-top:3px;color:var(--muted);font-size:10.5px;}
+.node-time{display:inline-flex;align-items:center;margin-top:8px;border:1px solid var(--grid);border-radius:999px;background:var(--soft);padding:2px 7px;color:var(--muted);font-family:var(--mono);font-size:10px;font-weight:700;transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.build-node.is-blue .node-time{border-color:var(--blue);background:rgba(255,255,255,.64);color:var(--blue-text);}
+.build-node.is-green .node-time{border-color:var(--green);background:rgba(255,255,255,.64);color:var(--green-text);}
+.build-node.is-amber .node-time{border-color:var(--amber);background:rgba(255,255,255,.64);color:var(--amber-text);}
+.build-node.is-danger .node-time{border-color:var(--danger);background:rgba(255,255,255,.64);color:var(--danger-text);}
+.node-flag{position:absolute;right:9px;top:9px;border:1px solid var(--line);border-radius:4px;background:var(--soft);padding:1px 5px;color:var(--faint);font-family:var(--mono);font-size:9px;font-weight:800;transition:all var(--dur) var(--ease);}
+.build-node.is-blue .node-flag{border-color:var(--blue);background:var(--blue);color:var(--paper);}.build-node.is-green .node-flag{border-color:var(--green);background:var(--green);color:var(--paper);}.build-node.is-amber .node-flag{border-color:var(--amber);background:var(--amber);color:var(--paper);}.build-node.is-danger .node-flag{border-color:var(--danger);background:var(--danger);color:var(--paper);}
+.scene-callout{position:relative;z-index:2;margin:26px auto 0;max-width:612px;min-height:54px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:9px 13px;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;transition:all var(--dur) var(--ease);}
+.scene-callout b{color:var(--ink);}.scene-callout.is-blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.scene-callout.is-blue b{color:var(--blue-text);}.scene-callout.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.scene-callout.is-green b{color:var(--green-text);}.scene-callout.is-amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}.scene-callout.is-amber b{color:var(--amber-text);}.scene-callout.is-danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}.scene-callout.is-danger b{color:var(--danger-text);}
+.legend{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:15px;color:var(--faint);font-family:var(--mono);font-size:9.5px;}
+.legend-item{display:inline-flex;align-items:center;gap:4px;}.legend-dot{width:9px;height:9px;border:1.5px solid currentColor;border-radius:50%;background:var(--paper);}.legend-dot.normal{color:var(--blue);}.legend-dot.order{color:var(--green);border-style:dashed;}
+
+/* 场景一：目标文件与前置条件的时间戳。 */
+.time-grid{display:grid;grid-template-columns:minmax(150px,1fr) minmax(170px,1fr);gap:58px;align-items:center;padding:28px 22px 0;}
+.time-prereqs{display:grid;gap:25px;}.time-target{min-height:151px;display:flex;flex-direction:column;justify-content:center;}
+.decision-row{position:relative;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin:29px 22px 0;}
+.decision-rule{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:9px 10px;color:var(--muted);font-family:var(--mono);font-size:10.5px;text-align:center;transition:all var(--dur) var(--ease);}
+.decision-rule.is-amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}.decision-rule.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.decision-rule.is-danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+.decision-or{color:var(--faint);font-family:var(--mono);font-size:10px;font-weight:750;}
+
+/* 场景二：DAG 中变化只向下游传播。 */
+.dag-grid{display:grid;grid-template-columns:minmax(135px,1fr) minmax(135px,1fr) minmax(155px,1fr);gap:56px;align-items:center;padding:29px 16px 0;}
+.dag-col{display:grid;gap:26px;}.dag-col.app-col{display:flex;align-items:center;}.dag-col.app-col .build-node{width:100%;}
+.dag-grid .build-node{min-height:99px;}.dag-grid .app-col .build-node{min-height:152px;display:flex;flex-direction:column;justify-content:center;}
+.dag-key{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:28px 16px 0;border-top:1px solid var(--grid);padding-top:13px;color:var(--muted);font-size:11px;}.dag-key strong{color:var(--ink);}.dag-key span{font-family:var(--mono);font-size:10px;}
+
+/* 场景三：.d 是元数据；头文件到对象文件的实线才是时间戳依赖。 */
+.dep-grid{display:grid;grid-template-columns:minmax(148px,1fr) minmax(160px,1.08fr) minmax(148px,1fr);grid-template-rows:repeat(2,1fr);column-gap:64px;row-gap:26px;align-items:stretch;padding:31px 8px 0;}
+.dep-sources{grid-column:1;grid-row:1 / span 2;display:grid;gap:26px;}.dep-grid .build-node{min-height:102px;}.dep-grid .d-file{grid-column:2;grid-row:1;min-height:112px;display:flex;flex-direction:column;justify-content:center;}.dep-grid .object-file{grid-column:2;grid-row:2;min-height:112px;display:flex;flex-direction:column;justify-content:center;}.dep-grid .app-file{grid-column:3;grid-row:1 / span 2;min-height:238px;display:flex;flex-direction:column;justify-content:center;}
+.d-content{margin-top:8px;border:1px solid var(--grid);border-radius:5px;background:rgba(255,255,255,.52);padding:5px 6px;color:var(--muted);font-family:var(--mono);font-size:9px;line-height:1.45;transition:all var(--dur) var(--ease);}.build-node.is-blue .d-content,.build-node.is-green .d-content,.build-node.is-amber .d-content{border-color:currentColor;color:inherit;}
+.dep-note{position:relative;z-index:2;margin:26px 8px 0;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:9px 11px;color:var(--muted);font-family:var(--mono);font-size:10.5px;text-align:center;transition:all var(--dur) var(--ease);}.dep-note.is-blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.dep-note.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.dep-note.is-amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+
+/* 场景四：普通依赖与 order-only 依赖走不同判定路径。 */
+.order-grid{display:grid;grid-template-columns:minmax(155px,1fr) minmax(165px,1fr);gap:76px;align-items:center;padding:27px 50px 0;}
+.order-inputs{display:grid;gap:42px;}.order-target{min-height:239px;display:flex;flex-direction:column;justify-content:center;}.order-grid .build-node{min-height:99px;}.order-grid .order-target{min-height:239px;}.edge-labels{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 50px 0;}.edge-label{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:7px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;text-align:center;transition:all var(--dur) var(--ease);}.edge-label.is-blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.edge-label.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.edge-label.is-amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+
+.right{display:flex;flex-direction:column;gap:14px;}.detail-card{min-height:202px;padding:17px 18px;}.detail-head{display:flex;gap:9px;align-items:center;flex-wrap:wrap;}.detail-title{font-size:16px;font-weight:700;}.chip{border:1px solid var(--line);border-radius:999px;background:var(--soft);padding:2px 8px;color:var(--muted);font-size:10.5px;font-weight:750;white-space:nowrap;}.chip.blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.chip.green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.chip.amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}.chip.danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+.action-line{min-height:36px;margin-top:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:11.5px;font-weight:750;transition:all var(--dur) var(--ease);}.action-line.blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.action-line.green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.action-line.amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}.action-line.danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+.detail-desc{min-height:64px;margin-top:11px;color:var(--muted);font-size:13.5px;}.detail-desc b{color:var(--ink);}
+.code-deck{overflow:hidden;border-radius:8px;background:var(--dark);box-shadow:0 2px 8px rgba(41,40,36,.17);}.code-scene{display:none;padding:11px 0;}.code-scene.is-active{display:block;}.code-line{min-height:20px;padding:2px 12px 2px 15px;color:var(--code);font-family:var(--mono);font-size:11.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.code-line.active-blue{background:rgba(66,144,214,.56);box-shadow:inset 4px 0 0 #9CC8EF;color:#FBF8F0;}.code-line.active-green{background:rgba(41,159,120,.56);box-shadow:inset 4px 0 0 #91DEC5;color:#FBF8F0;}.code-line.active-amber{background:rgba(206,142,39,.58);box-shadow:inset 4px 0 0 #F3C97B;color:#FBF8F0;}.code-line.active-danger{background:rgba(206,94,74,.58);box-shadow:inset 4px 0 0 #F0AA9C;color:#FBF8F0;}.kw{color:#E9B25C;}.var{color:#94C8EE;}.num{color:#E9A184;}.str{color:#A7CF90;}.cmt{color:#9C988E;}.code-line[class*="active-"] .cmt{color:#E2DED2;}
+.fact-card{padding:12px 14px;}.fact-title{margin-bottom:6px;color:var(--faint);font-family:var(--mono);font-size:10.5px;}.facts{width:100%;border-collapse:collapse;font-size:11.5px;}.facts td{border-bottom:1px solid var(--grid);padding:4px 3px;color:var(--muted);vertical-align:top;}.facts tr:last-child td{border-bottom:none;}.facts td:first-child{width:37%;color:var(--ink);font-family:var(--mono);font-weight:750;white-space:nowrap;}
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:20px;padding:13px 16px;}.btn{border:1px solid var(--line);border-radius:7px;background:var(--paper);padding:8px 13px;color:var(--ink);font-size:13px;cursor:pointer;transition:transform 120ms var(--ease),background-color 160ms var(--ease),border-color 160ms var(--ease);}.btn:hover:not(:disabled){border-color:var(--muted);background:var(--soft);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{min-width:82px;border-color:var(--ink);background:var(--ink);color:var(--paper);}.dots{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin:0 auto;}.dot{width:10px;height:10px;border:1.5px solid var(--line);border-radius:50%;background:transparent;padding:0;cursor:pointer;transition:transform 180ms var(--ease),background-color 180ms var(--ease),border-color 180ms var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.2);}.dot.is-done{border-color:var(--line);background:var(--line);}.dot.is-current{border-color:var(--ink);background:var(--ink);transform:scale(1.3);}.dot[hidden]{display:none;}.readout{min-width:45px;color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;}
+
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}.visual-card{min-height:0;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.detail-card{grid-column:1/-1;min-height:0;}.code-deck,.fact-card{align-self:start;}.dep-grid{gap:40px;}.order-grid{padding-left:38px;padding-right:38px;}}
+@media(max-width:720px){body{padding:19px 15px 30px;font-size:14px;}header h1{font-size:20px;}.tab{min-width:0;flex:1 1 145px;padding:8px 10px;}.visual-card{padding:13px;}.stage{min-height:0;padding-bottom:4px;}.time-grid,.dag-grid,.dep-grid,.order-grid{grid-template-columns:1fr;grid-template-rows:auto;gap:26px;padding-left:6px;padding-right:6px;}.time-prereqs,.dag-col,.order-inputs{gap:18px;}.time-target,.order-target,.order-grid .order-target{min-height:132px;}.dag-grid .app-col .build-node{min-height:132px;}.dep-sources,.dep-grid .d-file,.dep-grid .object-file,.dep-grid .app-file{grid-column:auto;grid-row:auto;min-height:0;}.dep-grid .app-file{min-height:132px;}.order-grid{padding-left:6px;padding-right:6px;}.edge-labels{grid-template-columns:1fr;margin-left:6px;margin-right:6px;}.right{display:flex;}.detail-desc{min-height:0;font-size:12.5px;}.code-line{padding-left:12px;font-size:10.5px;}.controls{gap:8px;padding:11px;}.btn{padding:7px 10px;font-size:12px;}.dots{order:3;width:100%;}.readout{margin-left:auto;}.node-name{font-size:12px;}.node-meta{font-size:9.5px;}.node-time{font-size:9px;padding:2px 5px;}.build-node{padding:9px 8px;}.scene-callout{font-size:10.5px;}.decision-row{margin-left:6px;margin-right:6px;}.dag-key{margin-left:0;margin-right:0;font-size:10px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>Makefile · 时间戳、依赖 DAG 与自动依赖</h1>
+    <p>配套笔记《14.1 / 14.2 Makefile》· 上方切换情境，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Makefile 情境">
+    <button class="tab" type="button" data-scene="timestamp"><span class="tab-title">时间戳判定</span><span class="tab-sub">missing / newer prerequisite</span></button>
+    <button class="tab" type="button" data-scene="dag"><span class="tab-title">依赖 DAG</span><span class="tab-sub">change only flows downstream</span></button>
+    <button class="tab" type="button" data-scene="deps"><span class="tab-title">头文件与 .d</span><span class="tab-sub">-MMD -MP / -include</span></button>
+    <button class="tab" type="button" data-scene="order"><span class="tab-title">order-only 依赖</span><span class="tab-sub">normal | directory</span></button>
+  </nav>
+
+  <div class="layout">
+    <section class="visual-card" aria-label="Makefile 动画图">
+      <div class="visual-caption" id="visualCaption"><b>时间戳判定</b>：目标缺失，或任一普通前置条件更新时，make 执行该目标的 recipe。</div>
+
+      <section class="scene" id="scene-timestamp" aria-label="时间戳判定">
+        <div class="stage" id="timestamp-stage">
+          <svg class="wires" id="timestamp-wires" aria-hidden="true">
+            <path class="wire-line" id="wire-t-main"></path><path class="wire-head" id="wire-t-main-head"></path><circle class="wire-port" id="wire-t-main-port" r="4"></circle>
+            <path class="wire-line" id="wire-t-utils"></path><path class="wire-head" id="wire-t-utils-head"></path><circle class="wire-port" id="wire-t-utils-port" r="4"></circle>
+          </svg>
+          <div class="time-grid">
+            <div class="time-prereqs">
+              <article class="build-node" id="t-main"><span class="node-flag" id="t-main-flag">prereq</span><div class="node-kicker">object file</div><div class="node-name">main.o</div><div class="node-meta">来自 main.c</div><div class="node-time" id="t-main-time">mtime 10:07</div></article>
+              <article class="build-node" id="t-utils"><span class="node-flag" id="t-utils-flag">prereq</span><div class="node-kicker">object file</div><div class="node-name">utils.o</div><div class="node-meta">来自 utils.c</div><div class="node-time" id="t-utils-time">mtime 10:08</div></article>
+            </div>
+            <article class="build-node time-target" id="t-app"><span class="node-flag" id="t-app-flag">target</span><div class="node-kicker">executable target</div><div class="node-name">app</div><div class="node-meta" id="t-app-meta">由 main.o 和 utils.o 链接</div><div class="node-time" id="t-app-time">mtime 10:12</div></article>
+          </div>
+          <div class="decision-row">
+            <div class="decision-rule" id="t-rule-missing">target 不存在</div><div class="decision-or">OR</div><div class="decision-rule" id="t-rule-newer">prerequisite 比 target 新</div>
+          </div>
+          <div class="scene-callout" id="t-callout">app 比两个 .o 都新，当前目标是 <b>up to date</b>。</div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-dag" aria-label="依赖 DAG">
+        <div class="stage" id="dag-stage">
+          <svg class="wires" id="dag-wires" aria-hidden="true">
+            <path class="wire-line" id="wire-d-main-src"></path><path class="wire-head" id="wire-d-main-src-head"></path><circle class="wire-port" id="wire-d-main-src-port" r="4"></circle>
+            <path class="wire-line" id="wire-d-utils-src"></path><path class="wire-head" id="wire-d-utils-src-head"></path><circle class="wire-port" id="wire-d-utils-src-port" r="4"></circle>
+            <path class="wire-line" id="wire-d-main-app"></path><path class="wire-head" id="wire-d-main-app-head"></path><circle class="wire-port" id="wire-d-main-app-port" r="4"></circle>
+            <path class="wire-line" id="wire-d-utils-app"></path><path class="wire-head" id="wire-d-utils-app-head"></path><circle class="wire-port" id="wire-d-utils-app-port" r="4"></circle>
+          </svg>
+          <div class="dag-grid">
+            <div class="dag-col">
+              <article class="build-node" id="d-main-c"><span class="node-flag" id="d-main-c-flag">source</span><div class="node-kicker">source file</div><div class="node-name">main.c</div><div class="node-meta">入口逻辑</div><div class="node-time" id="d-main-c-time">mtime 10:00</div></article>
+              <article class="build-node" id="d-utils-c"><span class="node-flag" id="d-utils-c-flag">source</span><div class="node-kicker">source file</div><div class="node-name">utils.c</div><div class="node-meta">工具函数</div><div class="node-time" id="d-utils-c-time">mtime 10:00</div></article>
+            </div>
+            <div class="dag-col">
+              <article class="build-node" id="d-main-o"><span class="node-flag" id="d-main-o-flag">object</span><div class="node-kicker">compiled output</div><div class="node-name">main.o</div><div class="node-meta">无需变化</div><div class="node-time" id="d-main-o-time">mtime 10:01</div></article>
+              <article class="build-node" id="d-utils-o"><span class="node-flag" id="d-utils-o-flag">object</span><div class="node-kicker">compiled output</div><div class="node-name">utils.o</div><div class="node-meta">等待检查</div><div class="node-time" id="d-utils-o-time">mtime 10:01</div></article>
+            </div>
+            <div class="dag-col app-col"><article class="build-node" id="d-app"><span class="node-flag" id="d-app-flag">target</span><div class="node-kicker">link output</div><div class="node-name">app</div><div class="node-meta">最终可执行文件</div><div class="node-time" id="d-app-time">mtime 10:02</div></article></div>
+          </div>
+          <div class="dag-key"><span><strong>make 沿依赖边检查</strong>，不扫描无关节点。</span><span id="d-key-right">all current</span></div>
+          <div class="scene-callout" id="d-callout">图中的每条边都表示“右侧目标依赖左侧文件”。</div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-deps" aria-label="自动依赖文件">
+        <div class="stage" id="deps-stage">
+          <svg class="wires" id="deps-wires" aria-hidden="true">
+            <path class="wire-line metadata" id="wire-h-src-d"></path><path class="wire-head" id="wire-h-src-d-head"></path><circle class="wire-port" id="wire-h-src-d-port" r="4"></circle>
+            <path class="wire-line metadata" id="wire-h-head-d"></path><path class="wire-head" id="wire-h-head-d-head"></path><circle class="wire-port" id="wire-h-head-d-port" r="4"></circle>
+            <path class="wire-line" id="wire-h-src-obj"></path><path class="wire-head" id="wire-h-src-obj-head"></path><circle class="wire-port" id="wire-h-src-obj-port" r="4"></circle>
+            <path class="wire-line" id="wire-h-head-obj"></path><path class="wire-head" id="wire-h-head-obj-head"></path><circle class="wire-port" id="wire-h-head-obj-port" r="4"></circle>
+            <path class="wire-line metadata" id="wire-h-d-obj"></path><path class="wire-head" id="wire-h-d-obj-head"></path><circle class="wire-port" id="wire-h-d-obj-port" r="4"></circle>
+            <path class="wire-line" id="wire-h-obj-app"></path><path class="wire-head" id="wire-h-obj-app-head"></path><circle class="wire-port" id="wire-h-obj-app-port" r="4"></circle>
+          </svg>
+          <div class="dep-grid">
+            <div class="dep-sources">
+              <article class="build-node" id="h-main-c"><span class="node-flag" id="h-main-c-flag">source</span><div class="node-kicker">translation unit</div><div class="node-name">main.c</div><div class="node-meta">#include "config.h"</div><div class="node-time" id="h-main-c-time">mtime 10:00</div></article>
+              <article class="build-node" id="h-config-h"><span class="node-flag" id="h-config-h-flag">header</span><div class="node-kicker">included header</div><div class="node-name">config.h</div><div class="node-meta">宏与声明</div><div class="node-time" id="h-config-h-time">mtime 10:00</div></article>
+            </div>
+            <article class="build-node d-file" id="h-main-d"><span class="node-flag" id="h-main-d-flag">generated</span><div class="node-kicker">dependency file</div><div class="node-name">build/main.d</div><div class="d-content" id="h-d-content">build/main.o: src/main.c include/config.h</div><div class="node-time" id="h-main-d-time">-MMD -MP</div></article>
+            <article class="build-node object-file" id="h-main-o"><span class="node-flag" id="h-main-o-flag">object</span><div class="node-kicker">compiled output</div><div class="node-name">build/main.o</div><div class="node-meta" id="h-main-o-meta">依赖规则待读入</div><div class="node-time" id="h-main-o-time">mtime 10:01</div></article>
+            <article class="build-node app-file" id="h-app"><span class="node-flag" id="h-app-flag">target</span><div class="node-kicker">link output</div><div class="node-name">app</div><div class="node-meta">下游链接目标</div><div class="node-time" id="h-app-time">mtime 10:02</div></article>
+          </div>
+          <div class="dep-note" id="h-note">编译器写出 .d；下一次 make 用 <b>-include</b> 把这条规则加入 DAG。</div>
+          <div class="scene-callout" id="h-callout">头文件的实际依赖不再靠人手维护。</div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-order" aria-label="order-only 依赖">
+        <div class="stage" id="order-stage">
+          <svg class="wires" id="order-wires" aria-hidden="true">
+            <path class="wire-line" id="wire-o-source"></path><path class="wire-head" id="wire-o-source-head"></path><circle class="wire-port" id="wire-o-source-port" r="4"></circle>
+            <path class="wire-line order-only" id="wire-o-dir"></path><path class="wire-head" id="wire-o-dir-head"></path><circle class="wire-port" id="wire-o-dir-port" r="4"></circle>
+          </svg>
+          <div class="order-grid">
+            <div class="order-inputs">
+              <article class="build-node" id="o-source"><span class="node-flag" id="o-source-flag">normal</span><div class="node-kicker">normal prerequisite</div><div class="node-name">src/main.c</div><div class="node-meta">更新会触发编译</div><div class="node-time" id="o-source-time">mtime 10:00</div></article>
+              <article class="build-node" id="o-dir"><span class="node-flag" id="o-dir-flag">order-only</span><div class="node-kicker">directory prerequisite</div><div class="node-name">build/</div><div class="node-meta">先满足；mtime 不触发重编</div><div class="node-time" id="o-dir-time">not found</div></article>
+            </div>
+            <article class="build-node order-target" id="o-object"><span class="node-flag" id="o-object-flag">target</span><div class="node-kicker">object target</div><div class="node-name">build/main.o</div><div class="node-meta" id="o-object-meta">等待目录和源文件</div><div class="node-time" id="o-object-time">not found</div></article>
+          </div>
+          <div class="edge-labels"><div class="edge-label" id="o-normal-label">普通依赖：比较时间戳</div><div class="edge-label" id="o-order-label">order-only：先满足，不比较 mtime</div></div>
+          <div class="scene-callout" id="o-callout">目录的 mtime 变化不应让所有 .o 文件重新编译。</div>
+          <div class="legend"><span class="legend-item"><i class="legend-dot normal"></i>normal prerequisite</span><span class="legend-item"><i class="legend-dot order"></i>order-only prerequisite</span></div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="right" aria-label="步骤说明">
+      <section class="detail-card">
+        <div class="detail-head"><h2 class="detail-title" id="detailTitle">时间戳判定</h2><span class="chip" id="detailChip">检查</span></div>
+        <div class="action-line" id="actionLine">▸ 比较 target 与 prerequisites 的修改时间</div>
+        <p class="detail-desc" id="detailDesc">make 不按文件内容逐字比较，而是依据目标是否存在以及普通前置条件的时间戳作出决定。</p>
+      </section>
+
+      <section class="code-deck" aria-label="对应 Makefile 代码">
+        <div class="code-scene" id="code-timestamp"></div>
+        <div class="code-scene" id="code-dag"></div>
+        <div class="code-scene" id="code-deps"></div>
+        <div class="code-scene" id="code-order"></div>
+      </section>
+
+      <section class="fact-card">
+        <div class="fact-title">当前语境</div>
+        <table class="facts"><tbody id="facts"></tbody></table>
+      </section>
+    </aside>
+  </div>
+
+  <section class="controls" aria-label="动画控制">
+    <button class="btn" id="prevBtn" type="button">上一帧</button>
+    <button class="btn primary" id="playBtn" type="button">播放</button>
+    <button class="btn" id="nextBtn" type="button">下一帧</button>
+    <div class="dots" id="dots" aria-label="步骤选择">
+      <button class="dot" type="button" data-step="0" aria-label="第 1 步"></button><button class="dot" type="button" data-step="1" aria-label="第 2 步"></button><button class="dot" type="button" data-step="2" aria-label="第 3 步"></button><button class="dot" type="button" data-step="3" aria-label="第 4 步"></button><button class="dot" type="button" data-step="4" aria-label="第 5 步"></button><button class="dot" type="button" data-step="5" aria-label="第 6 步"></button>
+    </div>
+    <div class="readout" id="readout">1 / 4</div>
+  </section>
+</main>
+
+<script>
+const codeSamples = {
+  timestamp: [
+    'app: main.o utils.o',
+    '\t$(CC) $^ -o $@',
+    '# recipe runs when app is missing or older'
+  ],
+  dag: [
+    'app: main.o utils.o',
+    'main.o: main.c',
+    'utils.o: utils.c',
+    '\t$(CC) -c $< -o $@'
+  ],
+  deps: [
+    'DEPS := $(OBJS:.o=.d)',
+    'build/%.o: src/%.c | build',
+    '\t$(CC) -MMD -MP -c $< -o $@',
+    '-include $(DEPS)'
+  ],
+  order: [
+    '$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)',
+    '\t$(CC) $(CFLAGS) -MMD -MP -c $< -o $@',
+    '$(BUILD_DIR):',
+    '\tmkdir -p $@'
+  ]
+};
+
+function escapeHTML(value) {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function highlightCode(line) {
+  const match = line.match(/^(.*?)(#.*)?$/);
+  let code = match[1];
+  const comment = match[2] || '';
+  const strings = [];
+  code = code.replace(/"[^"]*"/g, value => {
+    strings.push(value);
+    return '\u0001' + String.fromCharCode(65 + strings.length - 1) + '\u0001';
+  });
+  code = escapeHTML(code)
+    .replace(/(\$\([A-Z_]+\)|\$@|\$\^|\$&lt;)/g, '<span class="var">$1</span>')
+    .replace(/\b(include|mkdir|make)\b/g, '<span class="kw">$1</span>')
+    .replace(/\b(\d+)\b/g, '<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g, (_, letter) => '<span class="str">' + escapeHTML(strings[letter.charCodeAt(0) - 65]) + '</span>');
+  return code + (comment ? '<span class="cmt">' + escapeHTML(comment) + '</span>' : '');
+}
+
+function mountCodePanels() {
+  Object.entries(codeSamples).forEach(([sceneId, lines]) => {
+    const panel = document.getElementById('code-' + sceneId);
+    lines.forEach((line, index) => {
+      const row = document.createElement('div');
+      row.className = 'code-line';
+      row.dataset.line = String(index);
+      row.innerHTML = highlightCode(line);
+      panel.appendChild(row);
+    });
+  });
+}
+
+const wireSets = {
+  timestamp: [
+    {id:'t-main', from:'t-main', to:'t-app', color:'blue', targetSlot:0, targetTotal:2},
+    {id:'t-utils', from:'t-utils', to:'t-app', color:'amber', targetSlot:1, targetTotal:2}
+  ],
+  dag: [
+    {id:'d-main-src', from:'d-main-c', to:'d-main-o', color:'blue'},
+    {id:'d-utils-src', from:'d-utils-c', to:'d-utils-o', color:'amber'},
+    {id:'d-main-app', from:'d-main-o', to:'d-app', color:'blue', targetSlot:0, targetTotal:2},
+    {id:'d-utils-app', from:'d-utils-o', to:'d-app', color:'green', targetSlot:1, targetTotal:2}
+  ],
+  deps: [
+    {id:'h-src-d', from:'h-main-c', to:'h-main-d', color:'blue'},
+    {id:'h-head-d', from:'h-config-h', to:'h-main-d', color:'amber'},
+    {id:'h-src-obj', from:'h-main-c', to:'h-main-o', color:'blue', targetSlot:0, targetTotal:2},
+    {id:'h-head-obj', from:'h-config-h', to:'h-main-o', color:'amber', targetSlot:1, targetTotal:2},
+    {id:'h-d-obj', from:'h-main-d', to:'h-main-o', color:'green', fromSide:'bottom', toSide:'top'},
+    {id:'h-obj-app', from:'h-main-o', to:'h-app', color:'blue'}
+  ],
+  order: [
+    {id:'o-source', from:'o-source', to:'o-object', color:'blue', targetSlot:0, targetTotal:2},
+    {id:'o-dir', from:'o-dir', to:'o-object', color:'green', targetSlot:1, targetTotal:2}
+  ]
+};
+
+const scenes = [
+  {
+    id:'timestamp',
+    caption:'<b>时间戳判定</b>：目标缺失，或任一普通前置条件更新时，make 执行该目标的 recipe。',
+    title:'时间戳判定',
+    facts:[['比较对象','target / prerequisite'],['重建条件','不存在或前置更新'],['本例 recipe','链接 app']],
+    steps:[
+      {chip:'检查',tone:'blue',action:'▸ 比较 target 与 prerequisites 的修改时间',desc:'app 的时间戳晚于两个对象文件。没有目标缺失，也没有更晚的普通前置条件，链接步骤被跳过。',nodes:{'t-main':'blue','t-utils':'blue','t-app':'green'},text:{'t-main-time':'mtime 10:07','t-utils-time':'mtime 10:08','t-app-time':'mtime 10:12','t-app-meta':'比两个 prerequisites 都新','t-app-flag':'up to date','t-callout':'app 比两个 .o 都新，当前目标是 <b>up to date</b>。'},classes:{'t-callout':'green','t-rule-missing':'','t-rule-newer':'green'},wires:[],code:[[0,'blue']]},
+      {chip:'缺失',tone:'danger',action:'▸ target 不存在，直接运行 recipe',desc:'make 不需要再比较前置条件。没有 app 时，规则的目标缺失本身就是执行链接命令的充分条件。',nodes:{'t-main':'blue','t-utils':'blue','t-app':'danger'},text:{'t-app-time':'not found','t-app-meta':'目标文件不存在','t-app-flag':'missing','t-callout':'<b>target missing</b>：运行 $(CC) $^ -o $@。'},classes:{'t-callout':'danger','t-rule-missing':'danger','t-rule-newer':''},wires:['t-main','t-utils'],code:[[0,'danger'],[1,'danger']]},
+      {chip:'前置更新',tone:'amber',action:'▸ utils.o 比 app 新，链接 app',desc:'目标存在也不代表可跳过。只要任一普通前置条件的时间戳更晚，目标就过期，make 执行它的 recipe。',nodes:{'t-main':'blue','t-utils':'amber','t-app':'amber'},text:{'t-main-time':'mtime 10:07','t-utils-time':'mtime 10:15','t-app-time':'mtime 10:12','t-app-meta':'utils.o 比 target 新','t-app-flag':'stale','t-callout':'<b>utils.o 10:15</b> 晚于 app 10:12：重新链接。'},classes:{'t-callout':'amber','t-rule-missing':'','t-rule-newer':'amber'},wires:['t-utils'],code:[[0,'amber'],[1,'amber']]},
+      {chip:'完成',tone:'green',action:'▸ recipe 更新 target 的时间戳',desc:'链接成功后 app 的时间戳前进到 10:16。下一次 make 再检查这条规则时，两个对象文件都不比 app 新。',nodes:{'t-main':'blue','t-utils':'blue','t-app':'green'},text:{'t-main-time':'mtime 10:07','t-utils-time':'mtime 10:15','t-app-time':'mtime 10:16','t-app-meta':'链接后的新目标','t-app-flag':'current','t-callout':'新的 app 晚于所有 prerequisites，下一次可跳过链接。'},classes:{'t-callout':'green','t-rule-missing':'','t-rule-newer':'green'},wires:['t-utils'],code:[[1,'green']]}
+    ]
+  },
+  {
+    id:'dag',
+    caption:'<b>依赖 DAG</b>：make 从目标沿依赖边递归检查，变化只会让它的下游节点变为待构建。',
+    title:'依赖 DAG',
+    facts:[['图方向','prerequisite → target'],['本次改动','utils.c'],['不受影响','main.c / main.o']],
+    steps:[
+      {chip:'全图',tone:'blue',action:'▸ 从 app 递归检查整张 DAG',desc:'图里的每个节点都是一个文件目标或源文件。此刻所有对象和 app 都比各自前置条件新。',nodes:{'d-main-c':'blue','d-utils-c':'blue','d-main-o':'green','d-utils-o':'green','d-app':'green'},text:{'d-key-right':'all current','d-callout':'图中的每条边都表示“右侧目标依赖左侧文件”。'},classes:{'d-callout':'green'},wires:[],code:[[0,'blue']]},
+      {chip:'源文件更新',tone:'amber',action:'▸ touch utils.c，只标记它的下游',desc:'utils.c 在 10:05 被修改。它不会让 main.o 失效，因为 DAG 中没有从 utils.c 通往 main.o 的边。',nodes:{'d-main-c':'blue','d-utils-c':'amber','d-main-o':'green','d-utils-o':'','d-app':'green'},text:{'d-utils-c-time':'mtime 10:05','d-utils-o-time':'mtime 10:01','d-key-right':'utils branch dirty','d-callout':'变化沿 <b>utils.c → utils.o → app</b> 这条分支传播。'},classes:{'d-callout':'amber'},wires:['d-utils-src'],code:[[2,'amber']]},
+      {chip:'编译',tone:'amber',action:'▸ 重建 utils.o',desc:'make 发现 utils.o 的前置条件 utils.c 更新，于是调用模式规则编译这个对象文件。main.o 不执行 recipe。',nodes:{'d-main-c':'blue','d-utils-c':'amber','d-main-o':'green','d-utils-o':'amber','d-app':'green'},text:{'d-utils-o-time':'building...','d-key-right':'compile utils.o','d-callout':'只有受影响的 object 进入 recipe：<b>utils.o</b>。'},classes:{'d-callout':'amber'},wires:['d-utils-src'],code:[[2,'amber'],[3,'amber']]},
+      {chip:'链接',tone:'blue',action:'▸ 新的 utils.o 让 app 过期，重新链接',desc:'utils.o 更新后，app 对它的依赖变得比目标新。make 继续走到唯一的下游链接目标 app。',nodes:{'d-main-c':'blue','d-utils-c':'blue','d-main-o':'green','d-utils-o':'blue','d-app':'amber'},text:{'d-utils-o-time':'mtime 10:06','d-app-time':'mtime 10:02','d-key-right':'relink app','d-callout':'<b>main.o 保持 current</b>；只有 app 需要接收新的 utils.o。'},classes:{'d-callout':'blue'},wires:['d-utils-src','d-utils-app'],code:[[0,'blue']]},
+      {chip:'完成',tone:'green',action:'▸ app 的下游构建链收敛',desc:'链接后 app 的时间戳更新。修改一个源文件只重建它所在分支的对象文件，以及依赖该对象的目标。',nodes:{'d-main-c':'blue','d-utils-c':'blue','d-main-o':'green','d-utils-o':'green','d-app':'green'},text:{'d-utils-o-time':'mtime 10:06','d-app-time':'mtime 10:07','d-key-right':'main.o skipped','d-callout':'DAG 让 make 避免无关的 <b>main.o</b> 重编译。'},classes:{'d-callout':'green'},wires:['d-utils-src','d-utils-app'],code:[[0,'green']]}
+    ]
+  },
+  {
+    id:'deps',
+    caption:'<b>头文件与 .d</b>：编译时生成依赖元数据；下次读取后，头文件会作为对象文件的普通前置条件进入 DAG。',
+    title:'头文件与 .d',
+    facts:[['生成选项','-MMD -MP'],['生成文件','build/main.d'],['读取方式','-include $(DEPS)']],
+    steps:[
+      {chip:'编译产物',tone:'blue',action:'▸ 编译 src/main.c 时同步写出 build/main.d',desc:'-MMD 只列出非系统头文件依赖；-MP 同时为这些头文件写伪目标，避免头文件删除后 make 先因无规则可做而停止。',nodes:{'h-main-c':'blue','h-config-h':'blue','h-main-d':'blue','h-main-o':'green','h-app':'green'},text:{'h-main-d-time':'-MMD -MP','h-main-o-meta':'已由 src/main.c 编译','h-note':'编译器写入：build/main.o: src/main.c include/config.h','h-callout':'<b>build/main.d</b> 是编译器看到的头文件清单。'},classes:{'h-note':'blue','h-callout':'blue'},wires:['h-src-d','h-head-d'],code:[[1,'blue'],[2,'blue']]},
+      {chip:'读入依赖',tone:'green',action:'▸ 下一次 make 用 -include 读入 build/main.d',desc:'build/main.d 的规则被解析进当前 Makefile；首次不存在时 -include 也不会报错。实线表示普通前置条件，虚线只表示依赖元数据被写出和读入。',nodes:{'h-main-c':'blue','h-config-h':'blue','h-main-d':'green','h-main-o':'green','h-app':'green'},text:{'h-main-o-meta':'普通依赖：src/main.c + config.h','h-note':'-include $(DEPS) 让普通边进入 DAG','h-callout':'真正的时间戳边是 <b>config.h → build/main.o</b>。'},classes:{'h-note':'green','h-callout':'green'},wires:['h-src-obj','h-head-obj','h-d-obj'],code:[[3,'green']]},
+      {chip:'头文件更新',tone:'amber',action:'▸ config.h 比 build/main.o 新，对象文件过期',desc:'即使 src/main.c 没变化，config.h 的修改时间也已是 build/main.o 的普通前置条件，因此对象文件不能复用。',nodes:{'h-main-c':'blue','h-config-h':'amber','h-main-d':'green','h-main-o':'amber','h-app':'green'},text:{'h-config-h-time':'mtime 10:05','h-main-o-time':'mtime 10:01','h-main-o-meta':'header newer than object','h-note':'build/main.o: src/main.c include/config.h','h-callout':'不靠人工补规则，也不会留下 <b>stale build/main.o</b>。'},classes:{'h-note':'amber','h-callout':'amber'},wires:['h-head-obj'],code:[[3,'amber']]},
+      {chip:'重编对象',tone:'amber',action:'▸ 重新编译 build/main.o，并刷新 build/main.d',desc:'编译动作既更新对象文件，也重新写出它的依赖清单。之后新增或删除 include 的变化也会在下一次构建中被接住。',nodes:{'h-main-c':'blue','h-config-h':'blue','h-main-d':'amber','h-main-o':'amber','h-app':'green'},text:{'h-main-d-time':'refreshing...','h-main-o-time':'building...','h-main-o-meta':'重新编译 src/main.c','h-note':'编译输出同时更新 build/main.o 与 build/main.d','h-callout':'<b>一个编译动作</b> 维护对象和依赖文件。'},classes:{'h-note':'amber','h-callout':'amber'},wires:['h-src-d','h-head-d','h-src-obj','h-head-obj'],code:[[1,'amber'],[2,'amber']]},
+      {chip:'下游链接',tone:'green',action:'▸ 更新后的 build/main.o 再触发 app 链接',desc:'build/main.o 在 10:06 生成后比 app 新。make 只重建受影响的对象和下游 app，其余对象无需参与。',nodes:{'h-main-c':'blue','h-config-h':'blue','h-main-d':'green','h-main-o':'green','h-app':'green'},text:{'h-main-d-time':'-MMD -MP','h-main-o-time':'mtime 10:06','h-app-time':'mtime 10:07','h-main-o-meta':'header dependency current','h-note':'build/main.d 保留给下一次 make','h-callout':'头文件更新完成：<b>build/main.o → app</b> 的下游链已收敛。'},classes:{'h-note':'green','h-callout':'green'},wires:['h-head-obj','h-obj-app'],code:[[2,'green'],[3,'green']]}
+    ]
+  },
+  {
+    id:'order',
+    caption:'<b>order-only 依赖</b>：竖线右侧的 prerequisite 仍会先被更新，但它的时间戳不会使目标过期。',
+    title:'order-only 依赖',
+    facts:[['规则','target: normal | order-only'],['目录目标','先更新到可用'],['目录 mtime','不触发重编']],
+    steps:[
+      {chip:'规则',tone:'blue',action:'▸ 读取 normal 与 order-only 两类 prerequisites',desc:'src/main.c 在竖线左侧，是普通依赖。build/ 在右侧也会先按自己的规则更新，但不会参与 build/main.o 的时间戳比较。',nodes:{'o-source':'blue','o-dir':'','o-object':'danger'},text:{'o-dir-time':'not found','o-object-time':'not found','o-object-meta':'目标与目录都不存在','o-callout':'先区分两条边：<b>timestamp edge</b> 与 <b>order-only edge</b>。'},classes:{'o-callout':'blue','o-normal-label':'blue','o-order-label':'green'},wires:[],code:[[0,'blue']]},
+      {chip:'建目录',tone:'green',action:'▸ 先满足 order-only：mkdir -p build',desc:'build/ 缺失时，make 先执行目录规则。它的作用是排序，确保编译 recipe 开始前目标路径已经存在。',nodes:{'o-source':'blue','o-dir':'green','o-object':'danger'},text:{'o-dir-time':'mkdir -p build','o-object-meta':'等待 source recipe','o-callout':'<b>build/ exists</b>，现在才可以写入 build/main.o。'},classes:{'o-callout':'green','o-normal-label':'','o-order-label':'green'},wires:['o-dir'],code:[[2,'green'],[3,'green']]},
+      {chip:'编译',tone:'blue',action:'▸ normal prerequisite 决定 build/main.o 是否重建',desc:'目标仍然不存在，因此编译 recipe 运行。此时 build/ 只是已满足的前置环境，不参与更新时间戳的比较。',nodes:{'o-source':'blue','o-dir':'green','o-object':'amber'},text:{'o-dir-time':'mtime 10:01','o-object-time':'building...','o-object-meta':'compile src/main.c','o-callout':'recipe 由 <b>src/main.c → build/main.o</b> 的普通边驱动。'},classes:{'o-callout':'blue','o-normal-label':'blue','o-order-label':'green'},wires:['o-source','o-dir'],code:[[0,'blue'],[1,'blue']]},
+      {chip:'当前',tone:'green',action:'▸ 新对象文件写入 build/',desc:'编译完成，build/main.o 现在比 src/main.c 新。目录也存在，下一次 make 无需运行任何 recipe。',nodes:{'o-source':'blue','o-dir':'green','o-object':'green'},text:{'o-dir-time':'mtime 10:01','o-object-time':'mtime 10:02','o-object-meta':'up to date','o-callout':'当前状态：source 更旧，目录存在，target <b>up to date</b>。'},classes:{'o-callout':'green','o-normal-label':'blue','o-order-label':'green'},wires:['o-source','o-dir'],code:[[0,'green']]},
+      {chip:'目录 mtime',tone:'amber',action:'▸ build/ 因写入其他文件而更新时间戳',desc:'目录的 mtime 在 10:05 改变很常见。因为它在竖线右侧，make 不会把这次变化当成 build/main.o 的重编译理由。',nodes:{'o-source':'blue','o-dir':'amber','o-object':'green'},text:{'o-dir-time':'mtime 10:05','o-object-time':'mtime 10:02','o-object-meta':'仍然 up to date','o-callout':'<b>directory changed</b>，但 order-only 不比较它与 target 的时间戳。'},classes:{'o-callout':'amber','o-normal-label':'','o-order-label':'amber'},wires:['o-dir'],code:[[0,'amber']]},
+      {chip:'源文件更新',tone:'amber',action:'▸ src/main.c 更新，普通依赖触发重编',desc:'真正会让目标过期的是竖线左侧的 src/main.c。make 再次运行编译 recipe，而不是因为 build/ 的 mtime。',nodes:{'o-source':'amber','o-dir':'green','o-object':'amber'},text:{'o-source-time':'mtime 10:06','o-dir-time':'mtime 10:05','o-object-time':'rebuilding...','o-object-meta':'source newer than target','o-callout':'只有普通依赖的更新使 <b>build/main.o</b> 重新构建。'},classes:{'o-callout':'amber','o-normal-label':'amber','o-order-label':'green'},wires:['o-source'],code:[[0,'amber'],[1,'amber']]}
+    ]
+  }
+];
+
+const semanticClasses = ['is-blue','is-green','is-amber','is-danger','is-muted','is-pop'];
+const styleClasses = ['blue','green','amber','danger'];
+const previousWireState = new Map();
+let currentScene = 0;
+let currentStep = 0;
+let player = null;
+
+function setTone(element, tone) {
+  if (!element) return;
+  semanticClasses.forEach(name => element.classList.remove(name));
+  if (tone) element.classList.add('is-' + tone);
+}
+
+function setClassTone(element, tone) {
+  if (!element) return;
+  styleClasses.forEach(name => element.classList.remove(name));
+  if (tone) element.classList.add(tone);
+}
+
+function drawIn(line) {
+  const length = line.getTotalLength();
+  line.style.transition = 'none';
+  line.style.strokeDasharray = String(length);
+  line.style.strokeDashoffset = String(length);
+  void line.getBoundingClientRect();
+  line.style.transition = '';
+  line.style.strokeDashoffset = '0';
+  window.clearTimeout(line._dashTimer);
+  line._dashTimer = window.setTimeout(() => {
+    line.style.strokeDasharray = '';
+    line.style.strokeDashoffset = '';
+  }, 560);
+}
+
+function edgePoint(rect, stageRect, side, slot = 0, total = 1) {
+  const offset = (slot - (total - 1) / 2) * 20;
+  const left = rect.left - stageRect.left;
+  const top = rect.top - stageRect.top;
+  if (side === 'left') return {x:left, y:top + rect.height / 2 + offset};
+  if (side === 'right') return {x:left + rect.width, y:top + rect.height / 2 + offset};
+  if (side === 'top') return {x:left + rect.width / 2 + offset, y:top};
+  return {x:left + rect.width / 2 + offset, y:top + rect.height};
+}
+
+function sideVector(side) {
+  return ({left:{x:-1,y:0},right:{x:1,y:0},top:{x:0,y:-1},bottom:{x:0,y:1}})[side];
+}
+
+function setWireGeometry(sceneId) {
+  const stage = document.getElementById(sceneId + '-stage');
+  const svg = document.getElementById(sceneId + '-wires');
+  if (!stage || !svg) return;
+  const stageRect = stage.getBoundingClientRect();
+  const mobile = window.matchMedia('(max-width: 720px)').matches;
+  svg.setAttribute('viewBox', '0 0 ' + stageRect.width + ' ' + stageRect.height);
+  wireSets[sceneId].forEach(config => {
+    const source = document.getElementById(config.from).getBoundingClientRect();
+    const target = document.getElementById(config.to).getBoundingClientRect();
+    const forward = target.left >= source.right;
+    const fromSide = mobile ? (config.mobileFromSide || 'bottom') : (config.fromSide || (forward ? 'right' : 'left'));
+    const toSide = mobile ? (config.mobileToSide || 'top') : (config.toSide || (forward ? 'left' : 'right'));
+    const start = edgePoint(source, stageRect, fromSide, config.sourceSlot || 0, config.sourceTotal || 1);
+    const tip = edgePoint(target, stageRect, toSide, config.targetSlot || 0, config.targetTotal || 1);
+    const distance = Math.max(34, Math.hypot(tip.x - start.x, tip.y - start.y) * .42);
+    const startVector = sideVector(fromSide);
+    const targetVector = sideVector(toSide);
+    const c1 = {x:start.x + startVector.x * distance, y:start.y + startVector.y * distance};
+    const c2 = {x:tip.x + targetVector.x * distance, y:tip.y + targetVector.y * distance};
+    const dx = tip.x - start.x;
+    const dy = tip.y - start.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const unit = {x:dx / length, y:dy / length};
+    const normal = {x:-unit.y, y:unit.x};
+    const base = {x:tip.x - unit.x * 9, y:tip.y - unit.y * 9};
+    const path = document.getElementById('wire-' + config.id);
+    const head = document.getElementById('wire-' + config.id + '-head');
+    const port = document.getElementById('wire-' + config.id + '-port');
+    path.setAttribute('d', 'M ' + start.x + ' ' + start.y + ' C ' + c1.x + ' ' + c1.y + ', ' + c2.x + ' ' + c2.y + ', ' + tip.x + ' ' + tip.y);
+    head.setAttribute('d', 'M ' + tip.x + ' ' + tip.y + ' L ' + (base.x + normal.x * 5) + ' ' + (base.y + normal.y * 5) + ' L ' + (base.x - normal.x * 5) + ' ' + (base.y - normal.y * 5) + ' Z');
+    port.setAttribute('cx', String(start.x));
+    port.setAttribute('cy', String(start.y));
+  });
+}
+
+function updateWires(sceneId, activeIds) {
+  setWireGeometry(sceneId);
+  const active = new Set(activeIds);
+  const previous = previousWireState.get(sceneId) || new Set();
+  const hasActive = active.size > 0;
+  wireSets[sceneId].forEach(config => {
+    const line = document.getElementById('wire-' + config.id);
+    const head = document.getElementById('wire-' + config.id + '-head');
+    const port = document.getElementById('wire-' + config.id + '-port');
+    [line, head, port].forEach(element => {
+      element.classList.remove('is-hint','is-active');
+      setClassTone(element, config.color);
+    });
+    if (active.has(config.id)) {
+      line.classList.add('is-active');
+      head.classList.add('is-active');
+      port.classList.add('is-active');
+      if (!previous.has(config.id)) drawIn(line);
+    } else if (!hasActive) {
+      line.classList.add('is-hint');
+    }
+  });
+  previousWireState.set(sceneId, active);
+}
+
+function setHTML(id, value) {
+  const element = document.getElementById(id);
+  if (element && value !== undefined) element.innerHTML = value;
+}
+
+function updateVisual(scene, step) {
+  const sceneRoot = document.getElementById('scene-' + scene.id);
+  sceneRoot.querySelectorAll('.build-node').forEach(node => setTone(node, ''));
+  Object.entries(step.nodes || {}).forEach(([id, tone]) => setTone(document.getElementById(id), tone));
+  Object.entries(step.text || {}).forEach(([id, value]) => setHTML(id, value));
+  Object.entries(step.classes || {}).forEach(([id, tone]) => setTone(document.getElementById(id), tone));
+  updateWires(scene.id, step.wires || []);
+}
+
+function updateCode(scene, step) {
+  document.querySelectorAll('.code-scene').forEach(panel => panel.classList.toggle('is-active', panel.id === 'code-' + scene.id));
+  document.querySelectorAll('.code-line').forEach(line => {
+    styleClasses.forEach(tone => line.classList.remove('active-' + tone));
+  });
+  (step.code || []).forEach(([index, tone]) => {
+    const row = document.querySelector('#code-' + scene.id + ' .code-line[data-line="' + index + '"]');
+    if (row) row.classList.add('active-' + tone);
+  });
+}
+
+function updateFacts(scene) {
+  const tbody = document.getElementById('facts');
+  tbody.textContent = '';
+  scene.facts.forEach(([label, value]) => {
+    const row = document.createElement('tr');
+    const key = document.createElement('td');
+    const val = document.createElement('td');
+    key.textContent = label;
+    val.textContent = value;
+    row.append(key, val);
+    tbody.appendChild(row);
+  });
+}
+
+function updateControls(scene) {
+  document.querySelectorAll('.dot').forEach((dot, index) => {
+    dot.hidden = index >= scene.steps.length;
+    dot.classList.toggle('is-done', index < currentStep);
+    dot.classList.toggle('is-current', index === currentStep);
+    dot.setAttribute('aria-current', index === currentStep ? 'step' : 'false');
+  });
+  document.getElementById('readout').textContent = (currentStep + 1) + ' / ' + scene.steps.length;
+  document.getElementById('prevBtn').disabled = currentStep === 0;
+  document.getElementById('nextBtn').disabled = currentStep === scene.steps.length - 1;
+}
+
+function writeHash() {
+  const scene = scenes[currentScene];
+  history.replaceState(null, '', '#scene=' + encodeURIComponent(scene.id) + '&step=' + currentStep);
+}
+
+function render(persist = true) {
+  const scene = scenes[currentScene];
+  const step = scene.steps[currentStep];
+  document.getElementById('visualCaption').innerHTML = scene.caption;
+  document.getElementById('detailTitle').textContent = scene.title;
+  document.getElementById('detailChip').textContent = step.chip;
+  setClassTone(document.getElementById('detailChip'), step.tone);
+  document.getElementById('actionLine').textContent = step.action;
+  setClassTone(document.getElementById('actionLine'), step.tone);
+  document.getElementById('detailDesc').textContent = step.desc;
+  updateFacts(scene);
+  updateVisual(scene, step);
+  updateCode(scene, step);
+  updateControls(scene);
+  if (persist) writeHash();
+  if (currentStep === scene.steps.length - 1 && player) stop();
+}
+
+function activateScene(index, step = 0, persist = true) {
+  currentScene = index;
+  currentStep = Math.max(0, Math.min(step, scenes[index].steps.length - 1));
+  document.querySelectorAll('.scene').forEach((item, sceneIndex) => item.classList.toggle('is-active', sceneIndex === currentScene));
+  document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('is-active', tab.dataset.scene === scenes[currentScene].id));
+  requestAnimationFrame(() => render(persist));
+}
+
+function go(step) {
+  currentStep = Math.max(0, Math.min(step, scenes[currentScene].steps.length - 1));
+  render();
+}
+
+function stop() {
+  if (player) window.clearInterval(player);
+  player = null;
+  document.getElementById('playBtn').textContent = '播放';
+}
+
+function play() {
+  const scene = scenes[currentScene];
+  if (currentStep === scene.steps.length - 1) go(0);
+  document.getElementById('playBtn').textContent = '暂停';
+  player = window.setInterval(() => {
+    if (currentStep < scenes[currentScene].steps.length - 1) go(currentStep + 1);
+    else stop();
+  }, 2900);
+}
+
+function parseHash() {
+  const values = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const id = values.get('scene');
+  const step = Number(values.get('step'));
+  const index = scenes.findIndex(scene => scene.id === id);
+  return {index:index >= 0 ? index : 0, step:Number.isFinite(step) ? step : 0};
+}
+
+mountCodePanels();
+document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+  const index = scenes.findIndex(scene => scene.id === tab.dataset.scene);
+  if (index !== currentScene) { stop(); activateScene(index); }
+}));
+document.getElementById('prevBtn').addEventListener('click', () => { stop(); go(currentStep - 1); });
+document.getElementById('nextBtn').addEventListener('click', () => { stop(); go(currentStep + 1); });
+document.getElementById('playBtn').addEventListener('click', () => { if (player) stop(); else play(); });
+document.querySelectorAll('.dot').forEach(dot => dot.addEventListener('click', () => { stop(); go(Number(dot.dataset.step)); }));
+document.addEventListener('keydown', event => {
+  if (event.target.closest('button')) return;
+  if (event.key === 'ArrowRight') { stop(); go(currentStep + 1); }
+  if (event.key === 'ArrowLeft') { stop(); go(currentStep - 1); }
+  if (event.key === ' ') { event.preventDefault(); if (player) stop(); else play(); }
+});
+window.addEventListener('resize', () => updateWires(scenes[currentScene].id, scenes[currentScene].steps[currentStep].wires || []));
+window.addEventListener('hashchange', () => { const target = parseHash(); stop(); activateScene(target.index, target.step, false); });
+
+const initial = parseHash();
+activateScene(initial.index, initial.step, false);
+</script>
+</body>
+</html>

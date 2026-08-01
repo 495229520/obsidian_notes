@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 712" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <title>迭代服务器的排队代价</title>
+  <desc>三个客户端同时到达时，迭代服务器把它们串成一队；等待时间随排在前面的人数线性累加。同时说明 listen 的 backlog 决定了队列有多长，以及与 fork 并发模型的差别。</desc>
+
+  <rect x="0" y="0" width="1240" height="712" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">迭代服务器：accept 一个，服务到底，再 accept 下一个</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">同时到达的客户端并不会被同时服务，它们在内核队列里排队；第 N 个人的等待时间是前面所有人处理时长之和</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="104" width="1144" height="240" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · 三个客户端在 0 时刻同时到达，每个请求处理 2 秒</text>
+
+  <!-- time axis -->
+  <path d="M200 158 L1148 158" stroke="#9B968A" stroke-width="1"/>
+  <path d="M200 154 L200 162" stroke="#9B968A" stroke-width="1"/>
+  <path d="M516 154 L516 162" stroke="#9B968A" stroke-width="1"/>
+  <path d="M832 154 L832 162" stroke="#9B968A" stroke-width="1"/>
+  <path d="M1148 154 L1148 162" stroke="#9B968A" stroke-width="1"/>
+  <text x="200" y="150" font-size="9.5" fill="#6B675C" text-anchor="middle">0s</text>
+  <text x="516" y="150" font-size="9.5" fill="#6B675C" text-anchor="middle">2s</text>
+  <text x="832" y="150" font-size="9.5" fill="#6B675C" text-anchor="middle">4s</text>
+  <text x="1148" y="150" font-size="9.5" fill="#6B675C" text-anchor="middle">6s</text>
+
+  <!-- server lane -->
+  <text x="72" y="188" font-size="12" font-weight="700" fill="#4A473F">服务器（单线程）</text>
+  <rect x="200" y="170" width="314" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="357" y="190" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">服务 A</text>
+  <rect x="516" y="170" width="314" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="673" y="190" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">服务 B</text>
+  <rect x="832" y="170" width="316" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="990" y="190" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">服务 C</text>
+  <path d="M72 208 L1148 208" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- client A -->
+  <text x="72" y="238" font-size="12" font-weight="700" fill="#4A473F">客户端 A</text>
+  <rect x="200" y="220" width="314" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="357" y="238" font-size="11" fill="#24473F" text-anchor="middle">被服务</text>
+  <text x="1160" y="238" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="end">等 0s</text>
+
+  <!-- client B -->
+  <text x="72" y="272" font-size="12" font-weight="700" fill="#4A473F">客户端 B</text>
+  <rect x="200" y="254" width="314" height="26" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="357" y="272" font-size="11" fill="#6B4E28" text-anchor="middle">在 accept 队列里干等</text>
+  <rect x="516" y="254" width="314" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="673" y="272" font-size="11" fill="#24473F" text-anchor="middle">被服务</text>
+  <text x="1160" y="272" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="end">等 2s</text>
+
+  <!-- client C -->
+  <text x="72" y="306" font-size="12" font-weight="700" fill="#4A473F">客户端 C</text>
+  <rect x="200" y="288" width="630" height="26" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="515" y="306" font-size="11" fill="#733428" text-anchor="middle">连接早就建好了，但没人 accept 它</text>
+  <rect x="832" y="288" width="316" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="990" y="306" font-size="11" fill="#24473F" text-anchor="middle">被服务</text>
+  <text x="1160" y="306" font-size="10.5" font-weight="700" fill="#733428" text-anchor="end">等 4s</text>
+
+  <text x="72" y="332" font-size="11.5" font-weight="700" fill="#2C4460">三次握手在 accept 之前就由内核完成了，所以「连接成功」不等于「服务器在理你」</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="360" width="560" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="390" font-size="15" font-weight="700" fill="#4A473F">B · listen(fd, 5) 里的 5 排的是谁</text>
+
+  <rect x="72" y="404" width="488" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="90" y="422" font-size="12" font-weight="700" fill="#2C4460">半连接队列 SYN queue</text>
+  <text x="90" y="440" font-size="10.5" fill="#2C4460">收到 SYN，回了 SYN+ACK，还在等对方的 ACK</text>
+
+  <path d="M316 452 L316 470" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="330" y="466" font-size="10.5" fill="#4A473F">三次握手完成</text>
+
+  <rect x="72" y="476" width="488" height="46" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="90" y="494" font-size="12" font-weight="700" fill="#6B4E28">全连接队列 accept queue　长度 ≈ backlog</text>
+  <text x="90" y="512" font-size="10.5" fill="#6B4E28">连接已可用，躺在这里等应用来取</text>
+
+  <path d="M316 524 L316 542" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="330" y="538" font-size="10.5" fill="#4A473F">accept() 每次取走一个</text>
+
+  <rect x="72" y="548" width="488" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="90" y="566" font-size="12" font-weight="700" fill="#24473F">应用拿到已连接套接字 connfd</text>
+  <text x="90" y="584" font-size="10.5" fill="#24473F">迭代服务器要把它处理完才回头再 accept</text>
+
+  <rect x="72" y="606" width="488" height="36" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="90" y="629" font-size="11.5" font-weight="700" fill="#733428">队列满了：新连接被丢弃，客户端表现为超时或被拒</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="624" y="360" width="568" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="648" y="390" font-size="15" font-weight="700" fill="#4A473F">C · 迭代 vs fork 并发</text>
+
+  <text x="648" y="414" font-size="11" font-weight="700" fill="#6B675C">维度</text>
+  <text x="800" y="414" font-size="11" font-weight="700" fill="#6B675C">迭代服务器</text>
+  <text x="990" y="414" font-size="11" font-weight="700" fill="#6B675C">fork 并发</text>
+  <path d="M648 422 L1168 422" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="648" y="428" width="520" height="30" fill="#F1EFE8"/>
+  <text x="656" y="448" font-size="11" font-weight="700" fill="#4A473F">同时在服务</text>
+  <text x="800" y="448" font-size="11" fill="#733428">1 个</text>
+  <text x="990" y="448" font-size="11" fill="#24473F">N 个</text>
+
+  <rect x="648" y="460" width="520" height="30" fill="#EDEBE3"/>
+  <text x="656" y="480" font-size="11" font-weight="700" fill="#4A473F">第 N 个的等待</text>
+  <text x="800" y="480" font-size="11" fill="#733428">(N−1) × 处理时长</text>
+  <text x="990" y="480" font-size="11" fill="#24473F">接近 0</text>
+
+  <rect x="648" y="492" width="520" height="30" fill="#F1EFE8"/>
+  <text x="656" y="512" font-size="11" font-weight="700" fill="#4A473F">要额外处理的坑</text>
+  <text x="800" y="512" font-size="11" fill="#24473F">没有</text>
+  <text x="990" y="512" font-size="11" fill="#733428">僵尸进程、fd 泄漏</text>
+
+  <rect x="648" y="524" width="520" height="30" fill="#EDEBE3"/>
+  <text x="656" y="544" font-size="11" font-weight="700" fill="#4A473F">一个请求卡住</text>
+  <text x="800" y="544" font-size="11" fill="#733428">整个服务停摆</text>
+  <text x="990" y="544" font-size="11" fill="#24473F">只影响那条连接</text>
+
+  <rect x="648" y="556" width="520" height="30" fill="#F1EFE8"/>
+  <text x="656" y="576" font-size="11" font-weight="700" fill="#4A473F">适合什么</text>
+  <text x="800" y="576" font-size="11" fill="#4A473F">处理极快的内部工具</text>
+  <text x="990" y="576" font-size="11" fill="#4A473F">通用</text>
+
+  <rect x="648" y="606" width="520" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="666" y="629" font-size="11.5" font-weight="700" fill="#2C4460">迭代模型的价值在于：它是理解并发模型的对照组</text>
+
+  <text x="48" y="690" font-size="12" fill="#6B675C">口径：图中 2 秒是为了看清排队效应而假设的处理时长；真实的 accept 队列长度还受 net.core.somaxconn 限制，不只看 backlog 参数</text>
+</svg>

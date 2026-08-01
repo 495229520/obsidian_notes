@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="620" viewBox="0 0 1240 620" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrN" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <title>非阻塞 connect 的四步与两条出口</title>
+  <desc>从设置非阻塞、调用 connect、等待可写事件到用 getsockopt 取 SO_ERROR 的完整流程，以及成功与失败两条出口。</desc>
+
+  <rect x="0" y="0" width="1240" height="620" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">非阻塞 connect：四步，一步都不能省</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">最容易漏掉的是第 ④ 步。少了它，失败的连接会被当成功，问题推迟到第一次 send 才暴露</text>
+
+  <rect x="48" y="104" width="1144" height="352" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- step 1 -->
+  <rect x="72" y="168" width="170" height="52" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="157" y="190" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① 设为非阻塞</text>
+  <text x="157" y="208" font-size="10" fill="#6B675C" text-anchor="middle">fcntl O_NONBLOCK</text>
+  <line x1="242" y1="194" x2="286" y2="194" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+
+  <!-- step 2 -->
+  <rect x="292" y="168" width="170" height="52" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="377" y="190" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">② connect()</text>
+  <text x="377" y="208" font-size="10" fill="#6B675C" text-anchor="middle">立刻返回，不等握手</text>
+
+  <!-- fork to three outcomes -->
+  <polyline points="462,194 491,194 491,150 514,150" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrN)"/>
+  <polyline points="462,194 491,194 491,198 514,198" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrN)"/>
+  <polyline points="462,194 491,194 491,246 514,246" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+
+  <rect x="520" y="130" width="250" height="40" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="645" y="154" font-size="11" fill="#4A473F" text-anchor="middle">返回 0：已连上（多见于本机）</text>
+
+  <rect x="520" y="178" width="250" height="40" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="645" y="202" font-size="11" fill="#733428" text-anchor="middle">-1 且其他 errno：直接失败</text>
+
+  <rect x="520" y="226" width="250" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="645" y="250" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">-1 且 EINPROGRESS：进行中</text>
+
+  <!-- step 3 -->
+  <line x1="645" y1="266" x2="645" y2="284" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <rect x="520" y="290" width="250" height="52" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="645" y="312" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 等可写 / 错误事件</text>
+  <text x="645" y="330" font-size="10" fill="#6B675C" text-anchor="middle">EPOLLOUT，或 select 的写集合</text>
+  <line x1="770" y1="316" x2="814" y2="316" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+
+  <!-- step 4 -->
+  <rect x="820" y="290" width="300" height="52" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.6"/>
+  <text x="970" y="312" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">④ getsockopt(fd, SO_ERROR, &amp;err)</text>
+  <text x="970" y="330" font-size="10" fill="#6B675C" text-anchor="middle">问内核：这条连接到底成没成</text>
+
+  <!-- fork to two results -->
+  <polyline points="970,342 970,360 770,360 770,378" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrG)"/>
+  <polyline points="970,342 970,360 1050,360 1050,378" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrR)"/>
+
+  <rect x="650" y="384" width="240" height="48" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="770" y="404" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">err == 0 → 连接成功</text>
+  <text x="770" y="422" font-size="9.5" fill="#6B675C" text-anchor="middle">可以开始收发了</text>
+
+  <rect x="930" y="384" width="240" height="48" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="1050" y="404" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">err != 0 → 连接失败</text>
+  <text x="1050" y="422" font-size="9.5" fill="#733428" text-anchor="middle">ECONNREFUSED / ETIMEDOUT …</text>
+
+  <!-- cards -->
+  <rect x="48" y="476" width="560" height="110" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="500" font-size="13" font-weight="700" fill="#4A473F">为什么"可写"不能直接当成功</text>
+  <text x="72" y="522" font-size="10.5" fill="#4A473F">连接失败时 fd 同样会被唤醒，Linux 上甚至可读可写一起报。</text>
+  <text x="72" y="542" font-size="10.5" fill="#4A473F">光看事件类型分不出成功还是失败，必须再问一次 SO_ERROR。</text>
+  <text x="72" y="566" font-size="10.5" font-weight="700" fill="#733428">注意 getsockopt 会把待处理错误取走并清零，只有一次机会。</text>
+
+  <rect x="632" y="476" width="560" height="110" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="656" y="500" font-size="13" font-weight="700" fill="#4A473F">超时得自己做</text>
+  <text x="656" y="522" font-size="10.5" fill="#4A473F">非阻塞 connect 没有超时参数，内核自己的 SYN 重试能拖几十秒。</text>
+  <text x="656" y="542" font-size="10.5" fill="#4A473F">工程做法：注册 fd 的同时挂一个定时器，到点还没结果就 close 重来。</text>
+  <text x="656" y="566" font-size="10.5" fill="#8A8578">阻塞式 connect 也没有可移植的超时选项，Linux 上只能用 TCP_SYNCNT 粗调。</text>
+
+  <text x="48" y="606" font-size="11" fill="#6B675C">这四步一步都不能省。尤其别把第 ③ 步的可写事件直接当成"连上了"——那是把失败当成功，最难查的一类 bug</text>
+</svg>

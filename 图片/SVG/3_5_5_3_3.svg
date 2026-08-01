@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>从信号处理函数里跳出去时，信号掩码归谁恢复</title>
+  <desc>两条泳道按四个步骤对照。longjmp 那条：正常运行时掩码为空，内核调 handler 时自动把 SIGINT 加进掩码防重入，从 handler 里 longjmp 出去时 sigreturn 没有执行，掩码是否被恢复由 libc 决定，于是再按 Ctrl-C 可能收不到。siglongjmp 那条：掩码来自 sigsetjmp 存下的那一份，写回后与 sigreturn 无关，再按 Ctrl-C 正常触发。底部两个盒子说明掩码是内核加的，以及跳走之后由谁负责还。</desc>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">从信号处理函数里跳出去，掩码归谁恢复</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">handler 正常返回时靠 sigreturn 写回旧掩码；longjmp 不返回，这一步就没人做</text>
+
+  <text x="244" y="124" font-size="11.5" font-weight="700" fill="#4A473F">① 正常运行</text>
+  <text x="490" y="124" font-size="11.5" font-weight="700" fill="#4A473F">② Ctrl-C，内核调 handler</text>
+  <text x="736" y="124" font-size="11.5" font-weight="700" fill="#4A473F">③ 从 handler 里跳出去</text>
+  <text x="982" y="124" font-size="11.5" font-weight="700" fill="#4A473F">④ 再按一次 Ctrl-C</text>
+
+  <text x="56" y="152" font-size="13" font-weight="700" fill="#4A473F">A · setjmp + longjmp：掩码是不是被恢复，POSIX 不保证</text>
+  <rect x="48" y="160" width="1144" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <text x="64" y="218" font-size="12.5" font-weight="700" fill="#4A473F">longjmp</text>
+  <text x="64" y="240" font-size="10.5" fill="#6B675C">不带掩码</text>
+
+  <rect x="240" y="176" width="222" height="108" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="258" y="204" font-size="11.5" font-weight="700" fill="#24473F">掩码：空</text>
+  <text x="258" y="228" font-size="10.5" fill="#24473F">SIGINT 能进来</text>
+  <text x="258" y="250" font-size="10.5" fill="#24473F">程序在 sleep(1)</text>
+
+  <rect x="486" y="176" width="222" height="108" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="504" y="204" font-size="11.5" font-weight="700" fill="#6B4E28">掩码：{SIGINT}</text>
+  <text x="504" y="228" font-size="10.5" fill="#6B4E28">内核自动加上的</text>
+  <text x="504" y="250" font-size="10.5" fill="#6B4E28">防 handler 重入</text>
+
+  <rect x="732" y="176" width="222" height="108" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="750" y="204" font-size="11.5" font-weight="700" fill="#733428">掩码：不确定</text>
+  <text x="750" y="228" font-size="10.5" fill="#733428">sigreturn 没跑</text>
+  <text x="750" y="250" font-size="10.5" fill="#733428">由 libc 自己决定</text>
+
+  <rect x="978" y="176" width="214" height="108" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="996" y="204" font-size="11.5" font-weight="700" fill="#733428">可能收不到</text>
+  <text x="996" y="228" font-size="10.5" fill="#733428">掩码还带着 SIGINT</text>
+  <text x="996" y="250" font-size="10.5" fill="#733428">信号只能挂 pending</text>
+
+  <text x="56" y="328" font-size="13" font-weight="700" fill="#4A473F">B · sigsetjmp(env, 1) + siglongjmp：掩码写成了显式参数</text>
+  <rect x="48" y="336" width="1144" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <text x="64" y="394" font-size="12.5" font-weight="700" fill="#4A473F">siglongjmp</text>
+  <text x="64" y="416" font-size="10.5" fill="#6B675C">掩码一起还</text>
+
+  <rect x="240" y="352" width="222" height="108" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="258" y="380" font-size="11.5" font-weight="700" fill="#24473F">掩码：空</text>
+  <text x="258" y="404" font-size="10.5" fill="#24473F">sigsetjmp 存了它</text>
+  <text x="258" y="426" font-size="10.5" fill="#24473F">savesigs 传了 1</text>
+
+  <rect x="486" y="352" width="222" height="108" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="504" y="380" font-size="11.5" font-weight="700" fill="#6B4E28">掩码：{SIGINT}</text>
+  <text x="504" y="404" font-size="10.5" fill="#6B4E28">内核自动加上的</text>
+  <text x="504" y="426" font-size="10.5" fill="#6B4E28">跟 A 完全一样</text>
+
+  <rect x="732" y="352" width="222" height="108" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="750" y="380" font-size="11.5" font-weight="700" fill="#24473F">掩码：空</text>
+  <text x="750" y="404" font-size="10.5" fill="#24473F">从 env 里写回</text>
+  <text x="750" y="426" font-size="10.5" fill="#24473F">不依赖 sigreturn</text>
+
+  <rect x="978" y="352" width="214" height="108" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="996" y="380" font-size="11.5" font-weight="700" fill="#24473F">正常触发</text>
+  <text x="996" y="404" font-size="10.5" fill="#24473F">handler 又能进来</text>
+  <text x="996" y="426" font-size="10.5" fill="#24473F">可以反复中断</text>
+
+  <text x="56" y="506" font-size="13" font-weight="700" fill="#4A473F">C · 掩码是谁加的，又该谁还</text>
+
+  <rect x="48" y="520" width="560" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="548" font-size="11.5" font-weight="700" fill="#4A473F">内核这一半</text>
+  <text x="68" y="578" font-size="11" fill="#4A473F">调 handler 前：旧掩码存进 ucontext</text>
+  <text x="68" y="606" font-size="11" fill="#4A473F">同时把 SIGINT 加进掩码，防重入</text>
+  <text x="68" y="634" font-size="11" fill="#4A473F">handler 正常返回：sigreturn 写回旧掩码</text>
+
+  <rect x="624" y="520" width="568" height="140" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="644" y="548" font-size="11.5" font-weight="700" fill="#4A473F">跳走之后归谁管</text>
+  <text x="644" y="578" font-size="11" fill="#4A473F">longjmp：sigreturn 没跑，掩码看 libc</text>
+  <text x="644" y="606" font-size="11" fill="#4A473F">siglongjmp：用 sigsetjmp 存的那一份</text>
+  <text x="644" y="634" font-size="11" fill="#4A473F">所以 handler 里只该用后者</text>
+</svg>

@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>从 buf[] 到盘片 · write / fsync 全路径</title>
+<!-- Visual system: shared with the 3.Linux animation series — warm paper #F5F4ED, quiet panels, semantic blue(用户态)/amber(内核)/green(持久)/danger(丢失), 8px rhythm. -->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#625F56;--faint:#918D83;
+  --line:#D8D5C8;--grid:#E4E1D6;--gray:#F0EEE6;
+  --blue:#2467A6;--bluebg:#E1EEF9;--bluetx:#1C4D7A;
+  --green:#087A5C;--greenbg:#DAF0E7;--greentx:#075B45;
+  --amber:#A66408;--amberbg:#F7E9D4;--ambertx:#7C4A05;
+  --danger:#C34935;--dangerbg:#F7DFDA;--dangertx:#913025;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+.wrap{max-width:1320px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;color:var(--ink);}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:10px 16px;cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),transform .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.14);}.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.78;}
+
+.layout{display:grid;grid-template-columns:minmax(0,760px) minmax(300px,1fr);gap:28px;margin-top:22px;align-items:start;}
+.viz{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:22px;min-height:520px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.vcap{font-size:13px;color:var(--muted);margin-bottom:15px;}.vcap b{color:var(--ink);font-weight:700;}
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:18px 20px;min-height:212px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:9px 12px;}
+#stDesc{margin-top:10px;font-size:14px;color:var(--muted);}
+.blue{color:var(--blue);font-weight:700;}.green{color:var(--green);font-weight:700;}.amber{color:var(--amber);font-weight:700;}.danger{color:var(--danger);font-weight:700;}
+.chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1.5px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.chip.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.chip.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{align-self:flex-start;width:100%;background:#2E2C27;border-radius:8px;padding:10px 0;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#D8D5CC;box-shadow:0 2px 8px rgba(46,44,39,.18);overflow:hidden;}
+.codebox .cl{min-height:22px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease);}
+.codebox .cmt{color:#918D83;}.codebox .kw{color:#E9AC50;}.codebox .type{color:#95C7EF;}.codebox .fn{color:#83C9B2;}.codebox .num{color:#F0BE7E;}.codebox .str{color:#D9CE9F;}
+.codebox .cl.hl-blue{background:rgba(52,122,198,.54);box-shadow:inset 4px 0 0 #91C7F5;color:#F7F4EA;}
+.codebox .cl.hl-green{background:rgba(22,143,107,.54);box-shadow:inset 4px 0 0 #90DFC2;color:#F7F4EA;}
+.codebox .cl.hl-amber{background:rgba(185,112,16,.58);box-shadow:inset 4px 0 0 #FFD08A;color:#F7F4EA;}
+.codebox .cl.hl-danger{background:rgba(198,73,53,.58);box-shadow:inset 4px 0 0 #FFAA98;color:#F7F4EA;}
+.codebox .cl[class*="hl-"] .cmt{color:#D5D0C1;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.5px solid var(--grid);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:7px;padding:8px 15px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--ink);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:86px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector layer: paths, filled triangle heads and source ports stay mounted; endpoints come from live element rectangles. */
+.stage{position:relative;width:100%;}
+.wire-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;}
+.wire-line{--wc:var(--muted);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.wire-head{--wc:var(--muted);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}
+.wire-port{--wc:var(--muted);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire-line.on,.wire-head.on,.wire-port.on{opacity:1;}
+.wire-line.hint{stroke-width:2;opacity:.1;}.wire-head.hint,.wire-port.hint{opacity:.1;}
+.wire-head.drawing{transition-delay:200ms;}
+.wire-line.blue,.wire-head.blue,.wire-port.blue{--wc:var(--blue);}
+.wire-line.green,.wire-head.green,.wire-port.green{--wc:var(--green);}
+.wire-line.amber,.wire-head.amber,.wire-port.amber{--wc:var(--amber);}
+.wire-line.danger,.wire-head.danger,.wire-port.danger{--wc:var(--danger);}
+
+/* ---------- persistence ladder: 4 storage layers, 3 boundaries ---------- */
+.fs-stage{display:grid;grid-template-rows:64px 32px 64px 32px 60px 32px 60px 34px 26px;row-gap:9px;min-height:472px;}
+.layer{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);
+  display:grid;grid-template-columns:20px 134px minmax(0,1fr) 98px;align-items:center;gap:9px;padding:6px 11px;
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease),border-style var(--dur) var(--ease);}
+.layer .lnum{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease);}
+.lname{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.lname b{font-size:12.5px;font-weight:700;color:var(--ink);}
+.lname em{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lbody{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:9px;min-width:0;}
+.layer.on-blue{border-color:var(--blue);background:var(--bluebg);}.layer.on-blue .lnum{color:var(--blue);}
+.layer.on-amber{border-color:var(--amber);background:var(--amberbg);}.layer.on-amber .lnum{color:var(--amber);}
+.layer.on-green{border-color:var(--green);background:var(--greenbg);}.layer.on-green .lnum{color:var(--green);}
+.layer.on-danger{border-color:var(--danger);background:var(--dangerbg);}.layer.on-danger .lnum{color:var(--danger);}
+.layer.dim{opacity:.36;}
+.layer.bypass{border-style:dashed;border-color:var(--line);
+  background:repeating-linear-gradient(-45deg,transparent,transparent 6px,rgba(145,141,131,.08) 6px,rgba(145,141,131,.08) 12px);}
+.layer.bypass .lnum,.layer.bypass .lname b{color:var(--faint);}
+.layer.bypass .station,.layer.bypass .pgs{opacity:.4;}
+
+.station{position:relative;z-index:2;min-height:40px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);
+  display:flex;align-items:center;gap:9px;padding:5px 9px;font-size:11px;color:var(--muted);min-width:0;
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.station .sk{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);flex:0 0 auto;transition:color var(--dur) var(--ease);}
+.station .stx{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ram-tag{flex:0 1 auto;min-width:0;border:1px solid var(--amber);border-radius:999px;background:var(--amberbg);color:var(--ambertx);
+  padding:1px 7px;font-family:var(--mono);font-size:9px;font-weight:700;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.station.on-blue{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}.station.on-blue .sk{color:var(--blue);}
+.station.on-amber{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}.station.on-amber .sk{color:var(--amber);}
+.station.on-green{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}.station.on-green .sk{color:var(--green);}
+.station.on-danger{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}.station.on-danger .sk{color:var(--danger);}
+
+.dock{margin-left:auto;flex:0 0 64px;height:25px;border:1.5px dashed var(--line);border-radius:6px;background:var(--panel);
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.dock.ok{border-style:solid;border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.dock.warn{border-style:solid;border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.dock.lost{border-style:solid;border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);text-decoration:line-through;}
+
+.risk{justify-self:end;font-family:var(--mono);font-size:9.5px;font-weight:700;padding:4px 9px;border-radius:999px;
+  border:1.5px solid var(--line);color:var(--faint);background:var(--panel);white-space:nowrap;
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.risk:empty{opacity:0;}
+.risk.lost{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.risk.safe{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.risk.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+
+.edge{position:relative;z-index:2;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:7px;
+  border:1.5px dashed var(--line);background:var(--gray);
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),border-style var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.edge .ecap{font-size:10.5px;font-weight:700;color:var(--faint);white-space:nowrap;transition:color var(--dur) var(--ease);}
+.echips{display:flex;gap:6px;flex-wrap:wrap;}
+.echips i{font-style:normal;font-family:var(--mono);font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:5px;
+  border:1px solid var(--line);background:var(--panel);color:var(--faint);
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.edge.on{border-style:solid;border-color:var(--amber);background:var(--amberbg);}
+.edge.on .ecap{color:var(--ambertx);}
+.edge.on .echips i.lit{border-color:var(--amber);background:var(--panel);color:var(--ambertx);}
+.edge.on-green{border-style:solid;border-color:var(--green);background:var(--greenbg);}
+.edge.on-green .ecap{color:var(--greentx);}
+.edge.on-green .echips i.lit{border-color:var(--green);background:var(--panel);color:var(--greentx);}
+.edge.dim{opacity:.34;}
+
+.pgs{display:flex;gap:5px;margin-left:auto;}
+.pgs i{display:block;width:24px;height:15px;border-radius:3px;border:1.5px solid var(--line);background:var(--panel);
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),background-image var(--dur) var(--ease);}
+.pgs i.clean{border-color:var(--blue);background:var(--bluebg);}
+.pgs i.dirty{border-color:var(--danger);background:var(--dangerbg);background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(195,73,53,.30) 3px,rgba(195,73,53,.30) 6px);}
+.pgs i.writing{border-color:var(--amber);background:var(--amberbg);}
+.pgs i.done{border-color:var(--green);background:var(--greenbg);}
+
+.counts{display:flex;gap:10px;justify-content:center;align-items:center;}
+.count{border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:5px 13px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.count:empty{opacity:0;}
+.count.lit-blue{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.count.lit-amber{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.count.lit-green{border-color:var(--green);background:var(--greenbg);color:var(--greentx);}
+.count.lit-danger{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+
+.pillrow{display:flex;align-items:center;justify-content:center;}
+.pill{border:1.5px solid var(--line);border-radius:999px;background:var(--panel);padding:4px 12px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);
+  white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.pill.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}
+.pill.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.pill.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}
+.pill.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.ctoken{position:absolute;z-index:4;min-width:64px;height:25px;padding:0 7px;border:1.5px solid var(--green);border-radius:6px;
+  background:var(--greenbg);color:var(--greentx);font-family:var(--mono);font-size:9.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;opacity:0;transform:translate(-50%,-50%);
+  transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease);}
+.ctoken.on{opacity:1;}
+.ctoken.blue{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);}
+.ctoken.amber{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.ctoken.danger{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}
+
+/* ---------- locate-chain stage: fd table -> struct file -> inode ---------- */
+.ch-stage{display:grid;grid-template-columns:1fr 1fr 1.24fr;column-gap:34px;grid-template-rows:392px 30px;row-gap:14px;min-height:436px;}
+.gcard{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:12px 13px;
+  display:flex;flex-direction:column;justify-content:center;gap:6px;
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gcard .k{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease);}
+.gcard .n{font-size:13px;font-weight:700;}
+.gcard.blue{border-color:var(--blue);}.gcard.blue .k{color:var(--blue);}
+.gcard.green{border-color:var(--green);}.gcard.green .k{color:var(--green);}
+.gcard.amber{border-color:var(--amber);}.gcard.amber .k{color:var(--amber);}
+.gcard.blue.active{background:var(--bluebg);}.gcard.green.active{background:var(--greenbg);}.gcard.amber.active{background:var(--amberbg);}
+.gcard.dim{opacity:.4;}
+.fdrow,.kv{display:flex;align-items:center;gap:8px;min-height:30px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);
+  padding:4px 9px;font-size:11px;color:var(--muted);
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.fdrow b,.kv b{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:0 0 auto;transition:color var(--dur) var(--ease);}
+.kv span{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink);}
+.fdrow.on,.kv.on{border-color:var(--blue);background:var(--bluebg);color:var(--bluetx);transform:translateX(2px);}
+.fdrow.on b,.kv.on b{color:var(--blue);}
+.kv.hot{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}
+.kv.hot b{color:var(--amber);}
+.fdrow.ghost,.kv.ghost{border-style:dashed;opacity:.34;}
+.isec{border:1.5px solid var(--line);border-radius:6px;background:var(--gray);padding:7px 9px;display:flex;flex-direction:column;gap:5px;
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.isec .it{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease);}
+.isec .iv{font-size:10.5px;color:var(--muted);}
+.isec.on{border-color:var(--green);background:var(--greenbg);}.isec.on .it{color:var(--greentx);}.isec.on .iv{color:var(--greentx);}
+.isec.hot{border-color:var(--amber);background:var(--amberbg);}.isec.hot .it{color:var(--ambertx);}.isec.hot .iv{color:var(--ambertx);}
+.isec.dim{opacity:.36;}
+.isec .pgs{margin-left:0;}
+
+/* ---------- writeback stage: dirty-page meter + three triggers ---------- */
+.wb-stage{display:grid;grid-template-rows:104px 1fr 88px 30px;row-gap:14px;min-height:472px;}
+.panel-box{position:relative;z-index:2;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);padding:30px 14px 12px;
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.panel-title{position:absolute;left:13px;top:9px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}
+.meter{position:relative;height:32px;border:1.5px solid var(--line);border-radius:7px;background:var(--gray);margin-top:6px;}
+.mfill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:5px 0 0 5px;background:var(--bluebg);border-right:2.5px solid var(--blue);
+  transition:width var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease);}
+.mfill.warn{background:var(--amberbg);border-right-color:var(--amber);}
+.mfill.bad{background:var(--dangerbg);border-right-color:var(--danger);}
+.mark{position:absolute;top:-16px;bottom:-2px;width:0;border-left:1.5px dashed var(--muted);}
+.mark em{position:absolute;right:5px;top:-3px;font-style:normal;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.mark.bg{border-color:var(--amber);}.mark.bg em{color:var(--ambertx);}
+.mark.hi{border-color:var(--danger);}.mark.hi em{color:var(--dangertx);}
+.mlegend{display:flex;justify-content:space-between;margin-top:7px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);}
+.trigbox{display:flex;flex-direction:column;gap:9px;justify-content:center;}
+.rrow{min-height:38px;border:1.5px solid var(--line);border-radius:6px;background:var(--gray);font-size:11px;color:var(--muted);
+  display:flex;align-items:center;padding:6px 11px;gap:9px;
+  transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.rrow b{font-family:var(--mono);font-size:10.5px;flex:0 0 auto;color:var(--faint);transition:color var(--dur) var(--ease);}
+.rrow .rtx{min-width:0;}
+.rrow.on{border-color:var(--green);background:var(--greenbg);color:var(--greentx);transform:translateX(2px);}
+.rrow.on b{color:var(--green);}
+.rrow.warn{border-color:var(--amber);background:var(--amberbg);color:var(--ambertx);}.rrow.warn b{color:var(--amber);}
+.rrow.bad{border-color:var(--danger);background:var(--dangerbg);color:var(--dangertx);}.rrow.bad b{color:var(--danger);}
+.rrow.dim{opacity:.34;}
+.tbar{margin-left:auto;flex:0 0 74px;height:8px;border-radius:999px;background:var(--panel);border:1.5px solid var(--line);overflow:hidden;}
+.tbar i{display:block;height:100%;width:0;background:var(--amber);transition:width var(--dur) var(--ease),background var(--dur) var(--ease);}
+.wb-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.gcard .s{font-size:11px;color:var(--muted);}
+.gcard.bad{border-color:var(--danger);background:var(--dangerbg);}
+.gcard.good{border-color:var(--green);background:var(--greenbg);}
+
+@media(max-width:1060px){.layout{grid-template-columns:1fr;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.codebox{grid-column:2;}.desc-card{grid-column:1;grid-row:1 / span 2;}}
+@media(max-width:680px){body{padding:20px 16px 32px;}.viz{padding:15px;min-height:0;}.right{display:flex;}.desc-card{min-height:0;padding:16px;}.controls{padding:12px 13px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 140px;}.btn{padding:8px 12px;}
+.fs-stage{grid-template-rows:none;grid-auto-rows:auto;row-gap:10px;min-height:0;}
+.layer{grid-template-columns:20px 1fr;grid-template-areas:"n m" "b b";row-gap:7px;padding:9px 11px;}
+.layer .lnum{grid-area:n;}.lname{grid-area:m;}.lbody{grid-area:b;grid-auto-flow:row;}
+.edge{padding:7px 11px;flex-wrap:wrap;}
+.risk{display:none;}
+.echips{flex-wrap:wrap;}
+.ch-stage{grid-template-columns:1fr;grid-template-rows:auto auto auto 30px;row-gap:18px;min-height:0;}
+.wb-stage{grid-template-rows:auto auto auto 30px;min-height:0;}
+.wb-cards{grid-template-columns:1fr;}
+.pill{white-space:normal;text-align:center;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>从 buf[] 到盘片 · write / fsync 的四层存储与两条边界</h1>
+    <p>配套笔记《4.2 重定向、同步》「详细流转：从 buf[] 到盘片」 · 全链路 · 定位链与元数据 · 回写时机 · 丢失边界 · O_DIRECT 与 mmap　·　<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SENTINEL=String.fromCharCode(1);
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]));}
+/* Comment is split off first, string literals parked behind digit-free sentinels,
+   so no later pass can ever match inside the span markup it just inserted. */
+function highlightC(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts?parts[1]:line;
+  const comment=parts&&parts[2]?parts[2]:'';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{strings.push(escapeHtml(value));return SENTINEL+String.fromCharCode(65+strings.length-1)+SENTINEL;});
+  code=escapeHtml(code)
+    .replace(/\b(int|void|char|ssize_t|size_t|off_t|struct|FILE)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(open|write|read|fwrite|fflush|fsync|fdatasync|lseek|dup|close|mmap|msync|memcpy|posix_memalign)\b/g,'<span class="fn">$1</span>')
+    .replace(/\b(fd2|fd|buf|fp|len|O_RDWR|O_DIRECT|O_APPEND|SEEK_SET|PROT_WRITE|MAP_SHARED|MS_SYNC)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="num">$1</span>')
+    .replace(new RegExp(SENTINEL+'([A-Z])'+SENTINEL,'g'),(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment?'<span class="cmt">'+escapeHtml(comment)+'</span>':'');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="codeLine'+index+'">'+highlightC(line||' ')+'</div>').join('');}
+function classes(id,value){const node=el(id);if(node)node.className=value;}
+function setPill(id,text,tone){const node=el(id);if(!node)return;node.textContent=text||'';node.className='pill'+(tone?' '+tone:'');}
+
+/* Persistent arrow controller: one path + filled triangle head + source port per wire, created once. */
+function createWires(stageId,specs){
+  const stage=el(stageId);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id=stageId+'-svg';svg.classList.add('wire-svg');svg.setAttribute('preserveAspectRatio','none');stage.appendChild(svg);
+  const entries=specs.map(spec=>{
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const head=document.createElementNS('http://www.w3.org/2000/svg','path');
+    const port=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    line.id=stageId+'-'+spec.id;head.id=line.id+'-head';port.id=line.id+'-port';port.setAttribute('r','4');
+    line.classList.add('wire-line',spec.color);head.classList.add('wire-head',spec.color);port.classList.add('wire-port',spec.color);
+    svg.append(line,head,port);return {...spec,line,head,port};
+  });
+  let active=new Set();let timers=[];
+  function geometry(item){
+    const sr=stage.getBoundingClientRect(),source=el(item.from)?.getBoundingClientRect(),target=el(item.to)?.getBoundingClientRect();
+    if(!source||!target)return;
+    const sx=source.left-sr.left,sy=source.top-sr.top,sw=source.width,sh=source.height;
+    const tx=target.left-sr.left,ty=target.top-sr.top,tw=target.width,th=target.height;
+    const scx=sx+sw/2,scy=sy+sh/2,tcx=tx+tw/2,tcy=ty+th/2;
+    const horizontal=Math.abs(tcx-scx)>=Math.abs(tcy-scy);
+    const spread=item.spread||0;
+    let x1,y1,x2,y2;
+    if(horizontal){const right=tcx>=scx;x1=right?sx+sw:sx;y1=scy;x2=right?tx:tx+tw;y2=tcy+spread;}
+    else{const down=tcy>=scy;x1=scx;y1=down?sy+sh:sy;x2=tcx+spread;y2=down?ty:ty+th;}
+    const dx=x2-x1,dy=y2-y1,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,baseX=x2-ux*9,baseY=y2-uy*9;
+    const d=horizontal?`M ${x1} ${y1} C ${x1+dx*.45} ${y1}, ${baseX-dx*.45} ${baseY}, ${baseX} ${baseY}`:`M ${x1} ${y1} C ${x1} ${y1+dy*.45}, ${baseX} ${baseY-dy*.45}, ${baseX} ${baseY}`;
+    const px=-uy*5,py=ux*5;
+    item.line.setAttribute('d',d);item.head.setAttribute('d',`M ${x2} ${y2} L ${baseX+px} ${baseY+py} L ${baseX-px} ${baseY-py} Z`);
+    item.port.setAttribute('cx',x1);item.port.setAttribute('cy',y1);
+  }
+  function layout(){const rect=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${rect.width} ${rect.height}`);entries.forEach(geometry);}
+  function draw(item){
+    const length=item.line.getTotalLength();
+    item.line.style.transition='none';item.line.style.strokeDasharray=length;item.line.style.strokeDashoffset=length;
+    void item.line.getBoundingClientRect();
+    item.line.style.transition='';item.line.style.strokeDashoffset='0';
+    const timeout=setTimeout(()=>{item.line.style.strokeDasharray='';item.line.style.strokeDashoffset='';},560);timers.push(timeout);
+  }
+  function setClass(item,state){
+    const suffix=' '+item.color+(state?' '+state:'');
+    item.line.className.baseVal='wire-line'+suffix;item.head.className.baseVal='wire-head'+suffix;item.port.className.baseVal='wire-port'+suffix;
+    if(state==='on')item.head.classList.add('drawing');
+  }
+  function sync(ids){
+    layout();const wanted=new Set(ids||[]),hasAny=wanted.size>0;let stagger=0;
+    entries.forEach(item=>{
+      if(wanted.has(item.id)){setClass(item,'on');if(!active.has(item.id)&&!reducedMotion()){const delay=stagger++*160;timers.push(setTimeout(()=>draw(item),delay));}}
+      else setClass(item,hasAny?'':'hint');
+    });active=wanted;
+  }
+  const observer=new ResizeObserver(layout);observer.observe(stage);window.addEventListener('resize',layout);layout();
+  return {sync,layout,destroy(){observer.disconnect();window.removeEventListener('resize',layout);timers.forEach(clearTimeout);timers=[];}};
+}
+
+/* The data token glides between docks; positions come from the live dock rectangles. */
+function makePlacer(stageId){
+  return function place(tokenId,slotId,extra){
+    const token=el(tokenId);if(!token)return;
+    if(!slotId){token.className='ctoken';return;}
+    const stage=el(stageId),slot=el(slotId);if(!stage||!slot)return;
+    const sr=stage.getBoundingClientRect(),r=slot.getBoundingClientRect();
+    token.style.left=(r.left-sr.left+r.width/2)+'px';
+    token.style.top=(r.top-sr.top+r.height/2)+'px';
+    token.className='ctoken on'+(extra?' '+extra:'');
+  };
+}
+
+/* ============================ 持久性阶梯（三个场景共用） ============================ */
+const DOCKS=['Buf','Stdio','PC','DC','Media'];
+function ladderStageHtml(p,caption){
+  return '<div class="vcap">'+caption+'</div><div class="stage fs-stage" id="'+p+'Stage">'+
+  '<section class="layer" id="'+p+'L1"><span class="lnum">①</span>'+
+    '<span class="lname"><b>用户态内存</b><em>进程虚拟内存 · 内核不知情</em></span>'+
+    '<div class="lbody">'+
+      '<div class="station" id="'+p+'Buf"><span class="sk">buf[]</span><span class="stx">应用缓冲区</span><span class="dock" id="'+p+'BufDock"></span></div>'+
+      '<div class="station" id="'+p+'Stdio"><span class="sk">FILE*</span><span class="stx">stdio 库缓冲</span><span class="dock" id="'+p+'StdioDock"></span></div>'+
+    '</div><span class="risk" id="'+p+'R1"></span></section>'+
+  '<div class="edge" id="'+p+'E1"><span class="ecap">↓ 边界一 用户态 / 内核态</span><span class="echips">'+
+    '<i id="'+p+'E1c0">trap</i><i id="'+p+'E1c1">fd→file→inode</i><i id="'+p+'E1c2">copy_from_user</i><i id="'+p+'E1c3">PG_dirty</i></span></div>'+
+  '<section class="layer" id="'+p+'L2"><span class="lnum">②</span>'+
+    '<span class="lname"><b>内核页缓存</b><em>位于 RAM · i_mapping · 4KB 页</em></span>'+
+    '<div class="lbody">'+
+      '<div class="station" id="'+p+'PC"><span class="sk">page cache</span>'+
+        '<span class="ram-tag" title="Page Cache 位于 RAM（物理内存）">RAM · 物理内存</span>'+
+        '<span class="pgs" id="'+p+'Pgs"><i></i><i></i><i></i><i></i></span>'+
+        '<span class="dock" id="'+p+'PCDock"></span></div>'+
+    '</div><span class="risk" id="'+p+'R2"></span></section>'+
+  '<div class="edge" id="'+p+'E2"><span class="ecap">↓ 边界二 内核 / 硬件</span><span class="echips">'+
+    '<i id="'+p+'E2c0">bio</i><i id="'+p+'E2c1">blk-mq</i><i id="'+p+'E2c2">驱动</i><i id="'+p+'E2c3">DMA</i></span></div>'+
+  '<section class="layer" id="'+p+'L3"><span class="lnum">③</span>'+
+    '<span class="lname"><b>盘上 DRAM 缓存</b><em>控制器写缓存 · 易失</em></span>'+
+    '<div class="lbody">'+
+      '<div class="station" id="'+p+'DC"><span class="sk">disk cache</span><span class="stx">盘回复「写完了」≠ 已上介质</span><span class="dock" id="'+p+'DCDock"></span></div>'+
+    '</div><span class="risk" id="'+p+'R3"></span></section>'+
+  '<div class="edge" id="'+p+'E3"><span class="ecap">↓ 缓存 / 介质</span><span class="echips">'+
+    '<i id="'+p+'E3c0">FLUSH</i><i id="'+p+'E3c1">FUA</i><i id="'+p+'E3c2">PLP 超级电容</i></span></div>'+
+  '<section class="layer" id="'+p+'L4"><span class="lnum">④</span>'+
+    '<span class="lname"><b>盘片 / NAND</b><em>持久介质</em></span>'+
+    '<div class="lbody">'+
+      '<div class="station" id="'+p+'Media"><span class="sk">persistent media</span><span class="stx">数据到底了</span><span class="dock" id="'+p+'MediaDock"></span></div>'+
+    '</div><span class="risk" id="'+p+'R4"></span></section>'+
+  '<div class="counts"><span class="count" id="'+p+'C0"></span><span class="count" id="'+p+'C1"></span><span class="count" id="'+p+'C2"></span></div>'+
+  '<div class="pillrow"><span class="pill" id="'+p+'Pill"></span></div>'+
+  '<div class="ctoken" id="'+p+'Data">4KB 数据</div></div>';
+}
+function makeLadderScene(opts){
+  const p=opts.prefix;let observer,current=null;
+  const place=makePlacer(p+'Stage');
+  function mount(){
+    viz.innerHTML=ladderStageHtml(p,opts.caption);
+    observer=new ResizeObserver(()=>{if(current)place(p+'Data',current.at?p+current.at+'Dock':null,current.tokenCls);});
+    observer.observe(el(p+'Stage'));
+  }
+  function paint(s){
+    current=s;
+    [1,2,3,4].forEach(n=>{
+      const tone=s.lay&&s.lay[n];
+      classes(p+'L'+n,'layer'+(tone?' on-'+tone:'')+(s.dim&&s.dim.includes(n)?' dim':'')+(s.bypass===n?' bypass':''));
+      const badge=el(p+'R'+n),cfg=s.risk&&s.risk[n];
+      badge.textContent=cfg?cfg[0]:'';badge.className='risk'+(cfg?' '+cfg[1]:'');
+    });
+    [1,2,3].forEach(n=>{
+      const cfg=s.edge&&s.edge[n];
+      classes(p+'E'+n,'edge'+(cfg?(cfg.tone==='green'?' on-green':' on'):'')+(s.edim&&s.edim.includes(n)?' dim':''));
+      [0,1,2,3].forEach(i=>{const chip=el(p+'E'+n+'c'+i);if(chip)chip.classList.toggle('lit',!!(cfg&&cfg.chips&&cfg.chips.includes(i)));});
+    });
+    ['Buf','Stdio','PC','DC','Media'].forEach(name=>{
+      const node=el(p+name);if(node)node.className='station'+((s.st&&s.st[name])?' on-'+s.st[name]:'');
+    });
+    el(p+'Pgs').querySelectorAll('i').forEach((page,i)=>{page.className=(s.pgs&&s.pgs[i])||'';});
+    DOCKS.forEach(name=>{
+      const dock=el(p+name+'Dock'),cfg=s.docks&&s.docks[name];
+      dock.textContent=cfg?cfg[0]:'';dock.className='dock'+(cfg?' '+cfg[1]:'');
+    });
+    place(p+'Data',s.at?p+s.at+'Dock':null,s.tokenCls);
+    [0,1,2].forEach(i=>{
+      const node=el(p+'C'+i),cfg=s.cnt&&s.cnt[i];
+      node.textContent=cfg?cfg[0]:'';node.className='count'+(cfg&&cfg[1]?' lit-'+cfg[1]:'');
+    });
+    setPill(p+'Pill',s.pill,s.pillC);
+  }
+  return {id:opts.id,label:opts.label,sub:opts.sub,steps:opts.steps,code:opts.code,mount,paint,destroy(){observer?.disconnect();}};
+}
+
+/* ============================ 场景一 · 全链路 ============================ */
+const pathScene=makeLadderScene({
+  id:'path',prefix:'pa',label:'全链路 · buf[] → 盘片',sub:'4 layers · 2 boundaries',
+  caption:'<b>一次写入的完整旅程</b>：4 层存储、2 条边界。每一层都有各自的「谁来推它」和「怎么丢」。',
+  code:[
+    'char buf[4096];',
+    'fwrite(buf, 1, n, fp);  // 只 memcpy 进 stdio 库缓冲',
+    'fflush(fp);             // 库缓冲 -> write()，跨过 ①',
+    'write(fd, buf, n);      // copy_from_user -> 页缓存',
+    '                        // 打上 PG_dirty，立即返回',
+    'fsync(fd);              // 提交 bio + 等待 + FLUSH',
+    '                        // 它返回时数据才真在盘片上',
+    'close(fd);'
+  ],
+  steps:[
+    {chip:'总览',chipC:'c0',title:'四层存储，两条边界',
+     desc:'一份数据从 <code>buf[]</code> 走到磁盘介质，要穿过 <b>4 层存储</b>（用户态内存 → 内核页缓存 → 盘上缓存 → 持久介质），跨过 <b>2 条边界</b>（用户态/内核态、内核/硬件）。看懂这张梯子，后面所有问题都是它的推论。',
+     lines:[0],hl:'blue',at:null,lay:{},risk:{},edge:{},pgs:[],st:{},
+     cnt:[['CPU 拷贝 0'],['系统调用 0'],['数据最深 —']],
+     pill:'4 layers, 2 boundaries',pillC:''},
+
+    {chip:'① 用户态',chipC:'cb',title:'printf / fwrite 只是 memcpy 到库缓冲',
+     desc:'<span class="blue">stdio 库缓冲</span>就在进程自己的内存里：<code>fwrite</code> 把字节 memcpy 进去就返回了，<b>此时还没有任何系统调用</b>。默认模式：普通文件<b>全缓冲</b>（缓冲区通常取文件系统块大小，如 4096 字节），连到终端是<b>行缓冲</b>，<code>stderr</code> <b>无缓冲</b>。',
+     lines:[0,1],hl:'blue',at:'Stdio',tokenCls:'blue',lay:{1:'blue'},dim:[2,3,4],edim:[1,2,3],
+     risk:{1:['kill -9 即丢','lost']},edge:{},pgs:[],st:{Stdio:'blue'},
+     cnt:[['CPU 拷贝 0'],['系统调用 0'],['数据最深 ①','blue']],
+     pill:'no syscall yet — bytes are still yours',pillC:'blue'},
+
+    {chip:'① 谁来推',chipC:'cd',title:'这块内存内核完全不知情',
+     desc:'进程被 <code>kill -9</code>、或段错误崩溃时，库缓冲里还没 <code>write</code> 出去的数据<b class="danger">直接消失</b>——内核根本不知道它存在。只有三件事能把它推到下一层：<code>fflush()</code>、<b>缓冲写满</b>、进程<b>正常</b>退出（<code>exit</code> 会刷 stdio 缓冲，<code>_exit</code> 和被信号杀死则不会）。',
+     lines:[1,2],hl:'danger',at:'Stdio',tokenCls:'danger',lay:{1:'danger'},dim:[2,3,4],edim:[1,2,3],
+     risk:{1:['kill -9 即丢','lost']},edge:{},pgs:[],st:{Stdio:'danger'},
+     cnt:[['CPU 拷贝 0'],['系统调用 0'],['数据最深 ①','danger']],
+     pill:'fflush / buffer full / normal exit',pillC:'danger'},
+
+    {chip:'边界一',chipC:'ca',title:'write() 陷入内核，并沿定位链找到文件',
+     desc:'<code>write(fd, buf, n)</code> 是进入内核的唯一入口。先<b>陷入（trap）</b>：CPU 从用户态切到内核态，这是<b>固定开销，与数据量无关</b>；再<b>定位文件</b>：<code>fd</code>（进程内的下标）→ <code>struct file</code>（内含偏移量 <code>f_pos</code>）→ <code>inode</code>。定位链的细节见「定位链与元数据」一幕。',
+     lines:[3],hl:'amber',at:'Buf',tokenCls:'blue',lay:{1:'blue'},dim:[3,4],edim:[2,3],
+     risk:{1:['kill -9 即丢','lost']},edge:{1:{chips:[0,1]}},pgs:[],st:{Buf:'blue'},
+     cnt:[['CPU 拷贝 0'],['系统调用 1','amber'],['数据最深 ①','blue']],
+     pill:'trap: fixed cost, independent of size',pillC:'amber'},
+
+    {chip:'唯一一次拷贝',chipC:'cd',title:'copy_from_user：整条路径上唯一一次 CPU 拷贝',
+     desc:'内核把用户 buf 的内容<b>逐字节复制</b>进页缓存页——这是从 <code>buf[]</code> 到盘片<b class="danger">唯一一次 CPU 拷贝</b>。再往下的每一步（DMA、FLUSH）都不再由 CPU 搬字节。',
+     lines:[3],hl:'danger',at:'PC',tokenCls:'amber',lay:{1:'blue',2:'amber'},dim:[3,4],edim:[2,3],
+     risk:{},edge:{1:{chips:[0,1,2]}},pgs:['clean','clean','',''],st:{Buf:'blue',PC:'amber'},
+     cnt:[['CPU 拷贝 1','danger'],['系统调用 1','amber'],['数据最深 ②','amber']],
+     pill:'copy_from_user: the only CPU copy',pillC:'danger'},
+
+    {chip:'② 页缓存',chipC:'ca',title:'页被标记 PG_dirty，write() 立刻返回',
+     desc:'页缓存以 <b>4KB 页</b>为单位缓存文件内容，数据页挂在 <code>inode-&gt;i_mapping</code> 下。写进去的页被打上 <b>PG_dirty</b>（脏页）标记，然后 <code>write()</code> <b>立刻返回</b>——注意：<b class="danger">返回 ≠ 落盘</b>。',
+     lines:[3,4],hl:'amber',at:'PC',tokenCls:'amber',lay:{2:'amber'},dim:[3,4],edim:[2,3],
+     risk:{1:['已交出去','safe'],2:['掉电即丢','lost']},edge:{1:{chips:[0,1,2,3]}},
+     pgs:['dirty','dirty','',''],st:{PC:'amber'},
+     cnt:[['CPU 拷贝 1','danger'],['系统调用 1','amber'],['数据最深 ②','amber']],
+     pill:'PG_dirty set, write() returns now',pillC:'amber'},
+
+    {chip:'② 怎么丢',chipC:'cd',title:'进程崩溃不影响这层，内核 panic / 掉电全丢',
+     desc:'数据已经交给内核，<b>进程再怎么崩也不影响它</b>，之后照样会被写下去。但它仍然<b>只是内存</b>：内核 panic 或掉电就全丢，<code>write()</code> 早已成功返回也救不回来。读路径同样走这层——<code>read()</code> 命中页缓存时只有一次 <code>copy_to_user</code>，根本不碰磁盘。',
+     lines:[4],hl:'danger',at:'PC',tokenCls:'danger',lay:{2:'danger'},dim:[3,4],edim:[2,3],
+     risk:{1:['已交出去','safe'],2:['掉电即丢','lost']},edge:{},
+     pgs:['dirty','dirty','',''],st:{PC:'danger'},
+     cnt:[['CPU 拷贝 1','danger'],['系统调用 1','amber'],['数据最深 ②','danger']],
+     pill:'survives kill -9, dies on power loss',pillC:'danger'},
+
+    {chip:'边界二',chipC:'ca',title:'块层与 DMA：内存页变成磁盘请求',
+     desc:'内核把待写的脏页打包成 <b>bio</b>（描述「哪些内存页写到磁盘哪些扇区」）提交给通用块层；<b>blk-mq</b> 多队列负责排队、<b>合并相邻请求</b>、取 tag 后交给驱动；驱动敲响设备后由 <b>DMA</b> 搬运——设备<b>主动读取物理内存</b>，不经过 CPU，所以这一步<b class="green">没有第二次 CPU 拷贝</b>。',
+     lines:[5],hl:'amber',at:'DC',tokenCls:'amber',lay:{2:'amber',3:'amber'},dim:[4],edim:[3],
+     risk:{2:['掉电即丢','lost']},edge:{2:{chips:[0,1,2,3]}},
+     pgs:['writing','writing','',''],st:{PC:'amber',DC:'amber'},
+     cnt:[['CPU 拷贝 1','danger'],['系统调用 2','amber'],['数据最深 ③','amber']],
+     pill:'bio -> blk-mq -> driver -> DMA (no CPU copy)',pillC:'amber'},
+
+    {chip:'③ 盘上缓存',chipC:'cd',title:'介质之前还有一层易失缓存',
+     desc:'现代机械盘和 SSD 都自带一块 <b>DRAM 写缓存</b>。数据进了它，盘就回复「<b>写完了</b>」——但它<b class="danger">是易失的，断电即丢</b>。很多「我明明 write 成功了怎么数据没了」的事故就卡在这一层。',
+     lines:[5],hl:'danger',at:'DC',tokenCls:'danger',lay:{3:'danger'},dim:[4],edim:[1],
+     risk:{2:['已写出','safe'],3:['无 PLP 掉电丢','lost']},edge:{2:{chips:[3]}},
+     pgs:['done','done','',''],st:{DC:'danger'},
+     cnt:[['CPU 拷贝 1','danger'],['系统调用 2','amber'],['数据最深 ③','danger']],
+     pill:'the disk says "done" before the media does',pillC:'danger'},
+
+    {chip:'④ 落介质',chipC:'cg',title:'FLUSH / FUA 才把数据推上盘片',
+     desc:'要让数据从盘上缓存进入<b>盘片 / NAND</b>，必须下发 <b>FLUSH</b> 命令，或使用 <b>FUA</b>（Force Unit Access）写。<code>fsync()</code> 在现代 Linux 上<b>会连这个 FLUSH 一起下发</b>，所以它的语义才是真正的「落盘」。企业盘的<b>掉电保护 PLP</b>（超级电容）能在断电瞬间把缓存写完，此时盘缓存才可视为持久；消费级盘一般没有。反过来，文件系统若用 <code>nobarrier</code> 一类选项挂载（禁用 flush），fsync 的持久性保证就会<b class="danger">打折</b>。',
+     lines:[5,6],hl:'green',at:'Media',tokenCls:'',lay:{3:'green',4:'green'},edim:[1],
+     risk:{3:['已刷出','safe'],4:['已持久','safe']},edge:{3:{chips:[0,1],tone:'green'}},
+     pgs:['done','done','',''],st:{DC:'green',Media:'green'},
+     cnt:[['CPU 拷贝 1','danger'],['系统调用 2','amber'],['数据最深 ④','green']],
+     pill:'FLUSH / FUA: cache -> platter / NAND',pillC:'green'},
+
+    {chip:'收口',chipC:'cg',title:'三句话记住整条路径',
+     desc:'<code>fflush()</code> 只跨过第 <b>①</b> 层的门；<code>write()</code> 返回只代表数据到了第 <b>②</b> 层；只有 <b class="green">fsync() 返回</b>，才代表数据穿过了 <b>②③</b> 一路写进第 <b>④</b> 层。整条路上 CPU 只搬了一次字节，其余全是 DMA 与命令。',
+     lines:[2,3,5],hl:'green',at:'Media',tokenCls:'',lay:{1:'blue',2:'amber',3:'green',4:'green'},
+     risk:{1:['kill -9 即丢','lost'],2:['掉电即丢','lost'],3:['无 PLP 丢','warn'],4:['已持久','safe']},
+     edge:{1:{chips:[0,2]},2:{chips:[3]},3:{chips:[0],tone:'green'}},
+     pgs:['done','done','',''],st:{},
+     cnt:[['CPU 拷贝 1','danger'],['系统调用 2','amber'],['数据最深 ④','green']],
+     pill:'fflush -> (1) | write -> (2) | fsync -> (4)',pillC:'green'}
+  ]
+});
+
+/* ============================ 场景二 · 定位链与元数据 ============================ */
+const chainScene=(()=>{
+  const code=[
+    'int  fd  = open("a.txt", O_RDWR);',
+    'int  fd2 = dup(fd);        // 同一个 struct file',
+    'lseek(fd, 128, SEEK_SET);  // 改的只是 f_pos',
+    'read(fd2, buf, 16);        // 从 128 读起：偏移共享',
+    'write(fd, buf, 16);        // 脏页挂进 i_mapping',
+    'fsync(fd);                 // 数据页 + inode 元数据',
+    'fdatasync(fd);             // 数据页 + 必需的元数据'
+  ];
+  const steps=[
+    {chip:'fd',chipC:'cb',title:'fd 只是进程内的一个下标',
+     desc:'<code>fd</code> 不是文件，也不是指针，它是<b>进程 fd 表的下标</b>。0/1/2 被 stdin/stdout/stderr 占着，<code>open</code> 返回<b>当前可用的最小非负整数</b>。换个进程，同样的数字 3 指向完全不同的文件。',
+     lines:[0],hl:'blue',fd:{3:'on'},cards:{fd:'active'},kv:{},isec:{},pos:'0',cnt:'1',wires:[],pgs:[],
+     pill:'fd = index into the process fd table',pillC:'blue'},
+
+    {chip:'struct file',chipC:'ca',title:'偏移量住在 struct file 里，lseek 改的就是它',
+     desc:'fd 表项指向内核的<b>打开文件表项</b> <code>struct file</code>：文件偏移量 <code>f_pos</code>、状态标志 <code>f_flags</code>（如 <code>O_APPEND</code>）、引用计数 <code>f_count</code> 都在这里。<code>lseek()</code> 不移动任何数据，<b>它改的只是 <code>f_pos</code></b>。',
+     lines:[0,2],hl:'amber',fd:{3:'on'},cards:{fd:'active',file:'active'},kv:{pos:'hot'},isec:{},pos:'128',cnt:'1',wires:['fd3-file'],pgs:[],
+     pill:'lseek() moves f_pos, nothing else',pillC:'amber'},
+
+    {chip:'dup',chipC:'cb',title:'dup / dup2 复制 fd 表项，不复制 struct file',
+     desc:'<code>dup</code>/<code>dup2</code> 复制的是 <b>fd 表项</b>，新旧 fd 指向<b>同一个 <code>struct file</code></b>——这就是笔记开头那句「共享同一个文件偏移量、访问模式和 <code>O_APPEND</code> 等状态标志」的实现原因。用 fd2 读一次，fd 的偏移量也跟着走。<code>f_count</code> 从 1 变 2。',
+     lines:[1,3],hl:'blue',fd:{3:'on',4:'on'},cards:{fd:'active',file:'active'},kv:{pos:'on',cnt:'on'},isec:{},pos:'144',cnt:'2',wires:['fd3-file','fd4-file'],pgs:[],
+     pill:'two fds, one struct file, one offset',pillC:'blue'},
+
+    {chip:'inode',chipC:'cg',title:'定位链的终点是唯一的 inode',
+     desc:'<code>struct file</code> 再指向 <b>inode</b>。不管有多少个 fd、多少个 <code>struct file</code>（比如两次独立 <code>open</code> 同一文件），只要是同一个文件，<b>终点都是同一个 inode</b>。这个「唯一终点」是下面两件事能被一次搞定的前提。',
+     lines:[0],hl:'green',fd:{3:'on',4:'on'},cards:{fd:'',file:'active',inode:'active'},kv:{},isec:{},pos:'144',cnt:'2',wires:['fd3-file','fd4-file','file-inode'],pgs:[],
+     pill:'fd table -> struct file -> inode (unique)',pillC:'green'},
+
+    {chip:'i_mapping',chipC:'cg',title:'页缓存不是一大锅散页',
+     desc:'常见误解是「页缓存是全局一大锅缓存页」。实际上数据页挂在 <b><code>inode-&gt;i_mapping</code></b>（address_space）下，<b>按页索引组织</b>，所以「哪个文件的哪一页」永远是明确的。<code>write()</code> 弄脏的页，就挂在这棵树上。',
+     lines:[4],hl:'green',fd:{3:'on'},cards:{inode:'active'},kv:{},isec:{map:'on',meta:'dim'},pos:'160',cnt:'2',wires:['file-inode'],
+     pgs:['dirty','dirty','clean','clean'],
+     pill:'data pages hang under inode->i_mapping',pillC:'green'},
+
+    {chip:'元数据',chipC:'ca',title:'元数据不在别处，就是 inode 自己',
+     desc:'很多人以为元数据是「另一块要单独同步的东西」。不是——<b>元数据就是 inode 自己</b>：<code>i_size</code>（文件大小）、<code>mtime</code>、块映射。改数据往往<b>顺带改它</b>：文件变大了，<code>i_size</code> 就得跟着改，新分配的块也要记进块映射。',
+     lines:[4],hl:'amber',fd:{3:'on'},cards:{inode:'active'},kv:{},isec:{meta:'hot',map:'dim'},pos:'160',cnt:'2',wires:['file-inode'],
+     pgs:['dirty','dirty','clean','clean'],
+     pill:'metadata IS the inode: i_size / mtime / blocks',pillC:'amber'},
+
+    {chip:'fsync',chipC:'cg',title:'一个 fd 为什么能同步「数据 + 元数据」',
+     desc:'正因为脏数据页和元数据<b>都归属同一个 inode</b>，<code>fsync(fd)</code> 才能凭一个 fd 沿定位链找到那个唯一 inode，<b>一次性</b>把「这个文件的脏数据页 <b>+</b> 它的元数据」都刷下去。',
+     lines:[5],hl:'green',fd:{3:'on'},cards:{fd:'active',file:'active',inode:'active'},kv:{},isec:{meta:'on',map:'on'},pos:'160',cnt:'2',wires:['fd3-file','file-inode'],
+     pgs:['done','done','clean','clean'],
+     pill:'fsync: dirty pages + metadata, one call',pillC:'green'},
+
+    {chip:'fdatasync',chipC:'ca',title:'fdatasync 省下的正是那部分元数据',
+     desc:'<code>fdatasync(fd)</code> 只保证<b>数据页</b>和<b>读取必需的</b>那部分元数据落盘。文件<b>变大</b>时 <code>i_size</code> 属于「读取必需」——不刷它，重启后读不到新数据，所以它照样会被刷；而单纯的 <code>mtime</code> 更新可以省掉。省一次元数据写入，在高频小写场景里就是实打实的性能。',
+     lines:[6],hl:'amber',fd:{3:'on'},cards:{fd:'active',inode:'active'},kv:{},isec:{map:'on',meta:'dim'},pos:'160',cnt:'2',wires:['fd3-file','file-inode'],
+     pgs:['done','done','clean','clean'],
+     pill:'fdatasync: data + only what reads require',pillC:'amber'}
+  ];
+  let wires,current=null;
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>定位链</b>：<code>fd 表 → struct file → inode</code>。三个概念常被混成一团，拆开就能解释 lseek、dup 和 fsync 的全部行为。</div>'+
+    '<div class="stage ch-stage" id="chStage">'+
+      '<section class="gcard blue" id="chFd"><span class="k">进程 · fd 表</span>'+
+        '<div class="fdrow ghost" id="chFdA"><b>0 1 2</b>stdin / stdout / stderr</div>'+
+        '<div class="fdrow" id="chFd3"><b>3</b>fd = open("a.txt")</div>'+
+        '<div class="fdrow ghost" id="chFd4"><b>4</b>fd2 = dup(fd)</div>'+
+        '<div class="fdrow ghost" id="chFdB"><b>…</b>下标是进程私有的</div></section>'+
+      '<section class="gcard amber" id="chFile"><span class="k">内核 · 打开文件表</span><span class="n">struct file</span>'+
+        '<div class="kv" id="chPos"><b>f_pos</b><span id="chPosV">0</span></div>'+
+        '<div class="kv" id="chFlags"><b>f_flags</b><span>O_RDWR</span></div>'+
+        '<div class="kv" id="chCnt"><b>f_count</b><span id="chCntV">1</span></div></section>'+
+      '<section class="gcard green" id="chInode"><span class="k">inode（定位链唯一终点）</span>'+
+        '<div class="isec" id="chMeta"><span class="it">元数据 = inode 自己</span><span class="iv">i_size · mtime · 块映射</span></div>'+
+        '<div class="isec" id="chMap"><span class="it">i_mapping（address_space）</span>'+
+          '<span class="pgs" id="chPgs"><i></i><i></i><i></i><i></i></span>'+
+          '<span class="iv">数据页按页索引挂在这里</span></div></section>'+
+      '<div class="pillrow" style="grid-column:1 / span 3;"><span class="pill" id="chPill"></span></div>'+
+    '</div>';
+    wires=createWires('chStage',[
+      {id:'fd3-file',from:'chFd3',to:'chFile',color:'blue',spread:-11},
+      {id:'fd4-file',from:'chFd4',to:'chFile',color:'blue',spread:11},
+      {id:'file-inode',from:'chFile',to:'chInode',color:'green'}
+    ]);
+  }
+  function paint(s){
+    current=s;
+    classes('chFd','gcard blue'+(s.cards.fd==='active'?' active':'')+(s.cards.fd==='dim'?' dim':''));
+    classes('chFile','gcard amber'+(s.cards.file==='active'?' active':'')+(s.cards.file==='dim'?' dim':''));
+    classes('chInode','gcard green'+(s.cards.inode==='active'?' active':'')+(s.cards.inode==='dim'?' dim':''));
+    classes('chFd3','fdrow'+(s.fd[3]?' '+s.fd[3]:' ghost'));
+    classes('chFd4','fdrow'+(s.fd[4]?' '+s.fd[4]:' ghost'));
+    classes('chPos','kv'+(s.kv.pos?' '+s.kv.pos:''));
+    classes('chCnt','kv'+(s.kv.cnt?' '+s.kv.cnt:''));
+    el('chPosV').textContent=s.pos;el('chCntV').textContent=s.cnt;
+    classes('chMeta','isec'+(s.isec.meta?' '+s.isec.meta:''));
+    classes('chMap','isec'+(s.isec.map?' '+s.isec.map:''));
+    el('chPgs').querySelectorAll('i').forEach((page,i)=>{page.className=(s.pgs&&s.pgs[i])||'';});
+    setPill('chPill',s.pill,s.pillC);
+    wires.sync(s.wires);
+  }
+  return {id:'chain',label:'定位链与元数据',sub:'fd → file → inode',steps,code,mount,paint,destroy(){wires?.destroy();}};
+})();
+
+/* ============================ 场景三 · 脏页回写的三种时机 ============================ */
+const writebackScene=(()=>{
+  const code=[
+    'write(fd, buf, n);   // 页缓存变脏，write 立即返回',
+    '',
+    '// 时机一 周期回写：dirty_expire_centisecs=3000 (30s)',
+    '// 时机二 比例回写：dirty_background_ratio -> 后台回写',
+    '//                dirty_ratio            -> 写者阻塞',
+    '',
+    'fsync(fd);           // 时机三 显式同步：提交并等待完成',
+    '// 前两种由内核决定、不可预测；只有这一种应用可控'
+  ];
+  const steps=[
+    {chip:'起点',chipC:'cb',title:'write() 立即返回，脏页开始堆积',
+     desc:'<code>write()</code> 把数据放进页缓存、打上 <b>PG_dirty</b> 就返回了，<b>不等磁盘</b>。脏页什么时候真的被写下去？只有三种时机——而其中<b>两种你说了不算</b>。',
+     lines:[0],hl:'blue',fill:9,fillC:'',pct:'脏页占比 9%',age:'最老脏页驻留 2s',timer:8,
+     rows:['dim','dim','dim'],writer:['write() 立即返回','数据交给内核，不等磁盘',''],flusher:['空闲','等待触发条件',''],
+     pill:'dirty pages accumulate, writer never waits',pillC:'blue'},
+
+    {chip:'时机一',chipC:'ca',title:'周期回写：驻留超时的脏页被写出',
+     desc:'回写线程<b>定期唤醒</b>，写出驻留超过 <code>dirty_expire_centisecs</code>（默认 3000，即 <b>30 秒</b>）的脏页。触发点是<b>时间</b>，与你写了多少无关；什么时候真的动手，应用<b>无从预测</b>。',
+     lines:[2],hl:'amber',fill:5,fillC:'',pct:'脏页占比 5%',age:'最老脏页驻留 30s ≥ 阈值',timer:100,
+     rows:['warn','dim','dim'],writer:['write() 立即返回','完全不受影响',''],flusher:['周期回写中','写出超时的老脏页','good'],
+     pill:'timer fired: expired pages written back',pillC:'amber'},
+
+    {chip:'时机二',chipC:'ca',title:'比例回写：越过背景水位，后台回写启动',
+     desc:'脏页占比越过 <code>dirty_background_ratio</code>，内核启动<b>后台回写</b>。这一档只是「悄悄开始写」，<b>写者仍然不被阻塞</b>——所以应用往往察觉不到它已经在拼命刷盘了。',
+     lines:[3],hl:'amber',fill:14,fillC:'warn',pct:'脏页占比 14% > 背景水位',age:'最老脏页驻留 6s',timer:20,
+     rows:['dim','warn','dim'],writer:['write() 仍立即返回','没有反压，感知不到',''],flusher:['后台回写中','异步刷脏页，不挡写者','good'],
+     pill:'above dirty_background_ratio: async flush',pillC:'amber'},
+
+    {chip:'时机二',chipC:'cd',title:'越过硬水位，写者被直接阻塞',
+     desc:'脏页占比继续涨，越过 <code>dirty_ratio</code> 时，<b class="danger">写者被直接阻塞</b>在 <code>write()</code> 里，直到脏页降下来。这就是「平时 write 都是微秒级，突然有几次卡了几百毫秒」的典型成因——<b>延迟毛刺不在你的代码里，在水位上</b>。',
+     lines:[4],hl:'danger',fill:21,fillC:'bad',pct:'脏页占比 21% ≥ 硬水位',age:'最老脏页驻留 9s',timer:30,
+     rows:['dim','bad','dim'],writer:['write() 被阻塞','等脏页降下来才返回','bad'],flusher:['全力回写','写者也被拉来一起回写','good'],
+     pill:'above dirty_ratio: the writer itself blocks',pillC:'danger'},
+
+    {chip:'时机三',chipC:'cg',title:'显式同步：唯一由应用决定的时机',
+     desc:'<code>fsync()</code> / <code>fdatasync()</code> / <code>sync()</code>：<b>立刻提交并等待完成</b>。跟水位、跟计时器都无关——<b>你说刷就刷，刷完才返回</b>。代价是这次调用会真的等磁盘，所以它慢是应该的，不是 bug。',
+     lines:[6],hl:'green',fill:0,fillC:'',pct:'脏页占比 0%',age:'脏页已清空',timer:0,
+     rows:['dim','dim','on'],writer:['阻塞在 fsync 里','等待落盘完成后才返回','good'],flusher:['同步提交','提交 bio 并等待完成','good'],
+     pill:'fsync: submit and wait — you decide when',pillC:'green'},
+
+    {chip:'收口',chipC:'cg',title:'前两种由内核决定，只有第三种可控',
+     desc:'周期回写看<b>时间</b>，比例回写看<b>水位</b>——两者都由内核决定、<b>不可预测</b>。应用能主动控制的只有第三种。<b class="green">这就是 fsync 存在的全部理由</b>：不是为了「写得快」，而是为了「知道什么时候真的写完了」。',
+     lines:[2,3,4,6,7],hl:'green',fill:0,fillC:'',pct:'脏页占比 0%',age:'脏页已清空',timer:0,
+     rows:['warn','warn','on'],writer:['应用可控的只有 fsync','返回即代表已落盘','good'],flusher:['三种时机','两种归内核，一种归你',''],
+     pill:'2 kernel-driven, 1 application-driven',pillC:'green'}
+  ];
+  function mount(){
+    viz.innerHTML='<div class="vcap"><b>脏页什么时候真的被写下去</b>：三种时机，只有一种握在应用手里。</div>'+
+    '<div class="stage wb-stage" id="wbStage">'+
+      '<section class="panel-box"><span class="panel-title">页缓存脏页水位</span>'+
+        '<div class="meter" id="wbMeter"><div class="mfill" id="wbFill"></div>'+
+          '<span class="mark bg" style="left:40%"><em>dirty_background_ratio 10%</em></span>'+
+          '<span class="mark hi" style="left:80%"><em>dirty_ratio 20%</em></span></div>'+
+        '<div class="mlegend"><span id="wbPct"></span><span id="wbAge"></span></div></section>'+
+      '<section class="panel-box trigbox"><span class="panel-title">脏页被写下去的三种时机</span>'+
+        '<div class="rrow" id="wbT0"><b>周期回写</b><span class="rtx">回写线程定期唤醒，写出驻留超过 dirty_expire_centisecs（默认 3000 = 30s）的脏页</span><span class="tbar"><i id="wbTimer"></i></span></div>'+
+        '<div class="rrow" id="wbT1"><b>比例回写</b><span class="rtx">越过 dirty_background_ratio 启动后台回写；越过 dirty_ratio 时写者被直接阻塞</span></div>'+
+        '<div class="rrow" id="wbT2"><b>显式同步</b><span class="rtx">fsync / fdatasync / sync：立刻提交并等待完成——唯一由应用决定的时机</span></div></section>'+
+      '<div class="wb-cards">'+
+        '<section class="gcard blue" id="wbWriter"><span class="k">写者进程</span><span class="n" id="wbWriterN"></span><span class="s" id="wbWriterS"></span></section>'+
+        '<section class="gcard amber" id="wbFlush"><span class="k">回写线程 / 内核</span><span class="n" id="wbFlushN"></span><span class="s" id="wbFlushS"></span></section></div>'+
+      '<div class="pillrow"><span class="pill" id="wbPill"></span></div>'+
+    '</div>';
+  }
+  function paint(s){
+    const fill=el('wbFill');fill.style.width=(s.fill*4)+'%';fill.className='mfill'+(s.fillC?' '+s.fillC:'');
+    el('wbPct').textContent=s.pct;el('wbAge').textContent=s.age;
+    el('wbTimer').style.width=s.timer+'%';
+    ['wbT0','wbT1','wbT2'].forEach((id,i)=>classes(id,'rrow '+s.rows[i]));
+    el('wbWriterN').textContent=s.writer[0];el('wbWriterS').textContent=s.writer[1];
+    classes('wbWriter','gcard blue'+(s.writer[2]?' '+s.writer[2]:''));
+    el('wbFlushN').textContent=s.flusher[0];el('wbFlushS').textContent=s.flusher[1];
+    classes('wbFlush','gcard amber'+(s.flusher[2]?' '+s.flusher[2]:''));
+    setPill('wbPill',s.pill,s.pillC);
+  }
+  return {id:'writeback',label:'脏页回写三时机',sub:'timer · ratio · fsync',steps,code,mount,paint,destroy(){}};
+})();
+
+/* ============================ 场景四 · 丢失边界 ============================ */
+const lossScene=makeLadderScene({
+  id:'loss',prefix:'ls',label:'丢失边界',sub:'kill -9 vs 掉电',
+  caption:'<b>数据停在哪一层，就决定了什么能弄丢它</b>。同一张梯子，换两种故障看。',
+  code:[
+    'fwrite(buf, 1, n, fp);  // 停在 ① stdio 库缓冲',
+    'fflush(fp);             // 跨过 ①，进入 ② 页缓存',
+    'write(fd, buf, n);      // 停在 ② 页缓存脏页',
+    'fsync(fd);              // 穿过 ②③，抵达 ④ 持久介质',
+    '',
+    '// kill -9      : ① 丢失；②③④ 存活（内核已接手）',
+    '// panic / 掉电 : ①② 丢失；③ 无 PLP 也丢；④ 存活'
+  ],
+  steps:[
+    {chip:'设定',chipC:'c0',title:'同一时刻，数据可能同时停在好几层',
+     desc:'一个正在运行的进程里，往往<b>每一层都躺着一部分数据</b>：刚 <code>fwrite</code> 的还在库缓冲，之前 <code>write</code> 的在页缓存，更早提交的在盘上缓存，最早的已经上了盘片。故障来的时候，各层各自的命运并不相同。',
+     lines:[0,1,2,3],hl:'blue',at:null,lay:{},risk:{},edge:{},edim:[1,2,3],pgs:['dirty','dirty','',''],st:{},
+     docks:{Buf:['进程内存','warn'],Stdio:['未刷出','warn'],PC:['脏页','warn'],DC:['未 flush','warn'],Media:['已落盘','ok']},
+     cnt:[['四层各有残留']],
+     pill:'data sits at every layer at once',pillC:''},
+
+    {chip:'kill -9',chipC:'cd',title:'进程崩溃：只丢第 ① 层',
+     desc:'<code>kill -9</code>、段错误、<code>_exit</code>——进程<b>没机会刷 stdio 缓冲</b>，第 <b>①</b> 层<b class="danger">直接消失</b>。但 <b>②③④</b> 全部存活：数据已经交给内核，内核照样会把它写下去。<b>进程的死活不影响已经进内核的数据</b>。',
+     lines:[0,5],hl:'danger',at:null,lay:{1:'danger',2:'green',3:'green',4:'green'},edim:[1,2,3],
+     risk:{1:['丢失','lost'],2:['存活','safe'],3:['存活','safe'],4:['存活','safe']},edge:{},
+     pgs:['dirty','dirty','',''],st:{Stdio:'danger',Buf:'danger'},
+     docks:{Buf:['丢失','lost'],Stdio:['丢失','lost'],PC:['存活','ok'],DC:['存活','ok'],Media:['存活','ok']},
+     cnt:[['① 丢失','danger'],['②③④ 存活','green']],
+     pill:'process dies, kernel keeps its copy',pillC:'danger'},
+
+    {chip:'掉电',chipC:'cd',title:'内核 panic / 掉电：① ② 全丢，③ 看运气',
+     desc:'内核 panic 或直接断电，<b>所有内存都没了</b>：第 <b>①</b> 层（进程内存）和第 <b>②</b> 层（页缓存脏页）一起丢——<code>write()</code> 早已成功返回也救不回来。第 <b>③</b> 层是盘上的 <b>DRAM</b>，同样易失，<b>无 PLP 时一并丢失</b>。只有第 <b>④</b> 层稳稳活着。',
+     lines:[2,6],hl:'danger',at:null,lay:{1:'danger',2:'danger',3:'danger',4:'green'},edim:[1,2,3],
+     risk:{1:['丢失','lost'],2:['丢失','lost'],3:['无 PLP 丢失','lost'],4:['存活','safe']},edge:{},
+     pgs:['dirty','dirty','',''],st:{Stdio:'danger',PC:'danger',DC:'danger'},
+     docks:{Buf:['丢失','lost'],Stdio:['丢失','lost'],PC:['丢失','lost'],DC:['丢失','lost'],Media:['存活','ok']},
+     cnt:[['①②③ 丢失','danger'],['④ 存活','green']],
+     pill:'power loss kills every volatile layer',pillC:'danger'},
+
+    {chip:'PLP',chipC:'cg',title:'企业盘的掉电保护，把 ③ 变成准持久层',
+     desc:'企业盘常带<b>掉电保护 PLP</b>（超级电容）：断电瞬间靠电容供电，把盘上缓存里的数据<b>写完再停</b>。此时第 <b>③</b> 层才可视为持久——这也是同样跑 <code>fsync</code>，企业盘能比消费级盘快一个数量级的原因：它可以放心地把 FLUSH 变成空操作。<b>消费级盘一般没有</b>。',
+     lines:[3],hl:'green',at:null,lay:{2:'danger',3:'green',4:'green'},dim:[1],edim:[1,2],
+     risk:{2:['仍会丢失','lost'],3:['PLP 保护 · 存活','safe'],4:['存活','safe']},edge:{3:{chips:[2],tone:'green'}},
+     pgs:['dirty','dirty','',''],st:{DC:'green'},
+     docks:{PC:['丢失','lost'],DC:['存活','ok'],Media:['存活','ok']},
+     cnt:[['③ 有 PLP 时存活','green']],
+     pill:'PLP capacitor drains the cache to media',pillC:'green'},
+
+    {chip:'陷阱',chipC:'cd',title:'nobarrier：fsync 还在，保证没了',
+     desc:'如果文件系统用 <code>nobarrier</code> 一类选项挂载（禁用 flush），<code>fsync()</code> 就<b>不再下发 FLUSH</b>。它照样返回成功、照样看起来正常，但数据可能还留在盘上易失缓存里——<b class="danger">持久性保证被悄悄打折</b>。在没有 PLP 的盘上开 nobarrier，等于用可靠性换吞吐。',
+     lines:[3],hl:'danger',at:null,lay:{3:'danger',4:'green'},dim:[1,2],edim:[1,2],
+     risk:{3:['FLUSH 被禁用','lost'],4:['存活','safe']},edge:{3:{chips:[]}},
+     pgs:['done','done','',''],st:{DC:'danger'},
+     docks:{DC:['未 flush','lost'],Media:['旧数据','ok']},
+     cnt:[['fsync 返回成功','amber'],['数据未必落介质','danger']],
+     pill:'nobarrier: fsync returns, FLUSH never sent',pillC:'danger'},
+
+    {chip:'收口',chipC:'cg',title:'四层 × 两种故障的完整对照',
+     desc:'<b>①</b> stdio 库缓冲：崩溃丢、掉电丢，靠 <code>fflush()</code> 推。<b>②</b> 页缓存脏页：崩溃活、掉电丢，靠回写线程或 <code>fsync()</code> 推。<b>③</b> 盘上缓存：崩溃活、无 PLP 掉电丢，靠 <b>FLUSH</b> 推。<b>④</b> 盘片 / NAND：都活，<b class="green">已经到底</b>。',
+     lines:[0,1,2,3],hl:'green',at:'Media',tokenCls:'',lay:{1:'blue',2:'amber',3:'amber',4:'green'},edim:[],
+     risk:{1:['fflush 推它','warn'],2:['fsync 推它','warn'],3:['FLUSH 推它','warn'],4:['已经到底','safe']},
+     edge:{1:{chips:[0]},2:{chips:[3]},3:{chips:[0,1],tone:'green'}},
+     pgs:['done','done','',''],st:{},
+     docks:{},
+     cnt:[['崩溃：丢 ①','amber'],['掉电：丢 ①②③','danger'],['fsync 后：④ 到底','green']],
+     pill:'know which layer your data is sitting in',pillC:'green'}
+  ]
+});
+
+/* ============================ 场景五 · 旁路：O_DIRECT 与 mmap ============================ */
+const bypassScene=makeLadderScene({
+  id:'bypass',prefix:'by',label:'旁路 · O_DIRECT / mmap',sub:'skip or merge the page cache',
+  caption:'<b>两条旁路</b>：O_DIRECT 绕开页缓存，mmap 干脆和页缓存共用同一张物理页。',
+  code:[
+    '// 旁路一 O_DIRECT：绕过页缓存，buf 与磁盘直接 DMA',
+    'int fd = open("a.bin", O_RDWR | O_DIRECT);',
+    'posix_memalign(&buf, 4096, 4096);  // 三处都要对齐',
+    'write(fd, buf, 4096);',
+    'fsync(fd);              // 仍需要：元数据 + FLUSH',
+    '',
+    '// 旁路二 mmap：映射到的物理页就是页缓存页',
+    'void* p = mmap(0, len, PROT_WRITE, MAP_SHARED, fd, 0);',
+    'memcpy(p, buf, len);    // 写内存即改页缓存，无 syscall',
+    'msync(p, len, MS_SYNC); // 用 msync 代替 fsync'
+  ],
+  steps:[
+    {chip:'基准',chipC:'c0',title:'先回到标准路径',
+     desc:'标准 <code>write()</code> 路径：用户 buf <b>→</b> 页缓存（<code>copy_from_user</code>，唯一一次 CPU 拷贝）<b>→</b> 盘上缓存 <b>→</b> 介质。下面两条旁路，各自动了这条链子的不同环节。',
+     lines:[],hl:'blue',at:'PC',tokenCls:'amber',lay:{1:'blue',2:'amber'},dim:[3,4],edim:[2,3],
+     risk:{},edge:{1:{chips:[2,3]}},pgs:['dirty','dirty','',''],st:{Buf:'blue',PC:'amber'},
+     cnt:[['CPU 拷贝 1','danger'],['经过页缓存','amber']],
+     pill:'baseline: user buf -> page cache -> disk',pillC:'blue'},
+
+    {chip:'O_DIRECT',chipC:'cg',title:'绕过页缓存：用户 buf 与磁盘直接 DMA',
+     desc:'<code>O_DIRECT</code> 让数据<b>不进页缓存</b>：用户 buf 与磁盘之间<b>直接 DMA</b>。<code>copy_from_user</code> 那次 CPU 拷贝没了，页缓存也不再被这份数据污染——数据库自己管缓存时最怕内核再缓存一份（双重缓存），这就是它们用 O_DIRECT 的原因。',
+     lines:[0,1,3],hl:'green',at:'DC',tokenCls:'',lay:{1:'green',3:'green'},bypass:2,dim:[4],edim:[1,3],
+     risk:{2:['旁路 · 不经过','warn']},edge:{2:{chips:[0,1,2,3],tone:'green'}},
+     pgs:['','','',''],st:{Buf:'green',DC:'green'},
+     cnt:[['CPU 拷贝 0','green'],['绕过页缓存','green']],
+     pill:'O_DIRECT: DMA straight from the user buffer',pillC:'green'},
+
+    {chip:'O_DIRECT',chipC:'ca',title:'代价：三样东西都必须按块对齐',
+     desc:'O_DIRECT 不是免费的开关：<b>缓冲区地址、文件偏移、长度</b>都要按<b>块大小对齐</b>（通常 512B 或 4KB），所以要用 <code>posix_memalign</code> 分配缓冲区。对不齐就是 <code>EINVAL</code>。而且没了页缓存，<b>预读和合并也一起没了</b>——顺序小写会明显变慢，这是自己接管缓存要付的学费。',
+     lines:[2],hl:'amber',at:'Buf',tokenCls:'blue',lay:{1:'amber'},bypass:2,dim:[3,4],edim:[1,2,3],
+     risk:{2:['旁路 · 不经过','warn']},edge:{},pgs:['','','',''],st:{Buf:'amber'},
+     cnt:[['地址对齐','amber'],['偏移对齐','amber'],['长度对齐','amber']],
+     pill:'align the address, the offset and the length',pillC:'amber'},
+
+    {chip:'O_DIRECT',chipC:'cd',title:'绕过页缓存，并不等于绕过 fsync',
+     desc:'最常见的误解：「都 O_DIRECT 了还要 fsync？」——<b>要</b>。O_DIRECT 只跳过了第 <b>②</b> 层，它<b>不保证元数据落盘</b>（文件变大要改 <code>i_size</code>），也<b>不保证第 ③ 层的盘上缓存被 flush</b>。这两件事仍然只有 <code>fsync()</code> 能做。',
+     lines:[4],hl:'danger',at:'Media',tokenCls:'',lay:{3:'amber',4:'green'},bypass:2,dim:[1],edim:[1,2],
+     risk:{2:['旁路 · 不经过','warn'],3:['仍需 FLUSH','lost'],4:['fsync 后到底','safe']},
+     edge:{3:{chips:[0,1],tone:'green'}},pgs:['','','',''],st:{DC:'amber',Media:'green'},
+     cnt:[['元数据未落','danger'],['盘上缓存未 flush','danger'],['仍需 fsync','amber']],
+     pill:'O_DIRECT still needs fsync for (3) and metadata',pillC:'danger'},
+
+    {chip:'mmap',chipC:'cb',title:'mmap 不是绕开页缓存，是与它合体',
+     desc:'另一条路完全相反：<code>mmap</code> 映射到的<b>物理页就是页缓存页</b>。用户态和内核态<b>看的是同一张物理页</b>——写内存即改页缓存，<b>没有系统调用，也没有拷贝</b>。第 ① 层和第 ② 层在这里合并成了一层。',
+     lines:[6,7,8],hl:'blue',at:'PC',tokenCls:'amber',lay:{1:'blue',2:'blue'},dim:[3,4],edim:[2,3],
+     risk:{1:['同一张物理页','warn'],2:['同一张物理页','warn']},edge:{1:{chips:[]}},
+     pgs:['dirty','dirty','clean','clean'],st:{Buf:'blue',PC:'blue'},
+     cnt:[['CPU 拷贝 0','green'],['系统调用 0','green'],['映射页 = 页缓存页','blue']],
+     pill:'mapped pages ARE page-cache pages',pillC:'blue'},
+
+    {chip:'收口',chipC:'cg',title:'msync 代替 fsync，两条旁路各归其位',
+     desc:'mmap 改的是页缓存页，所以要用 <code>msync(MS_SYNC)</code> 把它刷下去。<b>两条旁路的定位</b>：<span class="green">O_DIRECT</span> 跳过第 ② 层，适合自己管缓存的场景（数据库），代价是对齐要求和失去预读；<span class="blue">mmap</span> 把第 ①② 层合成一层，省掉系统调用和拷贝，代价是要处理缺页与 <code>msync</code>。<b>但两者都改变不了：第 ③ 层的 FLUSH 谁都省不掉。</b>',
+     lines:[4,9],hl:'green',at:'Media',tokenCls:'',lay:{2:'amber',3:'amber',4:'green'},dim:[],edim:[1],
+     risk:{1:['mmap 与 ② 合体','warn'],2:['msync 刷它','warn'],3:['FLUSH 谁都免不了','lost'],4:['已持久','safe']},
+     edge:{2:{chips:[0,3]},3:{chips:[0,1],tone:'green'}},
+     pgs:['done','done','clean','clean'],st:{Media:'green'},
+     cnt:[['O_DIRECT → 跳过 ②','green'],['mmap → ①② 合体','blue'],['③ 的 FLUSH 省不掉','danger']],
+     pill:'msync for mmap; nobody escapes the FLUSH',pillC:'green'}
+  ]
+});
+
+/* ============================ 步进引擎 ============================ */
+const SCENES=[pathScene,chainScene,writebackScene,lossScene,bypassScene];
+const tabsBox=el('tabs'),stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc'),
+      codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots'),btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{
+  const tab=document.createElement('button');tab.type='button';tab.className='tab';
+  tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';
+  tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);
+});
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();
+  sceneIndex=index;stepIndex=0;
+  [...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));
+  const scene=SCENES[sceneIndex];
+  scene.mount();codeBox.innerHTML=codePanel(scene.code);dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,i)=>{
+    const dot=document.createElement('button');dot.type='button';dot.className='dot';
+    dot.title=step.title;dot.setAttribute('aria-label',step.title);
+    dot.addEventListener('click',()=>{stop();go(i);});dotsBox.appendChild(dot);dotEls.push(dot);
+  });
+  go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;
+  stepIndex=Math.max(0,Math.min(steps.length-1,index));
+  const step=steps[stepIndex];
+  SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.className='cl '+(step.lines.includes(i)?'hl-'+step.hl:''));
+  stTitle.textContent=SCENES[sceneIndex].label;
+  stChip.textContent=step.chip;stChip.className='chip '+step.chipC;
+  stAct.textContent='▸ '+step.title;stDesc.innerHTML=step.desc;
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});
+  readout.textContent=stepIndex+' / '+(steps.length-1);
+  btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}
+  if(stepIndex===steps.length-1)stop();
+}
+function play(){
+  if(stepIndex===SCENES[sceneIndex].steps.length-1)go(0);
+  btnPlay.textContent='暂停';
+  timer=setInterval(()=>{stepIndex<SCENES[sceneIndex].steps.length-1?go(stepIndex+1):stop();},3200);
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());
+btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});
+btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{
+  if(event.key==='ArrowRight'){stop();go(stepIndex+1);}
+  else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}
+  else if(event.key===' '){event.preventDefault();timer?stop():play();}
+});
+const hashScene=location.hash.match(/scene=(\w+)/),hashStep=location.hash.match(/step=(\d+)/);
+let initialScene=0;
+if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}
+switchScene(initialScene);
+if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

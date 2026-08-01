@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FBFBF6/#8A8574；蓝 #E3EAF4/#3D5A80/#2C4460；
+       绿/直达 #E1F5EE/#0F6E56/#2F6B5E；红/成本 #F0E0DB/#A64B3C；与本库既有 SVG 同一套 -->
+  <title>Bounce Buffer 与直读的路径对比与决策</title>
+  <desc>上半左右两条路径：bounce 路径为盘 DMA 进主存缓冲、CPU 解码增广后写 pinned 环、再 DMA 过 PCIe 进显存，标注两次 DMA 与主存流量；直读路径为盘经 cuFile 一次 DMA 直写显存 BAR1，主存零流量。下半为五判据决策表——第一消费者、缓存有益性、IO 形状、拓扑、工程性。底部为贯穿负载结论：图像流走 bounce，文本流走直读。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">bounce vs 直读：分界线不是「哪个快」，是「谁第一个消费数据」</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">同一台 8 卡节点上两条流各有主场；判据优先级 = 第一消费者 &#62; 缓存有益性 &#62; IO 形状/拓扑 &#62; 搬运次数</text>
+
+  <!-- ======== A · bounce 路径 ======== -->
+  <rect x="48" y="104" width="568" height="360" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="130" font-size="14" font-weight="700" fill="#4A473F" dominant-baseline="central">A · bounce 路径：CPU 先消费（图像流 JPEG）</text>
+
+  <rect x="72" y="152" width="250" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="197" y="172" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">NVMe 盘</text>
+  <text x="340" y="172" font-size="10.5" fill="#4A473F" dominant-baseline="central">16 GB/s 压缩字节 · 盘阵富余</text>
+
+  <path d="M197,193 L197,209" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="206" y="201" font-size="10" fill="#4A473F" dominant-baseline="central">DMA ①</text>
+
+  <rect x="72" y="212" width="250" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="197" y="232" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主存缓冲（O_DIRECT）</text>
+  <text x="340" y="232" font-size="10.5" fill="#4A473F" dominant-baseline="central">解码后 ~3× 膨胀 → 48 GB/s</text>
+
+  <path d="M197,253 L197,269" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <text x="206" y="261" font-size="10" font-weight="700" fill="#A64B3C" dominant-baseline="central">CPU 解码增广</text>
+
+  <rect x="72" y="272" width="250" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="197" y="292" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">pinned 环形缓冲</text>
+  <text x="340" y="292" font-size="10.5" fill="#4A473F" dominant-baseline="central">环深只平抖动，不提均值</text>
+
+  <path d="M197,313 L197,329" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="206" y="321" font-size="10" fill="#4A473F" dominant-baseline="central">DMA ② · PCIe</text>
+
+  <rect x="72" y="332" width="250" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="197" y="352" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">显存 HBM</text>
+  <text x="340" y="352" font-size="10.5" fill="#4A473F" dominant-baseline="central">6 GB/s/卡 · Gen4 x16 富余</text>
+
+  <rect x="72" y="396" width="520" height="48" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="332" y="414" font-size="11.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">主存总线上百 GB/s 级 · 几十个核全职解码</text>
+  <text x="332" y="434" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">瓶颈几乎总在 CPU 解码，不在任何一段搬运</text>
+
+  <!-- ======== B · 直读路径 ======== -->
+  <rect x="624" y="104" width="568" height="360" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="646" y="130" font-size="14" font-weight="700" fill="#4A473F" dominant-baseline="central">B · 直读路径：GPU 先消费（tokenized 文本）</text>
+
+  <rect x="648" y="152" width="250" height="40" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="773" y="172" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">NVMe 盘 · cuFile</text>
+  <text x="916" y="172" font-size="10.5" fill="#4A473F" dominant-baseline="central">≥ 百 KiB 大块 · 4 KiB 对齐</text>
+
+  <path d="M773,193 L773,209" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <text x="782" y="201" font-size="10" font-weight="700" fill="#2F6B5E" dominant-baseline="central">DMA · P2P</text>
+
+  <rect x="648" y="212" width="250" height="40" rx="7" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.4"/>
+  <text x="773" y="232" font-size="12" font-weight="700" fill="#085041" text-anchor="middle" dominant-baseline="central">同一 PCIe Switch</text>
+  <text x="916" y="232" font-size="10.5" fill="#4A473F" dominant-baseline="central">拓扑必须 PIX / PXB</text>
+
+  <path d="M773,253 L773,269" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <text x="782" y="261" font-size="10" font-weight="700" fill="#2F6B5E" dominant-baseline="central">不过主存</text>
+
+  <rect x="648" y="272" width="250" height="40" rx="7" fill="#E3EAF4" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="773" y="292" font-size="12" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">显存 BAR1</text>
+  <text x="916" y="292" font-size="10.5" fill="#4A473F" dominant-baseline="central">1 次 DMA · 主存 0 流量</text>
+
+  <path d="M773,313 L773,327" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrr)"/>
+  <rect x="648" y="330" width="250" height="42" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="773" y="351" font-size="11" font-weight="700" fill="#733428" text-anchor="middle" dominant-baseline="central">CPU 若要碰 → D2H 搬回</text>
+  <text x="916" y="351" font-size="10.5" fill="#733428" dominant-baseline="central">方向性错误，不是性能差异</text>
+
+  <rect x="648" y="396" width="520" height="48" rx="7" fill="#FAF9F2" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="908" y="414" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">主存流量 0 · CPU 只发 cuFile 命令</text>
+  <text x="908" y="434" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">省下的主存带宽补贴图像流解码</text>
+
+  <!-- ======== C · 五判据决策表 ======== -->
+  <text x="70" y="500" font-size="14" font-weight="700" fill="#4A473F" dominant-baseline="central">C · 五判据决策表：自上而下权重递减</text>
+
+  <rect x="48" y="518" width="1144" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="64" y="535" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">判据（权重递减）</text>
+  <text x="244" y="535" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">倾向 bounce（CPU 先消费）</text>
+  <text x="726" y="535" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">倾向直读 GDS（GPU 先消费）</text>
+
+  <rect x="48" y="552" width="1144" height="44" fill="#F0E0DB" stroke="#9B968A" stroke-width="1"/>
+  <text x="64" y="574" font-size="11.5" font-weight="700" fill="#A64B3C" dominant-baseline="central">① 第一消费者</text>
+  <text x="244" y="574" font-size="11" fill="#4A473F" dominant-baseline="central">要解码 / 解压 / 增广 / 校验</text>
+  <text x="726" y="574" font-size="11" fill="#4A473F" dominant-baseline="central">GPU 直吃原始字节：张量 · ckpt · KV cache</text>
+
+  <rect x="48" y="596" width="1144" height="44" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <text x="64" y="618" font-size="11.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">② 缓存有益性</text>
+  <text x="244" y="618" font-size="11" fill="#4A473F" dominant-baseline="central">热数据集反复读，page cache 命中免盘 IO</text>
+  <text x="726" y="618" font-size="11" fill="#4A473F" dominant-baseline="central">冷数据 / 单遍 epoch，命中率 ≈ 0</text>
+
+  <rect x="48" y="640" width="1144" height="44" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="64" y="662" font-size="11.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">③ IO 形状</text>
+  <text x="244" y="662" font-size="11" fill="#4A473F" dominant-baseline="central">小、碎、不对齐（FUSE / 网络文件系统）</text>
+  <text x="726" y="662" font-size="11" fill="#4A473F" dominant-baseline="central">≥ 百 KiB 大块 · 4 KiB 对齐（硬要求）</text>
+
+  <rect x="48" y="684" width="1144" height="44" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <text x="64" y="706" font-size="11.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">④ 拓扑</text>
+  <text x="244" y="706" font-size="11" fill="#4A473F" dominant-baseline="central">GPU 与盘 SYS 关系，跨 socket 打折</text>
+  <text x="726" y="706" font-size="11" fill="#4A473F" dominant-baseline="central">PIX / PXB 同一 Switch</text>
+
+  <rect x="48" y="728" width="1144" height="44" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="64" y="750" font-size="11.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">⑤ 工程性</text>
+  <text x="244" y="750" font-size="11" fill="#4A473F" dominant-baseline="central">路径通用、处处能跑、便于调试</text>
+  <text x="726" y="750" font-size="11" fill="#4A473F" dominant-baseline="central">依赖 nvidia-fs 与文件系统适配，有静默回退风险</text>
+
+  <!-- ======== 底部结论 ======== -->
+  <rect x="48" y="786" width="1144" height="76" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="812" font-size="12.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">同机总账：图像流走 bounce、文本流走直读——两条流共享同一根主存总线，直读省下的带宽补贴给解码</text>
+  <text x="70" y="840" font-size="11" fill="#4A473F" dominant-baseline="central">流水线吞吐 = min(盘读, 解码, H2D, 计算)；所有 bounce vs 直读对比，先按 8.2 §4 验证直读组没有静默回退到 compat</text>
+</svg>

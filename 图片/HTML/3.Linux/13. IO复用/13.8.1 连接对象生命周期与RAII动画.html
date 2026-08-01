@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E">
+<title>连接对象生命周期与RAII动画</title>
+<!--
+Visual system: 22 / 17 / 15 / 13 / 11px type scale; warm paper #F5F4ED and panel #FBFBF6;
+blue = 拥有者/UniqueFd, amber = 观察者/Channel, green = 连接表/安全路径, red = 悬空/重复关闭;
+all transitions share the 520ms cubic-bezier motion language.
+Engine: build-once + mutate（与 17.2.1 同一套步进引擎），#scene=xxx&step=n 深链。
+-->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;--gray:#F1EFE8;
+  --blue:#2467A6;--bluebg:#E1EFFA;--bluetx:#1A4F84;
+  --green:#087A5C;--greenbg:#DCF3E9;--greentx:#075A43;
+  --amber:#A66408;--amberbg:#FFF0D7;--ambertx:#764600;
+  --danger:#C34935;--dangerbg:#FAE1DC;--dangertx:#8F2B1C;
+  --code:#2E2C27;--codetext:#E8E3D6;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;line-height:1.3;text-wrap:balance;}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{min-height:48px;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.35);outline-offset:2px;}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1280px){.layout{grid-template-columns:minmax(0,1fr);}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;}.viz .vcap b{font-weight:700;color:var(--ink);}
+.stage-frame{position:relative;width:min(632px,100%);height:420px;margin:0 auto;}
+.stage{position:absolute;left:0;top:0;width:632px;height:420px;transform-origin:top left;}
+.layout > .right{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+#stDesc{font-size:14px;color:var(--muted);margin-top:11px;}.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{background:var(--code);border:1px solid #24231F;border-radius:10px;padding:12px 0;color:var(--codetext);font-family:var(--mono);font-size:13px;line-height:1.55;overflow:hidden;box-shadow:0 1px 3px rgba(60,55,40,.08);}
+.codebox .cl{min-height:24px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background .3s var(--ease),color .3s var(--ease),box-shadow .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}.codebox .cl.hl .cmt{color:#CCC8BA;}
+.codebox .kw{color:#D9B177;}.codebox .type{color:#8EB5DC;}.codebox .ord{color:#A7D7BF;}.codebox .num{color:#E0A797;}.codebox .str{color:#C8B694;}.codebox .cmt{color:#9A968B;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{min-height:40px;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector language. */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.wire{--wc:var(--arrow);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.warrow{--wc:var(--arrow);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wport{--wc:var(--arrow);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire.on,.warrow.on,.wport.on{opacity:1;}.wire.hint{stroke-width:2;opacity:.1;}.warrow.hint,.wport.hint{opacity:.1;}.warrow.drawing{transition-delay:200ms;}
+.wire.blue,.warrow.blue,.wport.blue{--wc:var(--blue);}.wire.green,.warrow.green,.wport.green{--wc:var(--green);}.wire.amber,.warrow.amber,.wport.amber{--wc:var(--amber);}.wire.danger,.warrow.danger,.wport.danger{--wc:var(--danger);}
+
+/* Shared bottom note bar. */
+.snote{position:absolute;left:16px;top:352px;width:600px;min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);padding:8px 14px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.snote.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.snote.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.snote.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.snote.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+/* Generic cards / op rows. */
+.gcard{position:absolute;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:10px 12px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.gcard.bl{border-color:var(--blue);}.gcard.gr{border-color:var(--green);}.gcard.am{border-color:var(--amber);}.gcard.ik{border-color:var(--ink);}
+.gcard.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.gcard.dim{opacity:.5;}
+.gcard.ghost{border-style:dashed;opacity:.45;}
+.gcard.badbg{border-color:var(--danger);background:var(--dangerbg);}.gcard.okbg{border-color:var(--green);background:var(--greenbg);}.gcard.warnbg{border-color:var(--amber);background:var(--amberbg);}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:700;}
+.ghead span{font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.gsub{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:3px;transition:color var(--dur) var(--ease);}
+.gop{margin-top:8px;min-height:30px;border:1px solid var(--grid);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);padding:5px 8px;display:flex;align-items:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gop.active{color:var(--ink);border-color:var(--ink);background:var(--paper);}
+.gop.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.gop.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.gop.bad{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.gop.off{opacity:.35;border-style:dashed;}
+.glab{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);margin-top:9px;}
+
+/* Scene 2: use_count badge. */
+.refbadge{display:flex;align-items:baseline;gap:6px;margin-top:8px;justify-content:center;}
+.refbadge .k{font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.refbadge .v{font-family:var(--mono);font-size:30px;font-weight:700;line-height:1;color:var(--ink);transition:color var(--dur) var(--ease);}
+.refbadge .v.ok{color:var(--green);}.refbadge .v.bad{color:var(--danger);}.refbadge .v.warn{color:var(--amber);}
+
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:16px;}.desc-card{padding:16px;}.controls{padding:12px 14px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 142px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>连接对象生命周期与 RAII · fd 所有权 · 智能指针 · 析构顺序</h1>
+    <p>配套笔记《13.8 连接对象生命周期与RAII》 · UniqueFd · shared_ptr/weak_ptr · 安全关闭顺序　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts ? parts[1] : line;
+  const comment=parts && parts[2] ? parts[2] : '';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{
+    strings.push(escapeHtml(value));
+    return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';
+  });
+  code=escapeHtml(code)
+    .replace(/\b(class|int|void|auto|if|const|std|explicit|noexcept|operator|map|shared_ptr|weak_ptr|TcpConnection|Channel|Socket|UniqueFd|socklen_t)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(nullptr|true|false|this|delete)\b/g,'<span class="ord">$1</span>')
+    .replace(/\b(close|lock|handleEvent|handleEventWithGuard|disableAll|removeChannel|erase|queueInLoop|reset|release|get)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment ? '<span class="cmt">'+escapeHtml(comment)+'</span>' : '');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="cl'+index+'">'+(line ? highlightCpp(line) : '&nbsp;')+'</div>').join('');}
+function stageFrame(id,classes,html){return '<div class="stage-frame" id="'+id+'Frame"><div class="stage '+classes+'" id="'+id+'Stage">'+html+'</div></div>';}
+function fitStage(id){
+  const base=id.endsWith('Stage')?id.slice(0,-5):id;
+  const stage=el(id),frame=el(base+'Frame');
+  if(!stage||!frame)return;
+  const scale=Math.min(1,frame.clientWidth/632);
+  stage.style.transform='scale('+scale+')';
+  frame.style.height=(420*scale)+'px';
+}
+
+function wireHTML(id){return '<path id="'+id+'" class="wire"></path><path id="'+id+'-head" class="warrow"></path><circle id="'+id+'-port" class="wport" r="4"></circle>';}
+function wireNodes(id){return [el(id),el(id+'-head'),el(id+'-port')];}
+function setWire(id,state,color){
+  const [path,head,port]=wireNodes(id);
+  if(!path||!head||!port)return;
+  const suffix=(state?' '+state:'')+(color?' '+color:'');
+  path.setAttribute('class','wire'+suffix);
+  head.setAttribute('class','warrow'+suffix);
+  port.setAttribute('class','wport'+suffix);
+  if(state!=='on'){
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    path.style.transition='';
+    head.classList.remove('drawing');
+  }
+}
+function drawWire(id,color,timers){
+  setWire(id,'on',color);
+  const [path,head]=wireNodes(id);
+  if(!path||reducedMotion())return;
+  const length=path.getTotalLength();
+  path.style.transition='none';
+  path.style.strokeDasharray=length;
+  path.style.strokeDashoffset=length;
+  head.classList.add('drawing');
+  void path.getBoundingClientRect();
+  path.style.transition='';
+  path.style.strokeDashoffset='0';
+  const timer=setTimeout(()=>{
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    head.classList.remove('drawing');
+  },560);
+  timers.push(timer);
+}
+function wireController(ids,colors){
+  let active=new Set();
+  let timers=[];
+  return {
+    sync(nextIds,hints=false){
+      timers.forEach(clearTimeout);timers=[];
+      const next=new Set(nextIds);
+      const any=next.size>0;
+      ids.forEach(id=>{
+        const state=next.has(id)?'on':(!any&&hints?'hint':'');
+        if(next.has(id)&&!active.has(id))drawWire(id,colors[id],timers);
+        else setWire(id,state,colors[id]);
+      });
+      active=next;
+    },
+    destroy(){timers.forEach(clearTimeout);timers=[];active.clear();}
+  };
+}
+function relRect(stageRect,id){
+  const rect=el(id).getBoundingClientRect();
+  return {left:rect.left-stageRect.left,right:rect.right-stageRect.left,top:rect.top-stageRect.top,bottom:rect.bottom-stageRect.top,cx:(rect.left+rect.right)/2-stageRect.left,cy:(rect.top+rect.bottom)/2-stageRect.top};
+}
+function point(rect,side,offset=0){
+  if(side==='left')return {x:rect.left,y:rect.cy+offset};
+  if(side==='right')return {x:rect.right,y:rect.cy+offset};
+  return {x:rect.cx,y:rect.cy+offset};
+}
+function bezierArrow(id,from,to){
+  const path=el(id),head=el(id+'-head'),port=el(id+'-port');
+  if(!path||!head||!port)return;
+  const direction=to.x>=from.x?1:-1;
+  const baseX=to.x-direction*9;
+  const gap=Math.max(1,Math.abs(baseX-from.x));
+  const c1=from.x+direction*gap*.45;
+  const c2=baseX-direction*gap*.45;
+  path.setAttribute('d','M '+from.x+' '+from.y+' C '+c1+' '+from.y+', '+c2+' '+to.y+', '+baseX+' '+to.y);
+  head.setAttribute('d','M '+to.x+' '+to.y+' L '+baseX+' '+(to.y-5)+' L '+baseX+' '+(to.y+5)+' Z');
+  port.setAttribute('cx',from.x);port.setAttribute('cy',from.y);
+}
+function classes(id,value){el(id).className=value;}
+function setOps(prefix,states){states.forEach((state,index)=>classes(prefix+index,'gop '+state));}
+
+/* ---------- Scene 1 · fd 所有权 ---------- */
+const ownScene=(()=>{
+  const code=[
+    'class UniqueFd {                 // 独占拥有 fd',
+    '  ~UniqueFd() { if (fd_ >= 0) ::close(fd_); }',
+    '  UniqueFd(const UniqueFd&)            = delete;',
+    '  UniqueFd& operator=(const UniqueFd&) = delete;',
+    '  UniqueFd(UniqueFd&& o) noexcept : fd_(o.fd_)',
+    '      { o.fd_ = -1; }          // 移动: 转移所有权',
+    '  int fd_;',
+    '};',
+    '// Channel 只保存 int fd + 回调, 从不 close'
+  ];
+  const wires=['wOwn','wOwnB','wObs','wDup','wClose'];
+  const colors={wOwn:'blue',wOwnB:'blue',wObs:'amber',wDup:'danger',wClose:'green'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 一个连接不只是一个 int fd',chip:'所有权',chipC:'c0',lines:[0,8],w:[],hint:true,k1:['fd 7 → 本连接','active'],k2:['——','off'],aFd:['fd_ = 7',''],aC:'',bFd:['fd_ = -1','off'],bC:'ghost',cC:'',cx:['~Channel 不 close ✓',''],note:'真实网络库里 fd 由一组对象共同维护——先分清：谁拥有（负责 close），谁只是观察（只保存数字）。',noteC:''},
+    {title:'步骤 1 · UniqueFd 构造：取得 fd 所有权',chip:'RAII',chipC:'cb',lines:[0,1],w:['wOwn'],hint:false,k1:['fd 7 → 本连接','active'],k2:['——','off'],aFd:['fd_ = 7','active'],aC:'active',bFd:['fd_ = -1','off'],bC:'ghost',cC:'dim',cx:['~Channel 不 close ✓',''],note:'RAII：资源在构造时取得、析构时释放——close 收进析构函数，不散落在各个异常路径和 return 分支里。',noteC:'blue'},
+    {title:'步骤 2 · Channel 只观察：保存数字，不负责关闭',chip:'观察者',chipC:'ca',lines:[8],w:['wOwn','wObs'],hint:false,k1:['fd 7 → 本连接','active'],k2:['——','off'],aFd:['fd_ = 7','active'],aC:'',bFd:['fd_ = -1','off'],bC:'ghost',cC:'active',cx:['~Channel 不 close ✓','done'],note:'Channel 保存 fd 数字、关注事件与回调，把事件分发给 TcpConnection——它对 fd 只有使用权，没有释放权。',noteC:'amber'},
+    {title:'步骤 3 · 只能移动：所有权 A → B 转移',chip:'move-only',chipC:'cb',lines:[2,3,4,5],w:['wOwnB'],hint:false,k1:['fd 7 → 本连接','active'],k2:['——','off'],aFd:['fd_ = -1（已交出）','warn'],aC:'dim',bFd:['fd_ = 7','active'],bC:'bl active',note:'拷贝被 delete：两个拥有者析构时会 close 同一个 fd。移动后源对象置 -1——任何时刻只有一个拥有者。',noteC:'blue',cC:'dim',cx:['~Channel 不 close ✓','']},
+    {title:'步骤 4 · 反例：Channel 也去 close(fd)',chip:'重复关闭',chipC:'cd',lines:[8],w:['wOwn','wDup'],hint:false,k1:['fd 7 已关闭','warn'],k2:['fd 7 →（复用!）新连接','bad'],aFd:['fd_ = 7','active'],aC:'',bFd:['fd_ = -1','off'],bC:'ghost',cC:'badbg active',cx:['~Channel 里 close ✗','bad'],note:'第一次 close 后整数 7 可能立刻被内核复用给另一条连接——第二次 close 误关的是别人的连接。高并发下极难排查。',noteC:'danger'},
+    {title:'步骤 5 · 析构：UniqueFd 自动 close(fd)',chip:'析构释放',chipC:'cg',lines:[1],w:['wClose'],hint:false,k1:['fd 7 已关闭 ✓','done'],k2:['——','off'],aFd:['~UniqueFd → close(7)','done'],aC:'active',bFd:['fd_ = -1','off'],bC:'ghost',cC:'dim',cx:['~Channel 不 close ✓','done'],note:'无论正常返回、异常抛出还是提前 return，栈回退都会执行析构——所有路径都释放，不泄漏、不重复。',noteC:'green'},
+    {title:'步骤 6 · 收口：一个 fd，一个 RAII 拥有者',chip:'铁律',chipC:'cg',lines:[0,8],w:[],hint:true,k1:['fd 7 → 本连接','active'],k2:['——','off'],aFd:['fd_ = 7','done'],aC:'',bFd:['fd_ = -1','off'],bC:'ghost',cC:'',cx:['~Channel 不 close ✓','done'],note:'Socket/UniqueFd 唯一拥有并释放；Channel 只分发事件。所有权清楚了，重复关闭与泄漏就都消失了。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('odStage');
+    const stage=el('odStage'),svg=el('odSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const k=relRect(sr,'odK'),a=relRect(sr,'odA'),b=relRect(sr,'odB'),c=relRect(sr,'odC');
+    bezierArrow('wOwn',point(a,'left',-10),point(k,'right',-24));
+    bezierArrow('wOwnB',point(b,'left',-10),point(k,'right',24));
+    bezierArrow('wObs',point(c,'left',-16),point(a,'right',-16));
+    bezierArrow('wDup',point(c,'left',20),point(k,'right',44));
+    bezierArrow('wClose',point(a,'left',14),point(k,'right',-2));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>fd 所有权</b>：谁拥有（负责 close），谁只是观察</div>'+stageFrame('od','own-stage',
+      '<div class="gcard ik" id="odK" style="left:16px;top:60px;width:150px;min-height:130px;"><div class="ghead">内核 fd 表 <span>kernel</span></div><div class="gop" id="odK1">fd 7 → 本连接</div><div class="gop off" id="odK2">——</div></div>'+
+      '<div class="gcard bl" id="odA" style="left:236px;top:36px;width:180px;min-height:92px;"><div class="ghead">UniqueFd A <span>owner</span></div><div class="gop" id="odAfd">fd_ = 7</div><div class="gsub">析构时 ::close(fd_)</div></div>'+
+      '<div class="gcard bl ghost" id="odB" style="left:236px;top:160px;width:180px;min-height:92px;"><div class="ghead">UniqueFd B <span>move 目标</span></div><div class="gop off" id="odBfd">fd_ = -1</div><div class="gsub">std::move 后接手</div></div>'+
+      '<div class="gcard am" id="odC" style="left:466px;top:60px;width:150px;min-height:130px;"><div class="ghead">Channel <span>observer</span></div><div class="gop">fd = 7（只是数字）</div><div class="gop">事件 + 回调</div><div class="gop" id="odCx">~Channel 不 close ✓</div></div>'+
+      '<svg class="arr-layer" id="odSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="odNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('odFrame'));
+  }
+  function paint(s){
+    layout();
+    el('odK1').textContent=s.k1[0];classes('odK1','gop '+s.k1[1]);
+    el('odK2').textContent=s.k2[0];classes('odK2','gop '+s.k2[1]);
+    el('odAfd').textContent=s.aFd[0];classes('odAfd','gop '+s.aFd[1]);
+    classes('odA','gcard bl '+s.aC);
+    el('odBfd').textContent=s.bFd[0];classes('odBfd','gop '+s.bFd[1]);
+    classes('odB','gcard '+(s.bC==='ghost'?'bl ghost':s.bC));
+    classes('odC','gcard am '+s.cC);
+    el('odCx').textContent=s.cx[0];classes('odCx','gop '+s.cx[1]);
+    classes('odNote','snote '+s.noteC);el('odNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'own',label:'fd 所有权',sub:'UniqueFd · move-only',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 2 · shared_ptr / weak_ptr ---------- */
+const spScene=(()=>{
+  const code=[
+    '// 连接表: 拥有 -> shared_ptr',
+    'std::map<int, std::shared_ptr<TcpConnection>> conns;',
+    '// Channel: 观察 -> weak_ptr',
+    'class Channel {',
+    '  std::weak_ptr<void> tie_;',
+    '  void handleEvent() {',
+    '    if (auto guard = tie_.lock()) // 对象还活着?',
+    '      handleEventWithGuard();     // 回调期间 +1 保命',
+    '  }',
+    '};                                // 死了: 静默跳过',
+    '// 拥有用 shared_ptr, 观察用 weak_ptr',
+    '// 反例: 捕获 this 会悬空 / 强引用互指会成环'
+  ];
+  const wires=['wTab','wCbBad','wOwnCh','wCycle','wWeak'];
+  const colors={wTab:'green',wCbBad:'danger',wOwnCh:'blue',wCycle:'danger',wWeak:'amber'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 连接对象被多方引用',chip:'shared_ptr',chipC:'c0',lines:[0,1],w:['wTab'],hint:false,ref:'1',refC:'',state:['存活',''],connC:'',tabC:'active',cb:['（暂无回调）','off'],cbC:'dim',ch:['tie_ = weak_ptr','off'],chr:['handleEvent: …','off'],chC:'dim',note:'连接表、正在执行的回调、定时器都可能同时引用一条连接——shared_ptr 表达共享生命周期，use_count 记着有几个主人。',noteC:''},
+    {title:'步骤 1 · 反例①：回调捕获裸指针 this',chip:'悬空隐患',chipC:'cd',lines:[11],w:['wTab','wCbBad'],hint:false,ref:'1',refC:'',state:['存活',''],connC:'',tabC:'',cb:['捕获 this（裸指针）','bad'],cbC:'active',ch:['tie_ = weak_ptr','off'],chr:['handleEvent: …','off'],chC:'dim',note:'裸指针不参与引用计数——连接可能在回调执行前就析构，隐患此刻已埋下。',noteC:'danger'},
+    {title:'步骤 2 · 连接已析构，回调仍然执行',chip:'use-after-free',chipC:'cd',lines:[11],w:['wCbBad'],hint:false,ref:'0',refC:'bad',state:['已析构 ✗','bad'],connC:'badbg',tabC:'dim',cb:['this → 悬空指针!','bad'],cbC:'active',ch:['tie_ = weak_ptr','off'],chr:['handleEvent: …','off'],chC:'dim',note:'连接表放手后 use_count=0 → 对象销毁；但回调还排在队列里——跑起来时 this 指向尸体，访问即 UB。',noteC:'danger'},
+    {title:'步骤 3 · 反例②：强引用互指成环',chip:'引用环',chipC:'cd',lines:[11],w:['wOwnCh','wCycle'],hint:false,ref:'2',refC:'warn',state:['永不释放','warn'],connC:'warnbg',tabC:'dim',cb:['长期捕获 shared_ptr','warn'],cbC:'dim',ch:['持有 shared_ptr ✗','bad'],chr:['强引用指回连接','bad'],chC:'active',note:'TcpConnection 拥有 Channel，Channel 又强持有 TcpConnection → use_count 永不为 0，谁也死不掉。长期捕获 shared_ptr 同理。',noteC:'danger'},
+    {title:'步骤 4 · 正确：tie_ 是 weak_ptr，先 lock 再执行',chip:'lock 提升',chipC:'cg',lines:[4,5,6,7],w:['wTab','wOwnCh','wWeak'],hint:false,ref:'2',refC:'ok',state:['存活 · guard 保护中','done'],connC:'okbg',tabC:'',cb:['guard = tie_.lock() ✓','done'],cbC:'dim',ch:['tie_ = weak_ptr ✓','done'],chr:['lock 成功 → 执行回调','done'],chC:'active',note:'weak_ptr 不增加计数；handleEvent 前提升为 shared_ptr——回调期间临时 +1（1→2），执行到一半对象绝不会被释放。',noteC:'green'},
+    {title:'步骤 5 · 对象已亡：lock() 返回空，静默跳过',chip:'安全失败',chipC:'cg',lines:[6,9],w:['wWeak'],hint:false,ref:'0',refC:'',state:['已析构（正常放手）',''],connC:'dim',tabC:'dim',cb:['（无回调执行）','off'],cbC:'dim',ch:['tie_ = weak_ptr ✓','done'],chr:['lock 失败 → 跳过 ✓','done'],chC:'active',note:'对象不在了就什么都不做——悬空回调从机制上不可能发生。这就是"观察不拥有"的全部意义。',noteC:'green'},
+    {title:'步骤 6 · 收口：拥有 shared_ptr，观察 weak_ptr',chip:'铁律',chipC:'cg',lines:[10],w:['wTab','wWeak'],hint:false,ref:'1',refC:'',state:['存活',''],connC:'',tabC:'',cb:['weak_ptr + lock','done'],cbC:'',ch:['tie_ = weak_ptr ✓','done'],chr:['handleEvent: lock 后执行','done'],chC:'',note:'连接表拥有（shared_ptr），Channel/回调观察（weak_ptr + lock）。环消失、悬空消失，寿命由拥有者唯一决定。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('spStage');
+    const stage=el('spStage'),svg=el('spSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const conn=relRect(sr,'spConn'),tab=relRect(sr,'spTab'),cb=relRect(sr,'spCb'),ch=relRect(sr,'spCh');
+    bezierArrow('wTab',point(tab,'right'),point(conn,'left',-24));
+    bezierArrow('wCbBad',point(cb,'right'),point(conn,'left',24));
+    bezierArrow('wOwnCh',point(conn,'right',-20),point(ch,'left',-20));
+    bezierArrow('wCycle',point(ch,'left',20),point(conn,'right',20));
+    bezierArrow('wWeak',point(ch,'left',0),point(conn,'right',0));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>shared_ptr / weak_ptr</b>：拥有与观察是两种不同的关系</div>'+stageFrame('sp','sp-stage',
+      '<div class="gcard ik" id="spConn" style="left:236px;top:110px;width:180px;min-height:126px;"><div class="ghead">TcpConnection <span>对象</span></div>'+
+        '<div class="refbadge"><span class="k">use_count</span><span class="v" id="spRef">1</span></div><div class="gop" id="spState">存活</div></div>'+
+      '<div class="gcard gr" id="spTab" style="left:16px;top:44px;width:160px;min-height:80px;"><div class="ghead">连接表 <span>拥有</span></div><div class="gsub">conns[7] = shared_ptr</div></div>'+
+      '<div class="gcard bl" id="spCb" style="left:16px;top:236px;width:160px;min-height:96px;"><div class="ghead">回调 / 定时器 <span>引用</span></div><div class="gop off" id="spCbr">（暂无回调）</div></div>'+
+      '<div class="gcard am" id="spCh" style="left:466px;top:110px;width:150px;min-height:126px;"><div class="ghead">Channel <span>观察</span></div><div class="gop off" id="spChTie">tie_ = weak_ptr</div><div class="gop off" id="spChr">handleEvent: …</div></div>'+
+      '<svg class="arr-layer" id="spSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="spNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('spFrame'));
+  }
+  function paint(s){
+    layout();
+    el('spRef').textContent=s.ref;classes('spRef','v '+s.refC);
+    el('spState').textContent=s.state[0];classes('spState','gop '+s.state[1]);
+    classes('spConn','gcard ik '+s.connC);
+    classes('spTab','gcard gr '+s.tabC);
+    el('spCbr').textContent=s.cb[0];classes('spCbr','gop '+s.cb[1]);
+    classes('spCb','gcard bl '+s.cbC);
+    el('spChTie').textContent=s.ch[0];classes('spChTie','gop '+s.ch[1]);
+    el('spChr').textContent=s.chr[0];classes('spChr','gop '+s.chr[1]);
+    classes('spCh','gcard am '+s.chC);
+    classes('spNote','snote '+s.noteC);el('spNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'sp',label:'shared / weak',sub:'tie_.lock() 保命',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 3 · 回调与析构顺序 ---------- */
+const seqScene=(()=>{
+  const code=[
+    '// 安全关闭顺序 (在所属 EventLoop 线程内)',
+    'void closeInLoop() {',
+    '  channel_->disableAll();          // ② 不再关注事件',
+    '  loop_->removeChannel(channel_);  // ③ epoll_ctl(DEL)',
+    '  conns_.erase(fd);                // ④ 连接表放手',
+    '}   // ⑤ 最后一个 shared_ptr 释放 -> 析构',
+    '    //    ~TcpConnection -> ~Socket -> close(fd)',
+    '// 反例: 先 close(fd) -> epoll 还挂着旧 data.ptr',
+    '// 跨线程: worker 只 queueInLoop, 不直接动连接'
+  ];
+  const wires=['wBad'];
+  const colors={wBad:'danger'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 关闭不是一句 close(fd)',chip:'全景',chipC:'c0',lines:[0],w:[],rows:['active','off','off','off','off','off'],ep:['Channel(fd=7) 已注册','warn'],tab:['conns[7] · use_count=1','active'],k:['fd 7 打开','active'],note:'四件事必须按序：事件注销 → 表移除 → 对象析构 → fd 关闭。顺序错了就是悬空指针或重复关闭。',noteC:''},
+    {title:'步骤 1 · 反例：直接 close(fd)，不删 epoll',chip:'经典事故',chipC:'cd',lines:[7],w:['wBad'],rows:['active','off','off','off','off','off'],ep:['epoll 仍挂着旧 data.ptr !','bad'],tab:['conns[7] 还留着','warn'],k:['fd 7 已关闭（又被复用!）','bad'],note:'旧事件可能命中已析构对象；复用的新 fd 还会撞进旧 Channel——"先 close"是最经典的顺序错误。',noteC:'danger'},
+    {title:'步骤 2 · ① 回到所属 EventLoop 线程',chip:'所属线程',chipC:'cb',lines:[8],w:[],rows:['done','active','off','off','off','off'],ep:['Channel(fd=7) 已注册','warn'],tab:['conns[7] · use_count=1','active'],k:['fd 7 打开','active'],note:'worker 想关连接只 queueInLoop，eventfd 唤醒所属 loop——其他线程只投递任务，绝不直接改连接状态。',noteC:'blue'},
+    {title:'步骤 3 · ②③ disableAll + 从 epoll 移除',chip:'事件注销',chipC:'cb',lines:[2,3],w:[],rows:['done','done','done','active','off','off'],ep:['Channel 已移除 ✓','done'],tab:['conns[7] · use_count=1','active'],k:['fd 7 打开','active'],note:'此后 epoll_wait 不会再返回这个 fd 的事件——悬空指针的源头被掐断。这一步必须发生在 close 之前。',noteC:'blue'},
+    {title:'步骤 4 · ④ 连接表 erase：表放手',chip:'释放引用',chipC:'ca',lines:[4],w:[],rows:['done','done','done','done','active','off'],ep:['Channel 已移除 ✓','done'],tab:['erase 完成 · use_count 1→0…','warn'],k:['fd 7 打开','active'],note:'若某个回调的 guard 还持着 shared_ptr，对象暂不析构、fd 暂不关闭——这正是场景②里 lock 提升的意义。',noteC:'amber'},
+    {title:'步骤 5 · ⑤ 引用归零：析构链 → close(fd)',chip:'RAII 收尾',chipC:'cg',lines:[5,6],w:[],rows:['done','done','done','done','done','done'],ep:['Channel 已移除 ✓','done'],tab:['已清空','done'],k:['fd 7 已关闭 ✓','done'],note:'~TcpConnection → ~Socket/UniqueFd → close(fd)。析构只释放资源——业务通知早在关闭流程中完成，不塞进析构函数。',noteC:'green'},
+    {title:'步骤 6 · 收口：每一步都有它防的事故',chip:'铁律',chipC:'cg',lines:[2,3,4,5,6],w:[],rows:['done','done','done','done','done','done'],ep:['先注销 → 防旧事件命中','done'],tab:['再移除 → 允许析构','done'],k:['最后 RAII 关 fd → 不泄漏','done'],note:'事件注销防悬空、表移除放引用、RAII 收尾保证所有路径释放——顺序即安全。',noteC:'green'}
+  ];
+  const rowTexts=['⓪ 检测到关闭 / 错误','① queueInLoop 回所属线程','② disableAll() 禁用事件','③ epoll_ctl(DEL) 移除 Channel','④ 连接表 erase(shared_ptr)','⑤ 引用归零析构 → close(fd)'];
+  function layout(){
+    fitStage('sqStage');
+    const stage=el('sqStage'),svg=el('sqSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const ep=relRect(sr,'sqEp'),k=relRect(sr,'sqK');
+    bezierArrow('wBad',point(k,'right',-10),point(ep,'right',10));
+  }
+  function mount(){
+    const rowsHtml=rowTexts.map((t,i)=>'<div class="gop off" id="sqR'+i+'">'+t+'</div>').join('');
+    const html='<div class="vcap"><b>回调与析构顺序</b>：事件注销 → 表移除 → 对象析构 → fd 关闭</div>'+stageFrame('sq','seq-stage',
+      '<div class="gcard ik" id="sqSeq" style="left:16px;top:16px;width:280px;min-height:308px;"><div class="ghead">安全关闭顺序 <span>closeInLoop</span></div>'+rowsHtml+'</div>'+
+      '<div class="gcard am" id="sqEp" style="left:326px;top:16px;width:290px;min-height:84px;"><div class="ghead">epoll <span>事件源</span></div><div class="gop" id="sqEpr">Channel(fd=7) 已注册</div></div>'+
+      '<div class="gcard gr" id="sqTab" style="left:326px;top:120px;width:290px;min-height:84px;"><div class="ghead">连接表 <span>拥有者</span></div><div class="gop" id="sqTabr">conns[7] · use_count=1</div></div>'+
+      '<div class="gcard bl" id="sqK" style="left:326px;top:224px;width:290px;min-height:84px;"><div class="ghead">内核 <span>fd 资源</span></div><div class="gop" id="sqKr">fd 7 打开</div></div>'+
+      '<svg class="arr-layer" id="sqSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="sqNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('sqFrame'));
+  }
+  function paint(s){
+    layout();
+    setOps('sqR',s.rows);
+    el('sqEpr').textContent=s.ep[0];classes('sqEpr','gop '+s.ep[1]);
+    el('sqTabr').textContent=s.tab[0];classes('sqTabr','gop '+s.tab[1]);
+    el('sqKr').textContent=s.k[0];classes('sqKr','gop '+s.k[1]);
+    classes('sqNote','snote '+s.noteC);el('sqNote').textContent=s.note;
+    controller.sync(s.w,false);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'seq',label:'析构顺序',sub:'安全关闭六步',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- 步进引擎 ---------- */
+const SCENES=[ownScene,spScene,seqScene];
+const tabsBox=el('tabs');
+const stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc');
+const codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots');
+const btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{
+  const tab=document.createElement('button');
+  tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';
+  tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);
+});
+
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();
+  sceneIndex=index;stepIndex=0;
+  [...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));
+  const scene=SCENES[sceneIndex];
+  scene.mount();
+  codeBox.innerHTML=codePanel(scene.code);
+  dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,index)=>{
+    const dot=document.createElement('button');
+    dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);
+    dot.addEventListener('click',()=>{stop();go(index);});dotsBox.appendChild(dot);dotEls.push(dot);
+  });
+  go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;
+  stepIndex=Math.max(0,Math.min(steps.length-1,index));
+  const step=steps[stepIndex];
+  SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.classList.toggle('hl',Boolean(step.lines&&step.lines.includes(i))));
+  stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;
+  stDesc.textContent=step.desc||step.note||'从初始状态开始，观察所有权与生命周期如何一步步移交。';
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});
+  readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}
+  if(stepIndex===steps.length-1)stop();
+}
+function play(){
+  const steps=SCENES[sceneIndex].steps;
+  if(stepIndex===steps.length-1)go(0);
+  btnPlay.textContent='暂停';
+  timer=setInterval(()=>{stepIndex<steps.length-1?go(stepIndex+1):stop();},2700);
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());
+btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});
+btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{
+  if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}
+});
+const hashScene=location.hash.match(/scene=(\w+)/);const hashStep=location.hash.match(/step=(\d+)/);
+let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}
+switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

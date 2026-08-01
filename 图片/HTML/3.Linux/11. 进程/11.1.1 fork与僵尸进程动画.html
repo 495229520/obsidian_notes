@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fork 与僵尸进程动画 · fork 分叉 · 僵尸态 · wait / SIGCHLD 回收</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+
+/* ===== fork 分叉 ===== */
+.fk-stage{position:relative;width:578px;height:340px;margin:2px auto 0;}
+.fk-proc{position:absolute;width:210px;height:168px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);transition:left var(--dur) var(--ease),top var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.fk-proc.parent{border-color:var(--blue);}
+.fk-proc.child{border-color:var(--green);}
+.fk-proc.glow{box-shadow:0 0 0 3px rgba(24,95,165,.22);}
+.fk-proc.glow-g{box-shadow:0 0 0 3px rgba(15,110,86,.22);}
+.fk-ph{position:absolute;top:10px;left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;}
+.fk-name{font-size:13px;font-weight:700;}
+.fk-pid{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;border:1.5px solid;}
+.fk-pid.p{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.fk-pid.c{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.fk-vars{position:absolute;left:12px;right:12px;top:44px;display:flex;flex-direction:column;gap:6px;}
+.fk-row{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:11.5px;padding:5px 8px;border-radius:7px;background:var(--gray);border:1px solid var(--grid);transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);}
+.fk-row.chg{background:var(--brownbg);border-color:var(--brown);color:var(--brown);font-weight:700;}
+.fk-ret{position:absolute;left:12px;right:12px;bottom:12px;text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;padding:6px 8px;border-radius:8px;border:1.5px solid var(--line);background:var(--gray);color:var(--muted);transition:all var(--dur) var(--ease);}
+.fk-ret.on-p{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.fk-ret.on-c{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.fk-arrow{position:absolute;top:118px;left:248px;width:82px;height:0;border-top:2px dashed var(--brown);opacity:0;transition:opacity var(--dur) var(--ease);}
+.fk-arrow::after{content:'';position:absolute;right:-1px;top:-5px;border:5px solid transparent;border-left:8px solid var(--brown);}
+.fk-arrow.show{opacity:1;}
+.fk-lbl{position:absolute;top:96px;left:248px;width:82px;text-align:center;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--brown);opacity:0;transition:opacity var(--dur) var(--ease);}
+.fk-lbl.show{opacity:1;}
+.fk-note{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:9px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);opacity:0;transition:opacity var(--dur) var(--ease);}
+.fk-note.show{opacity:1;}
+.fk-note.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.fk-note.warn{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+
+/* ===== 僵尸进程 ===== */
+.zb-stage{position:relative;width:578px;height:340px;margin:2px auto 0;}
+.zb-lane{position:absolute;left:0;right:0;height:96px;border:1.5px solid var(--grid);border-radius:11px;background:var(--paper);}
+.zb-lane.p{top:18px;}
+.zb-lane.c{top:140px;}
+.zb-tag{position:absolute;left:12px;top:10px;font-size:11px;font-weight:700;color:var(--muted);}
+.zb-card{position:absolute;top:34px;height:48px;min-width:96px;padding:0 12px;border-radius:9px;border:1.5px solid var(--line);background:var(--gray);display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--mono);font-size:11.5px;font-weight:700;transition:left var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.zb-card.p{color:var(--blue);border-color:var(--blue);background:var(--bluebg);left:28px;}
+.zb-card.c{color:var(--green);border-color:var(--green);background:var(--greenbg);left:28px;}
+.zb-card.z{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.zb-card.gone{opacity:0;transform:scale(.7);}
+.zb-badge{font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid currentColor;}
+.zb-pipe{position:absolute;left:180px;top:114px;width:2px;height:26px;background:var(--line);opacity:0;transition:opacity var(--dur) var(--ease);}
+.zb-pipe.show{opacity:1;}
+.zb-sig{position:absolute;left:196px;top:108px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brown);background:var(--brownbg);border:1.5px solid var(--brown);border-radius:7px;padding:3px 9px;opacity:0;transform:translateY(8px);transition:all var(--dur) var(--ease);}
+.zb-sig.show{opacity:1;transform:translateY(0);}
+.zb-table{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.zb-cell{border:1.5px solid var(--grid);border-radius:9px;padding:8px 10px;background:var(--paper);opacity:.35;transition:all var(--dur) var(--ease);}
+.zb-cell.lit{opacity:1;border-color:var(--ink);box-shadow:0 2px 8px rgba(60,55,40,.08);}
+.zb-cell.bad{border-color:var(--danger);background:var(--dangerbg);}
+.zb-cell.ok{border-color:var(--green);background:var(--greenbg);}
+.zb-cell b{display:block;font-size:12px;color:var(--ink);margin-bottom:2px;}
+.zb-cell span{font-size:11px;color:var(--muted);}
+
+/* ===== wait / SIGCHLD ===== */
+.wt-stage{position:relative;width:578px;height:340px;margin:2px auto 0;}
+.wt-mode{position:absolute;top:0;left:0;right:0;display:flex;gap:8px;}
+.wt-m{flex:1;text-align:center;font-size:11.5px;font-weight:700;padding:7px 8px;border-radius:9px;border:1.5px solid var(--grid);background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);}
+.wt-m.on{color:var(--ink);border-color:var(--ink);background:var(--gray);}
+.wt-m.hi{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.wt-timeline{position:absolute;left:20px;right:20px;top:72px;height:2px;background:var(--line);}
+.wt-tick{position:absolute;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--line);border:2px solid var(--panel);transition:background var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.wt-tick.on{background:var(--blue);transform:scale(1.25);}
+.wt-tick.done{background:var(--green);}
+.wt-row{position:absolute;left:0;right:0;height:54px;}
+.wt-row.p{top:96px;}
+.wt-row.c{top:168px;}
+.wt-lab{position:absolute;left:0;top:16px;width:64px;font-size:11px;font-weight:700;color:var(--muted);}
+.wt-bar{position:absolute;top:14px;height:26px;border-radius:7px;font-family:var(--mono);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 10px;white-space:nowrap;transition:left var(--dur) var(--ease),width var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease),opacity var(--dur) var(--ease),color var(--dur) var(--ease);border:1.5px solid;}
+.wt-bar.work{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.wt-bar.block{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.wt-bar.run{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.wt-bar.zomb{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.wt-bar.reap{color:var(--ink);border-color:var(--ink);background:var(--gray);}
+.wt-msg{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease);}
+.wt-msg.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.wt-msg.warn{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.wt-msg.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .hb{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>fork 与僵尸进程动画 · 分叉 · 僵尸态 · wait / SIGCHLD</h1>
+    <p>配套笔记《11.1 进程简介》《11.7 僵尸进程》 · fork 返回值、独立地址空间、Z 态占 PID、三种回收路径　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+
+/* ========== 场景 1：fork 分叉 ========== */
+const forkScene=(()=>{
+  const code=codeOf([
+    '<span class="kw">int</span> gval = 10, lval = 30;',
+    'pid_t pid = <span class="kw">fork</span>();',
+    '<span class="cmt">// 父: pid = 子 PID (&gt;0)</span>',
+    '<span class="cmt">// 子: pid = 0</span>',
+    '<span class="kw">if</span> (pid == 0) { gval++; lval++; }',
+    '<span class="kw">else</span> { gval--; lval--; }',
+    'printf("gval=%d lval=%d\\n", gval, lval);',
+  ]);
+  const steps=[
+    {title:'步骤 0 · 父进程准备调用 fork',chip:'单进程',chipC:'c0',lines:[0],
+     parent:{x:184,y:40,op:1,g:10,l:30,ret:'尚未 fork',retC:'',glow:1},
+     child:{x:184,y:40,op:0,g:10,l:30,ret:'',retC:'',glow:0},
+     arrow:0,note:'一个进程 · PID 1000',noteC:'',
+     desc:'调用 <code>fork()</code> 前只有<span class="bl">父进程</span>。全局 <code>gval=10</code>、局部 <code>lval=30</code> 都在它的地址空间里。'},
+    {title:'步骤 1 · fork() 复制进程',chip:'分叉',chipC:'ch',lines:[1],
+     parent:{x:40,y:40,op:1,g:10,l:30,ret:'fork 中…',retC:'',glow:1},
+     child:{x:328,y:40,op:1,g:10,l:30,ret:'fork 中…',retC:'',glow:1},
+     arrow:1,note:'内核复制地址空间 · COW 延迟真正拷贝',noteC:'warn',
+     desc:'内核创建<span class="gr">子进程</span>：复制页表、打开的 fd、程序计数器。现代 Linux 用 <b>COW</b>——写时才真正拷贝物理页。'},
+    {title:'步骤 2 · 返回值分叉',chip:'pid 语义',chipC:'cb',lines:[2,3],
+     parent:{x:40,y:40,op:1,g:10,l:30,ret:'return = 2001 (子 PID)',retC:'on-p',glow:1},
+     child:{x:328,y:40,op:1,g:10,l:30,ret:'return = 0',retC:'on-c',glow:1},
+     arrow:1,note:'同一调用，两个返回值',noteC:'ok',
+     desc:'<b>父进程</b>拿到子 PID（&gt;0），<b>子进程</b>拿到 0。靠这个返回值分支走不同逻辑——不是两个不同的函数调用。'},
+    {title:'步骤 3 · 子进程改自己的副本',chip:'独立内存',chipC:'cg',lines:[4],
+     parent:{x:40,y:40,op:1,g:10,l:30,ret:'return = 2001',retC:'on-p',glow:0},
+     child:{x:328,y:40,op:1,g:12,l:31,ret:'return = 0',retC:'on-c',glow:1},
+     arrow:0,note:'子: gval=12, lval=31',noteC:'ok',
+     desc:'子进程 <code>gval++</code> / <code>lval++</code>，只改<span class="gr">自己的副本</span>。父进程变量仍是 10 / 30——地址空间已独立。'},
+    {title:'步骤 4 · 父进程改自己的副本',chip:'互不影响',chipC:'cb',lines:[5],
+     parent:{x:40,y:40,op:1,g:9,l:29,ret:'return = 2001',retC:'on-p',glow:1},
+     child:{x:328,y:40,op:1,g:12,l:31,ret:'return = 0',retC:'on-c',glow:0},
+     arrow:0,note:'父: gval=9, lval=29 · 子不变',noteC:'ok',
+     desc:'父进程 <code>gval--</code> / <code>lval--</code>，结果 9 / 29。父子打印互不影响——这是「进程是资源分配单位」的直接证据。'},
+    {title:'步骤 5 · 收口：fork 三要点',chip:'汇总',chipC:'cg',lines:[6],
+     parent:{x:40,y:40,op:1,g:9,l:29,ret:'父: 9 / 29',retC:'on-p',glow:0},
+     child:{x:328,y:40,op:1,g:12,l:31,ret:'子: 12 / 31',retC:'on-c',glow:0},
+     arrow:0,note:'复制 · 返回值分叉 · 独立地址空间',noteC:'ok',
+     desc:'① <b>复制</b>而非加载新程序；② <b>返回值</b>区分父子；③ 之后内存<span class="bl">完全独立</span>。子退出后父必须 <code>wait</code>，否则变僵尸（下一场景）。'},
+  ];
+  function mount(){
+    let h='<div class="fk-stage">';
+    h+='<div class="fk-proc parent" id="fkP"><div class="fk-ph"><span class="fk-name">父进程</span><span class="fk-pid p" id="fkPpid">PID 1000</span></div>';
+    h+='<div class="fk-vars"><div class="fk-row" id="fkPg">gval <b id="fkPgv">10</b></div><div class="fk-row" id="fkPl">lval <b id="fkPlv">30</b></div></div>';
+    h+='<div class="fk-ret" id="fkPret">尚未 fork</div></div>';
+    h+='<div class="fk-arrow" id="fkArr"></div><div class="fk-lbl" id="fkLbl">fork()</div>';
+    h+='<div class="fk-proc child" id="fkC"><div class="fk-ph"><span class="fk-name">子进程</span><span class="fk-pid c" id="fkCpid">PID 2001</span></div>';
+    h+='<div class="fk-vars"><div class="fk-row" id="fkCg">gval <b id="fkCgv">10</b></div><div class="fk-row" id="fkCl">lval <b id="fkClv">30</b></div></div>';
+    h+='<div class="fk-ret" id="fkCret">—</div></div>';
+    h+='<div class="fk-note" id="fkNote"></div></div>';
+    viz.innerHTML='<div class="vcap"><b>fork() 分叉</b>：一次调用 → 两个进程 · 返回值不同 · 内存独立</div>'+h;
+  }
+  function paint(s){
+    const p=el('fkP'),c=el('fkC');
+    p.style.left=s.parent.x+'px';p.style.top=s.parent.y+'px';p.style.opacity=s.parent.op;
+    c.style.left=s.child.x+'px';c.style.top=s.child.y+'px';c.style.opacity=s.child.op;
+    p.className='fk-proc parent'+(s.parent.glow?' glow':'');
+    c.className='fk-proc child'+(s.child.glow?' glow-g':'');
+    el('fkPgv').textContent=s.parent.g;el('fkPlv').textContent=s.parent.l;
+    el('fkCgv').textContent=s.child.g;el('fkClv').textContent=s.child.l;
+    el('fkPg').classList.toggle('chg',s.parent.g!==10);
+    el('fkPl').classList.toggle('chg',s.parent.l!==30);
+    el('fkCg').classList.toggle('chg',s.child.g!==10);
+    el('fkCl').classList.toggle('chg',s.child.l!==30);
+    el('fkPret').textContent=s.parent.ret;el('fkPret').className='fk-ret '+s.parent.retC;
+    el('fkCret').textContent=s.child.ret||'—';el('fkCret').className='fk-ret '+s.child.retC;
+    el('fkArr').classList.toggle('show',!!s.arrow);
+    el('fkLbl').classList.toggle('show',!!s.arrow);
+    const n=el('fkNote');n.textContent=s.note;n.className='fk-note show'+(s.noteC?' '+s.noteC:'');
+  }
+  return {id:'fork',label:'fork 分叉',sub:'返回值 · 独立内存',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：僵尸进程 ========== */
+const zombieScene=(()=>{
+  const code=codeOf([
+    'pid_t pid = <span class="kw">fork</span>();',
+    '<span class="kw">if</span> (pid == 0) {',
+    '  sleep(2);',
+    '  <span class="kw">exit</span>(10);  <span class="cmt">// 子退出</span>',
+    '}',
+    '<span class="cmt">// 父不 wait → 子变僵尸</span>',
+    'sleep(30);  <span class="cmt">// 父还在忙</span>',
+  ]);
+  const steps=[
+    {title:'步骤 0 · 父子都在运行',chip:'Running',chipC:'cg',lines:[0,1],
+     pTxt:'父 PID 1000 · Running',pCls:'p',pLeft:28,pOp:1,
+     cTxt:'子 PID 2001 · Running',cCls:'c',cLeft:28,cOp:1,
+     pipe:0,sig:0,cells:[1,0,0],
+     desc:'父进程 <code>fork()</code> 出子进程后，双方都在运行。父持有子 PID，但还没调用 <code>wait</code>。'},
+    {title:'步骤 1 · 子进程 exit() 终止',chip:'终止',chipC:'ch',lines:[2,3],
+     pTxt:'父 PID 1000 · Running',pCls:'p',pLeft:28,pOp:1,
+     cTxt:'子 · exit(10)',cCls:'c',cLeft:200,cOp:1,
+     pipe:0,sig:0,cells:[1,0,0],
+     desc:'子进程 <code>exit(10)</code>。用户态代码结束，但内核还要保留一份「遗书」给父进程读。'},
+    {title:'步骤 2 · 进入僵尸态 Z',chip:'Zombie',chipC:'cd',lines:[3,5],
+     pTxt:'父 PID 1000 · 未 wait',pCls:'p',pLeft:28,pOp:1,
+     cTxt:'&lt;defunct&gt; Z',cCls:'z',cLeft:360,cOp:1,
+     pipe:1,sig:1,cells:[1,1,0],
+     desc:'子进入<span class="dg">僵尸态 (Z)</span>：不占 CPU/内存，但占 <b>PID + 退出码</b>。内核向父发 <code>SIGCHLD</code>——若父忽略且不 wait，Z 一直挂着。'},
+    {title:'步骤 3 · 危害：PID 被占住',chip:'资源泄漏',chipC:'cd',lines:[5,6],
+     pTxt:'父还在 sleep',pCls:'p',pLeft:28,pOp:1,
+     cTxt:'Z 占 PID 2001',cCls:'z',cLeft:360,cOp:1,
+     pipe:1,sig:1,cells:[0,1,0],
+     desc:'僵尸几乎不耗内存，但<span class="dg">PID 有限</span>。服务器若每请求 fork 却不回收，PID 表会被僵尸填满，无法再创建进程。'},
+    {title:'步骤 4 · 父调用 wait 回收',chip:'收尸',chipC:'cg',lines:[],
+     pTxt:'父 · wait(&status)',pCls:'p',pLeft:180,pOp:1,
+     cTxt:'彻底消失',cCls:'z gone',cLeft:360,cOp:0,
+     pipe:0,sig:0,cells:[0,0,1],
+     desc:'父调用 <code>wait(&status)</code> 读出退出码 10，内核释放进程描述符。Z 态消失——「收尸」完成。'},
+    {title:'步骤 5 · 状态机收口',chip:'汇总',chipC:'cg',lines:[],
+     pTxt:'父继续运行',pCls:'p',pLeft:28,pOp:1,
+     cTxt:'已回收',cCls:'c gone',cLeft:360,cOp:0,
+     pipe:0,sig:0,cells:[1,1,1],
+     desc:'<b>运行 → 终止 → 僵尸 → wait 后消失</b>。没有 wait 就停在僵尸。下一场景对比三种回收策略。'},
+  ];
+  function mount(){
+    let h='<div class="zb-stage">';
+    h+='<div class="zb-lane p"><span class="zb-tag">父进程时间线</span><div class="zb-card p" id="zbP">父</div></div>';
+    h+='<div class="zb-pipe" id="zbPipe"></div><div class="zb-sig" id="zbSig">SIGCHLD</div>';
+    h+='<div class="zb-lane c"><span class="zb-tag">子进程时间线</span><div class="zb-card c" id="zbC">子</div></div>';
+    h+='<div class="zb-table">';
+    h+='<div class="zb-cell" id="zbT0"><b>运行态</b><span>父子都在执行</span></div>';
+    h+='<div class="zb-cell bad" id="zbT1"><b>僵尸态 Z</b><span>占 PID · 等 wait</span></div>';
+    h+='<div class="zb-cell ok" id="zbT2"><b>彻底消失</b><span>wait 回收描述符</span></div>';
+    h+='</div></div>';
+    viz.innerHTML='<div class="vcap"><b>僵尸进程</b>：exit 后不立刻消失 · 等父 wait 读退出码</div>'+h;
+  }
+  function paint(s){
+    const p=el('zbP'),c=el('zbC');
+    p.textContent=s.pTxt;p.className='zb-card '+s.pCls;p.style.left=s.pLeft+'px';p.style.opacity=s.pOp;
+    c.innerHTML=s.cTxt;c.className='zb-card '+s.cCls;c.style.left=s.cLeft+'px';c.style.opacity=s.cOp;
+    el('zbPipe').classList.toggle('show',!!s.pipe);
+    el('zbSig').classList.toggle('show',!!s.sig);
+    for(let i=0;i<3;i++)el('zbT'+i).classList.toggle('lit',!!s.cells[i]);
+  }
+  return {id:'zombie',label:'僵尸进程',sub:'Z 态 · 占 PID',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：wait / SIGCHLD 回收 ========== */
+const waitScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// A. 阻塞 wait</span>',
+    'wait(&status);',
+    '<span class="cmt">// B. 非阻塞轮询</span>',
+    'waitpid(-1, &st, WNOHANG);',
+    '<span class="cmt">// C. 信号驱动</span>',
+    'signal(SIGCHLD, handler);',
+    '<span class="cmt">// handler 内 while(waitpid(...WNOHANG)&gt;0);</span>',
+  ]);
+  const steps=[
+    {title:'步骤 0 · 三种回收策略总览',chip:'对比',chipC:'c0',lines:[0,2,4],
+     modes:[1,1,1],ticks:[1,0,0,0,0],
+     p:{cls:'work',left:80,w:120,txt:'fork 后'},
+     c:{cls:'run',left:80,w:100,txt:'子运行'},
+     msg:'阻塞 wait · WNOHANG 轮询 · SIGCHLD 事件驱动',msgC:'',
+     desc:'父要回收子，有三条路：<b>阻塞 wait</b>（简单但停主业务）、<b>WNOHANG 轮询</b>（overlap）、<b>SIGCHLD handler</b>（事件驱动）。'},
+    {title:'步骤 1 · A：阻塞 wait 卡住父进程',chip:'阻塞',chipC:'ch',lines:[1],
+     modes:[1,0,0],ticks:[1,1,0,0,0],
+     p:{cls:'block',left:80,w:280,txt:'wait() 阻塞中…'},
+     c:{cls:'run',left:80,w:180,txt:'子还在 sleep'},
+     msg:'父停在 wait · 无法处理新请求',msgC:'warn',
+     desc:'<code>wait()</code> 在没有已终止子进程时会<span class="hb">阻塞</span>。父进程整条业务线停住——简单程序 OK，服务器不行。'},
+    {title:'步骤 2 · 子退出后 wait 立刻返回',chip:'回收完成',chipC:'cg',lines:[1],
+     modes:[1,0,0],ticks:[1,1,1,0,0],
+     p:{cls:'reap',left:300,w:140,txt:'wait 返回 PID'},
+     c:{cls:'zomb',left:280,w:100,txt:'Z → 消失'},
+     msg:'拿到退出码 · 描述符释放',msgC:'ok',
+     desc:'子一退出，阻塞的 <code>wait</code> 立刻返回子 PID，并用 <code>WEXITSTATUS</code> 读退出码。僵尸被清掉。'},
+    {title:'步骤 3 · B：WNOHANG 轮询式 overlap',chip:'非阻塞',chipC:'cb',lines:[3],
+     modes:[0,1,0],ticks:[1,1,1,1,0],
+     p:{cls:'work',left:80,w:200,txt:'主循环 + WNOHANG'},
+     c:{cls:'run',left:80,w:160,txt:'子并行干活'},
+     msg:'return 0 → 继续工作 · &gt;0 → 立刻收尸',msgC:'ok',
+     desc:'<code>waitpid(-1,&st,WNOHANG)</code>：没人退出返回 0，父继续 <code>handle_work()</code>；有人退出返回 PID 立刻回收。<span class="bl">overlap</span>：等与做重叠。'},
+    {title:'步骤 4 · C：SIGCHLD 事件驱动',chip:'信号',chipC:'cg',lines:[5,6],
+     modes:[0,0,1],ticks:[1,1,1,1,1],
+     p:{cls:'work',left:80,w:240,txt:'accept / epoll_wait'},
+     c:{cls:'zomb',left:300,w:120,txt:'exit → SIGCHLD'},
+     msg:'handler 里 while(waitpid WNOHANG) 扫光',msgC:'ok',
+     desc:'子退出 → 内核发 <code>SIGCHLD</code> → handler 里 <code>while(waitpid(-1,&st,WNOHANG)&gt;0)</code> 扫光可能同时死掉的多个子。父可阻塞在主循环。'},
+    {title:'步骤 5 · 选型收口',chip:'汇总',chipC:'cg',lines:[0,2,4],
+     modes:[1,1,1],ticks:[1,1,1,1,1],
+     p:{cls:'work',left:80,w:160,txt:'按场景选型'},
+     c:{cls:'reap',left:280,w:140,txt:'绝不留僵尸'},
+     msg:'玩具用 wait · 服务器用 WNOHANG / SIGCHLD',msgC:'ok',
+     desc:'<b>wait</b>：同步脚本；<b>WNOHANG</b>：主循环里顺手扫；<b>SIGCHLD</b>：高并发服务器标配。无论哪条，目标都是——<span class="dg">不留僵尸</span>。'},
+  ];
+  function mount(){
+    let h='<div class="wt-stage">';
+    h+='<div class="wt-mode"><div class="wt-m" id="wtM0">A · wait 阻塞</div><div class="wt-m" id="wtM1">B · WNOHANG</div><div class="wt-m" id="wtM2">C · SIGCHLD</div></div>';
+    h+='<div class="wt-timeline">';
+    for(let i=0;i<5;i++)h+='<div class="wt-tick" id="wtT'+i+'" style="left:'+(8+i*22)+'%"></div>';
+    h+='</div>';
+    h+='<div class="wt-row p"><span class="wt-lab">父</span><div class="wt-bar work" id="wtP">—</div></div>';
+    h+='<div class="wt-row c"><span class="wt-lab">子</span><div class="wt-bar run" id="wtC">—</div></div>';
+    h+='<div class="wt-msg" id="wtMsg"></div></div>';
+    viz.innerHTML='<div class="vcap"><b>三种回收路径</b>：阻塞 · 轮询 overlap · 信号驱动</div>'+h;
+  }
+  function paint(s){
+    for(let i=0;i<3;i++){
+      const m=el('wtM'+i);
+      m.className='wt-m'+(s.modes[i]?' on':'')+(s.modes[i]&&s.modes.filter(Boolean).length===1?' hi':'');
+    }
+    for(let i=0;i<5;i++){
+      const t=el('wtT'+i);
+      t.className='wt-tick'+(s.ticks[i]?(i===s.ticks.lastIndexOf(1)?' on':' done'):'');
+    }
+    const p=el('wtP'),c=el('wtC');
+    p.className='wt-bar '+s.p.cls;p.style.left=s.p.left+'px';p.style.width=s.p.w+'px';p.textContent=s.p.txt;
+    c.className='wt-bar '+s.c.cls;c.style.left=s.c.left+'px';c.style.width=s.c.w+'px';c.textContent=s.c.txt;
+    const msg=el('wtMsg');msg.textContent=s.msg;msg.className='wt-msg'+(s.msgC?' '+s.msgC:'');
+  }
+  return {id:'wait',label:'wait / SIGCHLD',sub:'三种回收路径',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[forkScene,zombieScene,waitScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2600;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

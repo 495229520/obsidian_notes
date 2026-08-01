@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrN" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>线上排障的三层：状态层、队列窗口层、报文层</title>
+  <desc>按代价从低到高排列的三层排查方法：先看连接状态分布，再看队列与拥塞窗口指标，最后才抓包定论，以及四种常见现象各自从哪一层入手。</desc>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">线上排障的三层：先看状态，再看队列，最后才抓包</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">代价从低到高。前两层几秒钟就能跑完，能圈定方向；抓包最贵，留到需要定论的时候</text>
+
+  <rect x="48" y="104" width="1144" height="406" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="312" y="146" font-size="11.5" font-weight="700" fill="#6B675C">看什么</text>
+  <text x="762" y="146" font-size="11.5" font-weight="700" fill="#6B675C">能得出什么</text>
+
+  <!-- band 1 -->
+  <rect x="72" y="156" width="200" height="90" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="172" y="190" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">① 状态层</text>
+  <text x="172" y="212" font-size="10.5" fill="#24473F" text-anchor="middle">ss -tan、ss -s</text>
+  <text x="172" y="230" font-size="9.5" fill="#8A8578" text-anchor="middle">秒级，最先跑</text>
+  <text x="312" y="186" font-size="10.5" fill="#4A473F">各个状态的连接数分布</text>
+  <text x="312" y="208" font-size="10.5" fill="#4A473F">TIME_WAIT / CLOSE_WAIT / SYN_RECV 有没有异常堆积</text>
+  <text x="312" y="230" font-size="10.5" fill="#4A473F">总连接数有没有贴着 fd 上限</text>
+  <text x="762" y="186" font-size="10.5" fill="#4A473F">CLOSE_WAIT 多 → 本机应用没 close</text>
+  <text x="762" y="208" font-size="10.5" fill="#4A473F">TIME_WAIT 多 → 本机在主动关闭</text>
+  <text x="762" y="230" font-size="10.5" fill="#4A473F">SYN_RECV 多 → 握手完不成，或被 SYN flood</text>
+
+  <line x1="172" y1="246" x2="172" y2="262" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrN)"/>
+
+  <!-- band 2 -->
+  <rect x="72" y="266" width="200" height="90" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="172" y="300" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">② 队列与窗口层</text>
+  <text x="172" y="322" font-size="10.5" fill="#6B4E28" text-anchor="middle">ss -ti、ss -lnt、nstat</text>
+  <text x="172" y="340" font-size="9.5" fill="#8A8578" text-anchor="middle">仍然不用抓包</text>
+  <text x="312" y="296" font-size="10.5" fill="#4A473F">Send-Q / Recv-Q 是不是持续不降</text>
+  <text x="312" y="318" font-size="10.5" fill="#4A473F">cwnd、ssthresh、rtt、retrans 这几个数</text>
+  <text x="312" y="340" font-size="10.5" fill="#4A473F">监听行的 Recv-Q（全连接队列积压）</text>
+  <text x="762" y="296" font-size="10.5" fill="#4A473F">Send-Q 不降 → 对端收不动，或者网络堵</text>
+  <text x="762" y="318" font-size="10.5" fill="#4A473F">Recv-Q 不降 → 本端应用自己读得太慢</text>
+  <text x="762" y="340" font-size="10.5" fill="#4A473F">retrans 在涨 → 链路真的在丢包，别怪应用</text>
+
+  <line x1="172" y1="356" x2="172" y2="372" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrN)"/>
+
+  <!-- band 3 -->
+  <rect x="72" y="376" width="200" height="90" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="172" y="410" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">③ 报文层</text>
+  <text x="172" y="432" font-size="10.5" fill="#733428" text-anchor="middle">tcpdump + Wireshark</text>
+  <text x="172" y="450" font-size="9.5" fill="#8A8578" text-anchor="middle">最贵，放最后</text>
+  <text x="312" y="406" font-size="10.5" fill="#4A473F">谁先发的 FIN，RST 是从哪一端来的</text>
+  <text x="312" y="428" font-size="10.5" fill="#4A473F">有没有重传，有没有出现零窗口通告</text>
+  <text x="312" y="450" font-size="10.5" fill="#4A473F">三次握手到底完成了没有</text>
+  <text x="762" y="406" font-size="10.5" font-weight="700" fill="#733428">定论性证据：包到底出没出去</text>
+  <text x="762" y="428" font-size="10.5" fill="#4A473F">前两层只给方向，这一层给结论</text>
+  <text x="762" y="450" font-size="10.5" fill="#4A473F">线上抓包要限量：加 -c、加过滤、写文件</text>
+
+  <text x="72" y="492" font-size="11" fill="#6B675C">顺序不能倒过来。先抓包再看状态，往往是抓了一堆包，回头发现 ss 第一行就能看出问题</text>
+
+  <!-- panel B -->
+  <text x="48" y="546" font-size="15" font-weight="700" fill="#4A473F">常见现象从哪一层入手</text>
+
+  <rect x="48" y="562" width="272" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="588" font-size="12" font-weight="700" fill="#4A473F">响应慢，但连接是通的</text>
+  <text x="68" y="610" font-size="10.5" fill="#6B675C">② 看 Send-Q 和 retrans</text>
+  <text x="68" y="628" font-size="9.5" fill="#8A8578">先分清是本端积压还是链路丢包</text>
+
+  <rect x="336" y="562" width="272" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="356" y="588" font-size="12" font-weight="700" fill="#4A473F">连不上 / 连上没反应</text>
+  <text x="356" y="610" font-size="10.5" fill="#6B675C">① 看状态，再对四道闸口</text>
+  <text x="356" y="628" font-size="9.5" fill="#8A8578">闸口对照见 8.13</text>
+
+  <rect x="624" y="562" width="272" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="644" y="588" font-size="12" font-weight="700" fill="#4A473F">连接莫名其妙就断了</text>
+  <text x="644" y="610" font-size="10.5" fill="#6B675C">③ 抓包看 RST 是谁发的</text>
+  <text x="644" y="628" font-size="9.5" fill="#8A8578">方向决定了该查哪一端</text>
+
+  <rect x="912" y="562" width="280" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="932" y="588" font-size="12" font-weight="700" fill="#4A473F">fd 数量只涨不降</text>
+  <text x="932" y="610" font-size="10.5" fill="#6B675C">① 看 CLOSE_WAIT 数量</text>
+  <text x="932" y="628" font-size="9.5" fill="#8A8578">堆着就是应用没 close，见 8.11</text>
+
+  <text x="48" y="676" font-size="11" fill="#6B675C">这三层的共同点是都在回答同一个问题：慢和断，到底是本机应用的问题、内核队列的问题，还是网络的问题</text>
+</svg>

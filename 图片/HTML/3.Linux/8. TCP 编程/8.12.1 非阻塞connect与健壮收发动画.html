@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E">
+<title>非阻塞connect与健壮收发动画</title>
+<!--
+Visual system: 22 / 17 / 15 / 13 / 11px type scale; warm paper #F5F4ED and panel #FBFBF6;
+blue = 本端应用/内核, amber = 握手/缓冲水位, green = 成功路径/放行, red = 失败/RST/破水位;
+all transitions share the 520ms cubic-bezier motion language.
+Engine: build-once + mutate（与 17.2.1 同一套步进引擎），#scene=xxx&step=n 深链。
+-->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;--gray:#F1EFE8;
+  --blue:#2467A6;--bluebg:#E1EFFA;--bluetx:#1A4F84;
+  --green:#087A5C;--greenbg:#DCF3E9;--greentx:#075A43;
+  --amber:#A66408;--amberbg:#FFF0D7;--ambertx:#764600;
+  --danger:#C34935;--dangerbg:#FAE1DC;--dangertx:#8F2B1C;
+  --code:#2E2C27;--codetext:#E8E3D6;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;line-height:1.3;text-wrap:balance;}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{min-height:48px;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.35);outline-offset:2px;}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1280px){.layout{grid-template-columns:minmax(0,1fr);}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;}.viz .vcap b{font-weight:700;color:var(--ink);}
+.stage-frame{position:relative;width:min(632px,100%);height:420px;margin:0 auto;}
+.stage{position:absolute;left:0;top:0;width:632px;height:420px;transform-origin:top left;}
+.layout > .right{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+#stDesc{font-size:14px;color:var(--muted);margin-top:11px;}.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{background:var(--code);border:1px solid #24231F;border-radius:10px;padding:12px 0;color:var(--codetext);font-family:var(--mono);font-size:13px;line-height:1.55;overflow:hidden;box-shadow:0 1px 3px rgba(60,55,40,.08);}
+.codebox .cl{min-height:24px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background .3s var(--ease),color .3s var(--ease),box-shadow .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}.codebox .cl.hl .cmt{color:#CCC8BA;}
+.codebox .kw{color:#D9B177;}.codebox .type{color:#8EB5DC;}.codebox .ord{color:#A7D7BF;}.codebox .num{color:#E0A797;}.codebox .str{color:#C8B694;}.codebox .cmt{color:#9A968B;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{min-height:40px;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector language. */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.wire{--wc:var(--arrow);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.warrow{--wc:var(--arrow);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wport{--wc:var(--arrow);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire.on,.warrow.on,.wport.on{opacity:1;}.wire.hint{stroke-width:2;opacity:.1;}.warrow.hint,.wport.hint{opacity:.1;}.warrow.drawing{transition-delay:200ms;}
+.wire.blue,.warrow.blue,.wport.blue{--wc:var(--blue);}.wire.green,.warrow.green,.wport.green{--wc:var(--green);}.wire.amber,.warrow.amber,.wport.amber{--wc:var(--amber);}.wire.danger,.warrow.danger,.wport.danger{--wc:var(--danger);}
+
+/* Shared bottom note bar. */
+.snote{position:absolute;left:16px;top:352px;width:600px;min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);padding:8px 14px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.snote.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.snote.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.snote.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.snote.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+/* Generic cards / op rows. */
+.gcard{position:absolute;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:10px 12px;transition:opacity var(--dur) var(--ease),box-shadow var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}
+.gcard.bl{border-color:var(--blue);}.gcard.gr{border-color:var(--green);}.gcard.am{border-color:var(--amber);}.gcard.ik{border-color:var(--ink);}
+.gcard.active{box-shadow:0 0 0 2px rgba(36,103,166,.12);}.gcard.dim{opacity:.5;}
+.gcard.badbg{border-color:var(--danger);background:var(--dangerbg);}.gcard.okbg{border-color:var(--green);background:var(--greenbg);}.gcard.warnbg{border-color:var(--amber);background:var(--amberbg);}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:700;}
+.ghead span{font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.gsub{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:3px;transition:color var(--dur) var(--ease);}
+.gop{margin-top:8px;min-height:30px;border:1px solid var(--grid);border-radius:6px;background:var(--gray);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--faint);padding:5px 8px;display:flex;align-items:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.gop.active{color:var(--ink);border-color:var(--ink);background:var(--paper);}
+.gop.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.gop.warn{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+.gop.bad{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.gop.off{opacity:.35;border-style:dashed;}
+.glab{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--faint);margin-top:9px;}
+
+/* Level bars (buffer fill). */
+.bar-track{position:relative;margin-top:6px;height:16px;border:1.5px solid var(--line);border-radius:999px;background:var(--gray);overflow:hidden;}
+.bar-fill{height:100%;width:0%;border-radius:999px;background:var(--green);transition:width 900ms var(--ease),background-color var(--dur) var(--ease);}
+.bar-fill.warn{background:var(--amber);}.bar-fill.bad{background:var(--danger);}.bar-fill.blue{background:var(--blue);}
+.bar-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--danger);opacity:.55;z-index:2;}
+.bar-cap{font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:3px;display:flex;justify-content:space-between;}
+
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:16px;}.desc-card{padding:16px;}.controls{padding:12px 14px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 142px;}.btn{padding:8px 12px;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>非阻塞 connect 与健壮收发 · EINPROGRESS · 短写 · 反压</h1>
+    <p>配套笔记《8.12 非阻塞connect与健壮收发》 · SO_ERROR 判定 · 短写与 output_buffer · 高低水位反压　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts ? parts[1] : line;
+  const comment=parts && parts[2] ? parts[2] : '';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{
+    strings.push(escapeHtml(value));
+    return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';
+  });
+  code=escapeHtml(code)
+    .replace(/\b(int|ssize_t|socklen_t|if|else|while|errno|const|sizeof|auto)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(EINPROGRESS|EAGAIN|EWOULDBLOCK|EINTR|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EPIPE|SO_ERROR|SOL_SOCKET|MSG_NOSIGNAL|HIGH_WATERMARK|LOW_WATERMARK)\b/g,'<span class="ord">$1</span>')
+    .replace(/\b(connect|getsockopt|send|recv|close|disableReading|enableReading)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(\d+)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment ? '<span class="cmt">'+escapeHtml(comment)+'</span>' : '');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="cl'+index+'">'+(line ? highlightCpp(line) : '&nbsp;')+'</div>').join('');}
+function stageFrame(id,classes,html){return '<div class="stage-frame" id="'+id+'Frame"><div class="stage '+classes+'" id="'+id+'Stage">'+html+'</div></div>';}
+function fitStage(id){
+  const base=id.endsWith('Stage')?id.slice(0,-5):id;
+  const stage=el(id),frame=el(base+'Frame');
+  if(!stage||!frame)return;
+  const scale=Math.min(1,frame.clientWidth/632);
+  stage.style.transform='scale('+scale+')';
+  frame.style.height=(420*scale)+'px';
+}
+
+function wireHTML(id){return '<path id="'+id+'" class="wire"></path><path id="'+id+'-head" class="warrow"></path><circle id="'+id+'-port" class="wport" r="4"></circle>';}
+function wireNodes(id){return [el(id),el(id+'-head'),el(id+'-port')];}
+function setWire(id,state,color){
+  const [path,head,port]=wireNodes(id);
+  if(!path||!head||!port)return;
+  const suffix=(state?' '+state:'')+(color?' '+color:'');
+  path.setAttribute('class','wire'+suffix);
+  head.setAttribute('class','warrow'+suffix);
+  port.setAttribute('class','wport'+suffix);
+  if(state!=='on'){
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    path.style.transition='';
+    head.classList.remove('drawing');
+  }
+}
+function drawWire(id,color,timers){
+  setWire(id,'on',color);
+  const [path,head]=wireNodes(id);
+  if(!path||reducedMotion())return;
+  const length=path.getTotalLength();
+  path.style.transition='none';
+  path.style.strokeDasharray=length;
+  path.style.strokeDashoffset=length;
+  head.classList.add('drawing');
+  void path.getBoundingClientRect();
+  path.style.transition='';
+  path.style.strokeDashoffset='0';
+  const timer=setTimeout(()=>{
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    head.classList.remove('drawing');
+  },560);
+  timers.push(timer);
+}
+function wireController(ids,colors){
+  let active=new Set();
+  let timers=[];
+  return {
+    sync(nextIds,hints=false){
+      timers.forEach(clearTimeout);timers=[];
+      const next=new Set(nextIds);
+      const any=next.size>0;
+      ids.forEach(id=>{
+        const state=next.has(id)?'on':(!any&&hints?'hint':'');
+        if(next.has(id)&&!active.has(id))drawWire(id,colors[id],timers);
+        else setWire(id,state,colors[id]);
+      });
+      active=next;
+    },
+    destroy(){timers.forEach(clearTimeout);timers=[];active.clear();}
+  };
+}
+function relRect(stageRect,id){
+  const rect=el(id).getBoundingClientRect();
+  return {left:rect.left-stageRect.left,right:rect.right-stageRect.left,top:rect.top-stageRect.top,bottom:rect.bottom-stageRect.top,cx:(rect.left+rect.right)/2-stageRect.left,cy:(rect.top+rect.bottom)/2-stageRect.top};
+}
+function point(rect,side,offset=0){
+  if(side==='left')return {x:rect.left,y:rect.cy+offset};
+  if(side==='right')return {x:rect.right,y:rect.cy+offset};
+  return {x:rect.cx,y:rect.cy+offset};
+}
+function bezierArrow(id,from,to){
+  const path=el(id),head=el(id+'-head'),port=el(id+'-port');
+  if(!path||!head||!port)return;
+  const direction=to.x>=from.x?1:-1;
+  const baseX=to.x-direction*9;
+  const gap=Math.max(1,Math.abs(baseX-from.x));
+  const c1=from.x+direction*gap*.45;
+  const c2=baseX-direction*gap*.45;
+  path.setAttribute('d','M '+from.x+' '+from.y+' C '+c1+' '+from.y+', '+c2+' '+to.y+', '+baseX+' '+to.y);
+  head.setAttribute('d','M '+to.x+' '+to.y+' L '+baseX+' '+(to.y-5)+' L '+baseX+' '+(to.y+5)+' Z');
+  port.setAttribute('cx',from.x);port.setAttribute('cy',from.y);
+}
+function classes(id,value){el(id).className=value;}
+function setOps(prefix,states){states.forEach((state,index)=>classes(prefix+index,'gop '+state));}
+
+/* ---------- Scene 1 · 非阻塞 connect：EINPROGRESS → SO_ERROR ---------- */
+const connScene=(()=>{
+  const code=[
+    'int ret = connect(fd, &addr, len);  // 非阻塞 fd',
+    'if (ret == 0)      { /* 立即成功(本机/极快) */ }',
+    'else if (errno == EINPROGRESS) {',
+    '    // 进行中: 等 fd 可写或错误事件',
+    '} else             { /* 立即失败 */ }',
+    '// 可写了 != 成功了, 必须取最终结果:',
+    'int err = 0; socklen_t l = sizeof(err);',
+    'getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &l);',
+    'if (err == 0)      { /* 真正连接成功 */ }',
+    'else { errno = err; /* ECONNREFUSED / ETIMEDOUT */ }'
+  ];
+  const wires=['wGo','wChk','wRst'];
+  const colors={wGo:'blue',wChk:'green',wRst:'danger'};
+  const controller=wireController(wires,colors);
+  let observer=null;
+  const steps=[
+    {title:'步骤 0 · 非阻塞 connect 几乎不会立即成功',chip:'三分支',chipC:'c0',lines:[0,1,2,4],w:[],hint:true,c:['connect() → -1','active'],c2:['errno == EINPROGRESS','warn'],c3:['等待可写 / 错误事件','off'],c4:['getsockopt(SO_ERROR)','off'],cC:'active',h:[['SYN →','off'],['← SYN+ACK','off'],['ACK →','off'],['← RST','off']],hC:'dim',r:[['err == 0 → 成功','off'],['err == ECONNREFUSED','off'],['err == ETIMEDOUT','off']],rC:'dim',note:'返回 -1 且 errno==EINPROGRESS 不是失败——SYN 已交给内核，握手在后台进行。三分支：0=立即成功（少见）/ EINPROGRESS / 真失败。',noteC:''},
+    {title:'步骤 1 · 握手在后台进行，应用去干别的',chip:'异步握手',chipC:'cb',lines:[3],w:['wGo'],hint:false,c:[ 'connect() → -1','done'],c2:['errno == EINPROGRESS','done'],c3:['等待可写 / 错误事件','active'],c4:['getsockopt(SO_ERROR)','off'],cC:'active',h:[['SYN →','done'],['← SYN+ACK','warn'],['ACK →','off'],['← RST','off']],hC:'active',r:[['err == 0 → 成功','off'],['err == ECONNREFUSED','off'],['err == ETIMEDOUT','off']],rC:'dim',note:'内核替你继续三次握手；应用线程可以去处理别的连接——这正是非阻塞的意义。',noteC:'blue'},
+    {title:'步骤 2 · 可写了 ≠ 成功了',chip:'关键误区',chipC:'ca',lines:[5],w:[],hint:false,c:[ 'connect() → -1','done'],c2:['errno == EINPROGRESS','done'],c3:['fd 变为可写 ✓','warn'],c4:['getsockopt(SO_ERROR)','active'],cC:'active',h:[['SYN →','done'],['← SYN+ACK','done'],['ACK →','done'],['← RST','off']],hC:'',r:[['err == 0 → 成功','off'],['err == ECONNREFUSED','off'],['err == ETIMEDOUT','off']],rC:'dim',note:'握手完成 socket 通常变可写；但连接失败也可能以可写或错误事件唤醒你——只看"可写"就宣布成功，是最经典的 bug。',noteC:'amber'},
+    {title:'步骤 3 · 成功路径：SO_ERROR == 0',chip:'真正成功',chipC:'cg',lines:[6,7,8],w:['wChk'],hint:false,c:[ 'connect() → -1','done'],c2:['errno == EINPROGRESS','done'],c3:['fd 变为可写 ✓','done'],c4:['SO_ERROR → err = 0 ✓','done'],cC:'',h:[['SYN →','done'],['← SYN+ACK','done'],['ACK →','done'],['← RST','off']],hC:'dim',r:[['err == 0 → 成功 ✓','done'],['err == ECONNREFUSED','off'],['err == ETIMEDOUT','off']],rC:'active',note:'getsockopt(SOL_SOCKET, SO_ERROR) 取出并清零最终结果。err==0 才是真正的连接成功，此后开始正常收发。',noteC:'green'},
+    {title:'步骤 4 · 失败路径：err = ECONNREFUSED',chip:'同样"可写"',chipC:'cd',lines:[9],w:['wRst'],hint:false,c:[ 'connect() → -1','done'],c2:['errno == EINPROGRESS','done'],c3:['被可写/错误事件唤醒','warn'],c4:['SO_ERROR → ECONNREFUSED','bad'],cC:'',h:[['SYN →','done'],['← SYN+ACK','off'],['ACK →','off'],['← RST（对端拒绝）','bad']],hC:'active',r:[['err == 0 → 成功','off'],['err == ECONNREFUSED ✗','bad'],['err == ETIMEDOUT（超时）','warn']],rC:'active',note:'对端没监听 → 回 RST；握手失败同样可能以"可写"唤醒你——这就是必须查 SO_ERROR 的原因。errno=err 后按连接失败处理。',noteC:'danger'},
+    {title:'步骤 5 · 收口：三步公式',chip:'公式',chipC:'cg',lines:[2,5,7],w:[],hint:true,c:[ '① EINPROGRESS','done'],c2:['② 等可写 / 错误','done'],c3:['③ 查 SO_ERROR','done'],c4:['再决定成功或失败','done'],cC:'',h:[['SYN →','off'],['← SYN+ACK','off'],['ACK →','off'],['← RST','off']],hC:'dim',r:[['err == 0 → 成功','done'],['err != 0 → 失败处理','done'],['（可写 ≠ 成功）','warn']],rC:'',note:'EINPROGRESS → 等可写/错误 → 查 SO_ERROR。非阻塞 fd 应在加入 epoll 前就设置好（ET 模式必须非阻塞）。',noteC:'green'}
+  ];
+  function layout(){
+    fitStage('ncStage');
+    const stage=el('ncStage'),svg=el('ncSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const c=relRect(sr,'ncC'),h=relRect(sr,'ncH'),r=relRect(sr,'ncR');
+    bezierArrow('wGo',point(c,'right',-30),point(h,'left',-30));
+    bezierArrow('wChk',point(h,'right',-30),point(r,'left',-30));
+    bezierArrow('wRst',point(h,'right',30),point(r,'left',30));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>非阻塞 connect</b>：EINPROGRESS 不是失败，可写不是成功</div>'+stageFrame('nc','conn-stage',
+      '<div class="gcard bl" id="ncC" style="left:16px;top:40px;width:180px;min-height:196px;"><div class="ghead">本端应用 <span>non-block</span></div>'+
+        '<div class="gop" id="ncC0">connect() → -1</div><div class="gop" id="ncC1">errno == EINPROGRESS</div><div class="gop off" id="ncC2">等待可写 / 错误事件</div><div class="gop off" id="ncC3">getsockopt(SO_ERROR)</div></div>'+
+      '<div class="gcard am" id="ncH" style="left:236px;top:40px;width:160px;min-height:196px;"><div class="ghead">TCP 握手 <span>内核后台</span></div>'+
+        '<div class="gop off" id="ncH0">SYN →</div><div class="gop off" id="ncH1">← SYN+ACK</div><div class="gop off" id="ncH2">ACK →</div><div class="gop off" id="ncH3">← RST</div></div>'+
+      '<div class="gcard ik" id="ncR" style="left:436px;top:40px;width:180px;min-height:196px;"><div class="ghead">SO_ERROR 判定 <span>最终结果</span></div>'+
+        '<div class="gop off" id="ncR0">err == 0 → 成功</div><div class="gop off" id="ncR1">err == ECONNREFUSED</div><div class="gop off" id="ncR2">err == ETIMEDOUT</div></div>'+
+      '<svg class="arr-layer" id="ncSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg>'+
+      '<div class="snote" id="ncNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('ncFrame'));
+  }
+  function paint(s){
+    layout();
+    el('ncC0').textContent=s.c[0];classes('ncC0','gop '+s.c[1]);
+    el('ncC1').textContent=s.c2[0];classes('ncC1','gop '+s.c2[1]);
+    el('ncC2').textContent=s.c3[0];classes('ncC2','gop '+s.c3[1]);
+    el('ncC3').textContent=s.c4[0];classes('ncC3','gop '+s.c4[1]);
+    classes('ncC','gcard bl '+s.cC);
+    s.h.forEach((row,i)=>{el('ncH'+i).textContent=row[0];classes('ncH'+i,'gop '+row[1]);});
+    classes('ncH','gcard am '+s.hC);
+    s.r.forEach((row,i)=>{el('ncR'+i).textContent=row[0];classes('ncR'+i,'gop '+row[1]);});
+    classes('ncR','gcard ik '+s.rC);
+    classes('ncNote','snote '+s.noteC);el('ncNote').textContent=s.note;
+    controller.sync(s.w,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'conn',label:'非阻塞 connect',sub:'EINPROGRESS · SO_ERROR',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 2 · 短写与 output_buffer ---------- */
+const swScene=(()=>{
+  const code=[
+    'ssize_t n = send(fd, buf + sent, total - sent,',
+    '                 MSG_NOSIGNAL);   // 防 SIGPIPE',
+    'if (n > 0)  sent += n;       // 短写: 只发出一部分',
+    'else if (n < 0 && (errno == EAGAIN ||',
+    '                   errno == EWOULDBLOCK)) {',
+    '    // 内核缓冲满: 余量挂到 output_buffer',
+    '    // 等下次可写事件续发 (见 13.6 写路径)',
+    '} else if (n < 0 && errno == EINTR) { /* 重试 */ }',
+    'else { /* ECONNRESET / EPIPE: 关闭连接 */ }'
+  ];
+  const steps=[
+    {title:'步骤 0 · send 成功 ≠ 发完 ≠ 对端收到',chip:'语义',chipC:'c0',lines:[0,1],sent:0,sentC:'blue',sentTx:'已交给内核 0 / 10KB',kb:75,kbC:'warn',kbTx:'已占 12KB / 16KB（剩 4KB）',ob:0,obC:'',obTx:'空',ret:['send() → ?','off'],appC:'active',kC:'',obCC:'dim',note:'send 只是把字节拷进内核发送缓冲；真正发出与对端确认都在之后。现在缓冲只剩 4KB，而业务要发 10KB——短写不可避免。',noteC:''},
+    {title:'步骤 1 · send(10KB) → 返回 4096：短写',chip:'短写',chipC:'ca',lines:[2],sent:40,sentC:'blue',sentTx:'已交给内核 4KB / 10KB',kb:100,kbC:'bad',kbTx:'16KB / 16KB 满',ob:0,obC:'',obTx:'空',ret:['send → 4096（短写）','warn'],appC:'active',kC:'active',obCC:'dim',note:'内核只收得下 4KB，返回值就是事实：只发出一部分。短写是正常现象，不是异常分支——必须用返回值推进 sent。',noteC:'amber'},
+    {title:'步骤 2 · 余量 6KB 挂到 output_buffer',chip:'输出缓冲',chipC:'cg',lines:[5,6],sent:40,sentC:'blue',sentTx:'已交给内核 4KB / 10KB',kb:100,kbC:'bad',kbTx:'16KB / 16KB 满',ob:60,obC:'',obTx:'6KB 待续发',ret:['余量 → output_buffer','active'],appC:'',kC:'',obCC:'active',note:'不丢弃、也不在原地死循环重试：把没发完的挂到每连接的输出缓冲，事件驱动地续发——这是健壮发送的骨架。',noteC:'green'},
+    {title:'步骤 3 · 再 send → -1 + EAGAIN：满了，不是错',chip:'EAGAIN',chipC:'cd',lines:[3,4,5,6],sent:40,sentC:'blue',sentTx:'已交给内核 4KB / 10KB',kb:100,kbC:'bad',kbTx:'16KB / 16KB 满',ob:60,obC:'',obTx:'6KB 待续发',ret:['send → -1 EAGAIN','bad'],appC:'active',kC:'active',obCC:'',note:'EAGAIN/EWOULDBLOCK = 现在写不进去，等可写事件再继续。（关注/注销 EPOLLOUT 的完整舞步见 13.6 动画写路径，这里不重演。）',noteC:'danger'},
+    {title:'步骤 4 · 分支齐活：EINTR 重试，真错误才关连接',chip:'errno 分诊',chipC:'ca',lines:[7,8],sent:40,sentC:'blue',sentTx:'已交给内核 4KB / 10KB',kb:100,kbC:'bad',kbTx:'16KB / 16KB 满',ob:60,obC:'',obTx:'6KB 待续发',ret:['EINTR→重试 · EPIPE→关闭','warn'],appC:'active',kC:'dim',obCC:'dim',note:'EINTR 被信号打断，重试即可；ECONNRESET/EPIPE 才是真错误——关闭连接。MSG_NOSIGNAL 避免写已关闭连接时进程被 SIGPIPE 杀死。',noteC:'amber'},
+    {title:'步骤 5 · 对端确认腾空 → 续发余量',chip:'续发完成',chipC:'cg',lines:[2],sent:100,sentC:'',sentTx:'已交给内核 10KB / 10KB ✓',kb:38,kbC:'',kbTx:'6KB / 16KB（对端确认腾空）',ob:0,obC:'',obTx:'已清空 ✓',ret:['send → 6144 ✓','done'],appC:'',kC:'active',obCC:'active',note:'可写事件到来，output_buffer 的 6KB 续发完成。注意：10KB 只是全部交给了内核——对端此刻未必都收到了。',noteC:'green'},
+    {title:'步骤 6 · 收口：短写是常态',chip:'铁律',chipC:'cg',lines:[0,2,5],sent:100,sentC:'',sentTx:'10KB 全部交付内核',kb:38,kbC:'',kbTx:'6KB / 16KB',ob:0,obC:'',obTx:'空',ret:['返回值 = 事实','done'],appC:'',kC:'',obCC:'',note:'健壮发送 = 返回值当事实推进 sent + 每连接输出缓冲 + EAGAIN 等事件续发 + EINTR 重试 + 真错误关闭。',noteC:'green'}
+  ];
+  let observer=null;
+  const steps_={};
+  function mount(){
+    const html='<div class="vcap"><b>短写</b>：send 返回多少，就只发出去了多少</div>'+stageFrame('sw','sw-stage',
+      '<div class="gcard bl" id="swApp" style="left:16px;top:40px;width:180px;min-height:196px;"><div class="ghead">业务 · 要发 10KB <span>app</span></div>'+
+        '<div class="glab">交付进度</div><div class="bar-track"><div class="bar-fill blue" id="swSent"></div></div><div class="gsub" id="swSentTx">已交给内核 0 / 10KB</div>'+
+        '<div class="gop off" id="swRet">send() → ?</div></div>'+
+      '<div class="gcard am" id="swK" style="left:236px;top:40px;width:160px;min-height:196px;"><div class="ghead">内核发送缓冲 <span>16KB</span></div>'+
+        '<div class="glab">占用水位</div><div class="bar-track"><div class="bar-fill warn" id="swKb"></div></div><div class="gsub" id="swKbTx">已占 12KB / 16KB</div>'+
+        '<div class="gsub">对端 ACK 后才腾空</div></div>'+
+      '<div class="gcard gr" id="swOb" style="left:436px;top:40px;width:180px;min-height:196px;"><div class="ghead">output_buffer <span>应用层</span></div>'+
+        '<div class="glab">待续发余量</div><div class="bar-track"><div class="bar-fill" id="swObf"></div></div><div class="gsub" id="swObTx">空</div>'+
+        '<div class="gsub">可写事件到来时续发</div></div>'+
+      '<div class="snote" id="swNote"></div>');
+    viz.innerHTML=html;
+    fitStage('swStage');
+    observer=new ResizeObserver(()=>fitStage('swStage'));observer.observe(el('swFrame'));
+  }
+  function paint(s){
+    el('swSent').style.width=s.sent+'%';classes('swSent','bar-fill '+s.sentC);
+    el('swSentTx').textContent=s.sentTx;
+    el('swKb').style.width=s.kb+'%';classes('swKb','bar-fill '+s.kbC);
+    el('swKbTx').textContent=s.kbTx;
+    el('swObf').style.width=s.ob+'%';classes('swObf','bar-fill '+s.obC);
+    el('swObTx').textContent=s.obTx;
+    el('swRet').textContent=s.ret[0];classes('swRet','gop '+s.ret[1]);
+    classes('swApp','gcard bl '+s.appC);classes('swK','gcard am '+s.kC);classes('swOb','gcard gr '+s.obCC);
+    classes('swNote','snote '+s.noteC);el('swNote').textContent=s.note;
+  }
+  function destroy(){observer?.disconnect();}
+  return {id:'sw',label:'短写',sub:'send 返回值 · EAGAIN',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- Scene 3 · 反压 ---------- */
+const bpScene=(()=>{
+  const code=[
+    '// 反压: 下游不消化, 上游就得减速',
+    'if (conn.output_buffer.size() > HIGH_WATERMARK) {',
+    '    conn.channel.disableReading(); // 暂停读该连接',
+    '    // 不读 -> 不产生新响应 -> 堆积不再增长',
+    '}',
+    'if (conn.output_buffer.size() < LOW_WATERMARK)',
+    '    conn.channel.enableReading();  // 回落恢复读取',
+    '// 输入缓冲过大: 限速或关闭连接',
+    '// 线程池队列过长: 拒绝 / 降级 / 返回忙',
+    '// 长时间不可写: 定时器关闭慢连接'
+  ];
+  const steps=[
+    {title:'步骤 0 · 反压：下游不消化，上游必须减速',chip:'链路',chipC:'c0',lines:[0],read:['正常读取请求','done'],resp:['产生响应 → 出队','done'],ob:15,obC:'',obTx:'水位正常',kb:25,kbC:'',kbTx:'通畅',peer:['正常消费',''],peerC:'',bizC:'',obCC:'',kC:'',timer:['——','off'],note:'链条：业务读请求→产生响应→output_buffer→内核发送缓冲→对端。任何一环变慢，堆积就会向上游蔓延。',noteC:''},
+    {title:'步骤 1 · 对端读得慢：内核缓冲先堆起来',chip:'TCP 反压',chipC:'ca',lines:[0],read:['仍在读取请求','warn'],resp:['仍在产生响应','warn'],ob:45,obC:'warn',obTx:'开始堆积',kb:92,kbC:'bad',kbTx:'rwnd 收缩 · 几乎发不出',peer:['读得很慢…','warn'],peerC:'warnbg',bizC:'',obCC:'',kC:'active',timer:['——','off'],note:'TCP 自带第一层反压：对端 win 变小，本端发不出去（窗口细节见 8.8 流控动画）。发不出的响应开始向应用层倒灌。',noteC:'amber'},
+    {title:'步骤 2 · output_buffer 冲破高水位',chip:'告警',chipC:'cd',lines:[1],read:['还在继续读!','bad'],resp:['还在继续产生响应!','bad'],ob:88,obC:'bad',obTx:'超过 HIGH_WATERMARK !',kb:92,kbC:'bad',kbTx:'依旧发不出',peer:['读得很慢…','warn'],peerC:'warnbg',bizC:'active',obCC:'active',kC:'',timer:['——','off'],note:'发不出去的响应都堆在应用层输出缓冲——再不刹车，内存无界增长，最终 OOM。',noteC:'danger'},
+    {title:'步骤 3 · 刹车：disableReading 暂停读取',chip:'应用层反压',chipC:'cg',lines:[1,2,3,4],read:['已暂停读取 ✋','done'],resp:['不再产生新响应','done'],ob:85,obC:'warn',obTx:'堆积不再增长',kb:90,kbC:'warn',kbTx:'慢慢消化',peer:['读得很慢…','warn'],peerC:'warnbg',bizC:'active',obCC:'',kC:'',timer:['——','off'],note:'高水位回调 disableReading：不读 → 不产生响应 → 堆积不再增长。这是应用层最重要的一个反压动作。',noteC:'green'},
+    {title:'步骤 4 · 其他反压点与慢连接兜底',chip:'全局视角',chipC:'ca',lines:[7,8,9],read:['已暂停读取 ✋','done'],resp:['不再产生新响应','done'],ob:80,obC:'warn',obTx:'缓慢回落',kb:85,kbC:'warn',kbTx:'缓慢回落',peer:['读得很慢…','warn'],peerC:'warnbg',bizC:'',obCC:'',kC:'',timer:['定时器: 30s 不可写 → 关闭慢连接','warn'],note:'输入缓冲过大 → 限速/关闭；线程池队列过长 → 拒绝/降级/返回忙；长时间不可写 → 定时器直接踢掉慢连接。',noteC:'amber'},
+    {title:'步骤 5 · 水位回落：enableReading 恢复',chip:'恢复',chipC:'cg',lines:[5,6],read:['恢复读取 ✓','done'],resp:['恢复产生响应','done'],ob:18,obC:'',obTx:'低于 LOW_WATERMARK',kb:35,kbC:'',kbTx:'通畅',peer:['恢复消费','done'],peerC:'',bizC:'',obCC:'active',kC:'',timer:['——','off'],note:'低水位回调 enableReading，链路恢复。高/低水位之间留滞回区间，避免在阈值附近反复开关抖动。',noteC:'green'}
+  ];
+  let observer=null;
+  function mount(){
+    const html='<div class="vcap"><b>反压</b>：output_buffer 破高水位就停止读取，回落再恢复</div>'+stageFrame('bp','bp-stage',
+      '<div class="gcard bl" id="bpBiz" style="left:16px;top:40px;width:170px;min-height:170px;"><div class="ghead">业务 / EventLoop <span>上游</span></div>'+
+        '<div class="gop" id="bpRead">正常读取请求</div><div class="gop" id="bpResp">产生响应 → 出队</div></div>'+
+      '<div class="gcard gr" id="bpOb" style="left:216px;top:40px;width:170px;min-height:170px;"><div class="ghead">output_buffer <span>应用层</span></div>'+
+        '<div class="glab">水位（红线 = HIGH）</div><div class="bar-track"><div class="bar-mark" style="left:78%;"></div><div class="bar-fill" id="bpObf"></div></div><div class="gsub" id="bpObTx">水位正常</div>'+
+        '<div class="gop off" id="bpTimer">——</div></div>'+
+      '<div class="gcard am" id="bpK" style="left:416px;top:40px;width:120px;min-height:170px;"><div class="ghead">内核缓冲 <span>snd</span></div>'+
+        '<div class="glab">占用</div><div class="bar-track"><div class="bar-fill" id="bpKf"></div></div><div class="gsub" id="bpKbTx">通畅</div></div>'+
+      '<div class="gcard" id="bpPeer" style="left:556px;top:40px;width:60px;min-height:170px;padding:10px 8px;"><div class="ghead" style="font-size:10.5px;">对端</div><div class="gop" id="bpPeerR" style="font-size:9px;padding:5px 4px;">正常消费</div></div>'+
+      '<div class="snote" id="bpNote"></div>');
+    viz.innerHTML=html;
+    fitStage('bpStage');
+    observer=new ResizeObserver(()=>fitStage('bpStage'));observer.observe(el('bpFrame'));
+  }
+  function paint(s){
+    el('bpRead').textContent=s.read[0];classes('bpRead','gop '+s.read[1]);
+    el('bpResp').textContent=s.resp[0];classes('bpResp','gop '+s.resp[1]);
+    el('bpObf').style.width=s.ob+'%';classes('bpObf','bar-fill '+s.obC);
+    el('bpObTx').textContent=s.obTx;
+    el('bpKf').style.width=s.kb+'%';classes('bpKf','bar-fill '+s.kbC);
+    el('bpKbTx').textContent=s.kbTx;
+    el('bpPeerR').textContent=s.peer[0];classes('bpPeerR','gop '+s.peer[1]);el('bpPeerR').style.cssText='font-size:9px;padding:5px 4px;';
+    classes('bpPeer','gcard '+s.peerC);
+    classes('bpBiz','gcard bl '+s.bizC);classes('bpOb','gcard gr '+s.obCC);classes('bpK','gcard am '+s.kC);
+    el('bpTimer').textContent=s.timer[0];classes('bpTimer','gop '+s.timer[1]);
+    classes('bpNote','snote '+s.noteC);el('bpNote').textContent=s.note;
+  }
+  function destroy(){observer?.disconnect();}
+  return {id:'bp',label:'反压',sub:'高低水位 · 暂停读取',steps,mount,paint,code,destroy};
+})();
+
+/* ---------- 步进引擎 ---------- */
+const SCENES=[connScene,swScene,bpScene];
+const tabsBox=el('tabs');
+const stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc');
+const codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots');
+const btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{
+  const tab=document.createElement('button');
+  tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';
+  tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);
+});
+
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();
+  sceneIndex=index;stepIndex=0;
+  [...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));
+  const scene=SCENES[sceneIndex];
+  scene.mount();
+  codeBox.innerHTML=codePanel(scene.code);
+  dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,index)=>{
+    const dot=document.createElement('button');
+    dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);
+    dot.addEventListener('click',()=>{stop();go(index);});dotsBox.appendChild(dot);dotEls.push(dot);
+  });
+  go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;
+  stepIndex=Math.max(0,Math.min(steps.length-1,index));
+  const step=steps[stepIndex];
+  SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.classList.toggle('hl',Boolean(step.lines&&step.lines.includes(i))));
+  stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;
+  stDesc.textContent=step.desc||step.note||'从初始状态开始，跟着返回值与水位走完整条发送链路。';
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});
+  readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}
+  if(stepIndex===steps.length-1)stop();
+}
+function play(){
+  const steps=SCENES[sceneIndex].steps;
+  if(stepIndex===steps.length-1)go(0);
+  btnPlay.textContent='暂停';
+  timer=setInterval(()=>{stepIndex<steps.length-1?go(stepIndex+1):stop();},2700);
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());
+btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});
+btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{
+  if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}
+});
+const hashScene=location.hash.match(/scene=(\w+)/);const hashStep=location.hash.match(/step=(\d+)/);
+let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}
+switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

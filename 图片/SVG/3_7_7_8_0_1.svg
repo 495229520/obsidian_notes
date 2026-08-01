@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 884" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <title>跨网段发一个包：四个协议各自改了什么</title>
+  <desc>上半部分是主机 A 经交换机、两台路由器到主机 B 的拓扑，配一张逐链路的帧头快照表，显示 MAC 每跳重写、IP 端到端不变、TTL 每跳减一；下半左侧是首包触发 ARP 的四个步骤，右侧是四种常见 ICMP 差错的触发条件与回信方。</desc>
+
+  <rect x="0" y="0" width="1240" height="884" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">跨网段发一个包：Ethernet、IP、ARP、ICMP 各自改了什么</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">判断准则：链路层地址每跳重写，网络层地址端到端不变，出错时只有 ICMP 会把消息带回源主机</text>
+
+  <!-- ================= Panel A ================= -->
+  <rect x="48" y="104" width="1144" height="372" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · 192.168.1.10 发往 203.0.113.20，途中每条链路上的帧头</text>
+
+  <!-- 拓扑 -->
+  <rect x="72" y="152" width="150" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="147" y="172" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主机 A</text>
+  <text x="147" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">192.168.1.10</text>
+
+  <rect x="308" y="152" width="150" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="383" y="172" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">交换机</text>
+  <text x="383" y="190" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">不改帧头，只查表转发</text>
+
+  <rect x="544" y="152" width="150" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="619" y="172" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">路由器 R1</text>
+  <text x="619" y="190" font-size="10.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">A 的默认网关</text>
+
+  <rect x="780" y="152" width="150" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="855" y="172" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">路由器 R2</text>
+  <text x="855" y="190" font-size="10.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">直连 B 所在网段</text>
+
+  <rect x="1016" y="152" width="150" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1091" y="172" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主机 B</text>
+  <text x="1091" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">203.0.113.20</text>
+
+  <line x1="222" y1="180" x2="308" y2="180" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="458" y1="180" x2="544" y2="180" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="694" y1="180" x2="780" y2="180" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="930" y1="180" x2="1016" y2="180" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <text x="265" y="140" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">①</text>
+  <text x="501" y="140" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">①</text>
+  <text x="737" y="140" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">②</text>
+  <text x="973" y="140" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">③</text>
+
+  <!-- 表头 -->
+  <rect x="72" y="244" width="196" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="268" y="244" width="300" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="568" y="244" width="300" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="868" y="244" width="300" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="260" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">帧头字段</text>
+  <text x="418" y="260" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">① A → R1（同一广播域）</text>
+  <text x="718" y="260" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">② R1 → R2</text>
+  <text x="1018" y="260" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">③ R2 → B</text>
+
+  <!-- 行 1：目的 MAC -->
+  <rect x="72" y="276" width="196" height="30" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="268" y="276" width="900" height="30" fill="#EFE7DA" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="568" y1="276" x2="568" y2="306" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="868" y1="276" x2="868" y2="306" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="291" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">目的 MAC</text>
+  <text x="418" y="291" font-size="11.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">R1 的 LAN 口网卡</text>
+  <text x="718" y="291" font-size="11.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">R2 的入口网卡</text>
+  <text x="1018" y="291" font-size="11.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">主机 B 的网卡</text>
+
+  <!-- 行 2：源 MAC -->
+  <rect x="72" y="306" width="196" height="30" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="268" y="306" width="900" height="30" fill="#EFE7DA" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="568" y1="306" x2="568" y2="336" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="868" y1="306" x2="868" y2="336" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="321" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">源 MAC</text>
+  <text x="418" y="321" font-size="11.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">主机 A 的网卡</text>
+  <text x="718" y="321" font-size="11.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">R1 的出口网卡</text>
+  <text x="1018" y="321" font-size="11.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">R2 的出口网卡</text>
+
+  <!-- 行 3：源 IP -->
+  <rect x="72" y="336" width="196" height="30" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="268" y="336" width="900" height="30" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="568" y1="336" x2="568" y2="366" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="868" y1="336" x2="868" y2="366" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="351" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">源 IP</text>
+  <text x="418" y="351" font-size="11.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">192.168.1.10</text>
+  <text x="718" y="351" font-size="11.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">192.168.1.10</text>
+  <text x="1018" y="351" font-size="11.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">192.168.1.10</text>
+
+  <!-- 行 4：目的 IP -->
+  <rect x="72" y="366" width="196" height="30" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="268" y="366" width="900" height="30" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="568" y1="366" x2="568" y2="396" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="868" y1="366" x2="868" y2="396" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="381" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">目的 IP</text>
+  <text x="418" y="381" font-size="11.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">203.0.113.20</text>
+  <text x="718" y="381" font-size="11.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">203.0.113.20</text>
+  <text x="1018" y="381" font-size="11.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">203.0.113.20</text>
+
+  <!-- 行 5：TTL -->
+  <rect x="72" y="396" width="196" height="30" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="268" y="396" width="900" height="30" fill="#E3EAF4" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="568" y1="396" x2="568" y2="426" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="868" y1="396" x2="868" y2="426" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="88" y="411" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">TTL（Linux 初值 64）</text>
+  <text x="418" y="411" font-size="11.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">64</text>
+  <text x="718" y="411" font-size="11.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">63</text>
+  <text x="1018" y="411" font-size="11.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">62</text>
+
+  <text x="72" y="452" font-size="11.5" fill="#6B675C" dominant-baseline="central">路由器每跳都换新帧头、TTL 减 1、重算 IPv4 首部校验和；IP 地址一路没动过</text>
+
+  <!-- ================= Panel B ================= -->
+  <rect x="48" y="496" width="560" height="340" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="524" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">B · 首包为什么要先停一下：ARP</text>
+
+  <rect x="72" y="548" width="512" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="88" y="565" font-size="12" font-weight="700" fill="#2C4460" dominant-baseline="central">① 查路由表：目的不在本网段</text>
+  <text x="88" y="582" font-size="10.5" fill="#2C4460" dominant-baseline="central">下一跳定为默认网关 192.168.1.1</text>
+
+  <rect x="72" y="612" width="512" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="88" y="629" font-size="12" font-weight="700" fill="#6B4E28" dominant-baseline="central">② 查邻居表：网关的 MAC 未知</text>
+  <text x="88" y="646" font-size="10.5" fill="#6B4E28" dominant-baseline="central">ip neigh 里是 INCOMPLETE，帧封不出来</text>
+
+  <rect x="72" y="676" width="512" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="88" y="693" font-size="12" font-weight="700" fill="#6B4E28" dominant-baseline="central">③ 广播 ARP 请求：谁是 192.168.1.1</text>
+  <text x="88" y="710" font-size="10.5" fill="#6B4E28" dominant-baseline="central">目的 MAC 全 f，EtherType 0x0806</text>
+
+  <rect x="72" y="740" width="512" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="88" y="757" font-size="12" font-weight="700" fill="#24473F" dominant-baseline="central">④ R1 单播应答，写入邻居表</text>
+  <text x="88" y="774" font-size="10.5" fill="#24473F" dominant-baseline="central">后续包直接封帧，不再广播</text>
+
+  <line x1="328" y1="596" x2="328" y2="610" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="328" y1="660" x2="328" y2="674" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="328" y1="724" x2="328" y2="738" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <text x="72" y="812" font-size="11" fill="#6B675C" dominant-baseline="central">IPv6 不走这条路：改用 ICMPv6 的 NS/NA，发往被请求节点组播</text>
+
+  <!-- ================= Panel C ================= -->
+  <rect x="632" y="496" width="560" height="340" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="656" y="524" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">C · 包走不通时，路上谁回 ICMP</text>
+
+  <rect x="656" y="546" width="210" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="866" y="546" width="180" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1046" y="546" width="122" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="672" y="562" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">触发条件</text>
+  <text x="882" y="562" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">ICMPv4 报文</text>
+  <text x="1062" y="562" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">谁回信</text>
+
+  <rect x="656" y="578" width="210" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="866" y="578" width="180" height="44" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1046" y="578" width="122" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="672" y="600" font-size="11.5" fill="#4A473F" dominant-baseline="central">TTL 减到 0</text>
+  <text x="882" y="600" font-size="11.5" fill="#733428" dominant-baseline="central">超时 Type 11</text>
+  <text x="1062" y="600" font-size="11.5" fill="#4A473F" dominant-baseline="central">该跳路由器</text>
+
+  <rect x="656" y="622" width="210" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="866" y="622" width="180" height="44" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1046" y="622" width="122" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="672" y="644" font-size="11.5" fill="#4A473F" dominant-baseline="central">路由表里没有这条路</text>
+  <text x="882" y="644" font-size="11.5" fill="#733428" dominant-baseline="central">网络不可达 3/0</text>
+  <text x="1062" y="644" font-size="11.5" fill="#4A473F" dominant-baseline="central">中途路由器</text>
+
+  <rect x="656" y="666" width="210" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="866" y="666" width="180" height="44" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1046" y="666" width="122" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="672" y="688" font-size="11.5" fill="#4A473F" dominant-baseline="central">超出链路 MTU 且置了 DF</text>
+  <text x="882" y="688" font-size="11.5" fill="#733428" dominant-baseline="central">需要分片 3/4</text>
+  <text x="1062" y="688" font-size="11.5" fill="#4A473F" dominant-baseline="central">受阻那一跳</text>
+
+  <rect x="656" y="710" width="210" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="866" y="710" width="180" height="44" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1046" y="710" width="122" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="672" y="732" font-size="11.5" fill="#4A473F" dominant-baseline="central">目的端口没人监听</text>
+  <text x="882" y="732" font-size="11.5" fill="#733428" dominant-baseline="central">端口不可达 3/3</text>
+  <text x="1062" y="732" font-size="11.5" fill="#4A473F" dominant-baseline="central">目的主机</text>
+
+  <line x1="1112" y1="770" x2="700" y2="770" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrRed)"/>
+  <text x="1122" y="770" font-size="11" fill="#733428" dominant-baseline="central">回程</text>
+  <text x="656" y="792" font-size="11" fill="#6B675C" dominant-baseline="central">差错报文沿反方向回到源 IP，里面附上原包首部和前 8 字节</text>
+  <text x="656" y="812" font-size="11" fill="#6B675C" dominant-baseline="central">IPv6 对应 ICMPv6 的 3 / 1 / 2；路由器不再替你分片</text>
+
+  <text x="48" y="862" font-size="11.5" fill="#6B675C" dominant-baseline="central">口径：图中地址与网卡均为示例；TTL 初值随系统而异（Linux 与 macOS 常见 64，Windows 128），traceroute 正是靠第一行逐跳逼出路径</text>
+</svg>

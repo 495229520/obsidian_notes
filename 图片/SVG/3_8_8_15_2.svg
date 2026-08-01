@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="720" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrN" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <title>Buffer 空间不够时的两种处理，以及 readv 加栈上临时缓冲的读法</title>
+  <desc>写入空间不足时先尝试把 readable 整体前移回收 prependable，实在不够才扩容；以及用 readv 同时指向 Buffer 与栈上 64KB 临时数组，一次系统调用读空内核缓冲区。</desc>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">写不下了怎么办，以及怎么一次就把内核读空</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">两个都是 muduo 的经典做法，也是应用层 Buffer 值得单独写一篇的原因</text>
+
+  <!-- ===================== Panel A ===================== -->
+  <rect x="48" y="104" width="1144" height="286" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · writable 不够时，先想着腾挪，再考虑扩容</text>
+
+  <line x1="620" y1="150" x2="620" y2="366" stroke="#E3E0D6" stroke-width="1"/>
+
+  <!-- case 1 -->
+  <text x="72" y="168" font-size="12.5" font-weight="700" fill="#24473F">① prependable + writable 够用 → 原地腾挪</text>
+  <rect x="100" y="184" width="200" height="28" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="300" y="184" width="120" height="28" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="420" y="184" width="140" height="28" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="200" y="203" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">prependable 白占了一大块</text>
+  <text x="360" y="203" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">readable</text>
+  <text x="490" y="203" font-size="9.5" fill="#2C4460" text-anchor="middle">writable 不够了</text>
+
+  <line x1="330" y1="222" x2="330" y2="250" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+  <text x="344" y="242" font-size="10" fill="#6B675C">把 readable 整体搬到最前面</text>
+
+  <rect x="100" y="256" width="40" height="28" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="140" y="256" width="120" height="28" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="260" y="256" width="300" height="28" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="120" y="275" font-size="8.5" fill="#8A8578" text-anchor="middle">8</text>
+  <text x="200" y="275" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">readable</text>
+  <text x="410" y="275" font-size="9.5" font-weight="700" fill="#2C4460" text-anchor="middle">writable 一下子宽敞了</text>
+
+  <text x="72" y="308" font-size="10.5" fill="#4A473F">一次 memmove，不申请新内存，缓冲区总长度不变。</text>
+  <text x="72" y="328" font-size="10.5" fill="#4A473F">长连接跑久了 prependable 会越攒越大，这一步就是在回收它。</text>
+
+  <!-- case 2 -->
+  <text x="668" y="168" font-size="12.5" font-weight="700" fill="#733428">② 腾挪之后还是不够 → 扩容</text>
+  <rect x="668" y="184" width="40" height="28" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="708" y="184" width="120" height="28" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="828" y="184" width="72" height="28" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="768" y="203" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">readable</text>
+  <text x="864" y="203" font-size="9" fill="#2C4460" text-anchor="middle">writable</text>
+  <text x="912" y="203" font-size="9.5" fill="#8A8578">← 当前总长度</text>
+
+  <line x1="784" y1="222" x2="784" y2="250" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+  <text x="798" y="242" font-size="10" fill="#6B675C">resize，底层 vector 重新分配</text>
+
+  <rect x="668" y="256" width="40" height="28" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="708" y="256" width="120" height="28" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="828" y="256" width="340" height="28" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="768" y="275" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">readable</text>
+  <text x="998" y="275" font-size="9.5" font-weight="700" fill="#2C4460" text-anchor="middle">writable</text>
+
+  <text x="668" y="308" font-size="10.5" fill="#4A473F">扩容会拷贝已有数据，还可能让之前拿到的指针失效。</text>
+  <text x="668" y="328" font-size="10.5" fill="#4A473F">所以顺序不能反：一定是先试腾挪，腾不出来才扩。</text>
+
+  <text x="72" y="362" font-size="11" fill="#6B675C">判断条件就一行：prependableBytes() + writableBytes() 够不够放下要写的数据。够就 memmove，不够才 resize</text>
+
+  <!-- ===================== Panel B ===================== -->
+  <rect x="48" y="410" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="438" font-size="15" font-weight="700" fill="#4A473F">B · 一次 readv 就把内核缓冲区读空</text>
+  <text x="72" y="460" font-size="11" fill="#6B675C">难点在于事先不知道对端发了多少：Buffer 开小了要反复 read，开大了每条连接都吃内存</text>
+
+  <rect x="80" y="482" width="260" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="210" y="500" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">iov[0] → Buffer 的 writable 区</text>
+  <text x="210" y="517" font-size="9.5" fill="#6B675C" text-anchor="middle">可以开得很小，比如 1 KB</text>
+
+  <rect x="80" y="538" width="260" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="210" y="556" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">iov[1] → 栈上 extrabuf[65536]</text>
+  <text x="210" y="573" font-size="9.5" fill="#6B675C" text-anchor="middle">每次调用才占，不常驻</text>
+
+  <polyline points="340,504 380,504 380,528 416,528" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <polyline points="340,560 380,560 380,532 416,532" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrN)"/>
+
+  <rect x="420" y="508" width="200" height="44" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="520" y="526" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">readv(fd, iov, 2)</text>
+  <text x="520" y="543" font-size="9.5" fill="#24473F" text-anchor="middle">一次系统调用</text>
+
+  <polyline points="620,530 656,530 656,504 692,504" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrG)"/>
+  <polyline points="620,530 656,530 656,572 692,572" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrG)"/>
+
+  <rect x="696" y="482" width="464" height="44" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="716" y="500" font-size="11" font-weight="700" fill="#24473F">读到的不超过 writable：全落进 Buffer</text>
+  <text x="716" y="517" font-size="9.5" fill="#6B675C">extrabuf 一个字节没用上，也没付出任何代价</text>
+
+  <rect x="696" y="538" width="464" height="60" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="716" y="556" font-size="11" font-weight="700" fill="#6B4E28">读到的超过 writable：多出来的落进 extrabuf</text>
+  <text x="716" y="573" font-size="9.5" fill="#6B675C">再把 extrabuf 里那段 append 进 Buffer，这时候才触发一次扩容</text>
+  <text x="716" y="590" font-size="9.5" fill="#6B675C">代价是多一次 memcpy，但省下了一次系统调用</text>
+
+  <text x="72" y="634" font-size="11" fill="#6B675C">结果是两头都占好处：常规流量下一次 readv 就读空了内核缓冲区，突发大包也不会漏读，而每条连接的常驻内存还能开得很小</text>
+
+  <text x="48" y="700" font-size="11" fill="#6B675C">64 KB 的栈上数组配上 1 KB 的初始 Buffer，意味着一次 readv 最多能吞 65 KB——通常已经超过内核接收缓冲区的水位，所以极少需要读第二次</text>
+</svg>

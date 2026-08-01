@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="780" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>应用层 Buffer 的三段结构与两个游标</title>
+  <desc>Buffer 被 readerIndex 和 writerIndex 切成 prependable、readable、writable 三段，以及创建、追加、取走、复位四步操作中两个游标的移动轨迹。</desc>
+
+  <rect x="0" y="0" width="1240" height="780" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">应用层 Buffer：两个游标，三段空间</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">整块内存是连续的，所有状态都由 readerIndex 和 writerIndex 两个下标决定</text>
+
+  <!-- ===================== Panel A ===================== -->
+  <rect x="48" y="104" width="1144" height="206" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · 三段空间各管什么</text>
+
+  <rect x="200" y="170" width="100" height="50" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="250" y="192" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">prependable</text>
+  <text x="250" y="210" font-size="9.5" fill="#8A8578" text-anchor="middle">预留给回填</text>
+  <rect x="300" y="170" width="400" height="50" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="500" y="192" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">readable</text>
+  <text x="500" y="210" font-size="9.5" fill="#24473F" text-anchor="middle">已经收到、还没被解析走的数据</text>
+  <rect x="700" y="170" width="400" height="50" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="900" y="192" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">writable</text>
+  <text x="900" y="210" font-size="9.5" fill="#2C4460" text-anchor="middle">还能往里塞的空闲空间</text>
+
+  <line x1="300" y1="160" x2="300" y2="232" stroke="#2F6B5E" stroke-width="2.2"/>
+  <line x1="700" y1="160" x2="700" y2="232" stroke="#3D5A80" stroke-width="2.2"/>
+  <text x="300" y="250" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">readerIndex</text>
+  <text x="300" y="266" font-size="9.5" fill="#8A8578" text-anchor="middle">下一个待解析的字节</text>
+  <text x="700" y="250" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">writerIndex</text>
+  <text x="700" y="266" font-size="9.5" fill="#8A8578" text-anchor="middle">下一个可写入的位置</text>
+
+  <text x="72" y="294" font-size="11" fill="#6B675C">readableBytes() = writerIndex − readerIndex　　writableBytes() = 总长度 − writerIndex　　prependableBytes() = readerIndex</text>
+
+  <!-- ===================== Panel B ===================== -->
+  <rect x="48" y="330" width="1144" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="358" font-size="15" font-weight="700" fill="#4A473F">B · 四步操作里游标怎么动</text>
+
+  <!-- step 1 -->
+  <text x="56" y="398" font-size="11.5" font-weight="700" fill="#4A473F">① 刚创建</text>
+  <text x="56" y="414" font-size="9.5" fill="#8A8578">readerIndex = writerIndex = 8</text>
+  <rect x="300" y="386" width="80" height="30" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="380" y="386" width="620" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <line x1="380" y1="380" x2="380" y2="422" stroke="#A64B3C" stroke-width="2.2"/>
+  <text x="1020" y="398" font-size="10" fill="#6B675C">readable = 0</text>
+  <text x="1020" y="414" font-size="9.5" fill="#8A8578">两个游标重合</text>
+
+  <!-- step 2 -->
+  <text x="56" y="454" font-size="11.5" font-weight="700" fill="#4A473F">② append 收到的 12 字节</text>
+  <text x="56" y="470" font-size="9.5" fill="#8A8578">writerIndex 右移 12</text>
+  <rect x="300" y="442" width="80" height="30" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="380" y="442" width="120" height="30" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="500" y="442" width="500" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <line x1="380" y1="436" x2="380" y2="478" stroke="#2F6B5E" stroke-width="2.2"/>
+  <line x1="500" y1="436" x2="500" y2="478" stroke="#3D5A80" stroke-width="2.2"/>
+  <text x="1020" y="454" font-size="10" fill="#6B675C">readable = 12</text>
+  <text x="1020" y="470" font-size="9.5" fill="#8A8578">只有 writerIndex 动了</text>
+
+  <!-- step 3 -->
+  <text x="56" y="510" font-size="11.5" font-weight="700" fill="#4A473F">③ 解析走一条 5 字节的消息</text>
+  <text x="56" y="526" font-size="9.5" fill="#8A8578">retrieve(5)，readerIndex 右移 5</text>
+  <rect x="300" y="498" width="130" height="30" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="430" y="498" width="70" height="30" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="500" y="498" width="500" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <line x1="430" y1="492" x2="430" y2="534" stroke="#2F6B5E" stroke-width="2.2"/>
+  <line x1="500" y1="492" x2="500" y2="534" stroke="#3D5A80" stroke-width="2.2"/>
+  <text x="1020" y="510" font-size="10" fill="#6B675C">readable = 7</text>
+  <text x="1020" y="526" font-size="9.5" font-weight="700" fill="#733428">prependable 涨到 13</text>
+
+  <!-- step 4 -->
+  <text x="56" y="566" font-size="11.5" font-weight="700" fill="#4A473F">④ 剩下的也解析完了</text>
+  <text x="56" y="582" font-size="9.5" fill="#8A8578">retrieveAll()，两个游标一起复位</text>
+  <rect x="300" y="554" width="80" height="30" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="380" y="554" width="620" height="30" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <line x1="380" y1="548" x2="380" y2="590" stroke="#A64B3C" stroke-width="2.2"/>
+  <text x="1020" y="566" font-size="10" fill="#6B675C">readable = 0</text>
+  <text x="1020" y="582" font-size="9.5" fill="#8A8578">prependable 复位回 8</text>
+
+  <text x="72" y="610" font-size="11" fill="#6B675C">示意图，没按真实比例。注意第 ③ 步之后 prependable 白白涨到了 13——这块空间谁也用不上，所以 readable 一归零就要把游标复位</text>
+
+  <!-- card -->
+  <rect x="48" y="640" width="1144" height="100" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="666" font-size="13" font-weight="700" fill="#4A473F">前面那 8 个字节到底留着干什么</text>
+  <text x="72" y="690" font-size="11" fill="#4A473F">序列化的时候，body 有多长往往要写完才知道。如果 buffer 前面没有富余空间，就得先算长度、再申请一块新内存把"长度 + body"拼起来，白白多一次拷贝。</text>
+  <text x="72" y="712" font-size="11" fill="#4A473F">留着这 8 个字节，body 写完之后直接往前面塞：readerIndex 往左退 4，把长度写进去就完事，一次拷贝都不用。</text>
+  <text x="72" y="732" font-size="10.5" fill="#8A8578">这也是为什么复位时是退回 kCheapPrepend（8），而不是退回 0。</text>
+
+  <text x="48" y="768" font-size="11" fill="#6B675C">整个 Buffer 的复杂度就集中在这两个下标上：所有操作都只是在挪它们，底层内存自始至终是一块连续的 vector</text>
+</svg>

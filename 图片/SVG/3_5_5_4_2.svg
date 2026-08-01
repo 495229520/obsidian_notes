@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>kill 第一个参数的四种符号含义，以及 Ctrl+C 从终端驱动找到前台进程组的过程</title>
+  <desc>上半列出 kill(pid, sig) 中 pid 大于零、等于零、小于负一、等于负一四种取值分别打中什么目标；下半是按下 Ctrl+C 之后终端驱动查前台进程组并向整组发信号的五步流程，以及后台进程组读写终端时收到的 SIGTTIN 与 SIGTTOU。</desc>
+  <defs>
+    <marker id="k1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">信号发给谁：kill 的第一个参数是带符号的</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">同一个 kill()，pid 传 4712 和传 -4712 打中的是完全不同的目标，写错一个负号后果差很远</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · kill(pid, sig) 里 pid 的四种符号</text>
+
+  <rect x="56" y="132" width="272" height="164" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="76" y="158" font-size="12.5" font-weight="700" fill="#2C4460">pid &gt; 0</text>
+  <text x="76" y="182" font-size="11.5" font-weight="700" fill="#2C4460">kill(4713, SIGINT)</text>
+  <text x="76" y="210" font-size="11" fill="#2C4460">只发给 PID 4713 这一个</text>
+  <text x="76" y="232" font-size="11" fill="#2C4460">同组的别人收不到</text>
+  <text x="76" y="254" font-size="11" fill="#2C4460">最常用，也最不容易出错</text>
+  <text x="76" y="276" font-size="11" fill="#6B675C">对应命令 kill 4713</text>
+
+  <rect x="344" y="132" width="272" height="164" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="364" y="158" font-size="12.5" font-weight="700" fill="#6B4E28">pid == 0</text>
+  <text x="364" y="182" font-size="11.5" font-weight="700" fill="#6B4E28">kill(0, SIGINT)</text>
+  <text x="364" y="210" font-size="11" fill="#6B4E28">发给调用者自己所在的组</text>
+  <text x="364" y="232" font-size="11" fill="#6B4E28">调用者本身也算在内</text>
+  <text x="364" y="254" font-size="11" font-weight="700" fill="#733428">变量忘了赋值就是自杀</text>
+  <text x="364" y="276" font-size="11" fill="#6B675C">不是「什么都不做」的意思</text>
+
+  <rect x="632" y="132" width="272" height="164" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="652" y="158" font-size="12.5" font-weight="700" fill="#24473F">pid &lt; -1</text>
+  <text x="652" y="182" font-size="11.5" font-weight="700" fill="#24473F">kill(-4712, SIGINT)</text>
+  <text x="652" y="210" font-size="11" fill="#24473F">发给 PGID 为 4712 的整组</text>
+  <text x="652" y="232" font-size="11" fill="#24473F">等价写法 killpg(4712, sig)</text>
+  <text x="652" y="254" font-size="11" font-weight="700" fill="#24473F">Ctrl+C 走的就是这一条</text>
+  <text x="652" y="276" font-size="11" fill="#6B675C">对应命令 kill -- -4712</text>
+
+  <rect x="920" y="132" width="264" height="164" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="940" y="158" font-size="12.5" font-weight="700" fill="#733428">pid == -1</text>
+  <text x="940" y="182" font-size="11.5" font-weight="700" fill="#733428">kill(-1, SIGINT)</text>
+  <text x="940" y="210" font-size="11" fill="#733428">发给所有有权限的进程</text>
+  <text x="940" y="232" font-size="11" fill="#733428">Linux 上只放过 init(1)</text>
+  <text x="940" y="254" font-size="11" font-weight="700" fill="#733428">root 下跑一次等于关机</text>
+  <text x="940" y="276" font-size="11" fill="#6B675C">别把 -1 当错误码传进来</text>
+
+  <text x="56" y="338" font-size="13" font-weight="700" fill="#4A473F">B · 按下 Ctrl+C 之后，信号是怎么找到目标的</text>
+
+  <rect x="56" y="352" width="210" height="76" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="161" y="378" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">① 终端驱动收到 0x03</text>
+  <text x="161" y="398" font-size="10.5" fill="#4A3F68" text-anchor="middle">这个键位由 stty intr 定</text>
+  <text x="161" y="416" font-size="10.5" fill="#4A3F68" text-anchor="middle">不经过任何进程</text>
+
+  <rect x="286" y="352" width="230" height="76" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="401" y="378" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">② 查这个终端的前台组</text>
+  <text x="401" y="398" font-size="10.5" fill="#4A3F68" text-anchor="middle">就是 tcgetpgrp(fd) 的值</text>
+  <text x="401" y="416" font-size="10.5" fill="#4A3F68" text-anchor="middle">由 shell 用 tcsetpgrp 设</text>
+
+  <rect x="536" y="352" width="230" height="76" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="651" y="378" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">③ 向该组整体发 SIGINT</text>
+  <text x="651" y="398" font-size="10.5" fill="#24473F" text-anchor="middle">等价于 kill(-PGID, SIGINT)</text>
+  <text x="651" y="416" font-size="10.5" fill="#24473F" text-anchor="middle">一次投递，不是逐个发</text>
+
+  <rect x="786" y="352" width="200" height="76" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="886" y="378" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">④ 组内各自处理</text>
+  <text x="886" y="398" font-size="10.5" fill="#24473F" text-anchor="middle">有的直接死</text>
+  <text x="886" y="416" font-size="10.5" fill="#24473F" text-anchor="middle">装了 handler 的自己接</text>
+
+  <rect x="1006" y="352" width="178" height="76" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="1095" y="378" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">⑤ 后台组收不到</text>
+  <text x="1095" y="398" font-size="10.5" fill="#6B4E28" text-anchor="middle">它们不是前台组</text>
+  <text x="1095" y="416" font-size="10.5" fill="#6B4E28" text-anchor="middle">照常继续跑</text>
+
+  <line x1="266" y1="390" x2="282" y2="390" stroke="#5A564B" stroke-width="1.6" marker-end="url(#k1)"/>
+  <line x1="516" y1="390" x2="532" y2="390" stroke="#5A564B" stroke-width="1.6" marker-end="url(#k1)"/>
+  <line x1="766" y1="390" x2="782" y2="390" stroke="#5A564B" stroke-width="1.6" marker-end="url(#k1)"/>
+
+  <text x="56" y="460" font-size="13" font-weight="700" fill="#4A473F">C · 前台与后台的分界，还体现在读写终端上</text>
+
+  <rect x="56" y="474" width="556" height="116" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="76" y="500" font-size="12" font-weight="700" fill="#733428">后台组去读终端：内核发 SIGTTIN，整组停住</text>
+  <text x="76" y="526" font-size="11" fill="#733428">cat 丢到后台，一读 stdin 就被停下</text>
+  <text x="76" y="548" font-size="11" fill="#733428">jobs 里显示 Stopped (tty input)</text>
+  <text x="76" y="570" font-size="11" fill="#733428">fg 换到前台才能继续读</text>
+
+  <rect x="628" y="474" width="556" height="116" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="648" y="500" font-size="12" font-weight="700" fill="#6B4E28">后台组去写终端：默认放行，不发 SIGTTOU</text>
+  <text x="648" y="526" font-size="11" fill="#6B4E28">所以后台任务的输出会直接糊到屏幕上</text>
+  <text x="648" y="548" font-size="11" fill="#6B4E28">stty tostop 打开之后才会被停住</text>
+  <text x="648" y="570" font-size="11" fill="#6B4E28">但改终端属性这类操作总会触发它</text>
+
+  <text x="68" y="640" font-size="11.5" fill="#4A473F">前台进程组是终端的属性，不是进程的属性。同一时刻一个终端只认一个前台组，fg 和 bg 改的就是终端里记的那个 PGID。</text>
+  <text x="68" y="664" font-size="11.5" fill="#4A473F">shell 之所以能把一条管道整体挂起再恢复，正是因为它在 fork 之后立刻把这几个进程塞进了同一个新进程组，让它们成为一个可寻址的整体。</text>
+</svg>

@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 716" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <title>服务端的两种套接字</title>
+  <desc>服务端六步流程中监听套接字与已连接套接字的分界、accept 每次调用产生一个新 fd、以及四元组如何让同一个监听端口承载大量并发连接。</desc>
+
+  <rect x="0" y="0" width="1240" height="716" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">服务端的两种套接字</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">六步流程 · accept 分叉出第二种 fd · 一个端口接住上万个连接的原因</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="104" width="1144" height="138" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · 六步流程，第 4 步换了主角</text>
+
+  <rect x="72" y="150" width="164" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="154" y="172" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">socket()</text>
+  <text x="154" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle">要一个 fd</text>
+
+  <rect x="255" y="150" width="164" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="337" y="172" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">bind()</text>
+  <text x="337" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle">占住 IP 和端口</text>
+
+  <rect x="438" y="150" width="164" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="520" y="172" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">listen()</text>
+  <text x="520" y="190" font-size="10.5" fill="#2C4460" text-anchor="middle">主动转被动</text>
+
+  <rect x="621" y="150" width="164" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.6"/>
+  <text x="703" y="172" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">accept()</text>
+  <text x="703" y="190" font-size="10.5" fill="#6B4E28" text-anchor="middle">取出一条，造新 fd</text>
+
+  <rect x="804" y="150" width="164" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="886" y="172" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">read / write</text>
+  <text x="886" y="190" font-size="10.5" fill="#24473F" text-anchor="middle">走新 fd 收发</text>
+
+  <rect x="987" y="150" width="164" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1069" y="172" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">close()</text>
+  <text x="1069" y="190" font-size="10.5" fill="#24473F" text-anchor="middle">先关新 fd</text>
+
+  <path d="M238 176 L253 176" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <path d="M421 176 L436 176" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <path d="M604 176 L619 176" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <path d="M787 176 L802 176" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <path d="M970 176 L985 176" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <rect x="72" y="212" width="713" height="6" rx="3" fill="#3D5A80"/>
+  <rect x="804" y="212" width="347" height="6" rx="3" fill="#2F6B5E"/>
+  <text x="72" y="234" font-size="11" font-weight="700" fill="#2C4460">前四步作用在监听套接字上</text>
+  <text x="804" y="234" font-size="11" font-weight="700" fill="#24473F">之后全部走已连接套接字</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="258" width="1144" height="188" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="288" font-size="15" font-weight="700" fill="#4A473F">B · accept() 不是把连接「读出来」，是造出一个新 fd</text>
+
+  <rect x="72" y="302" width="272" height="124" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="208" y="330" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">监听套接字 fd 3</text>
+  <text x="208" y="356" font-size="11.5" fill="#2C4460" text-anchor="middle">socket + bind + listen 之后</text>
+  <text x="208" y="380" font-size="11.5" fill="#2C4460" text-anchor="middle">只负责收连接</text>
+  <text x="208" y="404" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">读写它没有意义</text>
+
+  <path d="M352 364 L432 364" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="392" y="352" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">accept()</text>
+  <text x="392" y="384" font-size="10.5" fill="#24473F" text-anchor="middle">每调一次</text>
+
+  <rect x="444" y="302" width="392" height="36" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="462" y="325" font-size="12" font-weight="700" fill="#24473F">已连接套接字 fd 5　←　客户端 A</text>
+  <rect x="444" y="346" width="392" height="36" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="462" y="369" font-size="12" font-weight="700" fill="#24473F">已连接套接字 fd 6　←　客户端 B</text>
+  <rect x="444" y="390" width="392" height="36" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="462" y="413" font-size="12" font-weight="700" fill="#24473F">已连接套接字 fd 7　←　客户端 C</text>
+
+  <text x="868" y="325" font-size="11.5" fill="#4A473F">fd 3 从头到尾不变</text>
+  <text x="868" y="349" font-size="11.5" fill="#4A473F">每条连接一个独立 fd</text>
+  <text x="868" y="373" font-size="11.5" fill="#4A473F">数据全走新 fd</text>
+  <text x="868" y="397" font-size="11.5" font-weight="700" fill="#733428">连接结束只关新 fd</text>
+  <text x="868" y="419" font-size="11.5" font-weight="700" fill="#733428">忘了关就是 fd 泄漏</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="462" width="1144" height="206" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="492" font-size="15" font-weight="700" fill="#4A473F">C · 同一个 8080，为什么能接住上万条连接</text>
+
+  <text x="88" y="516" font-size="11" font-weight="700" fill="#6B675C">套接字</text>
+  <text x="200" y="516" font-size="11" font-weight="700" fill="#6B675C">本端 IP : Port</text>
+  <text x="440" y="516" font-size="11" font-weight="700" fill="#6B675C">对端 IP : Port</text>
+  <text x="700" y="516" font-size="11" font-weight="700" fill="#6B675C">说明</text>
+  <path d="M72 524 L1168 524" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="72" y="530" width="1096" height="30" fill="#E3EAF4"/>
+  <text x="88" y="550" font-size="11.5" font-weight="700" fill="#2C4460">监听 fd 3</text>
+  <text x="200" y="550" font-size="11.5" fill="#2C4460">10.0.0.1 : 8080</text>
+  <text x="440" y="550" font-size="11.5" fill="#2C4460">—　（还没有对端）</text>
+  <text x="700" y="550" font-size="11.5" fill="#2C4460">只有本端，是个三元组</text>
+
+  <rect x="72" y="562" width="1096" height="30" fill="#DCE9E3"/>
+  <text x="88" y="582" font-size="11.5" font-weight="700" fill="#24473F">已连接 fd 5</text>
+  <text x="200" y="582" font-size="11.5" fill="#24473F">10.0.0.1 : 8080</text>
+  <text x="440" y="582" font-size="11.5" fill="#24473F">203.0.113.7 : 51000</text>
+  <text x="700" y="582" font-size="11.5" fill="#24473F">四元组，本端与监听的完全一样</text>
+
+  <rect x="72" y="594" width="1096" height="30" fill="#DCE9E3"/>
+  <text x="88" y="614" font-size="11.5" font-weight="700" fill="#24473F">已连接 fd 6</text>
+  <text x="200" y="614" font-size="11.5" fill="#24473F">10.0.0.1 : 8080</text>
+  <text x="440" y="614" font-size="11.5" fill="#24473F">203.0.113.7 : 51001</text>
+  <text x="700" y="614" font-size="11.5" fill="#24473F">同一台客户端，换了个临时端口</text>
+
+  <rect x="72" y="626" width="1096" height="30" fill="#DCE9E3"/>
+  <text x="88" y="646" font-size="11.5" font-weight="700" fill="#24473F">已连接 fd 7</text>
+  <text x="200" y="646" font-size="11.5" fill="#24473F">10.0.0.1 : 8080</text>
+  <text x="440" y="646" font-size="11.5" fill="#24473F">198.51.100.9 : 40000</text>
+  <text x="700" y="646" font-size="11.5" fill="#24473F">换了一台客户端</text>
+
+  <text x="48" y="698" font-size="12" fill="#6B675C">三条已连接套接字的本端一模一样，靠对端 IP + Port 区分。所以并发上限取决于四元组的组合数与 fd 上限，不是端口数</text>
+</svg>

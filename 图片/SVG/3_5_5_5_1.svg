@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>子进程终止后 task_struct 的回收路径，以及父进程不回收时的三种结局</title>
+  <desc>上半是父进程、内核、子进程三条泳道的时间线，标出 exit 之后哪些资源立刻释放、哪一块要留到 wait 才释放；下半对照父进程不 wait、父进程先退出、显式忽略 SIGCHLD 三种情况的结局。</desc>
+  <defs>
+    <marker id="w1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">子进程 exit() 之后，内核留下的那一小块必须有人来取</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">地址空间、fd、物理内存在退出那一刻就还回去了；退出状态留在 task_struct 里，等父进程 wait() 取走</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 一次正常回收：从 exit() 到 task_struct 被释放</text>
+
+  <rect x="56" y="130" width="1128" height="96" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="150" font-size="12" font-weight="700" fill="#3D5A80">父进程</text>
+  <rect x="56" y="236" width="1128" height="110" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="256" font-size="12" font-weight="700" fill="#2F6B5E">内核</text>
+  <rect x="56" y="356" width="1128" height="90" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="376" font-size="12" font-weight="700" fill="#A64B3C">子进程</text>
+
+  <rect x="80" y="160" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="165" y="182" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① fork() 后各跑各的</text>
+  <text x="165" y="200" font-size="10.5" fill="#2C4460" text-anchor="middle">谁先被调度没有保证</text>
+
+  <rect x="266" y="172" width="720" height="30" rx="6" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="626" y="192" font-size="11.5" fill="#4A473F" text-anchor="middle">父进程阻塞在 wait()：不占 CPU，可被信号打断（EINTR）</text>
+
+  <rect x="1000" y="160" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1085" y="182" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">⑥ wait() 返回</text>
+  <text x="1085" y="200" font-size="10.5" fill="#2C4460" text-anchor="middle">拿到 pid 与 status</text>
+
+  <rect x="458" y="266" width="175" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="545" y="290" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">③ 释放地址空间与 fd</text>
+  <text x="545" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">物理内存这时就还了</text>
+  <text x="545" y="324" font-size="10.5" fill="#24473F" text-anchor="middle">打开的文件全部关闭</text>
+
+  <rect x="654" y="266" width="166" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="737" y="290" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">④ 只留 task_struct</text>
+  <text x="737" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">退出状态 + rusage</text>
+  <text x="737" y="324" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">这块就是「僵尸」</text>
+
+  <rect x="838" y="266" width="150" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="913" y="290" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑤ 发 SIGCHLD</text>
+  <text x="913" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">默认动作是忽略</text>
+  <text x="913" y="324" font-size="10.5" fill="#24473F" text-anchor="middle">不装处理函数也行</text>
+
+  <rect x="1000" y="266" width="170" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1085" y="290" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑦ 释放 task_struct</text>
+  <text x="1085" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">PID 回到可分配池</text>
+  <text x="1085" y="324" font-size="10.5" fill="#24473F" text-anchor="middle">进程条目彻底消失</text>
+
+  <rect x="266" y="384" width="175" height="54" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="353" y="406" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">② exit(42) 或被信号打死</text>
+  <text x="353" y="424" font-size="10.5" fill="#733428" text-anchor="middle">用户态代码到此为止</text>
+
+  <rect x="462" y="392" width="708" height="30" rx="6" fill="#F6E4DE" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="816" y="412" font-size="11.5" fill="#733428" text-anchor="middle">这一整段区间 ps 都显示 STAT=Z、命令名带 &lt;defunct&gt;</text>
+
+  <path d="M250,187 L258,187 L258,411 L262,411" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#w1)"/>
+  <path d="M441,411 L450,411 L450,299 L454,299" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#w1)"/>
+  <line x1="633" y1="299" x2="650" y2="299" stroke="#5A564B" stroke-width="1.6" marker-end="url(#w1)"/>
+  <line x1="820" y1="299" x2="834" y2="299" stroke="#5A564B" stroke-width="1.6" marker-end="url(#w1)"/>
+  <path d="M913,266 L913,232 L1040,232 L1040,218" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#w1)"/>
+  <line x1="1130" y1="214" x2="1130" y2="262" stroke="#5A564B" stroke-width="1.6" marker-end="url(#w1)"/>
+
+  <text x="56" y="486" font-size="13" font-weight="700" fill="#4A473F">B · 父进程没来取：三条路的结局完全不同</text>
+
+  <rect x="56" y="500" width="362" height="152" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="78" y="526" font-size="12.5" font-weight="700" fill="#733428">父进程活着，却从不 wait</text>
+  <text x="78" y="550" font-size="11" fill="#733428">子进程停在 Z 状态不动</text>
+  <text x="78" y="572" font-size="11" fill="#733428">PID 与 task_struct 一直占着</text>
+  <text x="78" y="594" font-size="11" fill="#733428">kill -9 杀不动：它已经死了</text>
+  <text x="78" y="616" font-size="11" fill="#733428">要清掉只能让父进程退出</text>
+  <text x="78" y="638" font-size="11" fill="#733428">PID 撑满后 fork 返回 EAGAIN</text>
+
+  <rect x="439" y="500" width="362" height="152" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="461" y="526" font-size="12.5" font-weight="700" fill="#24473F">父进程先退出了</text>
+  <text x="461" y="550" font-size="11" fill="#24473F">子进程当场被 PID 1 收养</text>
+  <text x="461" y="572" font-size="11" fill="#24473F">systemd 循环 wait，随死随收</text>
+  <text x="461" y="594" font-size="11" fill="#24473F">这叫孤儿进程，不是僵尸</text>
+  <text x="461" y="616" font-size="11" fill="#24473F">getppid() 从此返回 1</text>
+  <text x="461" y="638" font-size="11" fill="#24473F">容器里的 PID 1 未必肯收</text>
+
+  <rect x="822" y="500" width="362" height="152" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="844" y="526" font-size="12.5" font-weight="700" fill="#2C4460">signal(SIGCHLD, SIG_IGN)</text>
+  <text x="844" y="550" font-size="11" fill="#2C4460">要显式设，不是默认状态</text>
+  <text x="844" y="572" font-size="11" fill="#2C4460">内核不再保留退出状态</text>
+  <text x="844" y="594" font-size="11" fill="#2C4460">子进程一死就彻底消失</text>
+  <text x="844" y="616" font-size="11" fill="#2C4460">代价：status 也拿不到了</text>
+  <text x="844" y="638" font-size="11" fill="#2C4460">SA_NOCLDWAIT 效果相同</text>
+
+  <text x="68" y="700" font-size="11.5" fill="#4A473F">僵尸占的不是内存：地址空间在第 ③ 步就还回去了。它占的是一个 PID 号，加上内核里那一小块 task_struct。</text>
+  <text x="68" y="724" font-size="11.5" fill="#4A473F">/proc/sys/kernel/pid_max 默认 32768，被僵尸撑满之后新的 fork() 一律返回 EAGAIN，整台机器都起不了新进程。</text>
+</svg>

@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <title>一次 fprintf 的数据路径：两层缓冲与 FILE*/fd 桥接</title>
+  <desc>左侧为数据从用户代码经 stdio 缓冲、内核页缓存到磁盘的四站路径，右侧为 fdopen/fileno 桥接与三种缓冲模式。</desc>
+
+  <rect x="0" y="0" width="1240" height="660" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">一次 fprintf 的数据路径：两层缓冲，两次交接</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">fflush 只完成第一次交接（stdio 缓冲 → 内核）；掉电安全靠第二次交接 fsync（内核 → 磁盘）</text>
+
+  <!-- Panel A -->
+  <rect x="48" y="104" width="656" height="460" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · 数据往下走的四站</text>
+
+  <!-- box1 用户代码 -->
+  <rect x="96" y="150" width="300" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="246" y="173" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">用户代码</text>
+  <text x="246" y="192" font-size="10.5" fill="#2C4460" text-anchor="middle">fprintf(fp, ...) · fputs · fwrite</text>
+
+  <line x1="246" y1="206" x2="246" y2="242" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="266" y="222" font-size="11.5" fill="#4A473F">memcpy 进缓冲</text>
+  <text x="266" y="238" font-size="10" fill="#6B675C">不发生系统调用</text>
+
+  <!-- box2 stdio 缓冲 -->
+  <rect x="96" y="246" width="300" height="54" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="246" y="269" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">stdio 缓冲（FILE 内部）</text>
+  <text x="246" y="288" font-size="10.5" fill="#6B4E28" text-anchor="middle">大小可用 setvbuf 调整</text>
+
+  <line x1="246" y1="302" x2="246" y2="372" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+  <text x="266" y="324" font-size="11.5" font-weight="700" fill="#2C4460">write(fd) 系统调用</text>
+  <text x="266" y="340" font-size="10" fill="#6B675C">触发：缓冲满 / fflush / fclose / exit</text>
+
+  <!-- user/kernel divider -->
+  <line x1="64" y1="352" x2="688" y2="352" stroke="#9B968A" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="612" y="344" font-size="10.5" fill="#6B675C" text-anchor="end">用户态</text>
+  <text x="612" y="368" font-size="10.5" fill="#6B675C" text-anchor="end">内核态</text>
+
+  <!-- box3 页缓存 -->
+  <rect x="96" y="376" width="300" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="246" y="399" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">内核页缓存 page cache</text>
+  <text x="246" y="418" font-size="10.5" fill="#24473F" text-anchor="middle">write 返回 ≠ 落盘</text>
+
+  <line x1="246" y1="432" x2="246" y2="468" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrRed)"/>
+  <text x="266" y="448" font-size="11.5" font-weight="700" fill="#A64B3C">fsync(fd) 强制落盘</text>
+  <text x="266" y="464" font-size="10" fill="#6B675C">否则等内核周期回写</text>
+
+  <!-- box4 磁盘 -->
+  <rect x="96" y="472" width="300" height="54" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.4"/>
+  <text x="246" y="495" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">磁盘介质</text>
+  <text x="246" y="514" font-size="10.5" fill="#6B675C" text-anchor="middle">断电后数据仍在</text>
+
+  <!-- fflush scope bracket -->
+  <line x1="480" y1="276" x2="480" y2="400" stroke="#8A6A3A" stroke-width="1.4"/>
+  <line x1="472" y1="276" x2="480" y2="276" stroke="#8A6A3A" stroke-width="1.4"/>
+  <line x1="472" y1="400" x2="480" y2="400" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="492" y="330" font-size="11" font-weight="700" fill="#8A6A3A">fflush 的作用范围</text>
+  <text x="492" y="346" font-size="10" fill="#6B675C">只推到内核为止</text>
+
+  <!-- Panel B -->
+  <rect x="728" y="104" width="464" height="460" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="752" y="134" font-size="15" font-weight="700" fill="#4A473F">B · FILE* 与 fd：一对桥接函数</text>
+
+  <!-- FILE* box -->
+  <rect x="800" y="156" width="320" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="960" y="180" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">FILE* 流（标准 I/O）</text>
+  <text x="960" y="200" font-size="10.5" fill="#2C4460" text-anchor="middle">fopen · fprintf · fgets · fclose</text>
+
+  <!-- fd box -->
+  <rect x="800" y="294" width="320" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="960" y="318" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">文件描述符 fd（系统调用）</text>
+  <text x="960" y="338" font-size="10.5" fill="#24473F" text-anchor="middle">open · read · write · close</text>
+
+  <!-- bridges -->
+  <line x1="866" y1="216" x2="866" y2="290" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="854" y="248" font-size="12" font-weight="700" fill="#2C4460" text-anchor="end">fileno()</text>
+  <text x="854" y="264" font-size="10" fill="#6B675C" text-anchor="end">取出底层 fd</text>
+
+  <line x1="1054" y1="290" x2="1054" y2="216" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="1066" y="248" font-size="12" font-weight="700" fill="#24473F">fdopen()</text>
+  <text x="1066" y="264" font-size="10" fill="#6B675C">给 fd 包上一个流</text>
+
+  <text x="752" y="384" font-size="10.5" fill="#6B675C">fclose(流) 会连底层 fd 一起关闭，别再对 fd 调 close</text>
+
+  <!-- buffering table -->
+  <text x="752" y="414" font-size="12" font-weight="700" fill="#4A473F">缓冲模式（setvbuf 可改）</text>
+  <rect x="752" y="424" width="416" height="124" rx="6" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <rect x="753" y="425" width="414" height="30" fill="#EDEBE3"/>
+  <line x1="752" y1="455" x2="1168" y2="455" stroke="#9B968A" stroke-width="1"/>
+  <line x1="752" y1="486" x2="1168" y2="486" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="752" y1="517" x2="1168" y2="517" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="892" y1="424" x2="892" y2="548" stroke="#D8D5C8" stroke-width="1"/>
+  <line x1="1016" y1="424" x2="1016" y2="548" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="766" y="445" font-size="10.5" font-weight="700" fill="#6B675C">模式</text>
+  <text x="906" y="445" font-size="10.5" font-weight="700" fill="#6B675C">何时写出</text>
+  <text x="1030" y="445" font-size="10.5" font-weight="700" fill="#6B675C">默认对象</text>
+  <text x="766" y="476" font-size="10.5" fill="#4A473F">_IOFBF 全缓冲</text>
+  <text x="906" y="476" font-size="10.5" fill="#4A473F">缓冲写满</text>
+  <text x="1030" y="476" font-size="10.5" fill="#4A473F">普通文件</text>
+  <text x="766" y="507" font-size="10.5" fill="#4A473F">_IOLBF 行缓冲</text>
+  <text x="906" y="507" font-size="10.5" fill="#4A473F">遇到换行符</text>
+  <text x="1030" y="507" font-size="10.5" fill="#4A473F">终端 stdout</text>
+  <text x="766" y="538" font-size="10.5" fill="#4A473F">_IONBF 无缓冲</text>
+  <text x="906" y="538" font-size="10.5" fill="#4A473F">立即写出</text>
+  <text x="1030" y="538" font-size="10.5" fill="#4A473F">stderr</text>
+
+  <!-- bottom strip -->
+  <rect x="48" y="588" width="1144" height="40" rx="6" fill="#EDEBE3"/>
+  <text x="68" y="613" font-size="11.5" fill="#4A473F">口径：fflush 成功只说明数据到了内核页缓存；fclose 会自动 fflush 但不会 fsync；要保证落盘，先 fflush(fp) 再 fsync(fileno(fp))</text>
+</svg>

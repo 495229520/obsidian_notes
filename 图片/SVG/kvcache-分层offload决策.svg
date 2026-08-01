@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FBFBF6/#8A8574；蓝 #E3EAF4/#3D5A80/#2C4460；
+       绿 #DCE9E3/#2F6B5E/#24473F；琥珀 #F3E8D3/#B07D2B/#6B4E28；红 #A64B3C；与本库既有 SVG 同一套 -->
+  <title>KV Cache 分层 offload 决策</title>
+  <desc>左侧为体积账：每 token 320 KiB、32k 会话约 10 GiB、80 GB 卡只够几条并发，以及 HBM/主机 DRAM/本地 NVMe/远端池四层的带宽与取回耗时阶梯。右侧为决策不等式：取回时间等于体积除以层带宽加固定开销，重算时间随上下文长度超线性增长，两条曲线交于盈亏平衡点。底部为 paged 块管理与逐层流水预取。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">KV Cache Offload：给 GPU 造一套 page cache</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">一切决策归于一道不等式——取回时间 &#60; 重算时间。上下文越长越值得缓存；每层有自己的盈亏平衡段长</text>
+
+  <!-- ======== A · 体积账与分层阶梯 ======== -->
+  <rect x="48" y="104" width="568" height="400" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="130" font-size="14" font-weight="700" fill="#4A473F" dominant-baseline="central">A · 体积账与分层阶梯</text>
+
+  <rect x="72" y="146" width="520" height="58" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="332" y="168" font-size="12.5" font-weight="700" fill="#2B2A26" text-anchor="middle" dominant-baseline="central">Bytes/token = 2 × L × H_kv × D_head × B_dtype</text>
+  <text x="332" y="190" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">70B · 80 层 · GQA 8 · head_dim 128 · FP16</text>
+
+  <rect x="72" y="218" width="168" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="156" y="244" font-size="17" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">320 KiB</text>
+  <text x="156" y="268" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">每 token</text>
+
+  <rect x="248" y="218" width="168" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="332" y="244" font-size="17" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">~10 GiB</text>
+  <text x="332" y="268" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">32k 一条会话</text>
+
+  <rect x="424" y="218" width="168" height="66" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="508" y="244" font-size="17" font-weight="700" fill="#733428" text-anchor="middle" dominant-baseline="central">几条并发</text>
+  <text x="508" y="268" font-size="10.5" fill="#733428" text-anchor="middle" dominant-baseline="central">80 GB 卡的余量</text>
+
+  <text x="72" y="306" font-size="10.5" fill="#6B675C" dominant-baseline="central">逐层向下：容量变大、带宽变小、固定开销变高</text>
+
+  <text x="86" y="330" font-size="11" font-weight="700" fill="#4A473F" dominant-baseline="central">层</text>
+  <text x="352" y="330" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">带宽 → HBM</text>
+  <text x="512" y="330" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">取回 10 GiB</text>
+
+  <rect x="72" y="344" width="520" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="86" y="361" font-size="11.5" font-weight="700" fill="#24473F" dominant-baseline="central">HBM 本层</text>
+  <text x="352" y="361" font-size="11" fill="#24473F" text-anchor="middle" dominant-baseline="central">数 TB/s</text>
+  <text x="512" y="361" font-size="11" fill="#24473F" text-anchor="middle" dominant-baseline="central">~0（命中即用）</text>
+
+  <rect x="72" y="382" width="520" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="86" y="399" font-size="11.5" font-weight="700" fill="#2C4460" dominant-baseline="central">主机 DRAM</text>
+  <text x="352" y="399" font-size="11" fill="#2C4460" text-anchor="middle" dominant-baseline="central">~25 GB/s（PCIe）</text>
+  <text x="512" y="399" font-size="11" fill="#2C4460" text-anchor="middle" dominant-baseline="central">~0.4 s</text>
+
+  <rect x="72" y="420" width="520" height="34" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="86" y="437" font-size="11.5" font-weight="700" fill="#6B4E28" dominant-baseline="central">本地 NVMe</text>
+  <text x="352" y="437" font-size="11" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">几 ~ 几十 GB/s</text>
+  <text x="512" y="437" font-size="11" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">~1.5 s（7 GB/s）</text>
+
+  <rect x="72" y="458" width="520" height="34" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="86" y="475" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">远端池 RDMA</text>
+  <text x="352" y="475" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">~25 GB/s（200 Gb/s）</text>
+  <text x="512" y="475" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">~0.4 s + 往返</text>
+
+  <!-- ======== B · 决策不等式 ======== -->
+  <rect x="624" y="104" width="568" height="400" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="646" y="130" font-size="14" font-weight="700" fill="#4A473F" dominant-baseline="central">B · 决策不等式：取回赢过重算才值得</text>
+
+  <rect x="648" y="146" width="520" height="58" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="908" y="168" font-size="12.5" font-weight="700" fill="#3D5A80" text-anchor="middle" dominant-baseline="central">T_fetch = Bytes ÷ BW_tier + base_latency</text>
+  <text x="908" y="190" font-size="12.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">T_recompute(n) ~ O(n^1.x)　超线性</text>
+
+  <rect x="648" y="216" width="520" height="216" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <path d="M706,386 L1156,386" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <path d="M706,386 L706,238" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arrn)"/>
+  <text x="698" y="234" font-size="10" fill="#6B675C" text-anchor="end" dominant-baseline="central">时间</text>
+
+  <path d="M878,246 L878,386" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="886" y="262" font-size="10" fill="#6B675C" dominant-baseline="central">盈亏平衡</text>
+
+  <polyline points="716,383 826,373 976,318 1136,246" fill="none" stroke="#A64B3C" stroke-width="2.2"/>
+  <polyline points="716,366 826,358 976,346 1136,332" fill="none" stroke="#3D5A80" stroke-width="2.2"/>
+  <circle cx="878" cy="354" r="4" fill="#FBFBF6" stroke="#5A564B" stroke-width="1.6"/>
+
+  <text x="1040" y="262" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">重算（超线性）</text>
+  <text x="1040" y="316" font-size="10.5" font-weight="700" fill="#3D5A80" text-anchor="middle" dominant-baseline="central">取回（线性）</text>
+
+  <text x="722" y="330" font-size="10" fill="#6B675C" dominant-baseline="central">短 prompt：重算更快</text>
+  <text x="1144" y="370" font-size="10" fill="#4A473F" text-anchor="end" dominant-baseline="central">32k：重算秒级 vs DRAM 0.4 s</text>
+
+  <text x="716" y="400" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">1k</text>
+  <text x="826" y="400" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">4k</text>
+  <text x="976" y="400" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">16k</text>
+  <text x="1136" y="400" font-size="10" fill="#6B675C" text-anchor="middle" dominant-baseline="central">32k</text>
+  <text x="926" y="420" font-size="10.5" fill="#6B675C" text-anchor="middle" dominant-baseline="central">上下文长度（token）</text>
+
+  <rect x="648" y="446" width="520" height="52" rx="7" fill="#FAF9F2" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="908" y="466" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">上下文越长，offload 越划算</text>
+  <text x="908" y="486" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">短段被 base_latency 吃光收益 → 设最小段长门槛</text>
+
+  <!-- ======== C · 工程形态 ======== -->
+  <rect x="48" y="520" width="1144" height="250" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="546" font-size="14" font-weight="700" fill="#4A473F" dominant-baseline="central">C · 工程形态：paged 块管理 + 逐层流水预取</text>
+  <path d="M612,566 L612,756" fill="none" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <text x="72" y="574" font-size="10.5" fill="#6B675C" dominant-baseline="central">按 block 切块（十几 token 一块），机制即分页</text>
+
+  <text x="76" y="606" font-size="11" font-weight="700" fill="#24473F" dominant-baseline="central">HBM</text>
+  <rect x="150" y="593" width="36" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="194" y="593" width="36" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="238" y="593" width="36" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="282" y="593" width="36" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+
+  <text x="76" y="652" font-size="11" font-weight="700" fill="#2C4460" dominant-baseline="central">DRAM</text>
+  <rect x="150" y="639" width="36" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="194" y="639" width="36" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="238" y="639" width="36" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="282" y="639" width="36" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="326" y="639" width="36" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="370" y="639" width="36" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+
+  <text x="76" y="698" font-size="11" font-weight="700" fill="#6B4E28" dominant-baseline="central">NVMe</text>
+  <rect x="150" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="194" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="238" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="282" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="326" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="370" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="414" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="458" y="685" width="36" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+
+  <path d="M534,600 L534,690" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrn)"/>
+  <path d="M568,690 L568,600" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+  <text x="76" y="734" font-size="10.5" fill="#4A473F" dominant-baseline="central">↓ LRU 逐层下沉　↑ 命中逐层取回　块太大 → 头部等待</text>
+
+  <text x="636" y="574" font-size="10.5" fill="#6B675C" dominant-baseline="central">算第 N 层注意力时预取第 N+1 层 KV，传输被计算掩盖</text>
+
+  <text x="636" y="616" font-size="11" font-weight="700" fill="#2C4460" dominant-baseline="central">取回 PCIe</text>
+  <rect x="740" y="603" width="76" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="778" y="616" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">L1</text>
+  <rect x="820" y="603" width="76" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="858" y="616" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">L2</text>
+  <rect x="900" y="603" width="76" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="938" y="616" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">L3</text>
+  <rect x="980" y="603" width="76" height="26" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="1018" y="616" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">L4</text>
+
+  <path d="M816,631 L816,661" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="3 3"/>
+  <path d="M896,631 L896,661" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="3 3"/>
+  <path d="M976,631 L976,661" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="3 3"/>
+  <path d="M1056,631 L1056,661" fill="none" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="3 3"/>
+
+  <text x="636" y="676" font-size="11" font-weight="700" fill="#24473F" dominant-baseline="central">计算 GPU</text>
+  <rect x="816" y="663" width="76" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="854" y="676" font-size="10.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">L1</text>
+  <rect x="896" y="663" width="76" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="934" y="676" font-size="10.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">L2</text>
+  <rect x="976" y="663" width="76" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1014" y="676" font-size="10.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">L3</text>
+  <rect x="1056" y="663" width="76" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1094" y="676" font-size="10.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">L4</text>
+
+  <text x="636" y="712" font-size="10.5" fill="#2F6B5E" dominant-baseline="central">错开半拍 = 传输藏进计算背后（同 8.3 §4 的重叠）</text>
+  <text x="636" y="734" font-size="10.5" fill="#4A473F" dominant-baseline="central">命中率高但 TTFT 没降 → 先查逐层预取是否生效</text>
+
+  <!-- ======== 底部结论 ======== -->
+  <rect x="48" y="786" width="1144" height="76" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="812" font-size="12.5" font-weight="700" fill="#2B2A26" dominant-baseline="central">TTFT 分布被命中率改写：p50 看命中路径，p99 看未命中 + 慢层取回 + evict 风暴——排障第一步是按命中层分桶</text>
+  <text x="70" y="840" font-size="11" fill="#4A473F" dominant-baseline="central">收益在容量维（HBM 释放 → 并发 ↑ → 吞吐 ↑），代价在带宽维（取回与权重/激活争 PCIe → TBT 变差）；两个成本模型都要本机实测标定</text>
+</svg>

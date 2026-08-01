@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>互斥量 · 条件变量 · 线程池动画 · 竞态 · 死锁 · 任务流转</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:20px 22px 18px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;text-align:center;}
+.viz .vcap b{color:var(--ink);}
+
+/* ===== 竞态 + mutex ===== */
+.rc-stage{width:578px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:14px;}
+.rc-top{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.rc-num{
+  font-family:var(--mono);font-size:26px;font-weight:700;color:var(--ink);
+  padding:8px 28px;border-radius:12px;border:2px solid var(--line);background:var(--paper);
+  transition:all var(--dur) var(--ease);text-align:center;min-width:140px;
+}
+.rc-num.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.rc-num.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.rc-lock{
+  font-family:var(--mono);font-size:11px;font-weight:700;padding:5px 14px;border-radius:999px;
+  border:1.5px solid var(--line);background:var(--gray);color:var(--muted);
+  transition:all var(--dur) var(--ease);white-space:nowrap;text-align:center;
+}
+.rc-lock.free{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.rc-lock.held{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.rc-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;}
+.rc-th{
+  border:1.5px solid var(--line);border-radius:12px;background:var(--paper);
+  padding:12px 14px 14px;min-height:168px;
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur) var(--ease);
+  display:flex;flex-direction:column;gap:10px;
+}
+.rc-th.a{border-color:var(--blue);}
+.rc-th.b{border-color:var(--green);}
+.rc-th.glow{box-shadow:0 0 0 3px rgba(24,95,165,.2);}
+.rc-th.glow-g{box-shadow:0 0 0 3px rgba(15,110,86,.2);}
+.rc-th.blocked{opacity:.5;}
+.rc-thh{font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.rc-thh .tag{font-family:var(--mono);font-size:10px;font-weight:700;}
+.rc-th.a .tag{color:var(--blue);}
+.rc-th.b .tag{color:var(--green);}
+.rc-steps{display:flex;flex-direction:column;gap:8px;}
+.rc-s{
+  font-family:var(--mono);font-size:11px;padding:7px 10px;border-radius:8px;
+  border:1px solid var(--grid);background:var(--gray);color:var(--faint);
+  transition:all var(--dur) var(--ease);text-align:left;
+}
+.rc-s.on{color:var(--ink);border-color:var(--ink);background:var(--paper);font-weight:700;}
+.rc-s.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.rc-s.lost{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);text-decoration:line-through;}
+.rc-banner{
+  width:100%;text-align:center;font-size:12px;font-weight:700;padding:9px 12px;border-radius:9px;
+  border:1.5px solid var(--line);background:var(--paper);color:var(--muted);
+  transition:all var(--dur) var(--ease);min-height:38px;display:flex;align-items:center;justify-content:center;
+}
+.rc-banner.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.rc-banner.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+
+/* ===== 死锁 ===== */
+.dl-stage{width:578px;margin:0 auto;display:flex;flex-direction:column;gap:14px;}
+.dl-top{display:grid;grid-template-columns:1fr 110px 1fr;gap:14px;align-items:center;}
+.dl-th{
+  border:1.5px solid var(--line);border-radius:12px;background:var(--paper);
+  padding:14px 14px 16px;min-height:130px;
+  transition:all var(--dur) var(--ease);
+  display:flex;flex-direction:column;gap:8px;
+}
+.dl-th.t1{border-color:var(--blue);}
+.dl-th.t2{border-color:var(--green);}
+.dl-th.dead{border-color:var(--danger);background:var(--dangerbg);box-shadow:0 0 0 3px rgba(179,64,47,.18);}
+.dl-th.ok{border-color:var(--green);background:var(--greenbg);}
+.dl-thh{font-size:13px;font-weight:700;text-align:center;}
+.dl-st{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;min-height:32px;line-height:1.35;}
+.dl-holds{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:auto;}
+.dl-lock{
+  font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;
+  border:1.5px solid var(--line);background:var(--gray);color:var(--muted);
+  transition:all var(--dur) var(--ease);white-space:nowrap;
+}
+.dl-lock.held-a{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.dl-lock.held-b{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.dl-lock.wait{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);animation:pulse .9s ease infinite;}
+@keyframes pulse{50%{transform:scale(1.05);}}
+.dl-center{display:flex;align-items:center;justify-content:center;}
+.dl-cycle{
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--danger);
+  border:1.5px solid var(--danger);background:var(--dangerbg);border-radius:10px;
+  padding:12px 10px;text-align:center;opacity:0;transition:opacity var(--dur) var(--ease);
+  line-height:1.4;width:100%;
+}
+.dl-cycle.show{opacity:1;}
+.dl-fix{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.dl-card{
+  border:1.5px solid var(--grid);border-radius:10px;padding:12px 14px;background:var(--paper);
+  opacity:.32;transition:all var(--dur) var(--ease);text-align:center;min-height:64px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+}
+.dl-card.lit{opacity:1;border-color:var(--ink);}
+.dl-card b{display:block;font-size:12px;}
+.dl-card span{font-size:11px;color:var(--muted);}
+.dl-msg{
+  text-align:center;font-size:12px;font-weight:700;padding:9px 12px;border-radius:9px;
+  border:1.5px solid var(--line);color:var(--muted);background:var(--paper);
+  transition:all var(--dur) var(--ease);min-height:38px;
+  display:flex;align-items:center;justify-content:center;
+}
+.dl-msg.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.dl-msg.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.dl-msg.warn{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+
+/* ===== 条件变量 + 线程池 ===== */
+.tp-stage{width:578px;margin:0 auto;display:flex;flex-direction:column;gap:14px;}
+.tp-row1{
+  display:grid;grid-template-columns:132px 36px 1fr 36px;gap:10px;align-items:center;
+  min-height:128px;
+}
+.tp-io{
+  height:100%;min-height:110px;border:1.5px solid var(--blue);border-radius:12px;background:var(--bluebg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  transition:box-shadow var(--dur) var(--ease);padding:10px 8px;text-align:center;
+}
+.tp-io.glow{box-shadow:0 0 0 3px rgba(24,95,165,.22);}
+.tp-io b{font-size:12.5px;}
+.tp-io span{font-family:var(--mono);font-size:10px;color:var(--blue);}
+.tp-arr{
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--brown);
+  text-align:center;opacity:0;transition:opacity var(--dur) var(--ease);white-space:nowrap;
+}
+.tp-arr.show{opacity:1;}
+.tp-q{
+  height:100%;min-height:110px;border:1.5px solid var(--brown);border-radius:12px;background:var(--paper);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.tp-qh{
+  flex:none;height:28px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:var(--brown);border-bottom:1px solid var(--grid);
+  background:rgba(250,238,218,.45);
+}
+.tp-slots{flex:1;display:flex;flex-direction:column;gap:6px;padding:10px 12px;justify-content:center;}
+.tp-task{
+  height:24px;border-radius:7px;border:1.5px solid var(--brown);background:var(--brownbg);
+  color:var(--brown);font-family:var(--mono);font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:translateX(-10px);transition:all var(--dur) var(--ease);
+}
+.tp-task.on{opacity:1;transform:translateX(0);}
+.tp-task.out{opacity:0;transform:translateX(14px);}
+.tp-qfoot{
+  flex:none;padding:0 10px 8px;display:flex;justify-content:flex-end;
+}
+.tp-lock{
+  font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;
+  border:1.5px solid var(--line);background:var(--gray);color:var(--muted);
+  transition:all var(--dur) var(--ease);white-space:nowrap;
+}
+.tp-lock.held{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.tp-spacer{/* 右侧留白，对齐三列网格 */}
+.tp-cond{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 0 0 0;}
+.tp-c{
+  text-align:center;font-family:var(--mono);font-size:11px;font-weight:700;
+  padding:9px 8px;border-radius:9px;border:1.5px solid var(--grid);background:var(--paper);
+  color:var(--faint);transition:all var(--dur) var(--ease);
+}
+.tp-c.fire{color:var(--green);border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 3px rgba(15,110,86,.12);}
+.tp-workers{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.tp-w{
+  min-height:108px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);
+  padding:12px 12px 10px;transition:all var(--dur) var(--ease);
+  display:flex;flex-direction:column;gap:6px;
+}
+.tp-w.sleep{border-color:var(--line);opacity:.72;}
+.tp-w.busy{border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 2px rgba(15,110,86,.12);opacity:1;}
+.tp-w.wait{border-color:var(--brown);background:var(--brownbg);opacity:1;}
+.tp-wn{font-size:12.5px;font-weight:700;text-align:center;}
+.tp-ws{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;min-height:16px;}
+.tp-wt{
+  margin-top:auto;height:28px;border-radius:7px;border:1.5px dashed var(--line);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);
+  transition:all var(--dur) var(--ease);
+}
+.tp-wt.has{border-style:solid;border-color:var(--green);color:var(--green);background:rgba(15,110,86,.08);}
+.tp-msg{
+  text-align:center;font-size:12px;font-weight:700;padding:9px 12px;border-radius:9px;
+  border:1.5px solid var(--line);background:var(--paper);color:var(--muted);
+  transition:all var(--dur) var(--ease);min-height:38px;
+  display:flex;align-items:center;justify-content:center;
+}
+.tp-msg.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.tp-msg.warn{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+
+/* 右侧 */
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .hb{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.65;color:#D8D5CC;white-space:pre;overflow-x:auto;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;}
+.codebox .cl{padding:2px 17px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>互斥量 · 条件变量 · 线程池动画 · 竞态 · 死锁 · 任务流转</h1>
+    <p>配套笔记《12.3 互斥量》《12.7 条件变量与线程池》 · num++ 竞态、AB-BA 死锁、cond+队列+worker 流转　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+
+/* ========== 场景 1：竞态 + mutex ========== */
+const raceScene=(()=>{
+  const code=codeOf([
+    '<span class="kw">int</span> num = 0;',
+    '<span class="cmt">// 无锁时：load → add → store 可交错</span>',
+    'num++;  <span class="cmt">// 非原子</span>',
+    'pthread_mutex_lock(&m);',
+    'num++;  <span class="cmt">// 临界区</span>',
+    'pthread_mutex_unlock(&m);',
+    '<span class="cmt">// 有锁：结果恒为期望值</span>',
+  ]);
+  const steps=[
+    {title:'步骤 0 · 共享变量 num = 0',chip:'起点',chipC:'c0',lines:[0],
+     num:0,numC:'',lock:'mutex 未使用',lockC:'',
+     a:[0,0,0],b:[0,0,0],ag:0,bg:0,ab:0,bb:0,
+     ban:'两个线程都要做 num++',banC:'',
+     desc:'共享变量 <code>num=0</code>。线程 A / B 都要执行 <code>num++</code>。看起来一步，CPU 上其实是 <b>load → add → store</b> 三步。'},
+    {title:'步骤 1 · 无锁：A 读到 0',chip:'竞态开始',chipC:'cd',lines:[1,2],
+     num:0,numC:'',lock:'无锁 · 危险',lockC:'',
+     a:[1,0,0],b:[0,0,0],ag:1,bg:0,ab:0,bb:0,
+     ban:'A: load num → reg=0',banC:'',
+     desc:'线程 A 把 <code>num</code> 从内存<span class="bl">读进寄存器</span>（regA=0）。此刻 B 还没开始，看起来一切正常。'},
+    {title:'步骤 2 · 无锁：B 也读到 0',chip:'交错',chipC:'cd',lines:[1,2],
+     num:0,numC:'bad',lock:'无锁 · 危险',lockC:'',
+     a:[1,0,0],b:[1,0,0],ag:0,bg:1,ab:0,bb:0,
+     ban:'B: load num → reg=0（读到同一旧值）',banC:'bad',
+     desc:'线程 B 也 load，同样读到 0。两次 ++ 都基于旧值——这就是<span class="dg">数据竞争</span>的根。'},
+    {title:'步骤 3 · 双方都写回 1 · 丢一次更新',chip:'丢更新',chipC:'cd',lines:[2],
+     num:1,numC:'bad',lock:'无锁 · 危险',lockC:'',
+     a:[2,2,1],b:[2,2,1],ag:0,bg:0,ab:0,bb:0,
+     ban:'期望 2 · 实际 1 · 丢了一次 ++',banC:'bad',
+     desc:'A store 1，B 也 store 1。两次 ++ 只让 <code>num</code> 变成 1。<b>丢失更新</b>——竞态的经典症状。'},
+    {title:'步骤 4 · 加 mutex：A 持锁独占',chip:'加锁',chipC:'cb',lines:[3,4],
+     num:0,numC:'',lock:'🔒 held by A',lockC:'held',
+     a:[1,1,0],b:[0,0,0],ag:1,bg:0,ab:0,bb:1,
+     ban:'B 阻塞在 lock · 等 A 释放',banC:'',
+     desc:'A 先 <code>pthread_mutex_lock</code>，进入临界区。B 再 lock 时<span class="hb">阻塞等待</span>——同一时刻只有一个线程改 num。'},
+    {title:'步骤 5 · A 写完解锁 · B 再进',chip:'串行化',chipC:'cg',lines:[4,5],
+     num:1,numC:'ok',lock:'🔒 held by B',lockC:'held',
+     a:[2,2,2],b:[1,1,0],ag:0,bg:1,ab:0,bb:0,
+     ban:'A 完成 num=1 · B 读到最新值',banC:'ok',
+     desc:'A <code>unlock</code> 后 B 被唤醒，load 到最新的 1，再 ++ 成 2。临界区被<span class="gr">串行化</span>。'},
+    {title:'步骤 6 · 有锁结果正确',chip:'汇总',chipC:'cg',lines:[6],
+     num:2,numC:'ok',lock:'🔓 free',lockC:'free',
+     a:[2,2,2],b:[2,2,2],ag:0,bg:0,ab:0,bb:0,
+     ban:'期望 2 · 实际 2 · 竞态消除',banC:'ok',
+     desc:'模式固定：<b>lock → 临界区 → unlock</b>。锁保护的是「代码段」，不是变量本身。下一场景看锁用错会怎样。'},
+  ];
+  function mount(){
+    viz.innerHTML=
+      '<div class="vcap"><b>竞态条件</b>：num++ 非原子 · mutex 把三步捆成临界区</div>'+
+      '<div class="rc-stage">'+
+        '<div class="rc-top">'+
+          '<div class="rc-num" id="rcNum">num = 0</div>'+
+          '<div class="rc-lock" id="rcLock">mutex</div>'+
+        '</div>'+
+        '<div class="rc-cols">'+
+          '<div class="rc-th a" id="rcA">'+
+            '<div class="rc-thh">线程 A <span class="tag">inc</span></div>'+
+            '<div class="rc-steps">'+
+              '<div class="rc-s" id="rcA0">1. load num → reg</div>'+
+              '<div class="rc-s" id="rcA1">2. reg = reg + 1</div>'+
+              '<div class="rc-s" id="rcA2">3. store reg → num</div>'+
+            '</div>'+
+          '</div>'+
+          '<div class="rc-th b" id="rcB">'+
+            '<div class="rc-thh">线程 B <span class="tag">inc</span></div>'+
+            '<div class="rc-steps">'+
+              '<div class="rc-s" id="rcB0">1. load num → reg</div>'+
+              '<div class="rc-s" id="rcB1">2. reg = reg + 1</div>'+
+              '<div class="rc-s" id="rcB2">3. store reg → num</div>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="rc-banner" id="rcBan"></div>'+
+      '</div>';
+  }
+  function paint(s){
+    const n=el('rcNum');n.textContent='num = '+s.num;n.className='rc-num'+(s.numC?' '+s.numC:'');
+    const l=el('rcLock');l.textContent=s.lock;l.className='rc-lock'+(s.lockC?' '+s.lockC:'');
+    const a=el('rcA'),b=el('rcB');
+    a.className='rc-th a'+(s.ag?' glow':'')+(s.ab?' blocked':'');
+    b.className='rc-th b'+(s.bg?' glow-g':'')+(s.bb?' blocked':'');
+    for(let i=0;i<3;i++){
+      const sa=el('rcA'+i),sb=el('rcB'+i);
+      sa.className='rc-s'+(s.a[i]===1?' on':s.a[i]===2?' done':s.a[i]<0?' lost':'');
+      sb.className='rc-s'+(s.b[i]===1?' on':s.b[i]===2?' done':s.b[i]<0?' lost':'');
+    }
+    const ban=el('rcBan');ban.textContent=s.ban;ban.className='rc-banner'+(s.banC?' '+s.banC:'');
+  }
+  return {id:'race',label:'竞态 + mutex',sub:'load/add/store · 临界区',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：死锁 ========== */
+const deadScene=(()=>{
+  const code=codeOf([
+    '<span class="cmt">// 错误：加锁顺序相反</span>',
+    'T1: lock(A); lock(B);',
+    'T2: lock(B); lock(A);  <span class="cmt">// AB-BA</span>',
+    '<span class="cmt">// 修复：统一顺序</span>',
+    'T1: lock(A); lock(B);',
+    'T2: lock(A); lock(B);  <span class="cmt">// 同序</span>',
+    '<span class="cmt">// 或 trylock 失败回退</span>',
+  ]);
+  const steps=[
+    {title:'步骤 0 · 两把锁 · 两个线程',chip:'准备',chipC:'c0',lines:[0],
+     t1:{cls:'',st:'就绪',holds:['A free','B free'],hcls:['','']},
+     t2:{cls:'',st:'就绪',holds:['A free','B free'],hcls:['','']},
+     cycle:0,cards:[1,0,0,0],msg:'mutex_a · mutex_b',msgC:'',
+     desc:'线程 1 和线程 2 都需要同时持有 <code>mutex_a</code> 和 <code>mutex_b</code>。若加锁顺序不一致，就埋下死锁种子。'},
+    {title:'步骤 1 · T1 拿到 A · T2 拿到 B',chip:'持有并等待',chipC:'ch',lines:[1,2],
+     t1:{cls:'',st:'持有 A · 准备锁 B',holds:['A held','B ?'],hcls:['held-a','']},
+     t2:{cls:'',st:'持有 B · 准备锁 A',holds:['B held','A ?'],hcls:['held-b','']},
+     cycle:0,cards:[1,1,0,0],msg:'各持一把 · 还要对方那把',msgC:'warn',
+     desc:'T1 <code>lock(A)</code> 成功，T2 <code>lock(B)</code> 成功。双方都<span class="hb">持有并等待</span>——死锁四条件已占两条。'},
+    {title:'步骤 2 · 互相等待 · 死锁形成',chip:'循环等待',chipC:'cd',lines:[1,2],
+     t1:{cls:'dead',st:'阻塞在 lock(B)',holds:['A held','wait B'],hcls:['held-a','wait']},
+     t2:{cls:'dead',st:'阻塞在 lock(A)',holds:['B held','wait A'],hcls:['held-b','wait']},
+     cycle:1,cards:[1,1,1,1],msg:'T1→B←T2→A←T1 · 环出现',msgC:'bad',
+     desc:'T1 等 B（T2 持有），T2 等 A（T1 持有）。形成<span class="dg">循环等待</span>。不可剥夺 + 互斥 → 永久卡住。'},
+    {title:'步骤 3 · 四必要条件齐了',chip:'诊断',chipC:'cd',lines:[2],
+     t1:{cls:'dead',st:'永久阻塞',holds:['A held','wait B'],hcls:['held-a','wait']},
+     t2:{cls:'dead',st:'永久阻塞',holds:['B held','wait A'],hcls:['held-b','wait']},
+     cycle:1,cards:[1,1,1,1],msg:'互斥 · 持有等待 · 不可剥夺 · 循环等待',msgC:'bad',
+     desc:'死锁四条件：<b>互斥 / 持有并等待 / 不可剥夺 / 循环等待</b>。破任一条件即可避免——最实用的是破循环等待。'},
+    {title:'步骤 4 · 修复：固定加锁顺序',chip:'同序',chipC:'cg',lines:[4,5],
+     t1:{cls:'ok',st:'lock A → lock B',holds:['A held','B held'],hcls:['held-a','held-b']},
+     t2:{cls:'',st:'等 A（T1 持有）',holds:['wait A','—'],hcls:['wait','']},
+     cycle:0,cards:[0,0,0,0],msg:'都先 A 后 B · 不会成环',msgC:'ok',
+     desc:'所有线程统一 <b>先 A 后 B</b>。T2 想拿 A 时必须等 T1 整段做完——没有环，就不会死锁。'},
+    {title:'步骤 5 · 其他解法收口',chip:'汇总',chipC:'cg',lines:[6],
+     t1:{cls:'ok',st:'完成并释放',holds:['A free','B free'],hcls:['','']},
+     t2:{cls:'ok',st:'完成并释放',holds:['A free','B free'],hcls:['','']},
+     cycle:0,cards:[1,1,1,1],msg:'同序 · trylock 回退 · 少嵌套锁 · 超时',msgC:'ok',
+     desc:'① <b>固定顺序</b>（首选）；② <code>trylock</code> 失败释放已持锁重试；③ 少嵌套；④ <code>timedlock</code>。面试常考：画资源分配图找环。'},
+  ];
+  function mount(){
+    viz.innerHTML=
+      '<div class="vcap"><b>死锁 AB-BA</b>：加锁顺序相反 → 循环等待 → 固定顺序破环</div>'+
+      '<div class="dl-stage">'+
+        '<div class="dl-top">'+
+          '<div class="dl-th t1" id="dlT1">'+
+            '<div class="dl-thh">线程 T1</div>'+
+            '<div class="dl-st" id="dlS1">就绪</div>'+
+            '<div class="dl-holds"><span class="dl-lock" id="dlL10">A</span><span class="dl-lock" id="dlL11">B</span></div>'+
+          '</div>'+
+          '<div class="dl-center"><div class="dl-cycle" id="dlCycle">⟳ 循环等待</div></div>'+
+          '<div class="dl-th t2" id="dlT2">'+
+            '<div class="dl-thh">线程 T2</div>'+
+            '<div class="dl-st" id="dlS2">就绪</div>'+
+            '<div class="dl-holds"><span class="dl-lock" id="dlL20">A</span><span class="dl-lock" id="dlL21">B</span></div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="dl-fix">'+
+          '<div class="dl-card" id="dlC0"><b>① 互斥</b><span>锁只能一人持有</span></div>'+
+          '<div class="dl-card" id="dlC1"><b>② 持有并等待</b><span>拿着 A 还要 B</span></div>'+
+          '<div class="dl-card" id="dlC2"><b>③ 不可剥夺</b><span>只能自己 unlock</span></div>'+
+          '<div class="dl-card" id="dlC3"><b>④ 循环等待</b><span>T1→B→T2→A→T1</span></div>'+
+        '</div>'+
+        '<div class="dl-msg" id="dlMsg"></div>'+
+      '</div>';
+  }
+  function paint(s){
+    el('dlT1').className='dl-th t1'+(s.t1.cls?' '+s.t1.cls:'');
+    el('dlT2').className='dl-th t2'+(s.t2.cls?' '+s.t2.cls:'');
+    el('dlS1').textContent=s.t1.st;el('dlS2').textContent=s.t2.st;
+    el('dlL10').textContent=s.t1.holds[0];el('dlL10').className='dl-lock'+(s.t1.hcls[0]?' '+s.t1.hcls[0]:'');
+    el('dlL11').textContent=s.t1.holds[1];el('dlL11').className='dl-lock'+(s.t1.hcls[1]?' '+s.t1.hcls[1]:'');
+    el('dlL20').textContent=s.t2.holds[0];el('dlL20').className='dl-lock'+(s.t2.hcls[0]?' '+s.t2.hcls[0]:'');
+    el('dlL21').textContent=s.t2.holds[1];el('dlL21').className='dl-lock'+(s.t2.hcls[1]?' '+s.t2.hcls[1]:'');
+    el('dlCycle').classList.toggle('show',!!s.cycle);
+    for(let i=0;i<4;i++)el('dlC'+i).classList.toggle('lit',!!s.cards[i]);
+    const m=el('dlMsg');m.textContent=s.msg;m.className='dl-msg'+(s.msgC?' '+s.msgC:'');
+  }
+  return {id:'deadlock',label:'死锁 AB-BA',sub:'四条件 · 固定顺序',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：条件变量 + 线程池 ========== */
+const poolScene=(()=>{
+  const code=codeOf([
+    'pthread_mutex_lock(&m);',
+    '<span class="kw">while</span> (queue empty && !stop)',
+    '  pthread_cond_wait(&not_empty, &m);',
+    'task = pop(queue);  <span class="cmt">// 持锁取任务</span>',
+    'pthread_cond_signal(&not_full);',
+    'pthread_mutex_unlock(&m);',
+    'task->func(task->arg);  <span class="cmt">// 锁外执行！</span>',
+  ]);
+  const steps=[
+    {title:'步骤 0 · 线程池空闲 · worker 睡眠',chip:'初始',chipC:'c0',lines:[0,1,2],
+     io:0,tasks:[0,0,0],lock:'mutex free',lockC:'',
+     cEmpty:0,cFull:0,a1:0,a2:0,
+     w:[{s:'sleep',st:'cond_wait',t:''},{s:'sleep',st:'cond_wait',t:''},{s:'sleep',st:'cond_wait',t:''}],
+     msg:'队列空 · 3 个 worker 睡在 not_empty 上',msgC:'',
+     desc:'池里预创建 3 个 worker。队列空时它们 <code>pthread_cond_wait(&not_empty)</code> 睡眠——<b>不忙等</b>，不烧 CPU。'},
+    {title:'步骤 1 · I/O 线程提交任务 T1',chip:'入队',chipC:'cb',lines:[0],
+     io:1,tasks:[1,0,0],lock:'🔒 held by I/O',lockC:'held',
+     cEmpty:0,cFull:0,a1:1,a2:0,
+     w:[{s:'sleep',st:'cond_wait',t:''},{s:'sleep',st:'cond_wait',t:''},{s:'sleep',st:'cond_wait',t:''}],
+     msg:'I/O: lock → push T1',msgC:'',
+     desc:'网络/主线程拿到任务：先 <code>lock</code> 保护队列，把 T1 <span class="bl">push</span> 进队列。锁只护队列，不护业务。'},
+    {title:'步骤 2 · signal not_empty 唤醒 worker',chip:'唤醒',chipC:'cg',lines:[],
+     io:1,tasks:[1,0,0],lock:'mutex free',lockC:'',
+     cEmpty:1,cFull:0,a1:1,a2:1,
+     w:[{s:'wait',st:'被唤醒 · 抢锁',t:''},{s:'sleep',st:'cond_wait',t:''},{s:'sleep',st:'cond_wait',t:''}],
+     msg:'pthread_cond_signal(&not_empty)',msgC:'ok',
+     desc:'入队后 <code>pthread_cond_signal(&not_empty)</code>，再 unlock。W0 被唤醒，醒来后会<span class="gr">重新获得 mutex</span> 再往下走。'},
+    {title:'步骤 3 · worker 取任务 · 锁外执行',chip:'锁外执行',chipC:'cg',lines:[3,4,5,6],
+     io:0,tasks:[0,0,0],lock:'mutex free',lockC:'',
+     cEmpty:0,cFull:1,a1:0,a2:1,
+     w:[{s:'busy',st:'执行中',t:'T1'},{s:'sleep',st:'cond_wait',t:''},{s:'sleep',st:'cond_wait',t:''}],
+     msg:'pop 后立刻 unlock · 再跑 task->func',msgC:'ok',
+     desc:'W0：pop T1 → signal not_full → <b>unlock</b> → 再 <code>task->func()</code>。耗时工作必须在<span class="gr">锁外</span>，否则池退化成单线程。'},
+    {title:'步骤 4 · 突发三个任务 · 并行消化',chip:'吞吐',chipC:'ch',lines:[0,3,6],
+     io:1,tasks:[1,1,0],lock:'mutex free',lockC:'',
+     cEmpty:1,cFull:0,a1:1,a2:1,
+     w:[{s:'busy',st:'执行中',t:'T2'},{s:'busy',st:'执行中',t:'T3'},{s:'busy',st:'执行中',t:'T4'}],
+     msg:'队列缓冲突发 · worker 并行执行',msgC:'ok',
+     desc:'再来 T2/T3/T4：队列缓冲突发，三个 worker 同时忙。对比「每请求 pthread_create」——池把创建开销摊掉，并发可控。'},
+    {title:'步骤 5 · while 再检查 · 防虚假唤醒',chip:'while 不是 if',chipC:'ch',lines:[1,2],
+     io:0,tasks:[0,0,0],lock:'mutex free',lockC:'',
+     cEmpty:0,cFull:0,a1:0,a2:0,
+     w:[{s:'sleep',st:'while 再检查',t:''},{s:'sleep',st:'cond_wait',t:''},{s:'sleep',st:'cond_wait',t:''}],
+     msg:'虚假唤醒 / 任务被别人拿走 → while 兜底',msgC:'warn',
+     desc:'必须用 <code>while (empty)</code> 而非 <code>if</code>：可能<span class="hb">虚假唤醒</span>，或多个 worker 被唤醒后任务已被别人取走。醒来后重新检查条件。'},
+    {title:'步骤 6 · 线程池铁律收口',chip:'汇总',chipC:'cg',lines:[6],
+     io:0,tasks:[0,0,0],lock:'mutex free',lockC:'',
+     cEmpty:0,cFull:0,a1:0,a2:0,
+     w:[{s:'sleep',st:'idle',t:''},{s:'sleep',st:'idle',t:''},{s:'sleep',st:'idle',t:''}],
+     msg:'mutex 护队列 · cond 管睡眠 · 任务锁外跑',msgC:'ok',
+     desc:'① <b>mutex</b> 保护队列；② <b>cond</b> 空则睡、有则醒；③ <b>while</b> 再检查；④ 任务在<span class="gr">锁外执行</span>；⑤ stop 标志优雅关池。'},
+  ];
+  function mount(){
+    viz.innerHTML=
+      '<div class="vcap"><b>条件变量 + 线程池</b>：入队 signal · worker wait · 锁外执行任务</div>'+
+      '<div class="tp-stage">'+
+        '<div class="tp-row1">'+
+          '<div class="tp-io" id="tpIo"><b>I/O / 主线程</b><span>submit task</span></div>'+
+          '<div class="tp-arr" id="tpA1">push →</div>'+
+          '<div class="tp-q">'+
+            '<div class="tp-qh">任务队列（mutex 保护）</div>'+
+            '<div class="tp-slots">'+
+              '<div class="tp-task" id="tpT0">T?</div>'+
+              '<div class="tp-task" id="tpT1">T?</div>'+
+              '<div class="tp-task" id="tpT2">T?</div>'+
+            '</div>'+
+            '<div class="tp-qfoot"><div class="tp-lock" id="tpLock">mutex free</div></div>'+
+          '</div>'+
+          '<div class="tp-arr" id="tpA2">→ pop</div>'+
+        '</div>'+
+        '<div class="tp-cond">'+
+          '<div class="tp-c" id="tpCE">not_empty</div>'+
+          '<div class="tp-c" id="tpCF">not_full</div>'+
+        '</div>'+
+        '<div class="tp-workers">'+
+          [0,1,2].map(i=>'<div class="tp-w sleep" id="tpW'+i+'"><div class="tp-wn">Worker '+i+'</div><div class="tp-ws" id="tpWS'+i+'">cond_wait</div><div class="tp-wt" id="tpWT'+i+'">—</div></div>').join('')+
+        '</div>'+
+        '<div class="tp-msg" id="tpMsg"></div>'+
+      '</div>';
+  }
+  function paint(s){
+    el('tpIo').classList.toggle('glow',!!s.io);
+    const labels=['T1','T2','T3'];
+    for(let i=0;i<3;i++){
+      const t=el('tpT'+i);
+      t.textContent=labels[i]||('T'+(i+1));
+      t.className='tp-task'+(s.tasks[i]===1?' on':s.tasks[i]<0?' out':'');
+    }
+    const lk=el('tpLock');lk.textContent=s.lock;lk.className='tp-lock'+(s.lockC?' '+s.lockC:'');
+    el('tpCE').classList.toggle('fire',!!s.cEmpty);
+    el('tpCF').classList.toggle('fire',!!s.cFull);
+    el('tpA1').classList.toggle('show',!!s.a1);
+    el('tpA2').classList.toggle('show',!!s.a2);
+    for(let i=0;i<3;i++){
+      const w=el('tpW'+i),ws=el('tpWS'+i),wt=el('tpWT'+i);
+      w.className='tp-w '+s.w[i].s;
+      ws.textContent=s.w[i].st;
+      wt.textContent=s.w[i].t||'—';
+      wt.classList.toggle('has',!!s.w[i].t);
+    }
+    const m=el('tpMsg');m.textContent=s.msg;m.className='tp-msg'+(s.msgC?' '+s.msgC:'');
+  }
+  return {id:'pool',label:'条件变量 + 线程池',sub:'wait/signal · 锁外执行',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[raceScene,deadScene,poolScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2600;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

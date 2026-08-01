@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 670" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <title>缓冲区在做的三件事</title>
+  <desc>输出缓冲负责攒包提高有效载荷比、以及留底供超时重传；输入缓冲的空余量对外表现为通告窗口，是 TCP 流量控制的物理基础。</desc>
+
+  <rect x="0" y="0" width="1240" height="670" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">缓冲区在做三件事：攒包、流控、留底</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">三个作用分别落在不同的缓冲区上：攒包和留底靠输出缓冲，流量控制靠输入缓冲的空余量</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="104" width="560" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · 攒包：头是固定成本</text>
+
+  <text x="72" y="180" font-size="12" font-weight="700" fill="#733428">来一个字节就发一个</text>
+  <rect x="72" y="192" width="476" height="28" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="310" y="211" font-size="11" fill="#4A473F" text-anchor="middle">IP 头 20B + TCP 头 20B</text>
+  <rect x="548" y="192" width="12" height="28" rx="2" fill="#A64B3C"/>
+  <text x="72" y="240" font-size="11.5" font-weight="700" fill="#733428">40 字节头驮 1 字节数据，有效载荷 2.4%</text>
+
+  <text x="72" y="272" font-size="12" font-weight="700" fill="#24473F">攒到一个 MSS 再发</text>
+  <rect x="72" y="284" width="14" height="28" rx="2" fill="#9B968A"/>
+  <rect x="86" y="284" width="474" height="28" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="323" y="303" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">数据 1460B</text>
+  <text x="72" y="332" font-size="11.5" font-weight="700" fill="#24473F">同样 40 字节头驮 1460 字节，有效载荷 97%</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="624" y="104" width="568" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="648" y="134" font-size="15" font-weight="700" fill="#4A473F">B · 流控：空余量就是通告窗口</text>
+
+  <text x="648" y="188" font-size="11.5" font-weight="700" fill="#4A473F">① 刚开始</text>
+  <rect x="768" y="170" width="70" height="26" fill="#3D5A80"/>
+  <rect x="838" y="170" width="210" height="26" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="1060" y="188" font-size="11" font-weight="700" fill="#2C4460">窗口 48KB</text>
+
+  <text x="648" y="232" font-size="11.5" font-weight="700" fill="#4A473F">② 应用读得慢</text>
+  <rect x="768" y="214" width="245" height="26" fill="#8A6A3A"/>
+  <rect x="1013" y="214" width="35" height="26" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="1060" y="232" font-size="11" font-weight="700" fill="#6B4E28">窗口 8KB</text>
+
+  <text x="648" y="276" font-size="11.5" font-weight="700" fill="#4A473F">③ 缓冲区满</text>
+  <rect x="768" y="258" width="280" height="26" fill="#A64B3C"/>
+  <text x="1060" y="276" font-size="11" font-weight="700" fill="#733428">窗口 0</text>
+
+  <rect x="648" y="298" width="520" height="48" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="664" y="320" font-size="11.5" font-weight="700" fill="#24473F">④ 应用 read 走数据，空余量回升</text>
+  <text x="664" y="338" font-size="11" fill="#24473F">内核补发一个窗口更新，发送方恢复发送</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="370" width="1144" height="240" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="400" font-size="15" font-weight="700" fill="#4A473F">C · 留底：数据发出去了也不能删</text>
+
+  <rect x="72" y="414" width="352" height="140" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="88" y="438" font-size="12" font-weight="700" fill="#2C4460">① send 刚返回</text>
+  <rect x="92" y="450" width="96" height="34" rx="4" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="140" y="472" font-size="11" fill="#2C4460" text-anchor="middle">seg1</text>
+  <rect x="196" y="450" width="96" height="34" rx="4" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="244" y="472" font-size="11" fill="#2C4460" text-anchor="middle">seg2</text>
+  <rect x="300" y="450" width="96" height="34" rx="4" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="348" y="472" font-size="11" fill="#2C4460" text-anchor="middle">seg3</text>
+  <text x="92" y="512" font-size="11" fill="#2C4460">三段都已经交给网卡了</text>
+  <text x="92" y="532" font-size="11" font-weight="700" fill="#2C4460">但一段都没从缓冲区里删</text>
+
+  <rect x="444" y="414" width="352" height="140" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="460" y="438" font-size="12" font-weight="700" fill="#24473F">② 收到 seg1 的 ACK</text>
+  <rect x="464" y="450" width="96" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="512" y="472" font-size="11" fill="#9B968A" text-anchor="middle">已释放</text>
+  <rect x="568" y="450" width="96" height="34" rx="4" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="616" y="472" font-size="11" fill="#24473F" text-anchor="middle">seg2</text>
+  <rect x="672" y="450" width="96" height="34" rx="4" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="720" y="472" font-size="11" fill="#24473F" text-anchor="middle">seg3</text>
+  <text x="464" y="512" font-size="11" fill="#24473F">确认过的那段才被释放</text>
+  <text x="464" y="532" font-size="11" font-weight="700" fill="#24473F">腾出的空间给新的 send 用</text>
+
+  <rect x="816" y="414" width="352" height="140" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="832" y="438" font-size="12" font-weight="700" fill="#733428">③ seg2 超时没等到 ACK</text>
+  <rect x="836" y="450" width="96" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="884" y="472" font-size="11" fill="#9B968A" text-anchor="middle">已释放</text>
+  <rect x="940" y="450" width="96" height="34" rx="4" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="988" y="472" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">seg2</text>
+  <rect x="1044" y="450" width="96" height="34" rx="4" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1092" y="472" font-size="11" fill="#733428" text-anchor="middle">seg3</text>
+  <path d="M988 490 L988 502" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrR)"/>
+  <text x="836" y="524" font-size="11" font-weight="700" fill="#733428">原始数据还在，直接原样重发</text>
+  <text x="836" y="544" font-size="11" fill="#733428">应用完全不知道刚才丢过包</text>
+
+  <rect x="72" y="566" width="1096" height="36" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="88" y="589" font-size="11.5" font-weight="700" fill="#6B5B95">要是 send 返回后就把数据删掉，TCP 就没东西可重传了 —— 这是发送缓冲区省不掉的根本原因</text>
+
+  <text x="48" y="646" font-size="12" fill="#6B675C">口径：MSS 1460 按以太网 MTU 1500 减 40 字节头算；攒包行为还受 Nagle 算法与 TCP_NODELAY 影响，交互式应用往往要主动关掉攒包</text>
+</svg>

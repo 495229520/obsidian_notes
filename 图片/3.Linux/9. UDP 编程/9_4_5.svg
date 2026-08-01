@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 600" role="img" aria-label="UDP 打洞的四帧时序" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>打洞四帧：从两侧映射表全空，到第一个包被丢，再到单向放行，最后双向打通</title>
+  <desc>四个并排的帧依次展示 t0 双方刚拿到地址、t1 A 先发 PUNCH 被对端 NAT 丢弃、t2 B 也发 PUNCH 并命中 A 侧映射、t3 双向都通。底部说明双方都必须先向外发包，以及同一 NAT 下的 hairpinning 条件。</desc>
+  <defs>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="600" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="50" font-size="22" font-weight="700" fill="#2B2A26">打洞的四帧：头几包被丢，是流程的一部分</text>
+  <text x="48" y="78" font-size="13" fill="#6B675C">"同时发"的真正含义是：己方先发出向包，对端的回包才拿得到进门资格，所以两边都不能等</text>
+  <text x="48" y="118" font-size="11.5" fill="#6B675C">前提：A_pub = 1.2.3.4:50001，B_pub = 5.6.7.8:50002</text>
+  <text x="450" y="118" font-size="11.5" fill="#6B675C">两端各自复用 socket S₀</text>
+
+  <!-- ============ t0 ============ -->
+  <rect x="40" y="140" width="278" height="326" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="50" y="150" width="258" height="26" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="179" y="168" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">t₀ · 刚拿到对端地址</text>
+
+  <rect x="54" y="186" width="250" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="68" y="206" font-size="11.5" font-weight="700" fill="#2C4460">Peer A ／ NAT A</text>
+  <text x="68" y="227" font-size="11" fill="#733428">映射表：空</text>
+
+  <rect x="84" y="266" width="190" height="26" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="179" y="284" font-size="11" fill="#4A473F" text-anchor="middle">双方都还没发过包</text>
+
+  <rect x="54" y="326" width="250" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="68" y="346" font-size="11.5" font-weight="700" fill="#2C4460">Peer B ／ NAT B</text>
+  <text x="68" y="367" font-size="11" fill="#733428">映射表：空</text>
+
+  <rect x="54" y="392" width="250" height="60" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="68" y="414" font-size="11.5" font-weight="700" fill="#733428">谁先打进去都会被丢</text>
+  <text x="68" y="436" font-size="11" fill="#733428">两侧都没有出向记录</text>
+
+  <!-- ============ t1 ============ -->
+  <rect x="334" y="140" width="278" height="326" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="344" y="150" width="258" height="26" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="473" y="168" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">t₁ · A 先发 PUNCH</text>
+
+  <rect x="348" y="186" width="250" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="362" y="206" font-size="11.5" font-weight="700" fill="#2C4460">Peer A ／ NAT A</text>
+  <text x="362" y="227" font-size="11" fill="#24473F">记下 → 5.6.7.8:50002</text>
+
+  <line x1="404" y1="250" x2="404" y2="292" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrB)"/>
+  <line x1="394" y1="300" x2="414" y2="316" stroke="#A64B3C" stroke-width="2" stroke-linecap="round"/>
+  <line x1="394" y1="316" x2="414" y2="300" stroke="#A64B3C" stroke-width="2" stroke-linecap="round"/>
+  <text x="430" y="274" font-size="11" fill="#2C4460">PUNCH　A → B</text>
+  <text x="430" y="300" font-size="11" font-weight="700" fill="#733428">到 NAT B 被丢</text>
+
+  <rect x="348" y="326" width="250" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="362" y="346" font-size="11.5" font-weight="700" fill="#2C4460">Peer B ／ NAT B</text>
+  <text x="362" y="367" font-size="11" fill="#733428">映射表：空</text>
+
+  <rect x="348" y="392" width="250" height="60" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="362" y="414" font-size="11.5" font-weight="700" fill="#6B4E28">A 这一侧的洞开了</text>
+  <text x="362" y="436" font-size="11" fill="#6B4E28">包丢掉是意料之中，别停</text>
+
+  <!-- ============ t2 ============ -->
+  <rect x="628" y="140" width="278" height="326" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.1"/>
+  <rect x="638" y="150" width="258" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="767" y="168" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">t₂ · B 也发 PUNCH</text>
+
+  <rect x="642" y="186" width="250" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="656" y="206" font-size="11.5" font-weight="700" fill="#2C4460">Peer A ／ NAT A</text>
+  <text x="656" y="227" font-size="11" fill="#24473F">已记下 5.6.7.8:50002</text>
+
+  <line x1="698" y1="314" x2="698" y2="250" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="724" y="274" font-size="11" fill="#24473F">PUNCH　B → A</text>
+  <text x="724" y="300" font-size="11" font-weight="700" fill="#24473F">命中映射，放行</text>
+
+  <rect x="642" y="326" width="250" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="656" y="346" font-size="11.5" font-weight="700" fill="#2C4460">Peer B ／ NAT B</text>
+  <text x="656" y="367" font-size="11" fill="#24473F">记下 → 1.2.3.4:50001</text>
+
+  <rect x="642" y="392" width="250" height="60" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="656" y="414" font-size="11.5" font-weight="700" fill="#24473F">A 第一次真正收到包</text>
+  <text x="656" y="436" font-size="11" fill="#24473F">立刻回 PUNCH_ACK</text>
+
+  <!-- ============ t3 ============ -->
+  <rect x="922" y="140" width="278" height="326" rx="8" fill="#F2F7F4" stroke="#2F6B5E" stroke-width="1.3"/>
+  <rect x="932" y="150" width="258" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1061" y="168" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">t₃ · 两个洞都开着</text>
+
+  <rect x="936" y="186" width="250" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="950" y="206" font-size="11.5" font-weight="700" fill="#24473F">Peer A ／ NAT A</text>
+  <text x="950" y="227" font-size="11" fill="#24473F">映射有效</text>
+
+  <line x1="992" y1="250" x2="992" y2="314" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrB)"/>
+  <line x1="1130" y1="314" x2="1130" y2="250" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrG)"/>
+  <text x="1061" y="274" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">双向都通</text>
+  <text x="1061" y="296" font-size="11" fill="#24473F" text-anchor="middle">DATA 直走</text>
+
+  <rect x="936" y="326" width="250" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="950" y="346" font-size="11.5" font-weight="700" fill="#24473F">Peer B ／ NAT B</text>
+  <text x="950" y="367" font-size="11" fill="#24473F">映射有效</text>
+
+  <rect x="936" y="392" width="250" height="60" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="950" y="414" font-size="11.5" font-weight="700" fill="#24473F">S 从此不再参与</text>
+  <text x="950" y="436" font-size="11" fill="#24473F">改由 keepalive 维持</text>
+
+  <!-- 底部两格 -->
+  <rect x="40" y="486" width="568" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="58" y="508" font-size="12" font-weight="700" fill="#6B4E28">为什么两边都得发</text>
+  <text x="58" y="530" font-size="11" fill="#6B4E28">只有己方先发出向包，对端的回包才有资格进门</text>
+
+  <rect x="632" y="486" width="568" height="56" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="650" y="508" font-size="12" font-weight="700" fill="#4A3E70">两端在同一个 NAT 后面时</text>
+  <text x="650" y="530" font-size="11" fill="#4A3E70">还要看路由器支不支持 hairpinning 回环</text>
+
+  <text x="48" y="574" font-size="12" fill="#6B675C">工程上的做法：拿到地址立刻开打，每隔 200ms 重发一次持续几秒；收到对端包后改用实际源地址</text>
+</svg>

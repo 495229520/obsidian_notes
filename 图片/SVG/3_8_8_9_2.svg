@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="640" viewBox="0 0 1240 640" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrN" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <title>长度前缀协议的报文布局与解析状态机</title>
+  <desc>上半部分展示两条背靠背的长度前缀消息在字节流中的排布；下半部分是等消息头、等消息体、交付三个状态之间的转移，以及解析完一条后继续解析下一条的回边。</desc>
+
+  <rect x="0" y="0" width="1240" height="640" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">长度前缀：边界是算出来的，不是找出来的</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">先读满 4 字节头拿到 len，再读满 len 字节体。整条流上不需要任何分隔符，body 里可以是任意二进制</text>
+
+  <!-- ===================== Panel A ===================== -->
+  <rect x="48" y="104" width="1144" height="216" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · 两条消息在字节流上背靠背排着</text>
+
+  <path d="M200,166 L200,158 L560,158 L560,166" fill="none" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="380" y="152" font-size="10" fill="#8A8578" text-anchor="middle">第 1 条消息，共 4 + 5 = 9 字节</text>
+  <path d="M560,166 L560,158 L920,158 L920,166" fill="none" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="740" y="152" font-size="10" fill="#8A8578" text-anchor="middle">第 2 条消息，共 9 字节</text>
+
+  <rect x="200" y="172" width="160" height="50" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="280" y="192" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">len = 5</text>
+  <text x="280" y="210" font-size="9.5" fill="#8A8578" text-anchor="middle">4 字节，网络字节序</text>
+  <rect x="360" y="172" width="200" height="50" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="460" y="192" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">H E L L O</text>
+  <text x="460" y="210" font-size="9.5" fill="#8A8578" text-anchor="middle">body，5 字节</text>
+  <rect x="560" y="172" width="160" height="50" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="640" y="192" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">len = 5</text>
+  <text x="640" y="210" font-size="9.5" fill="#8A8578" text-anchor="middle">4 字节，网络字节序</text>
+  <rect x="720" y="172" width="200" height="50" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="820" y="192" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">W O R L D</text>
+  <text x="820" y="210" font-size="9.5" fill="#8A8578" text-anchor="middle">body，5 字节</text>
+  <rect x="920" y="172" width="140" height="50" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="990" y="202" font-size="12" fill="#8A8578" text-anchor="middle">下一条的头…</text>
+
+  <text x="200" y="240" font-size="9.5" fill="#8A8578" text-anchor="middle">0</text>
+  <text x="360" y="240" font-size="9.5" fill="#8A8578" text-anchor="middle">4</text>
+  <text x="560" y="240" font-size="9.5" fill="#8A8578" text-anchor="middle">9</text>
+  <text x="720" y="240" font-size="9.5" fill="#8A8578" text-anchor="middle">13</text>
+  <text x="920" y="240" font-size="9.5" fill="#8A8578" text-anchor="middle">18</text>
+  <text x="1075" y="240" font-size="9.5" fill="#8A8578">← 字节偏移</text>
+
+  <text x="72" y="272" font-size="11" fill="#6B675C">读到第 0 字节时并不知道这条消息多长，读满前 4 字节才知道要再读 5 字节；下一条消息的头就紧贴在第 9 字节上，中间没有任何间隔</text>
+  <text x="72" y="296" font-size="11" fill="#6B675C">正因为长度是显式写出来的，body 里出现 0x00、换行、甚至完整的另一段协议报文都不会干扰解析——这是它比分隔符方案通用的地方</text>
+
+  <!-- ===================== Panel B ===================== -->
+  <rect x="48" y="340" width="1144" height="270" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="368" font-size="15" font-weight="700" fill="#4A473F">B · 解析状态机：缓冲区里可能只有半个头，也可能躺着两条半消息</text>
+
+  <!-- self loops -->
+  <path d="M180,420 C180,392 290,392 290,420" fill="none" stroke="#B07D2B" stroke-width="1.4" marker-end="url(#arrA)"/>
+  <text x="235" y="386" font-size="10" fill="#6B4E28" text-anchor="middle">可读 &lt; 4：原样留着，等下次 recv</text>
+  <path d="M565,420 C565,392 675,392 675,420" fill="none" stroke="#B07D2B" stroke-width="1.4" marker-end="url(#arrA)"/>
+  <text x="620" y="386" font-size="10" fill="#6B4E28" text-anchor="middle">可读 &lt; len：原样留着，等下次 recv</text>
+
+  <!-- states -->
+  <rect x="120" y="420" width="230" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="235" y="443" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">等消息头</text>
+  <text x="235" y="463" font-size="10" fill="#6B675C" text-anchor="middle">还需要 4 字节</text>
+  <rect x="505" y="420" width="230" height="56" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="620" y="443" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">等消息体</text>
+  <text x="620" y="463" font-size="10" fill="#6B675C" text-anchor="middle">还需要 len 字节</text>
+  <rect x="890" y="420" width="230" height="56" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1005" y="443" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">交付一条消息</text>
+  <text x="1005" y="463" font-size="10" fill="#6B675C" text-anchor="middle">丢给业务逻辑</text>
+
+  <!-- transitions -->
+  <line x1="350" y1="448" x2="505" y2="448" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+  <text x="427" y="438" font-size="10" fill="#4A473F" text-anchor="middle">可读 ≥ 4 → 解析 len</text>
+  <line x1="735" y1="448" x2="890" y2="448" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+  <text x="812" y="438" font-size="10" fill="#4A473F" text-anchor="middle">可读 ≥ len → 取出 body</text>
+
+  <!-- return edge -->
+  <polyline points="1005,476 1005,540 235,540 235,482" fill="none" stroke="#2F6B5E" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrG)"/>
+  <rect x="430" y="522" width="380" height="18" fill="#FBFBF6"/>
+  <text x="620" y="535" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">缓冲区里还有剩余 → 立刻接着解析下一条</text>
+
+  <text x="72" y="576" font-size="11" fill="#6B675C">这条回边最容易被漏掉：一次 recv 常常带回好几条消息，如果解析完一条就 return，剩下的会一直躺在缓冲区里等下一次 recv，表现出来就是"消息总慢一拍"</text>
+
+  <text x="48" y="628" font-size="11" fill="#6B675C">readn 那种"读满 n 字节才返回"的写法只适合阻塞式一问一答；非阻塞 / epoll 下必须换成这台状态机加一块应用层缓冲区</text>
+</svg>

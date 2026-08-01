@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>消息队列动画 · 类型、边界、阻塞与双向通信</title>
+<style>
+/* 视觉系统：22/15/12px 字阶；暖白纸面与近白面板；蓝=数据、绿=成功、琥珀=选择、红=阻塞/错误。 */
+:root{
+  --paper:#F5F4ED;
+  --panel:#FBFBF6;
+  --ink:#2C2B27;
+  --muted:#5F5E58;
+  --faint:#85837A;
+  --line:#C9C7BC;
+  --grid:#E2E0D6;
+  --soft:#F0EFE7;
+  --blue:#2467A6;
+  --blue-text:#19517F;
+  --blue-bg:#E0EDF8;
+  --green:#087A5C;
+  --green-text:#075E47;
+  --green-bg:#DDF3EA;
+  --amber:#A66408;
+  --amber-text:#7E4B05;
+  --amber-bg:#FAECD2;
+  --danger:#C34935;
+  --danger-text:#963524;
+  --danger-bg:#F8E2DC;
+  --dark:#292824;
+  --code:#DCD8CD;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);
+  --dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.55;padding:28px 32px 44px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1200px;margin:0 auto;}
+header h1{font-size:22px;font-weight:650;letter-spacing:0;}
+header p{margin-top:5px;color:var(--muted);font-size:13px;}
+kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;background:var(--panel);color:var(--muted);padding:0 5px;}
+code{font-family:var(--mono);font-size:.9em;background:var(--soft);border-radius:4px;padding:1px 4px;}
+
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;}
+.tab{min-width:157px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);padding:9px 13px;text-align:left;cursor:pointer;transition:transform 180ms var(--ease),border-color 180ms var(--ease),background 180ms var(--ease),color 180ms var(--ease);}
+.tab:hover{border-color:var(--ink);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.34);outline-offset:2px;}
+.tab .tab-title{display:block;color:var(--ink);font-size:13px;font-weight:650;}
+.tab .tab-sub{display:block;margin-top:1px;color:var(--faint);font-family:var(--mono);font-size:10.5px;}
+.tab.is-active{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 9px rgba(44,43,39,.16);}
+.tab.is-active .tab-title{color:var(--paper);}
+.tab.is-active .tab-sub{color:#D8D5CA;}
+
+.layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,.7fr);gap:24px;margin-top:22px;align-items:start;}
+.visual-card,.detail-card,.fact-card{border:1px solid var(--grid);border-radius:8px;background:var(--panel);box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.visual-card{padding:18px;min-height:478px;}
+.visual-caption{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.visual-caption b{color:var(--ink);}
+.scene{display:none;}
+.scene.is-active{display:block;}
+.stage{position:relative;min-height:410px;isolation:isolate;}
+.stage > :not(.wires){position:relative;z-index:2;}
+.wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:1;}
+.wire-line{fill:none;stroke:var(--line);stroke-width:2;opacity:0;transition:opacity 220ms var(--ease),stroke-width 220ms var(--ease),stroke-dashoffset 520ms var(--ease);}
+.wire-head{fill:var(--line);stroke:none;opacity:0;transition:opacity 180ms var(--ease) 190ms;}
+.wire-port{fill:var(--panel);stroke:var(--line);stroke-width:2;opacity:0;transition:opacity 180ms var(--ease);}
+.wire-line.is-hint{opacity:.1;}
+.wire-line.is-active{opacity:1;stroke-width:3;}
+.wire-head.is-active,.wire-port.is-active{opacity:1;}
+.wire-line.blue{stroke:var(--blue);}.wire-head.blue{fill:var(--blue);}.wire-port.blue{stroke:var(--blue);}
+.wire-line.green{stroke:var(--green);}.wire-head.green{fill:var(--green);}.wire-port.green{stroke:var(--green);}
+.wire-line.amber{stroke:var(--amber);}.wire-head.amber{fill:var(--amber);}.wire-port.amber{stroke:var(--amber);}
+.wire-line.danger{stroke:var(--danger);}.wire-head.danger{fill:var(--danger);}.wire-port.danger{stroke:var(--danger);}
+
+.node{border:1.5px solid var(--line);border-radius:8px;background:var(--paper);transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.node.is-blue{border-color:var(--blue);background:var(--blue-bg);box-shadow:0 0 0 2px rgba(36,103,166,.11);}
+.node.is-green{border-color:var(--green);background:var(--green-bg);box-shadow:0 0 0 2px rgba(8,122,92,.11);}
+.node.is-amber{border-color:var(--amber);background:var(--amber-bg);box-shadow:0 0 0 2px rgba(166,100,8,.11);}
+.node.is-danger{border-color:var(--danger);background:var(--danger-bg);box-shadow:0 0 0 2px rgba(195,73,53,.11);}
+.node.is-dim{opacity:.48;}
+.node.is-pop{transform:scale(1.025);}
+.actor{padding:10px 8px;text-align:center;min-width:0;align-self:center;}
+.actor-name{font-family:var(--mono);font-size:12px;font-weight:750;color:var(--ink);}
+.actor-kind{font-size:10.5px;color:var(--faint);margin-top:2px;}
+.actor-op{min-height:35px;margin-top:9px;border:1px solid var(--grid);border-radius:6px;background:var(--soft);display:flex;align-items:center;justify-content:center;padding:5px 6px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);line-height:1.3;transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease),border-color var(--dur) var(--ease);}
+.actor.is-blue .actor-op{border-color:var(--blue);background:var(--blue);color:var(--paper);}
+.actor.is-green .actor-op{border-color:var(--green);background:var(--green);color:var(--paper);}
+.actor.is-amber .actor-op{border-color:var(--amber);background:var(--amber);color:var(--paper);}
+.actor.is-danger .actor-op{border-color:var(--danger);background:var(--danger);color:var(--paper);}
+.kernel-title{font-family:var(--mono);font-size:10.5px;font-weight:750;letter-spacing:0;color:var(--faint);text-align:center;}
+.queue{padding:9px;min-width:0;}
+.queue-head{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-bottom:8px;}
+.queue-id{font-family:var(--mono);font-size:10px;color:var(--faint);}
+.queue-count{border:1px solid var(--line);border-radius:999px;background:var(--soft);padding:1px 6px;font-family:var(--mono);font-size:10px;color:var(--muted);transition:all var(--dur) var(--ease);white-space:nowrap;}
+.queue-count.is-full{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+.queue-count.is-open{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+.type-pill{display:inline-flex;align-items:center;justify-content:center;min-width:27px;border:1px solid currentColor;border-radius:4px;padding:1px 4px;font-family:var(--mono);font-size:9px;font-weight:750;line-height:1.25;}
+.type-one{color:var(--blue-text);background:var(--blue-bg);}
+.type-two{color:var(--green-text);background:var(--green-bg);}
+.type-three{color:var(--amber-text);background:var(--amber-bg);}
+.type-four{color:var(--danger-text);background:var(--danger-bg);}
+.callout{margin-top:14px;border:1px solid var(--line);border-radius:7px;background:var(--paper);padding:8px 10px;text-align:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);transition:all var(--dur) var(--ease);}
+.callout.is-blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}
+.callout.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+.callout.is-amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+.callout.is-danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+
+/* 场景一：类型筛选。 */
+.typed-grid{display:grid;grid-template-columns:minmax(82px,.75fr) minmax(148px,1.5fr) minmax(82px,.75fr);gap:30px;align-items:center;padding-top:27px;}
+.typed-sender{opacity:.72;}
+.typed-messages{display:grid;gap:6px;}
+.mq-message{min-height:44px;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);padding:5px 7px;display:grid;grid-template-columns:34px 1fr;gap:6px;align-items:center;color:var(--muted);transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.mq-message .msg-body{font-family:var(--mono);font-size:10.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mq-message.is-selected{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);box-shadow:0 0 0 2px rgba(166,100,8,.12);transform:translateX(3px);}
+.mq-message.is-sent{border-color:var(--green);background:var(--green-bg);color:var(--green-text);transform:translateX(10px);opacity:.48;}
+.mq-message.is-muted{opacity:.38;}
+.filter-card{margin-top:17px;border:1px solid var(--line);border-radius:7px;background:var(--paper);padding:8px 10px;text-align:center;transition:all var(--dur) var(--ease);}
+.filter-card .filter-label{font-family:var(--mono);font-size:10px;color:var(--faint);}
+.filter-card .filter-value{font-family:var(--mono);font-size:13px;font-weight:750;color:var(--ink);margin-top:2px;}
+.filter-card.is-blue{border-color:var(--blue);background:var(--blue-bg);}.filter-card.is-blue .filter-value{color:var(--blue-text);}
+.filter-card.is-amber{border-color:var(--amber);background:var(--amber-bg);}.filter-card.is-amber .filter-value{color:var(--amber-text);}
+.receiver-buffer{margin-top:9px;min-height:36px;border:1px dashed var(--line);border-radius:6px;background:var(--soft);display:flex;align-items:center;justify-content:center;padding:5px;font-family:var(--mono);font-size:10px;color:var(--faint);transition:all var(--dur) var(--ease);}
+.receiver-buffer.is-filled{border-style:solid;border-color:var(--green);background:var(--green-bg);color:var(--green-text);font-weight:750;}
+.selection-note{margin:19px auto 0;max-width:490px;min-height:57px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:9px 12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:12px;transition:all var(--dur) var(--ease);}
+.selection-note b{color:var(--ink);}
+.selection-note.is-amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}.selection-note.is-amber b{color:var(--amber-text);}
+.selection-note.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.selection-note.is-green b{color:var(--green-text);}
+
+/* 场景二：消息边界。 */
+.boundary-grid{display:grid;grid-template-columns:minmax(82px,.78fr) minmax(148px,1.44fr) minmax(82px,.78fr);gap:30px;align-items:center;padding-top:26px;}
+.message-stack{display:grid;gap:7px;}
+.boundary-message{min-height:47px;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);padding:6px 7px;transition:all var(--dur) var(--ease);}
+.boundary-message .bm-head{display:flex;justify-content:space-between;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--faint);}
+.boundary-message .bm-payload{font-family:var(--mono);font-size:11px;font-weight:750;color:var(--ink);margin-top:4px;}
+.boundary-message.is-blue{border-color:var(--blue);background:var(--blue-bg);}.boundary-message.is-blue .bm-payload{color:var(--blue-text);}
+.boundary-message.is-green{border-color:var(--green);background:var(--green-bg);}.boundary-message.is-green .bm-payload{color:var(--green-text);}
+.boundary-message.is-amber{border-color:var(--amber);background:var(--amber-bg);}.boundary-message.is-amber .bm-payload{color:var(--amber-text);}
+.boundary-message.is-dim{opacity:.32;transform:scale(.98);}
+.boundary-rule{margin-top:14px;border:1px solid var(--line);border-radius:7px;background:var(--paper);padding:8px;text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--muted);transition:all var(--dur) var(--ease);}
+.boundary-rule.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+.boundary-rule.is-amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+.stream-compare{margin-top:19px;display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.compare-row{border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:7px 8px;min-width:0;}
+.compare-label{font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.compare-data{margin-top:4px;font-family:var(--mono);font-size:11px;font-weight:750;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color var(--dur) var(--ease);}
+.compare-row.is-amber{border-color:var(--amber);background:var(--amber-bg);}.compare-row.is-amber .compare-data{color:var(--amber-text);}
+.compare-row.is-green{border-color:var(--green);background:var(--green-bg);}.compare-row.is-green .compare-data{color:var(--green-text);}
+
+/* 场景三：容量、阻塞和 IPC_NOWAIT。 */
+.capacity-grid{display:grid;grid-template-columns:minmax(82px,.76fr) minmax(158px,1.48fr) minmax(82px,.76fr);gap:30px;align-items:center;padding-top:24px;}
+.capacity-slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;}
+.capacity-slot{height:50px;border:1.5px dashed var(--line);border-radius:6px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);}
+.capacity-slot .slot-type{font-family:var(--mono);font-size:9px;font-weight:750;color:var(--faint);}
+.capacity-slot .slot-text{font-family:var(--mono);font-size:9px;color:var(--faint);}
+.capacity-slot.is-full{border-style:solid;border-color:var(--blue);background:var(--blue-bg);}.capacity-slot.is-full .slot-type,.capacity-slot.is-full .slot-text{color:var(--blue-text);}
+.capacity-slot.is-leaving{border-color:var(--green);background:var(--green-bg);transform:translateX(2px);}.capacity-slot.is-leaving .slot-type,.capacity-slot.is-leaving .slot-text{color:var(--green-text);}
+.capacity-slot.is-open{border-color:var(--green);background:var(--green-bg);}.capacity-slot.is-open .slot-type{color:var(--green-text);}.capacity-slot.is-open .slot-text{color:var(--green-text);}
+.capacity-slot.is-arriving{border-color:var(--amber);background:var(--amber-bg);transform:scale(1.05);}.capacity-slot.is-arriving .slot-type,.capacity-slot.is-arriving .slot-text{color:var(--amber-text);}
+.capacity-status{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.status-box{min-height:50px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:7px;text-align:center;transition:all var(--dur) var(--ease);}
+.status-box .status-label{font-family:var(--mono);font-size:9.5px;color:var(--faint);}
+.status-box .status-value{font-family:var(--mono);font-size:10.5px;font-weight:750;color:var(--muted);margin-top:3px;}
+.status-box.is-danger{border-color:var(--danger);background:var(--danger-bg);}.status-box.is-danger .status-value{color:var(--danger-text);}
+.status-box.is-green{border-color:var(--green);background:var(--green-bg);}.status-box.is-green .status-value{color:var(--green-text);}
+.status-box.is-amber{border-color:var(--amber);background:var(--amber-bg);}.status-box.is-amber .status-value{color:var(--amber-text);}
+.nowait-strip{margin-top:16px;min-height:44px;border:1px solid var(--line);border-radius:7px;background:var(--paper);padding:7px 10px;display:flex;align-items:center;justify-content:center;text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--muted);transition:all var(--dur) var(--ease);}
+.nowait-strip.is-danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+.nowait-strip.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+
+/* 场景四：同一个队列的双向通信。 */
+.duplex-grid{display:grid;grid-template-columns:minmax(82px,.78fr) minmax(148px,1.44fr) minmax(82px,.78fr);gap:30px;align-items:center;padding-top:25px;}
+.duplex-queue{min-height:165px;}
+.duplex-lanes{display:grid;gap:7px;margin-top:9px;}
+.duplex-lane{min-height:47px;border:1.5px dashed var(--line);border-radius:6px;background:var(--paper);display:grid;grid-template-columns:35px 1fr;align-items:center;gap:6px;padding:5px 7px;transition:all var(--dur) var(--ease);}
+.duplex-lane .lane-payload{font-family:var(--mono);font-size:10.5px;font-weight:750;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.duplex-lane.is-blue{border-style:solid;border-color:var(--blue);background:var(--blue-bg);}.duplex-lane.is-blue .lane-payload{color:var(--blue-text);}
+.duplex-lane.is-green{border-style:solid;border-color:var(--green);background:var(--green-bg);}.duplex-lane.is-green .lane-payload{color:var(--green-text);}
+.duplex-lane.is-amber{border-style:solid;border-color:var(--amber);background:var(--amber-bg);}.duplex-lane.is-amber .lane-payload{color:var(--amber-text);}
+.duplex-lane.is-empty{opacity:.5;}
+.duplex-legend{margin-top:17px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;}
+.legend-item{display:inline-flex;gap:4px;align-items:center;font-family:var(--mono);font-size:9.5px;color:var(--muted);}
+.duplex-note{margin-top:18px;min-height:49px;border:1px solid var(--grid);border-radius:7px;background:var(--paper);padding:8px 11px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11.5px;color:var(--muted);transition:all var(--dur) var(--ease);}
+.duplex-note b{color:var(--ink);}
+.duplex-note.is-blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}.duplex-note.is-blue b{color:var(--blue-text);}
+.duplex-note.is-green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}.duplex-note.is-green b{color:var(--green-text);}
+
+.right{display:flex;flex-direction:column;gap:14px;}
+.detail-card{padding:17px 18px;min-height:187px;}
+.detail-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+.detail-title{font-size:16px;font-weight:650;}
+.chip{border:1px solid var(--line);border-radius:999px;background:var(--soft);color:var(--muted);font-size:10.5px;font-weight:700;padding:2px 8px;white-space:nowrap;}
+.chip.blue{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);}
+.chip.green{border-color:var(--green);background:var(--green-bg);color:var(--green-text);}
+.chip.amber{border-color:var(--amber);background:var(--amber-bg);color:var(--amber-text);}
+.chip.danger{border-color:var(--danger);background:var(--danger-bg);color:var(--danger-text);}
+.action-line{margin-top:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);padding:8px 10px;font-family:var(--mono);font-size:11.5px;font-weight:750;color:var(--ink);min-height:36px;transition:all var(--dur) var(--ease);}
+.detail-desc{margin-top:11px;color:var(--muted);font-size:13.5px;min-height:62px;}
+.detail-desc b{color:var(--ink);}
+
+.code-deck{border-radius:8px;background:var(--dark);box-shadow:0 2px 8px rgba(41,40,36,.17);overflow:hidden;}
+.code-scene{display:none;padding:11px 0;}
+.code-scene.is-active{display:block;}
+.code-line{min-height:20px;padding:2px 12px 2px 15px;color:var(--code);font-family:var(--mono);font-size:11.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.code-line.active-blue{background:rgba(66,144,214,.56);box-shadow:inset 4px 0 0 #9CC8EF;color:#FBF8F0;}
+.code-line.active-green{background:rgba(41,159,120,.56);box-shadow:inset 4px 0 0 #91DEC5;color:#FBF8F0;}
+.code-line.active-amber{background:rgba(206,142,39,.58);box-shadow:inset 4px 0 0 #F3C97B;color:#FBF8F0;}
+.code-line.active-danger{background:rgba(206,94,74,.58);box-shadow:inset 4px 0 0 #F0AA9C;color:#FBF8F0;}
+.kw{color:#E9B25C;}.fn{color:#94C8EE;}.type{color:#DCA5D5;}.str{color:#A7CF90;}.num{color:#E9A184;}.macro{color:#F2D081;}.cmt{color:#9C988E;}.code-line[class*="active-"] .cmt{color:#E2DED2;}
+
+.fact-card{padding:12px 14px;}
+.fact-title{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-bottom:6px;}
+.facts{width:100%;border-collapse:collapse;font-size:11.5px;}
+.facts td{padding:4px 3px;border-bottom:1px solid var(--grid);color:var(--muted);vertical-align:top;}
+.facts tr:last-child td{border-bottom:none;}
+.facts td:first-child{width:37%;font-family:var(--mono);font-weight:750;color:var(--ink);white-space:nowrap;}
+
+.controls{margin-top:20px;border:1px solid var(--grid);border-radius:8px;background:var(--panel);box-shadow:0 1px 3px rgba(60,55,40,.04);padding:13px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.btn{border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);padding:8px 13px;font-size:13px;cursor:pointer;transition:transform 120ms var(--ease),background-color 160ms var(--ease),border-color 160ms var(--ease);}
+.btn:hover:not(:disabled){background:var(--soft);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--paper);min-width:82px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;justify-content:center;}
+.dot{width:10px;height:10px;padding:0;border:1.5px solid var(--line);border-radius:50%;background:transparent;cursor:pointer;transition:transform 180ms var(--ease),background-color 180ms var(--ease),border-color 180ms var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.2);}
+.dot.is-done{background:var(--line);border-color:var(--line);}
+.dot.is-current{background:var(--ink);border-color:var(--ink);transform:scale(1.3);}
+.readout{min-width:43px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);}
+
+@media(max-width:980px){.layout{grid-template-columns:1fr;}.visual-card{min-height:0;}.detail-card{min-height:0;}.right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;}.detail-card{grid-column:1 / -1;}.code-deck{align-self:start;}.fact-card{align-self:start;}}
+@media(max-width:620px){body{padding:19px 15px 30px;font-size:14px;}header h1{font-size:20px;}header p{font-size:12px;}.tab{flex:1 1 142px;min-width:0;padding:8px 10px;}.visual-card{padding:13px;}.stage{min-height:390px;}.typed-grid,.boundary-grid,.capacity-grid,.duplex-grid{gap:15px;grid-template-columns:minmax(70px,.75fr) minmax(118px,1.5fr) minmax(70px,.75fr);}.actor{padding:8px 4px;}.actor-name{font-size:10.5px;}.actor-kind{font-size:9px;}.actor-op{font-size:9px;padding:4px;}.queue{padding:7px;}.kernel-title,.queue-id{font-size:9px;}.mq-message{grid-template-columns:29px 1fr;padding:4px 5px;min-height:40px;}.mq-message .msg-body,.boundary-message .bm-payload,.duplex-lane .lane-payload{font-size:9px;}.type-pill{min-width:24px;font-size:8px;}.selection-note,.duplex-note{font-size:10.5px;}.capacity-slots{gap:3px;}.capacity-slot{height:43px;}.capacity-slot .slot-type,.capacity-slot .slot-text{font-size:8px;}.status-box{padding:5px;}.status-box .status-value{font-size:9px;}.nowait-strip{font-size:9.5px;}.stream-compare{gap:6px;}.compare-data{font-size:9px;}.right{display:flex;}.controls{padding:11px;gap:8px;}.btn{padding:7px 10px;font-size:12px;}.dots{order:3;width:100%;}.readout{margin-left:auto;}.code-line{font-size:10.5px;padding-left:12px;}.detail-desc{font-size:12.5px;min-height:0;}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>消息队列 · 类型选择、消息边界、阻塞与双向通信</h1>
+    <p>System V Message Queue 配套笔记 · 上方切换情境，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="消息队列情境">
+    <button class="tab" type="button" data-scene="typed"><span class="tab-title">按类型接收</span><span class="tab-sub">msgtyp: 0 / +n / -n</span></button>
+    <button class="tab" type="button" data-scene="boundary"><span class="tab-title">消息边界</span><span class="tab-sub">one node, one receive</span></button>
+    <button class="tab" type="button" data-scene="capacity"><span class="tab-title">满队列与 NOWAIT</span><span class="tab-sub">block / EAGAIN</span></button>
+    <button class="tab" type="button" data-scene="duplex"><span class="tab-title">双向通信</span><span class="tab-sub">type 1 / type 2</span></button>
+  </nav>
+
+  <div class="layout">
+    <section class="visual-card" aria-label="消息队列动画">
+      <div class="visual-caption" id="visualCaption"><b>类型选择</b>：队列保持顺序，<code>msgrcv()</code> 根据 <code>msgtyp</code> 选择一条匹配消息。</div>
+
+      <section class="scene" id="scene-typed" aria-label="消息类型选择">
+        <div class="stage" id="typed-stage">
+          <svg class="wires" id="typed-wires" aria-hidden="true">
+            <path class="wire-line" id="t-call"></path><path class="wire-head" id="t-call-head"></path><circle class="wire-port" id="t-call-port" r="4"></circle>
+            <path class="wire-line" id="t-take"></path><path class="wire-head" id="t-take-head"></path><circle class="wire-port" id="t-take-port" r="4"></circle>
+          </svg>
+          <div class="typed-grid">
+            <article class="actor node typed-sender" id="typed-sender">
+              <div class="actor-name">发送进程</div><div class="actor-kind">已经入队</div><div class="actor-op" id="typed-send-op">msgsnd() = 0</div>
+            </article>
+            <section class="queue node" id="typed-queue">
+              <div class="queue-head"><span class="kernel-title">kernel message list</span><span class="queue-id">msqid=42</span></div>
+              <div class="typed-messages">
+                <div class="mq-message" id="t-msg-0"><span class="type-pill type-two">T=2</span><span class="msg-body">job-A</span></div>
+                <div class="mq-message" id="t-msg-1"><span class="type-pill type-one">T=1</span><span class="msg-body">reply-A</span></div>
+                <div class="mq-message" id="t-msg-2"><span class="type-pill type-three">T=3</span><span class="msg-body">audit-A</span></div>
+              </div>
+              <div class="filter-card" id="t-filter"><div class="filter-label">msgrcv(..., msgtyp, ...)</div><div class="filter-value" id="t-filter-value">等待接收方指定</div></div>
+            </section>
+            <article class="actor node" id="typed-receiver">
+              <div class="actor-name">接收进程</div><div class="actor-kind">用户态 buffer</div><div class="actor-op" id="t-recv-op">选择 msgtyp</div><div class="receiver-buffer" id="t-recv-buffer">尚未复制</div>
+            </article>
+          </div>
+          <div class="selection-note" id="t-selection-note">消息的 <b>类型</b> 是筛选条件；每次 <code>msgrcv()</code> 只取一条消息节点。</div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-boundary" aria-label="消息边界">
+        <div class="stage" id="boundary-stage">
+          <svg class="wires" id="boundary-wires" aria-hidden="true">
+            <path class="wire-line" id="b-send"></path><path class="wire-head" id="b-send-head"></path><circle class="wire-port" id="b-send-port" r="4"></circle>
+            <path class="wire-line" id="b-take"></path><path class="wire-head" id="b-take-head"></path><circle class="wire-port" id="b-take-port" r="4"></circle>
+          </svg>
+          <div class="boundary-grid">
+            <article class="actor node" id="boundary-sender">
+              <div class="actor-name">发送进程</div><div class="actor-kind">struct msg_buffer</div><div class="actor-op" id="b-send-op">准备两条消息</div>
+            </article>
+            <section class="queue node" id="boundary-queue">
+              <div class="queue-head"><span class="kernel-title">two kernel nodes</span><span class="queue-id">每条独立</span></div>
+              <div class="message-stack">
+                <div class="boundary-message" id="b-msg-a"><div class="bm-head"><span class="type-pill type-one">T=1</span><span>node #1</span></div><div class="bm-payload">HEAD</div></div>
+                <div class="boundary-message" id="b-msg-b"><div class="bm-head"><span class="type-pill type-two">T=2</span><span>node #2</span></div><div class="bm-payload">BODY</div></div>
+              </div>
+              <div class="boundary-rule" id="b-rule">每个节点都带有类型和长度</div>
+            </section>
+            <article class="actor node" id="boundary-receiver">
+              <div class="actor-name">接收进程</div><div class="actor-kind">用户态 buffer</div><div class="actor-op" id="b-recv-op">等待 msgrcv()</div><div class="receiver-buffer" id="b-recv-buffer">空 buffer</div>
+            </article>
+          </div>
+          <div class="stream-compare">
+            <div class="compare-row" id="b-stream"><div class="compare-label">pipe byte stream</div><div class="compare-data">HEADBODY</div></div>
+            <div class="compare-row" id="b-queue-compare"><div class="compare-label">message queue</div><div class="compare-data">[HEAD] [BODY]</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-capacity" aria-label="满队列和 IPC_NOWAIT">
+        <div class="stage" id="capacity-stage">
+          <svg class="wires" id="capacity-wires" aria-hidden="true">
+            <path class="wire-line" id="c-send"></path><path class="wire-head" id="c-send-head"></path><circle class="wire-port" id="c-send-port" r="4"></circle>
+            <path class="wire-line" id="c-take"></path><path class="wire-head" id="c-take-head"></path><circle class="wire-port" id="c-take-port" r="4"></circle>
+          </svg>
+          <div class="capacity-grid">
+            <article class="actor node" id="capacity-sender">
+              <div class="actor-name">发送进程</div><div class="actor-kind">待发 T=5</div><div class="actor-op" id="c-send-op">msgsnd(..., 0)</div>
+            </article>
+            <section class="queue node" id="capacity-queue">
+              <div class="queue-head"><span class="kernel-title">demo capacity = 4</span><span class="queue-count" id="c-count">4 / 4</span></div>
+              <div class="capacity-slots">
+                <div class="capacity-slot" id="c-slot-0"><span class="slot-type" id="c-slot-type-0">T=1</span><span class="slot-text" id="c-slot-text-0">A</span></div>
+                <div class="capacity-slot" id="c-slot-1"><span class="slot-type" id="c-slot-type-1">T=2</span><span class="slot-text" id="c-slot-text-1">B</span></div>
+                <div class="capacity-slot" id="c-slot-2"><span class="slot-type" id="c-slot-type-2">T=3</span><span class="slot-text" id="c-slot-text-2">C</span></div>
+                <div class="capacity-slot" id="c-slot-3"><span class="slot-type" id="c-slot-type-3">T=4</span><span class="slot-text" id="c-slot-text-3">D</span></div>
+              </div>
+              <div class="capacity-status"><div class="status-box" id="c-send-status"><div class="status-label">sender</div><div class="status-value" id="c-send-status-value">ready</div></div><div class="status-box" id="c-queue-status"><div class="status-label">queue</div><div class="status-value" id="c-queue-status-value">full</div></div></div>
+            </section>
+            <article class="actor node" id="capacity-receiver">
+              <div class="actor-name">接收进程</div><div class="actor-kind">可取出消息</div><div class="actor-op" id="c-recv-op">尚未接收</div><div class="receiver-buffer" id="c-recv-buffer">空 buffer</div>
+            </article>
+          </div>
+          <div class="nowait-strip" id="c-nowait">默认 flags = 0：队列满时，<b>发送者睡眠等待</b>。</div>
+        </div>
+      </section>
+
+      <section class="scene" id="scene-duplex" aria-label="双向通信">
+        <div class="stage" id="duplex-stage">
+          <svg class="wires" id="duplex-wires" aria-hidden="true">
+            <path class="wire-line" id="d-request-send"></path><path class="wire-head" id="d-request-send-head"></path><circle class="wire-port" id="d-request-send-port" r="4"></circle>
+            <path class="wire-line" id="d-request-recv"></path><path class="wire-head" id="d-request-recv-head"></path><circle class="wire-port" id="d-request-recv-port" r="4"></circle>
+            <path class="wire-line" id="d-reply-send"></path><path class="wire-head" id="d-reply-send-head"></path><circle class="wire-port" id="d-reply-send-port" r="4"></circle>
+            <path class="wire-line" id="d-reply-recv"></path><path class="wire-head" id="d-reply-recv-head"></path><circle class="wire-port" id="d-reply-recv-port" r="4"></circle>
+          </svg>
+          <div class="duplex-grid">
+            <article class="actor node" id="duplex-client">
+              <div class="actor-name">Client</div><div class="actor-kind">request / reply</div><div class="actor-op" id="d-client-op">准备请求</div><div class="receiver-buffer" id="d-client-buffer">reply buffer</div>
+            </article>
+            <section class="queue node duplex-queue" id="duplex-queue">
+              <div class="queue-head"><span class="kernel-title">same msqid = 42</span><span class="queue-id">two directions</span></div>
+              <div class="duplex-lanes">
+                <div class="duplex-lane" id="d-request-lane"><span class="type-pill type-one">T=1</span><span class="lane-payload" id="d-request-payload">request lane</span></div>
+                <div class="duplex-lane" id="d-reply-lane"><span class="type-pill type-two">T=2</span><span class="lane-payload" id="d-reply-payload">reply lane</span></div>
+              </div>
+            </section>
+            <article class="actor node" id="duplex-server">
+              <div class="actor-name">Server</div><div class="actor-kind">request / reply</div><div class="actor-op" id="d-server-op">等待 T=1</div><div class="receiver-buffer" id="d-server-buffer">request buffer</div>
+            </article>
+          </div>
+          <div class="duplex-legend"><span class="legend-item"><span class="type-pill type-one">T=1</span> Client → Server</span><span class="legend-item"><span class="type-pill type-two">T=2</span> Server → Client</span></div>
+          <div class="duplex-note" id="d-note">同一个队列通过 <b>不同消息类型</b> 区分请求和应答方向。</div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="right">
+      <section class="detail-card">
+        <div class="detail-head"><h2 class="detail-title" id="detailTitle">按类型接收</h2><span class="chip" id="detailChip">概览</span></div>
+        <div class="action-line" id="actionLine">▸ 观察队列中的类型与物理顺序</div>
+        <p class="detail-desc" id="detailDesc">System V 消息队列在内核中保存完整消息节点；接收时可用 <code>msgtyp</code> 指定选择规则。</p>
+      </section>
+
+      <section class="code-deck" aria-label="当前 API 代码">
+        <div class="code-scene" id="code-typed">
+          <div class="code-line"><span class="type">ssize_t</span> n = <span class="fn">msgrcv</span>(msqid, &amp;msg, sizeof msg.text,</div>
+          <div class="code-line">                   msgtyp, flags);</div>
+          <div class="code-line"><span class="cmt">// msgtyp == 0 : 队首消息</span></div>
+          <div class="code-line"><span class="cmt">// msgtyp &gt; 0  : 第一条同类型消息</span></div>
+          <div class="code-line"><span class="cmt">// msgtyp &lt; 0  : 最小类型且 type &lt;= |msgtyp|</span></div>
+        </div>
+        <div class="code-scene" id="code-boundary">
+          <div class="code-line"><span class="type">struct</span> msg_buffer { <span class="type">long</span> type; <span class="type">char</span> text[<span class="num">32</span>]; };</div>
+          <div class="code-line">msg.type = <span class="num">1</span>; <span class="fn">strcpy</span>(msg.text, <span class="str">&quot;HEAD&quot;</span>);</div>
+          <div class="code-line"><span class="fn">msgsnd</span>(msqid, &amp;msg, sizeof msg.text, <span class="num">0</span>);</div>
+          <div class="code-line">msg.type = <span class="num">2</span>; <span class="fn">strcpy</span>(msg.text, <span class="str">&quot;BODY&quot;</span>);</div>
+          <div class="code-line"><span class="fn">msgrcv</span>(msqid, &amp;out, sizeof out.text, <span class="num">0</span>, <span class="num">0</span>);</div>
+        </div>
+        <div class="code-scene" id="code-capacity">
+          <div class="code-line"><span class="cmt">// 默认：队列满则等待可用空间</span></div>
+          <div class="code-line"><span class="fn">msgsnd</span>(msqid, &amp;msg, sizeof msg.text, <span class="num">0</span>);</div>
+          <div class="code-line"><span class="fn">msgrcv</span>(msqid, &amp;out, sizeof out.text, <span class="num">0</span>, <span class="num">0</span>);</div>
+          <div class="code-line"><span class="cmt">// 非阻塞：满队列立即失败</span></div>
+          <div class="code-line"><span class="type">int</span> rc = <span class="fn">msgsnd</span>(msqid, &amp;msg, sizeof msg.text, <span class="macro">IPC_NOWAIT</span>);</div>
+          <div class="code-line"><span class="cmt">// rc == -1 &amp;&amp; errno == EAGAIN</span></div>
+        </div>
+        <div class="code-scene" id="code-duplex">
+          <div class="code-line"><span class="type">enum</span> { <span class="macro">REQUEST</span> = <span class="num">1</span>, <span class="macro">REPLY</span> = <span class="num">2</span> };</div>
+          <div class="code-line"><span class="cmt">// client</span></div>
+          <div class="code-line"><span class="fn">msgsnd</span>(msqid, &amp;req, sizeof req.text, <span class="num">0</span>);</div>
+          <div class="code-line"><span class="cmt">// server: msgrcv(..., REQUEST, 0)</span></div>
+          <div class="code-line"><span class="cmt">// server: msgsnd(..., REPLY, 0)</span></div>
+          <div class="code-line"><span class="cmt">// client: msgrcv(..., REPLY, 0)</span></div>
+        </div>
+      </section>
+
+      <section class="fact-card">
+        <div class="fact-title">要点速查</div>
+        <table class="facts">
+          <tr><td>消息类型</td><td><code>long</code>，必须大于 0。</td></tr>
+          <tr><td>消息边界</td><td>缓冲区足够时，一次接收移除一个完整节点。</td></tr>
+          <tr><td>满队列</td><td>默认发送阻塞；<code>IPC_NOWAIT</code> 返回 <code>EAGAIN</code>。</td></tr>
+          <tr><td>空接收</td><td><code>IPC_NOWAIT</code> 且无匹配消息时返回 <code>ENOMSG</code>。</td></tr>
+        </table>
+      </section>
+    </aside>
+  </div>
+
+  <div class="controls" aria-label="动画控制">
+    <button class="btn" type="button" id="prevBtn">‹ 上一步</button>
+    <button class="btn primary" type="button" id="playBtn">播放</button>
+    <button class="btn" type="button" id="nextBtn">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="当前情境步骤"></div>
+    <span class="readout" id="readout" aria-live="polite"></span>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function setClass(id, base, state = '') {
+  const node = $(id);
+  if (node) node.className = `${base}${state ? ` ${state}` : ''}`;
+}
+function setText(id, value) {
+  const node = $(id);
+  if (node) node.textContent = value;
+}
+function setHtml(id, value) {
+  const node = $(id);
+  if (node) node.innerHTML = value;
+}
+
+/* SVG connector geometry comes from live element bounds. Arrow tips land on the target border. */
+function relativeRect(stage, id) {
+  const stageRect = stage.getBoundingClientRect();
+  const rect = $(id).getBoundingClientRect();
+  return {
+    left: rect.left - stageRect.left,
+    right: rect.right - stageRect.left,
+    top: rect.top - stageRect.top,
+    bottom: rect.bottom - stageRect.top,
+    cx: (rect.left + rect.right) / 2 - stageRect.left,
+    cy: (rect.top + rect.bottom) / 2 - stageRect.top
+  };
+}
+function sidePoint(rect, side, offset = 0) {
+  if (side === 'left') return { x: rect.left, y: rect.cy + offset };
+  if (side === 'right') return { x: rect.right, y: rect.cy + offset };
+  return { x: rect.cx, y: rect.cy + offset };
+}
+function layoutArrow(sceneId, config) {
+  const stage = $(`${sceneId}-stage`);
+  const svg = $(`${sceneId}-wires`);
+  const line = $(config.id);
+  const head = $(`${config.id}-head`);
+  const port = $(`${config.id}-port`);
+  if (!stage || !svg || !line || !head || !port) return;
+  const width = stage.clientWidth;
+  const height = stage.clientHeight;
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  const from = sidePoint(relativeRect(stage, config.from), config.fromSide, config.fromOffset || 0);
+  const to = sidePoint(relativeRect(stage, config.to), config.toSide, config.toOffset || 0);
+  const direction = to.x >= from.x ? 1 : -1;
+  const baseX = to.x - direction * 9;
+  const gap = Math.max(1, Math.abs(baseX - from.x));
+  const c1 = from.x + direction * gap * .45;
+  const c2 = baseX - direction * gap * .45;
+  line.setAttribute('d', `M ${from.x} ${from.y} C ${c1} ${from.y}, ${c2} ${to.y}, ${baseX} ${to.y}`);
+  head.setAttribute('d', `M ${to.x} ${to.y} L ${baseX} ${to.y - 5} L ${baseX} ${to.y + 5} Z`);
+  port.setAttribute('cx', from.x);
+  port.setAttribute('cy', from.y);
+}
+function drawIn(line) {
+  if (!line || reducedMotion()) return;
+  const length = line.getTotalLength();
+  line.style.transition = 'none';
+  line.style.strokeDasharray = length;
+  line.style.strokeDashoffset = length;
+  void line.getBoundingClientRect();
+  line.style.transition = '';
+  line.style.strokeDashoffset = '0';
+  window.clearTimeout(line._wireTimer);
+  line._wireTimer = window.setTimeout(() => {
+    line.style.strokeDasharray = '';
+    line.style.strokeDashoffset = '';
+  }, 560);
+}
+const wireActive = new Map();
+const wireConfigs = new Map();
+function paintWires(sceneId, configs) {
+  wireConfigs.set(sceneId, configs);
+  const previous = wireActive.get(sceneId) || new Set();
+  const active = new Set(configs.filter(config => config.active).map(config => config.id));
+  const hasActive = active.size > 0;
+  configs.forEach(config => {
+    layoutArrow(sceneId, config);
+    const line = $(config.id);
+    const head = $(`${config.id}-head`);
+    const port = $(`${config.id}-port`);
+    const tone = config.tone || 'blue';
+    const state = active.has(config.id) ? 'is-active' : (!hasActive && config.hint ? 'is-hint' : '');
+    line.className = `wire-line ${tone} ${state}`.trim();
+    head.className = `wire-head ${tone} ${active.has(config.id) ? 'is-active' : ''}`.trim();
+    port.className = `wire-port ${tone} ${active.has(config.id) ? 'is-active' : ''}`.trim();
+    if (active.has(config.id) && !previous.has(config.id)) drawIn(line);
+  });
+  wireActive.set(sceneId, active);
+}
+function relayoutActiveWires(sceneId) {
+  (wireConfigs.get(sceneId) || []).forEach(config => layoutArrow(sceneId, config));
+}
+
+function typedPaint(state) {
+  ['t-msg-0', 't-msg-1', 't-msg-2'].forEach((id, index) => {
+    const mode = state.selected === index ? (state.delivered ? 'is-sent' : 'is-selected') : (state.dim ? 'is-muted' : '');
+    setClass(id, 'mq-message', mode);
+  });
+  setClass('typed-receiver', 'actor node', state.receiver);
+  setClass('typed-queue', 'queue node', state.queue || '');
+  setClass('t-filter', 'filter-card', state.filterTone || '');
+  setClass('t-recv-buffer', 'receiver-buffer', state.delivered ? 'is-filled' : '');
+  setText('t-filter-value', state.filter);
+  setText('t-recv-op', state.receiverOp);
+  setText('t-recv-buffer', state.buffer);
+  setClass('t-selection-note', 'selection-note', state.noteTone || '');
+  setHtml('t-selection-note', state.note);
+  paintWires('typed', [
+    { id: 't-call', from: 'typed-receiver', fromSide: 'left', to: 'typed-queue', toSide: 'right', fromOffset: -15, toOffset: 28, tone: 'amber', active: state.call, hint: true },
+    { id: 't-take', from: `t-msg-${state.selected ?? 0}`, fromSide: 'right', to: 'typed-receiver', toSide: 'left', tone: state.delivered ? 'green' : 'amber', active: state.take, hint: true }
+  ]);
+}
+function boundaryPaint(state) {
+  setClass('boundary-sender', 'actor node', state.sender);
+  setClass('boundary-queue', 'queue node', state.queue || '');
+  setClass('boundary-receiver', 'actor node', state.receiver);
+  setClass('b-msg-a', 'boundary-message', state.msgA);
+  setClass('b-msg-b', 'boundary-message', state.msgB);
+  setClass('b-rule', 'boundary-rule', state.ruleTone || '');
+  setClass('b-recv-buffer', 'receiver-buffer', state.bufferFilled ? 'is-filled' : '');
+  setClass('b-stream', 'compare-row', state.streamTone || '');
+  setClass('b-queue-compare', 'compare-row', state.queueTone || '');
+  setText('b-send-op', state.senderOp);
+  setText('b-recv-op', state.receiverOp);
+  setText('b-recv-buffer', state.buffer);
+  setText('b-rule', state.rule);
+  paintWires('boundary', [
+    { id: 'b-send', from: 'boundary-sender', fromSide: 'right', to: 'boundary-queue', toSide: 'left', tone: 'blue', active: state.send, hint: true },
+    { id: 'b-take', from: 'boundary-queue', fromSide: 'right', to: 'boundary-receiver', toSide: 'left', tone: 'green', active: state.take, hint: true }
+  ]);
+}
+function capacityPaint(state) {
+  setClass('capacity-sender', 'actor node', state.sender);
+  setClass('capacity-queue', 'queue node', state.queue || '');
+  setClass('capacity-receiver', 'actor node', state.receiver);
+  const slots = state.slotValues || [['T=1', 'A'], ['T=2', 'B'], ['T=3', 'C'], ['T=4', 'D']];
+  ['c-slot-0', 'c-slot-1', 'c-slot-2', 'c-slot-3'].forEach((id, index) => {
+    setClass(id, 'capacity-slot', state.slots[index]);
+    setText(`c-slot-type-${index}`, slots[index][0]);
+    setText(`c-slot-text-${index}`, slots[index][1]);
+  });
+  setClass('c-count', 'queue-count', state.countTone || '');
+  setClass('c-send-status', 'status-box', state.senderStatusTone || '');
+  setClass('c-queue-status', 'status-box', state.queueStatusTone || '');
+  setClass('c-recv-buffer', 'receiver-buffer', state.bufferFilled ? 'is-filled' : '');
+  setClass('c-nowait', 'nowait-strip', state.stripTone || '');
+  setText('c-send-op', state.senderOp);
+  setText('c-recv-op', state.receiverOp);
+  setText('c-recv-buffer', state.buffer);
+  setText('c-count', state.count);
+  setText('c-send-status-value', state.senderStatus);
+  setText('c-queue-status-value', state.queueStatus);
+  setHtml('c-nowait', state.strip);
+  paintWires('capacity', [
+    { id: 'c-send', from: 'capacity-sender', fromSide: 'right', to: 'capacity-queue', toSide: 'left', tone: state.sendTone || 'blue', active: state.send, hint: true },
+    { id: 'c-take', from: 'capacity-queue', fromSide: 'right', to: 'capacity-receiver', toSide: 'left', tone: 'green', active: state.take, hint: true }
+  ]);
+}
+function duplexPaint(state) {
+  setClass('duplex-client', 'actor node', state.client);
+  setClass('duplex-server', 'actor node', state.server);
+  setClass('duplex-queue', 'queue node duplex-queue', state.queue || '');
+  setClass('d-request-lane', 'duplex-lane', state.requestLane);
+  setClass('d-reply-lane', 'duplex-lane', state.replyLane);
+  setClass('d-client-buffer', 'receiver-buffer', state.clientBufferFilled ? 'is-filled' : '');
+  setClass('d-server-buffer', 'receiver-buffer', state.serverBufferFilled ? 'is-filled' : '');
+  setClass('d-note', 'duplex-note', state.noteTone || '');
+  setText('d-client-op', state.clientOp);
+  setText('d-server-op', state.serverOp);
+  setText('d-client-buffer', state.clientBuffer);
+  setText('d-server-buffer', state.serverBuffer);
+  setText('d-request-payload', state.requestPayload);
+  setText('d-reply-payload', state.replyPayload);
+  setHtml('d-note', state.note);
+  paintWires('duplex', [
+    { id: 'd-request-send', from: 'duplex-client', fromSide: 'right', to: 'duplex-queue', toSide: 'left', fromOffset: -17, toOffset: -26, tone: 'blue', active: state.requestSend, hint: true },
+    { id: 'd-request-recv', from: 'duplex-queue', fromSide: 'right', to: 'duplex-server', toSide: 'left', fromOffset: -26, toOffset: -17, tone: 'blue', active: state.requestReceive, hint: true },
+    { id: 'd-reply-send', from: 'duplex-server', fromSide: 'left', to: 'duplex-queue', toSide: 'right', fromOffset: 17, toOffset: 26, tone: 'green', active: state.replySend, hint: true },
+    { id: 'd-reply-recv', from: 'duplex-queue', fromSide: 'left', to: 'duplex-client', toSide: 'right', fromOffset: 26, toOffset: 17, tone: 'green', active: state.replyReceive, hint: true }
+  ]);
+}
+
+const scenes = [
+  {
+    id: 'typed', title: '按类型接收', caption: '<b>类型选择</b>：队列保持顺序，<code>msgrcv()</code> 根据 <code>msgtyp</code> 选择一条匹配消息。', paint: typedPaint,
+    steps: [
+      { chip: '概览', tone: '', action: '观察队列中的类型与物理顺序', desc: '消息节点按入队顺序排列为 T=2、T=1、T=3。接收者并不只能取队首，它还可以给出选择规则。', lines: [0,1], state: { selected: null, dim: false, receiver: '', queue: '', filter: '等待接收方指定', receiverOp: '选择 msgtyp', buffer: '尚未复制', note: '消息的 <b>类型</b> 是筛选条件；每次 <code>msgrcv()</code> 只取一条消息节点。', call: false, take: false } },
+      { chip: 'msgtyp = 0', tone: 'blue', action: '请求队首任意类型的消息', desc: '<code>msgtyp == 0</code> 不看类型，返回队列中的第一条消息。因此 T=2 的 job-A 被选中。', lines: [1,2], state: { selected: 0, dim: true, receiver: 'is-amber', queue: 'is-amber', filterTone: 'is-blue', filter: 'msgtyp = 0  →  队首', receiverOp: 'msgrcv(..., 0)', buffer: '等待 copy_to_user()', noteTone: 'is-amber', note: '<b>队首</b>是物理顺序的第一条：T=2 / job-A。', call: true, take: false } },
+      { chip: '队首', tone: 'green', action: '复制 job-A 并删除该消息节点', desc: '内核把正文复制到接收进程的用户态缓冲区，然后从队列删除这一个节点。其余节点保持原样。', lines: [0,1], state: { selected: 0, dim: true, delivered: true, receiver: 'is-green', queue: 'is-green', filterTone: 'is-blue', filter: 'msgtyp = 0  →  队首', receiverOp: 'return 5 bytes', buffer: 'T=2 : job-A', noteTone: 'is-green', note: '<b>一次接收</b>只移走一个完整节点，不会把相邻消息拼在一起。', call: false, take: true } },
+      { chip: 'msgtyp = 1', tone: 'amber', action: '跳过前面的 T=2，匹配第一条 T=1', desc: '正数按指定类型匹配。即使 T=2 更早入队，<code>msgtyp == 1</code> 仍选择最先出现的 T=1。', lines: [1,3], state: { selected: 1, dim: true, receiver: 'is-amber', queue: 'is-amber', filterTone: 'is-amber', filter: 'msgtyp = 1  →  首条 T=1', receiverOp: 'msgrcv(..., 1)', buffer: '等待 copy_to_user()', noteTone: 'is-amber', note: '只在 <b>同类型</b> 消息之间保留先入先出；T=2 不会被这次调用取走。', call: true, take: false } },
+      { chip: 'msgtyp = -3', tone: 'amber', action: '在类型 1..3 中选择最小类型', desc: '负数不是“取前 3 条”。<code>msgtyp == -3</code> 会在类型不超过 3 的消息中，选择类型最小的一条，所以仍是 T=1。', lines: [1,4], state: { selected: 1, dim: true, receiver: 'is-amber', queue: 'is-amber', filterTone: 'is-amber', filter: 'msgtyp = -3  →  最小 T≤3', receiverOp: 'msgrcv(..., -3)', buffer: '等待 copy_to_user()', noteTone: 'is-amber', note: '<b>负 msgtyp</b> 先按类型值比较，再在该类型中取最早的一条。', call: true, take: false } }
+    ]
+  },
+  {
+    id: 'boundary', title: '消息边界', caption: '<b>消息边界</b>：每次发送形成一个内核消息节点；每次接收取出一个完整节点。', paint: boundaryPaint,
+    steps: [
+      { chip: '概览', tone: '', action: '比较字节流与消息节点', desc: '管道把数据看成连续字节。消息队列为每次发送保留独立节点，因此 HEAD 和 BODY 的边界可见。', lines: [0], state: { sender: '', queue: '', receiver: '', msgA: '', msgB: '', senderOp: '准备两条消息', receiverOp: '等待 msgrcv()', buffer: '空 buffer', rule: '每个节点都带有类型和长度', send: false, take: false } },
+      { chip: '第一条', tone: 'blue', action: '发送 T=1 / HEAD，内核创建 node #1', desc: '<code>msgsnd()</code> 从用户态复制消息正文，并将 T=1 / HEAD 作为一个独立节点挂入队列。', lines: [1,2], state: { sender: 'is-blue', queue: 'is-blue', receiver: '', msgA: 'is-blue', msgB: 'is-dim', senderOp: 'msgsnd(HEAD)', receiverOp: '等待 msgrcv()', buffer: '空 buffer', ruleTone: 'is-blue', rule: 'node #1 = { type: 1, text: HEAD }', streamTone: 'is-amber', queueTone: 'is-blue', send: true, take: false } },
+      { chip: '第二条', tone: 'blue', action: '再发送 T=2 / BODY，形成 node #2', desc: '第二次发送不会续写到 node #1。内核再创建一个节点，所以队列中保留 [HEAD] [BODY] 两个边界。', lines: [3], state: { sender: 'is-blue', queue: 'is-blue', receiver: '', msgA: 'is-blue', msgB: 'is-blue', senderOp: 'msgsnd(BODY)', receiverOp: '等待 msgrcv()', buffer: '空 buffer', ruleTone: 'is-blue', rule: 'node #1 | node #2，各自有长度', streamTone: 'is-amber', queueTone: 'is-blue', send: true, take: false } },
+      { chip: '一次接收', tone: 'green', action: '接收一条完整消息，而不是任意切片', desc: '<code>msgrcv(..., 0, 0)</code> 取队首 node #1，接收缓冲区得到完整 HEAD。它不会得到 HE，也不会顺带读取 BODY。本例缓冲区足够；否则无 <code>MSG_NOERROR</code> 时会返回 <code>E2BIG</code>，节点仍留在队列。', lines: [4], state: { sender: '', queue: 'is-green', receiver: 'is-green', msgA: 'is-green is-dim', msgB: 'is-blue', senderOp: '两条均已入队', receiverOp: 'msgrcv(..., 0)', bufferFilled: true, buffer: 'T=1 : HEAD', ruleTone: 'is-green', rule: 'node #1 已删除；node #2 仍在', streamTone: 'is-amber', queueTone: 'is-green', send: false, take: true } },
+      { chip: '剩余边界', tone: 'green', action: '下一次接收才会取 BODY', desc: 'BODY 仍是第二个完整节点。消息队列交付的是消息，而不是无边界的连续字符序列。', lines: [4], state: { sender: '', queue: 'is-green', receiver: 'is-green', msgA: 'is-dim', msgB: 'is-green', senderOp: '两条均已入队', receiverOp: '下一次 msgrcv()', bufferFilled: true, buffer: '下一条：T=2 / BODY', ruleTone: 'is-green', rule: '边界仍在：下一次才取 node #2', streamTone: 'is-amber', queueTone: 'is-green', send: false, take: true } }
+    ]
+  },
+  {
+    id: 'capacity', title: '满队列与 IPC_NOWAIT', caption: '<b>容量与阻塞</b>：默认发送等待空间；加上 <code>IPC_NOWAIT</code> 则立即返回错误。', paint: capacityPaint,
+    steps: [
+      { chip: '已满', tone: 'danger', action: '观察动画演示容量为 4 的满队列', desc: '这里把演示上限设为四个消息槽。四个槽都被占用时，新的 T=5 消息不能直接加入，发送函数必须在阻塞与立即失败之间选择。', lines: [0,1], state: { sender: '', queue: 'is-danger', receiver: '', slots: ['is-full','is-full','is-full','is-full'], count: '4 / 4', countTone: 'is-full', senderOp: 'msgsnd(..., 0)', receiverOp: '尚未接收', buffer: '空 buffer', senderStatus: 'ready', queueStatus: 'full', queueStatusTone: 'is-danger', stripTone: 'is-danger', strip: '默认 flags = 0：队列满时，<b>发送者睡眠等待</b>。', send: false, take: false } },
+      { chip: '阻塞', tone: 'danger', action: '默认 flags = 0，发送进程睡眠', desc: '队列没有空间时，<code>msgsnd(..., 0)</code> 不返回成功，也不丢弃消息。内核让发送进程等待，直到有槽位空出。', lines: [1], state: { sender: 'is-danger', queue: 'is-danger', receiver: '', slots: ['is-full','is-full','is-full','is-full'], count: '4 / 4', countTone: 'is-full', senderOp: 'BLOCKED in msgsnd()', receiverOp: '尚未接收', buffer: '空 buffer', senderStatus: 'sleeping', senderStatusTone: 'is-danger', queueStatus: 'full', queueStatusTone: 'is-danger', stripTone: 'is-danger', strip: '<b>阻塞</b>不是忙等：该发送进程在内核等待队列中睡眠。', sendTone: 'danger', send: true, take: false } },
+      { chip: '腾出空间', tone: 'green', action: '接收者取走一条消息，释放一个槽位', desc: '接收者调用 <code>msgrcv()</code> 后，T=1 / A 被复制到用户态并从队列移除。现在队列有一个空位。', lines: [2], state: { sender: 'is-danger', queue: 'is-green', receiver: 'is-green', slots: ['is-open','is-full','is-full','is-full'], slotValues: [['空', 'slot'], ['T=2', 'B'], ['T=3', 'C'], ['T=4', 'D']], count: '3 / 4', countTone: 'is-open', senderOp: '仍在等待唤醒', receiverOp: 'msgrcv(..., 0)', bufferFilled: true, buffer: 'T=1 : A', senderStatus: 'sleeping', senderStatusTone: 'is-danger', queueStatus: 'one slot', queueStatusTone: 'is-green', stripTone: 'is-green', strip: '接收删除一个节点后，内核可以唤醒等待发送者。', send: false, take: true } },
+      { chip: '唤醒并入队', tone: 'green', action: '等待发送者写入刚刚空出的槽位', desc: '被唤醒的发送者完成原来的 <code>msgsnd()</code>。T=5 / E 进入队列，调用返回 0。', lines: [1], state: { sender: 'is-green', queue: 'is-green', receiver: '', slots: ['is-arriving','is-full','is-full','is-full'], slotValues: [['T=5', 'E'], ['T=2', 'B'], ['T=3', 'C'], ['T=4', 'D']], count: '4 / 4', countTone: 'is-full', senderOp: 'msgsnd() = 0', receiverOp: '已接收 A', bufferFilled: true, buffer: 'T=1 : A', senderStatus: 'woken', senderStatusTone: 'is-green', queueStatus: 'full again', queueStatusTone: 'is-danger', stripTone: 'is-green', strip: '默认模式保留消息，并在出现空间后完成这次发送。', sendTone: 'green', send: true, take: false } },
+      { chip: 'IPC_NOWAIT', tone: 'danger', action: '满队列时立即返回 EAGAIN', desc: '把发送 flags 改为 <code>IPC_NOWAIT</code> 后，内核不让发送者睡眠。队列仍满时，<code>msgsnd()</code> 返回 -1，errno 为 EAGAIN。', lines: [3,4,5], state: { sender: 'is-danger', queue: 'is-danger', receiver: '', slots: ['is-full','is-full','is-full','is-full'], count: '4 / 4', countTone: 'is-full', senderOp: 'msgsnd(..., IPC_NOWAIT)', receiverOp: '尚未接收', buffer: '空 buffer', senderStatus: '-1 / EAGAIN', senderStatusTone: 'is-danger', queueStatus: 'unchanged', queueStatusTone: 'is-danger', stripTone: 'is-danger', strip: '<b>IPC_NOWAIT</b>：不睡眠，不入队，立即用 <b>EAGAIN</b> 报告满队列。', sendTone: 'danger', send: true, take: false } }
+    ]
+  },
+  {
+    id: 'duplex', title: '双向通信', caption: '<b>双向通信</b>：Client 与 Server 共享同一个 <code>msqid</code>，用类型 1 和类型 2 划分两个方向。', paint: duplexPaint,
+    steps: [
+      { chip: '约定类型', tone: 'blue', action: '为请求和应答分配不同的类型', desc: '同一个消息队列可以承载双向通信。这里约定 T=1 是 Client 到 Server 的请求，T=2 是 Server 到 Client 的应答。', lines: [0], state: { client: '', server: '', queue: '', requestLane: 'is-empty', replyLane: 'is-empty', clientOp: '准备请求', serverOp: '等待 T=1', clientBuffer: 'reply buffer', serverBuffer: 'request buffer', requestPayload: 'request lane', replyPayload: 'reply lane', note: '同一个队列通过 <b>不同消息类型</b> 区分请求和应答方向。' } },
+      { chip: '请求入队', tone: 'blue', action: 'Client 发送 T=1 / GET profile', desc: 'Client 调用 <code>msgsnd()</code>，将 T=1 的请求节点交给内核队列。此时 Server 尚未读取。', lines: [1,2], state: { client: 'is-blue', server: '', queue: 'is-blue', requestLane: 'is-blue', replyLane: 'is-empty', clientOp: 'msgsnd(T=1)', serverOp: '等待 T=1', clientBuffer: '等待 reply', serverBuffer: 'request buffer', requestPayload: 'GET profile', replyPayload: 'reply lane', noteTone: 'is-blue', note: '<b>T=1</b> 标记请求方向；消息先在内核队列中等待接收。', requestSend: true } },
+      { chip: '请求出队', tone: 'blue', action: 'Server 只接收 T=1 请求', desc: 'Server 使用 <code>msgrcv(..., REQUEST, 0)</code>，只匹配 T=1。它拿到 GET profile 后，T=1 节点从队列删除。', lines: [3], state: { client: '', server: 'is-blue', queue: 'is-blue', requestLane: 'is-empty', replyLane: 'is-empty', clientOp: '等待 T=2', serverOp: 'msgrcv(T=1)', clientBuffer: '等待 reply', serverBuffer: 'GET profile', serverBufferFilled: true, requestPayload: '已被 Server 取走', replyPayload: 'reply lane', noteTone: 'is-blue', note: 'Server 的选择条件是 <b>T=1</b>，不会误取应答消息。', requestReceive: true } },
+      { chip: '应答入队', tone: 'green', action: 'Server 发送 T=2 / 200 OK', desc: '处理完请求后，Server 向同一个 msqid 发送 T=2。因为类型不同，这条消息走的是反向的应答通道。', lines: [4], state: { client: '', server: 'is-green', queue: 'is-green', requestLane: 'is-empty', replyLane: 'is-green', clientOp: '等待 T=2', serverOp: 'msgsnd(T=2)', clientBuffer: '等待 reply', serverBuffer: 'GET profile', serverBufferFilled: true, requestPayload: 'request lane', replyPayload: '200 OK', noteTone: 'is-green', note: '<b>T=2</b> 表示应答方向，仍然使用相同的内核消息队列。', replySend: true } },
+      { chip: '应答出队', tone: 'green', action: 'Client 只接收 T=2 应答', desc: 'Client 调用 <code>msgrcv(..., REPLY, 0)</code>，拿到 200 OK。类型把双向流量分隔开，不需要再建一个队列。', lines: [5], state: { client: 'is-green', server: '', queue: 'is-green', requestLane: 'is-empty', replyLane: 'is-empty', clientOp: 'msgrcv(T=2)', serverOp: '处理完成', clientBuffer: '200 OK', clientBufferFilled: true, serverBuffer: 'GET profile', serverBufferFilled: true, requestPayload: 'request lane', replyPayload: '已被 Client 取走', noteTone: 'is-green', note: '<b>同一 msqid</b> + 两个类型，即可形成请求/应答的双向协议。', replyReceive: true } }
+    ]
+  }
+];
+
+const sceneById = new Map(scenes.map(scene => [scene.id, scene]));
+const tabs = [...document.querySelectorAll('.tab')];
+const dots = $('dots');
+const prevBtn = $('prevBtn');
+const nextBtn = $('nextBtn');
+const playBtn = $('playBtn');
+let currentScene = 0;
+let currentStep = 0;
+let dotNodes = [];
+let player = null;
+
+function stop() {
+  if (player) window.clearInterval(player);
+  player = null;
+  playBtn.textContent = '播放';
+}
+function writeHash() {
+  const scene = scenes[currentScene];
+  try {
+    history.replaceState(null, '', `#scene=${scene.id}&step=${currentStep}`);
+  } catch (_) {
+    location.hash = `scene=${scene.id}&step=${currentStep}`;
+  }
+}
+function makeDots(scene) {
+  dots.replaceChildren();
+  dotNodes = scene.steps.map((step, index) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'dot';
+    dot.title = step.action;
+    dot.setAttribute('aria-label', `第 ${index + 1} 步：${step.action}`);
+    dot.addEventListener('click', () => { stop(); go(index); });
+    dots.append(dot);
+    return dot;
+  });
+}
+function activateScene(index, initialStep = 0, persist = true) {
+  currentScene = Math.max(0, Math.min(scenes.length - 1, index));
+  currentStep = 0;
+  const scene = scenes[currentScene];
+  scenes.forEach(item => {
+    $(`scene-${item.id}`).classList.toggle('is-active', item.id === scene.id);
+    $(`code-${item.id}`).classList.toggle('is-active', item.id === scene.id);
+  });
+  tabs.forEach(tab => tab.classList.toggle('is-active', tab.dataset.scene === scene.id));
+  setHtml('visualCaption', scene.caption);
+  makeDots(scene);
+  go(initialStep, persist);
+}
+function go(index, persist = true) {
+  const scene = scenes[currentScene];
+  currentStep = Math.max(0, Math.min(scene.steps.length - 1, index));
+  const step = scene.steps[currentStep];
+  scene.paint(step.state);
+  setText('detailTitle', scene.title);
+  setClass('detailChip', 'chip', step.tone);
+  setText('detailChip', step.chip);
+  setText('actionLine', `▸ ${step.action}`);
+  setHtml('detailDesc', step.desc);
+  document.querySelectorAll(`#code-${scene.id} .code-line`).forEach((line, lineIndex) => {
+    line.className = 'code-line';
+    if (step.lines.includes(lineIndex)) line.classList.add(`active-${step.tone || 'blue'}`);
+  });
+  dotNodes.forEach((dot, dotIndex) => {
+    dot.classList.toggle('is-current', dotIndex === currentStep);
+    dot.classList.toggle('is-done', dotIndex < currentStep);
+    dot.setAttribute('aria-current', dotIndex === currentStep ? 'step' : 'false');
+  });
+  setText('readout', `${currentStep + 1} / ${scene.steps.length}`);
+  prevBtn.disabled = currentStep === 0;
+  nextBtn.disabled = currentStep === scene.steps.length - 1;
+  if (currentStep === scene.steps.length - 1 && player) stop();
+  if (persist) writeHash();
+}
+function play() {
+  const scene = scenes[currentScene];
+  if (currentStep === scene.steps.length - 1) go(0);
+  playBtn.textContent = '暂停';
+  player = window.setInterval(() => {
+    if (currentStep < scenes[currentScene].steps.length - 1) go(currentStep + 1);
+    else stop();
+  }, 2700);
+}
+function parseHash() {
+  const values = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const id = values.get('scene');
+  const step = Number(values.get('step'));
+  const index = scenes.findIndex(scene => scene.id === id);
+  return { index: index >= 0 ? index : 0, step: Number.isFinite(step) ? step : 0 };
+}
+
+tabs.forEach(tab => tab.addEventListener('click', () => {
+  const index = scenes.findIndex(scene => scene.id === tab.dataset.scene);
+  if (index !== currentScene) { stop(); activateScene(index); }
+}));
+prevBtn.addEventListener('click', () => { stop(); go(currentStep - 1); });
+nextBtn.addEventListener('click', () => { stop(); go(currentStep + 1); });
+playBtn.addEventListener('click', () => { if (player) stop(); else play(); });
+document.addEventListener('keydown', event => {
+  if (event.target.closest('button')) return;
+  if (event.key === 'ArrowRight') { stop(); go(currentStep + 1); }
+  if (event.key === 'ArrowLeft') { stop(); go(currentStep - 1); }
+  if (event.key === ' ') { event.preventDefault(); if (player) stop(); else play(); }
+});
+window.addEventListener('resize', () => relayoutActiveWires(scenes[currentScene].id));
+window.addEventListener('hashchange', () => {
+  const target = parseHash();
+  stop();
+  activateScene(target.index, target.step, false);
+});
+
+const initial = parseHash();
+activateScene(initial.index, initial.step, false);
+</script>
+</body>
+</html>

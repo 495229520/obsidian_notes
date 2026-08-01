@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>wait 的 status 参数位布局，与 WIF 系列宏的分诊顺序</title>
+  <desc>上半是同一个 int 在五种终止方式下的高低字节布局，给出对应的十六进制值；下半是拿到 status 之后先问 WIF 系列判断死法、再用对应宏取值的四级分诊。</desc>
+  <defs>
+    <marker id="s1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">status 不是退出码，是内核在一个 int 里划出来的几段位域</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">子进程 exit(42) 之后 status 等于 10752 而不是 42；先用 WIF 系列问清死法，再用对应的宏取值</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 同一个 int，五种终止方式各占不同的位</text>
+
+  <rect x="56" y="132" width="1128" height="30" rx="6" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="152" font-size="11.5" font-weight="700" fill="#4A473F">终止方式</text>
+  <text x="288" y="152" font-size="11.5" font-weight="700" fill="#4A473F">bit 15–8（高字节）</text>
+  <text x="594" y="152" font-size="11.5" font-weight="700" fill="#4A473F">bit 7–0（低字节）</text>
+  <text x="900" y="152" font-size="11.5" font-weight="700" fill="#4A473F">status 的值 · 该问哪个宏</text>
+
+  <rect x="56" y="168" width="210" height="52" rx="6" fill="#E3EAF4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="190" font-size="11.5" font-weight="700" fill="#2C4460">exit(42) 正常退出</text>
+  <text x="72" y="208" font-size="10.5" fill="#6B675C">main 里 return 42 等价</text>
+  <rect x="272" y="168" width="300" height="52" rx="6" fill="#D3E0F0" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="288" y="190" font-size="11.5" font-weight="700" fill="#2C4460">0x2A = 42</text>
+  <text x="288" y="208" font-size="10.5" fill="#2C4460">退出码本体就存在这里</text>
+  <rect x="578" y="168" width="300" height="52" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="594" y="190" font-size="11.5" font-weight="700" fill="#4A473F">0x00</text>
+  <text x="594" y="208" font-size="10.5" fill="#6B675C">低字节为零就代表正常退出</text>
+  <rect x="884" y="168" width="300" height="52" rx="6" fill="#E3EAF4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="900" y="190" font-size="11.5" font-weight="700" fill="#2C4460">0x2A00 = 10752</text>
+  <text x="900" y="208" font-size="10.5" fill="#2C4460">WIFEXITED → WEXITSTATUS</text>
+
+  <rect x="56" y="226" width="210" height="52" rx="6" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="248" font-size="11.5" font-weight="700" fill="#733428">被 kill -9 打死</text>
+  <text x="72" y="266" font-size="10.5" fill="#6B675C">SIGKILL 的编号是 9</text>
+  <rect x="272" y="226" width="300" height="52" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="288" y="248" font-size="11.5" font-weight="700" fill="#4A473F">0x00</text>
+  <text x="288" y="266" font-size="10.5" fill="#6B675C">高字节没用上，全零</text>
+  <rect x="578" y="226" width="300" height="52" rx="6" fill="#EDD2CB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="594" y="248" font-size="11.5" font-weight="700" fill="#733428">bit 6–0 = 9</text>
+  <text x="594" y="266" font-size="10.5" fill="#733428">信号编号挤在低 7 位里</text>
+  <rect x="884" y="226" width="300" height="52" rx="6" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="900" y="248" font-size="11.5" font-weight="700" fill="#733428">0x0009 = 9</text>
+  <text x="900" y="266" font-size="10.5" fill="#733428">WIFSIGNALED → WTERMSIG</text>
+
+  <rect x="56" y="284" width="210" height="52" rx="6" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="306" font-size="11.5" font-weight="700" fill="#733428">段错误并转储 core</text>
+  <text x="72" y="324" font-size="10.5" fill="#6B675C">SIGSEGV 的编号是 11</text>
+  <rect x="272" y="284" width="300" height="52" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="288" y="306" font-size="11.5" font-weight="700" fill="#4A473F">0x00</text>
+  <text x="288" y="324" font-size="10.5" fill="#6B675C">高字节仍然没用上</text>
+  <rect x="578" y="284" width="300" height="52" rx="6" fill="#EDD2CB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="594" y="306" font-size="11.5" font-weight="700" fill="#733428">bit 7 = 1 · bit 6–0 = 11</text>
+  <text x="594" y="324" font-size="10.5" fill="#733428">第 7 位是 core dump 标志</text>
+  <rect x="884" y="284" width="300" height="52" rx="6" fill="#F0E0DB" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="900" y="306" font-size="11.5" font-weight="700" fill="#733428">0x008B = 139</text>
+  <text x="900" y="324" font-size="10.5" fill="#733428">再问一次 WCOREDUMP</text>
+
+  <rect x="56" y="342" width="210" height="52" rx="6" fill="#EFE7DA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="364" font-size="11.5" font-weight="700" fill="#6B4E28">被 SIGSTOP 停住</text>
+  <text x="72" y="382" font-size="10.5" fill="#6B675C">进程还活着，没有死</text>
+  <rect x="272" y="342" width="300" height="52" rx="6" fill="#E8DBC2" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="288" y="364" font-size="11.5" font-weight="700" fill="#6B4E28">0x13 = 19</text>
+  <text x="288" y="382" font-size="10.5" fill="#6B4E28">这次高字节放的是信号号</text>
+  <rect x="578" y="342" width="300" height="52" rx="6" fill="#E8DBC2" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="594" y="364" font-size="11.5" font-weight="700" fill="#6B4E28">0x7F</text>
+  <text x="594" y="382" font-size="10.5" fill="#6B4E28">固定标记，认它就知道是停住</text>
+  <rect x="884" y="342" width="300" height="52" rx="6" fill="#EFE7DA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="900" y="364" font-size="11.5" font-weight="700" fill="#6B4E28">0x137F</text>
+  <text x="900" y="382" font-size="10.5" fill="#6B4E28">WIFSTOPPED → WSTOPSIG</text>
+
+  <rect x="56" y="400" width="210" height="52" rx="6" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="72" y="422" font-size="11.5" font-weight="700" fill="#24473F">被 SIGCONT 恢复</text>
+  <text x="72" y="440" font-size="10.5" fill="#6B675C">从停住的状态继续跑</text>
+  <rect x="272" y="400" width="300" height="52" rx="6" fill="#CCE0D7" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="288" y="422" font-size="11.5" font-weight="700" fill="#24473F">0xFF</text>
+  <text x="288" y="440" font-size="10.5" fill="#24473F">全一，不编码任何信息</text>
+  <rect x="578" y="400" width="300" height="52" rx="6" fill="#CCE0D7" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="594" y="422" font-size="11.5" font-weight="700" fill="#24473F">0xFF</text>
+  <text x="594" y="440" font-size="10.5" fill="#24473F">整个 status 就是一个哨兵值</text>
+  <rect x="884" y="400" width="300" height="52" rx="6" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="900" y="422" font-size="11.5" font-weight="700" fill="#24473F">0xFFFF</text>
+  <text x="900" y="440" font-size="10.5" fill="#24473F">WIFCONTINUED 单独判断</text>
+
+  <text x="56" y="488" font-size="13" font-weight="700" fill="#4A473F">B · 拿到 status 之后的分诊顺序：先问是怎么没的，再取值</text>
+
+  <rect x="56" y="502" width="259" height="118" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="76" y="528" font-size="11.5" font-weight="700" fill="#2C4460">① WIFEXITED(status)</text>
+  <text x="76" y="552" font-size="11" fill="#2C4460">真 → WEXITSTATUS(status)</text>
+  <text x="76" y="574" font-size="11" fill="#2C4460">读回 0 到 255 的退出码</text>
+  <text x="76" y="596" font-size="11" fill="#2C4460">exit(-1) 读回来是 255</text>
+
+  <rect x="345" y="502" width="259" height="118" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="365" y="528" font-size="11.5" font-weight="700" fill="#733428">② WIFSIGNALED(status)</text>
+  <text x="365" y="552" font-size="11" fill="#733428">真 → WTERMSIG(status)</text>
+  <text x="365" y="574" font-size="11" fill="#733428">读回杀死它的信号编号</text>
+  <text x="365" y="596" font-size="11" fill="#733428">再问 WCOREDUMP 有无 core</text>
+
+  <rect x="634" y="502" width="259" height="118" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="654" y="528" font-size="11.5" font-weight="700" fill="#6B4E28">③ WIFSTOPPED(status)</text>
+  <text x="654" y="552" font-size="11" fill="#6B4E28">真 → WSTOPSIG(status)</text>
+  <text x="654" y="574" font-size="11" fill="#6B4E28">子进程只是停了，没退出</text>
+  <text x="654" y="596" font-size="11" fill="#6B4E28">要传 WUNTRACED 才看得到</text>
+
+  <rect x="923" y="502" width="259" height="118" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="943" y="528" font-size="11.5" font-weight="700" fill="#24473F">④ WIFCONTINUED(status)</text>
+  <text x="943" y="552" font-size="11" fill="#24473F">SIGCONT 让它继续跑了</text>
+  <text x="943" y="574" font-size="11" fill="#24473F">没有配套的取值宏</text>
+  <text x="943" y="596" font-size="11" fill="#24473F">要传 WCONTINUED 才看得到</text>
+
+  <line x1="319" y1="561" x2="341" y2="561" stroke="#5A564B" stroke-width="1.6" marker-end="url(#s1)"/>
+  <line x1="608" y1="561" x2="630" y2="561" stroke="#5A564B" stroke-width="1.6" marker-end="url(#s1)"/>
+  <line x1="897" y1="561" x2="919" y2="561" stroke="#5A564B" stroke-width="1.6" marker-end="url(#s1)"/>
+  <text x="330" y="547" font-size="10" fill="#6B675C" text-anchor="middle">假</text>
+  <text x="619" y="547" font-size="10" fill="#6B675C" text-anchor="middle">假</text>
+  <text x="908" y="547" font-size="10" fill="#6B675C" text-anchor="middle">假</text>
+
+  <text x="68" y="662" font-size="11.5" fill="#4A473F">WEXITSTATUS 只在 WIFEXITED 为真时有意义。对一个被信号打死的 status 调用它，读到的是低字节右移出来的垃圾值。</text>
+  <text x="68" y="686" font-size="11.5" fill="#4A473F">shell 里 echo $? 看到的 137 是 bash 自己算的 128+9，那是它的约定，跟这张表里 status 的位布局不是同一件事。</text>
+</svg>

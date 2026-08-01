@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 744" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>定长结构体当协议的三个坑</title>
+  <desc>CalcRequest 的真实大小是 12 字节而非 4+4+1=9；直接 send 结构体依赖两端对齐规则一致、字节序一致、结构体内无指针这三个前提，并给出各自的破坏后果与对策。</desc>
+
+  <rect x="0" y="0" width="1240" height="744" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">把结构体直接 send 出去，要先过三关</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">结构体的真实大小、每个数值的字节排列、以及里面有没有指针，三者只要有一个两端对不上，收到的就是垃圾</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="104" width="1144" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · sizeof 不等于各字段大小之和</text>
+
+  <text x="200" y="152" font-size="9.5" fill="#6B675C">偏移 0</text>
+  <text x="432" y="152" font-size="9.5" fill="#6B675C">4</text>
+  <text x="664" y="152" font-size="9.5" fill="#6B675C">8</text>
+  <text x="880" y="152" font-size="9.5" fill="#6B675C">11</text>
+
+  <text x="72" y="182" font-size="12" font-weight="700" fill="#4A473F">CalcRequest</text>
+  <rect x="200" y="158" width="232" height="36" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="316" y="181" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">operand1　int　4B</text>
+  <rect x="432" y="158" width="232" height="36" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="548" y="181" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">operand2　int　4B</text>
+  <rect x="664" y="158" width="58" height="36" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="693" y="181" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">op 1B</text>
+  <rect x="722" y="158" width="174" height="36" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="809" y="181" font-size="11" fill="#4A473F" text-anchor="middle">padding[3]　3B</text>
+  <text x="920" y="181" font-size="12" font-weight="700" fill="#733428">sizeof = 12 字节</text>
+
+  <text x="72" y="238" font-size="12" font-weight="700" fill="#4A473F">CalcResponse</text>
+  <rect x="200" y="214" width="232" height="36" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="316" y="237" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">result　int　4B</text>
+  <rect x="432" y="214" width="232" height="36" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="548" y="237" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">error　int　4B</text>
+  <text x="690" y="237" font-size="12" font-weight="700" fill="#24473F">sizeof = 8 字节，没有空洞</text>
+
+  <rect x="72" y="258" width="1096" height="36" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="88" y="281" font-size="11.5" font-weight="700" fill="#733428">手算 4 + 4 + 1 = 9，编译器补齐到 12　·　代码里一律写 sizeof</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="320" width="1144" height="180" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="350" font-size="15" font-weight="700" fill="#4A473F">B · 同一个 int 10，两种排法</text>
+
+  <text x="72" y="388" font-size="11.5" font-weight="700" fill="#4A473F">x86 内存里（小端）</text>
+  <rect x="240" y="366" width="64" height="30" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="272" y="386" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">0A</text>
+  <rect x="306" y="366" width="64" height="30" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="338" y="386" font-size="11.5" fill="#6B4E28" text-anchor="middle">00</text>
+  <rect x="372" y="366" width="64" height="30" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="404" y="386" font-size="11.5" fill="#6B4E28" text-anchor="middle">00</text>
+  <rect x="438" y="366" width="64" height="30" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="470" y="386" font-size="11.5" fill="#6B4E28" text-anchor="middle">00</text>
+
+  <path d="M372 400 L372 424" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="516" y="392" font-size="11" font-weight="700" fill="#4A473F">htonl(10) 把四个字节整个翻过来</text>
+
+  <text x="72" y="450" font-size="11.5" font-weight="700" fill="#4A473F">网络字节序（大端）</text>
+  <rect x="240" y="428" width="64" height="30" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="272" y="448" font-size="11.5" fill="#24473F" text-anchor="middle">00</text>
+  <rect x="306" y="428" width="64" height="30" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="338" y="448" font-size="11.5" fill="#24473F" text-anchor="middle">00</text>
+  <rect x="372" y="428" width="64" height="30" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="404" y="448" font-size="11.5" fill="#24473F" text-anchor="middle">00</text>
+  <rect x="438" y="428" width="64" height="30" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="470" y="448" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">0A</text>
+
+  <rect x="700" y="360" width="468" height="106" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="718" y="384" font-size="11.5" fill="#4A473F">两端都是 x86：不转也碰巧能通</text>
+  <text x="718" y="408" font-size="11.5" font-weight="700" fill="#733428">对端是大端机或 Java / Go：10 被读成 167772160</text>
+  <text x="718" y="432" font-size="11.5" fill="#4A473F">单字节的 char 和 char[] 不用转</text>
+  <text x="718" y="456" font-size="11.5" font-weight="700" fill="#2C4460">规则：凡是多字节数值，一律 htonl / ntohl</text>
+
+  <text x="72" y="486" font-size="11" fill="#6B675C">「本机测试通过」在字节序问题上完全没有说服力：回环两端是同一台机器</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="516" width="1144" height="170" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="546" font-size="15" font-weight="700" fill="#4A473F">C · 直接 send 结构体的三个前提</text>
+
+  <text x="88" y="572" font-size="11" font-weight="700" fill="#6B675C">前提</text>
+  <text x="360" y="572" font-size="11" font-weight="700" fill="#6B675C">被破坏会怎样</text>
+  <text x="790" y="572" font-size="11" font-weight="700" fill="#6B675C">怎么办</text>
+  <path d="M72 580 L1168 580" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="72" y="586" width="1096" height="30" fill="#E3EAF4"/>
+  <text x="88" y="606" font-size="11.5" font-weight="700" fill="#2C4460">两端对齐规则一致</text>
+  <text x="360" y="606" font-size="11.5" fill="#2C4460">sizeof 不同，一端多读或少读，此后全错位</text>
+  <text x="790" y="606" font-size="11.5" fill="#2C4460">#pragma pack，或逐字段序列化</text>
+
+  <rect x="72" y="618" width="1096" height="30" fill="#EFE7DA"/>
+  <text x="88" y="638" font-size="11.5" font-weight="700" fill="#6B4E28">两端字节序一致</text>
+  <text x="360" y="638" font-size="11.5" fill="#6B4E28">数值被解释成天文数字，程序不报错照跑</text>
+  <text x="790" y="638" font-size="11.5" fill="#6B4E28">收发前后各转一次字节序</text>
+
+  <rect x="72" y="650" width="1096" height="30" fill="#F0E0DB"/>
+  <text x="88" y="670" font-size="11.5" font-weight="700" fill="#733428">结构体里没有指针</text>
+  <text x="360" y="670" font-size="11.5" fill="#733428">传过去的是本机地址，对端解引用直接崩</text>
+  <text x="790" y="670" font-size="11.5" fill="#733428">只传值，变长数据改用长度头</text>
+
+  <text x="48" y="722" font-size="12" fill="#6B675C">口径：布局按常见的 x86-64 System V ABI，int 为 4 字节、4 字节对齐；真实工程里这三关通常交给 Protocol Buffers 之类的框架统一处理</text>
+</svg>

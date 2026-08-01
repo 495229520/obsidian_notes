@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="720" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>短写、output_buffer 与高低水位反压</title>
+  <desc>一次 send 只写进一半数据后剩余部分如何进入应用层输出缓冲区、EPOLLOUT 为什么必须用完就摘，以及高低水位如何触发反压。</desc>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">短写、output_buffer 与反压</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">send() 返回的是"内核收下了多少"，不是"业务发完了多少"，更不是"对端收到了多少"</text>
+
+  <!-- ===================== Panel A ===================== -->
+  <rect x="48" y="104" width="1144" height="230" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · 一次 send 只走了一半</text>
+  <text x="72" y="156" font-size="11.5" fill="#6B675C">业务要发 10 KB，此刻内核发送缓冲区只剩 4 KB 空位</text>
+
+  <rect x="200" y="176" width="320" height="44" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="360" y="203" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">内核收下了 4 KB</text>
+  <rect x="520" y="176" width="480" height="44" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="760" y="203" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">剩下 6 KB 得自己存着</text>
+  <text x="200" y="238" font-size="9.5" fill="#8A8578" text-anchor="middle">0</text>
+  <text x="520" y="238" font-size="9.5" fill="#8A8578" text-anchor="middle">4 KB</text>
+  <text x="1000" y="238" font-size="9.5" fill="#8A8578" text-anchor="middle">10 KB</text>
+  <text x="1016" y="203" font-size="11" font-weight="700" fill="#4A473F">send() 返回 4096</text>
+
+  <text x="72" y="266" font-size="11" fill="#4A473F">① send() 返回 4096 而不是 10240——这是正常现象，不是错误分支</text>
+  <text x="72" y="288" font-size="11" fill="#4A473F">② 剩下的 6 KB 追加进这条连接自己的 output_buffer，由应用层保管</text>
+  <text x="72" y="310" font-size="11" fill="#4A473F">③ EPOLL_CTL_MOD 加上 EPOLLOUT，等内核腾出空位了再接着发</text>
+
+  <!-- ===================== Panel B ===================== -->
+  <rect x="48" y="354" width="560" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="382" font-size="14" font-weight="700" fill="#4A473F">B · EPOLLOUT 必须用完就摘</text>
+
+  <text x="72" y="412" font-size="11.5" font-weight="700" fill="#733428">✗ 一直挂着 EPOLLOUT</text>
+  <text x="72" y="434" font-size="10.5" fill="#4A473F">发送缓冲区只要有空位就一直触发，LT 模式下事件</text>
+  <text x="72" y="452" font-size="10.5" fill="#4A473F">循环空转，CPU 直接打满</text>
+
+  <text x="72" y="484" font-size="11.5" font-weight="700" fill="#24473F">✓ 发空的那一刻立刻摘掉</text>
+  <text x="72" y="506" font-size="10.5" fill="#4A473F">output_buffer 一清空就 EPOLL_CTL_MOD 去掉 EPOLLOUT，</text>
+  <text x="72" y="524" font-size="10.5" fill="#4A473F">下次真有数据要发时再加回来</text>
+  <text x="72" y="544" font-size="9.5" fill="#8A8578">ET 模式不会空转，但一样要摘，留着会让后续事件判断变复杂</text>
+
+  <!-- ===================== Panel C ===================== -->
+  <rect x="632" y="354" width="560" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="656" y="382" font-size="14" font-weight="700" fill="#4A473F">C · 高低水位：什么时候该踩刹车</text>
+  <text x="656" y="404" font-size="10.5" fill="#6B675C">横轴是 output_buffer 的当前长度</text>
+
+  <rect x="680" y="420" width="140" height="32" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <rect x="820" y="420" width="200" height="32" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.1"/>
+  <rect x="1020" y="420" width="120" height="32" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="750" y="441" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">正常</text>
+  <text x="920" y="441" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">积压中</text>
+  <text x="1080" y="441" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">触发反压</text>
+  <line x1="820" y1="412" x2="820" y2="462" stroke="#B07D2B" stroke-width="1.8"/>
+  <line x1="1020" y1="412" x2="1020" y2="462" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="820" y="476" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">低水位</text>
+  <text x="1020" y="476" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">高水位</text>
+
+  <text x="656" y="502" font-size="10.5" fill="#4A473F">超过高水位 → 暂停读这条连接，别再产生新响应</text>
+  <text x="656" y="522" font-size="10.5" fill="#4A473F">回落到低水位 → 恢复读取</text>
+  <text x="656" y="542" font-size="10.5" fill="#4A473F">长时间下不来 → 说明对端根本收不动，可以直接关掉</text>
+
+  <!-- card -->
+  <rect x="48" y="574" width="1144" height="106" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="600" font-size="13" font-weight="700" fill="#4A473F">配套的一条：要写完再关</text>
+  <text x="72" y="624" font-size="11" fill="#4A473F">output_buffer 里还压着数据时直接 close()，那部分数据就被丢掉了，对端只会看到一个突然结束的响应。</text>
+  <text x="72" y="646" font-size="11" fill="#4A473F">正确做法是把这条连接标记成"待关闭"，等 output_buffer 发空之后再 shutdown(SHUT_WR)，然后才 close。</text>
+  <text x="72" y="668" font-size="11" font-weight="700" fill="#733428">所以优雅关闭的动作要挂在"写完成"的回调里，而不是业务处理完就立刻调 close。</text>
+
+  <text x="48" y="706" font-size="11" fill="#6B675C">短写和短读不是异常分支，是常态。任何"假设一次系统调用就能搞定"的代码，压力一上来都会露馅</text>
+</svg>

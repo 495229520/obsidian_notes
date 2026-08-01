@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="640" viewBox="0 0 1240 640" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <title>四次挥手的状态变化：CLOSE_WAIT 和 TIME_WAIT 分别落在哪一端</title>
+  <desc>主动关闭方与被动关闭方各自的状态链，标出 read 返回 0 的时刻、CLOSE_WAIT 停留期完全由应用决定、以及 TIME_WAIT 的 2MSL 等待落在主动关闭方。</desc>
+
+  <rect x="0" y="0" width="1240" height="640" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">四次挥手：CLOSE_WAIT 和 TIME_WAIT 各自落在哪一端</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">两个状态经常被一起提起，但责任方完全相反——一个是应用的锅，一个是协议的要求</text>
+
+  <rect x="220" y="104" width="160" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="300" y="124" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">主动关闭方</text>
+  <rect x="720" y="104" width="160" height="30" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="800" y="124" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">被动关闭方</text>
+
+  <line x1="300" y1="142" x2="300" y2="570" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="800" y1="142" x2="800" y2="570" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="955" y1="150" x2="955" y2="570" stroke="#E3E0D6" stroke-width="1"/>
+
+  <!-- r0 established -->
+  <rect x="150" y="158" width="140" height="24" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="220" y="175" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">ESTABLISHED</text>
+  <rect x="810" y="158" width="140" height="24" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="880" y="175" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">ESTABLISHED</text>
+
+  <!-- r1 FIN -->
+  <line x1="300" y1="212" x2="800" y2="212" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="550" y="203" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">FIN　seq = u　（close 或 shutdown(SHUT_WR)）</text>
+  <rect x="150" y="200" width="140" height="24" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="220" y="217" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">FIN_WAIT_1</text>
+
+  <!-- r2 ACK -->
+  <line x1="800" y1="254" x2="300" y2="254" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="550" y="245" font-size="11" fill="#24473F" text-anchor="middle">ACK　ack = u + 1</text>
+  <rect x="150" y="242" width="140" height="24" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="220" y="259" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">FIN_WAIT_2</text>
+  <rect x="810" y="242" width="140" height="24" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="880" y="259" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">CLOSE_WAIT</text>
+  <text x="970" y="252" font-size="10.5" font-weight="700" fill="#733428">被动方的 read() 正是在</text>
+  <text x="970" y="268" font-size="10.5" font-weight="700" fill="#733428">这一刻返回 0</text>
+
+  <!-- CLOSE_WAIT band -->
+  <rect x="720" y="292" width="160" height="56" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="800" y="314" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">还能继续 write()</text>
+  <text x="800" y="334" font-size="10.5" fill="#733428" text-anchor="middle">直到应用调用 close()</text>
+  <text x="970" y="312" font-size="10.5" fill="#4A473F">这段停留多久，完全由应用</text>
+  <text x="970" y="328" font-size="10.5" fill="#4A473F">决定。CLOSE_WAIT 堆积就是</text>
+  <text x="970" y="344" font-size="10.5" font-weight="700" fill="#733428">卡在这里，纯属应用层的锅</text>
+
+  <!-- r4 FIN back -->
+  <line x1="800" y1="378" x2="300" y2="378" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="550" y="369" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">FIN　seq = w　（应用终于 close 了）</text>
+  <rect x="810" y="366" width="140" height="24" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="880" y="383" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">LAST_ACK</text>
+
+  <!-- r5 last ACK -->
+  <line x1="300" y1="420" x2="800" y2="420" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="550" y="411" font-size="11" fill="#2C4460" text-anchor="middle">ACK　ack = w + 1</text>
+  <rect x="150" y="408" width="140" height="24" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="220" y="425" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">TIME_WAIT</text>
+  <rect x="810" y="408" width="140" height="24" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="880" y="425" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">CLOSED</text>
+
+  <!-- TIME_WAIT band -->
+  <rect x="220" y="454" width="160" height="56" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="300" y="476" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">在这里停 2MSL</text>
+  <text x="300" y="496" font-size="10.5" fill="#6B4E28" text-anchor="middle">Linux 固定 60 秒</text>
+  <text x="970" y="474" font-size="10.5" fill="#4A473F">TIME_WAIT 只落在主动关闭方。</text>
+  <text x="970" y="490" font-size="10.5" font-weight="700" fill="#6B4E28">服务端要是先关，就会攒一堆</text>
+  <text x="970" y="506" font-size="10.5" fill="#4A473F">这是协议要求，改设计不改代码</text>
+
+  <rect x="150" y="536" width="140" height="24" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="220" y="553" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">CLOSED</text>
+
+  <text x="48" y="600" font-size="11" fill="#6B675C">看到一台机器上 CLOSE_WAIT 很多，去查这台机器的代码——它是被动关闭方，收到 FIN 后没 close；看到 TIME_WAIT 很多，去看是不是它在主动关闭，能不能改成让对端先关</text>
+</svg>

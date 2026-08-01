@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；泳道 #FBFBF6/#8A8574；蓝 #E3EAF4/#3D5A80/#2C4460；
+       绿/直达 #E1F5EE/#0F6E56/#2F6B5E；红/成本 #F0E0DB/#A64B3C/#733428；与本库既有 SVG 同一套 -->
+  <title>对象直读三代路径对账</title>
+  <desc>第一代 HTTP+TCP 路径：存储节点经内核 TCP 到用户缓冲，解压后进 pinned 暂存再 DMA 进显存，每字节一次内核拷贝与一到两次应用中转。第二代控制面保留 HTTP，数据面换 RDMA 直写主机注册缓冲，内核协议栈退场。第三代 cuObject 形态：RDMA 目的地直接是显存 BAR1，主存全程退场。底部为边界条件与定型期的工程答案。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">对象 → 显存：两步减法，三代路径对账</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">控制面/数据面天然可分离——S3 语义一行不改，先换数据面（RDMA），再换目的地（显存 BAR1）</text>
+
+  <!-- ======== ① HTTP + TCP ======== -->
+  <rect x="48" y="104" width="1144" height="160" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="128" font-size="13.5" font-weight="700" fill="#4A473F" dominant-baseline="central">① HTTP + TCP：每字节 2~3 次 CPU 拷贝</text>
+
+  <rect x="72" y="146" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="157" y="166" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">存储节点</text>
+  <text x="157" y="186" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">S3 GET range</text>
+
+  <path d="M244,173 L290,173" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="268" y="157" font-size="9.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">网络</text>
+
+  <rect x="294" y="146" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="379" y="166" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">内核 TCP</text>
+  <text x="379" y="186" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">skb → 用户 buffer</text>
+
+  <path d="M466,173 L512,173" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <text x="490" y="157" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">拷 ×1</text>
+
+  <rect x="516" y="146" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="601" y="166" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">用户 buffer</text>
+  <text x="601" y="186" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">TLS · HTTP · 解压</text>
+
+  <path d="M688,173 L734,173" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <text x="712" y="157" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">拷 ×1~2</text>
+
+  <rect x="738" y="146" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="823" y="166" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">pinned 暂存</text>
+  <text x="823" y="186" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">解压后的落点</text>
+
+  <path d="M910,173 L956,173" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="934" y="157" font-size="9.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">DMA</text>
+
+  <rect x="960" y="146" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1045" y="166" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">显存</text>
+  <text x="1045" y="186" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">训练 kernel 消费</text>
+
+  <rect x="72" y="212" width="1058" height="38" rx="7" fill="#FAF9F2" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="601" y="231" font-size="11.5" font-weight="700" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">账单：内核拷贝 1 · 应用中转 1~2 · 主存穿越 4~8 · CPU 全程搬运</text>
+
+  <!-- ======== ② 数据面换 RDMA ======== -->
+  <rect x="48" y="280" width="1144" height="160" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="304" font-size="13.5" font-weight="700" fill="#4A473F" dominant-baseline="central">② 数据面换 RDMA：控制面仍是 S3/HTTP</text>
+
+  <rect x="72" y="322" width="290" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="217" y="342" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">存储节点</text>
+  <text x="217" y="362" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">控制面不动：认证 · bucket · range</text>
+
+  <path d="M364,349 L452,349" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <text x="409" y="333" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">RDMA · 零拷贝</text>
+
+  <rect x="456" y="322" width="290" height="54" rx="7" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.4"/>
+  <text x="601" y="342" font-size="11.5" font-weight="700" fill="#085041" text-anchor="middle" dominant-baseline="central">主机注册缓冲 MR</text>
+  <text x="601" y="362" font-size="10" fill="#085041" text-anchor="middle" dominant-baseline="central">RDMA WRITE 直写 · 内核栈退场</text>
+
+  <path d="M748,349 L836,349" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arrn)"/>
+  <text x="793" y="333" font-size="10" fill="#4A473F" text-anchor="middle" dominant-baseline="central">DMA · PCIe</text>
+
+  <rect x="840" y="322" width="290" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="985" y="342" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">显存</text>
+  <text x="985" y="362" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主存仍中转一次</text>
+
+  <rect x="72" y="388" width="1058" height="38" rx="7" fill="#FAF9F2" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="601" y="407" font-size="11.5" font-weight="700" fill="#3D5A80" text-anchor="middle" dominant-baseline="central">账单：内核拷贝 0 · 应用中转 0~1 · 主存穿越 2（进出各一）</text>
+
+  <!-- ======== ③ cuObject 形态 ======== -->
+  <rect x="48" y="456" width="1144" height="160" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="480" font-size="13.5" font-weight="700" fill="#4A473F" dominant-baseline="central">③ cuObject 形态：目的地换成显存 BAR1</text>
+
+  <rect x="72" y="498" width="290" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="217" y="518" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">存储节点</text>
+  <text x="217" y="538" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">RDMA WRITE，目的地 = BAR1</text>
+
+  <path d="M364,525 L452,525" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <text x="409" y="509" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">RDMA 直达</text>
+
+  <rect x="456" y="498" width="290" height="54" rx="7" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.4"/>
+  <text x="601" y="518" font-size="11.5" font-weight="700" fill="#085041" text-anchor="middle" dominant-baseline="central">host 网卡 ↔ GPU</text>
+  <text x="601" y="538" font-size="10" fill="#085041" text-anchor="middle" dominant-baseline="central">GPUDirect RDMA · 同 Switch</text>
+
+  <path d="M748,525 L836,525" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <text x="793" y="509" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">P2P · 不过主存</text>
+
+  <rect x="840" y="498" width="290" height="54" rx="7" fill="#E3EAF4" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="985" y="518" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">显存 BAR1</text>
+  <text x="985" y="538" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主存全程退场</text>
+
+  <rect x="72" y="564" width="1058" height="38" rx="7" fill="#FAF9F2" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="601" y="583" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">账单：内核拷贝 0 · 应用拷贝 0 · 主存穿越 0 · CPU 只发请求</text>
+
+  <!-- ======== 边界 / 工程答案 ======== -->
+  <rect x="48" y="632" width="560" height="150" rx="10" fill="#F1EFE8" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="70" y="656" font-size="12.5" font-weight="700" fill="#A64B3C" dominant-baseline="central">边界：换数据面救不了什么</text>
+  <text x="70" y="682" font-size="11" fill="#4A473F" dominant-baseline="central">① TTFB 归控制面——小对象海先打包合并（7.2）</text>
+  <text x="70" y="706" font-size="11" fill="#4A473F" dominant-baseline="central">② CPU 要预处理的数据别直读（判据表 8.3 §3）</text>
+  <text x="70" y="730" font-size="11" fill="#4A473F" dominant-baseline="central">③ 前提三件套：RDMA 网卡 · 机房内网络 · 存储侧支持</text>
+  <text x="70" y="754" font-size="11" fill="#4A473F" dominant-baseline="central">④ 拓扑税照收：网卡与 GPU 跨 socket，收益蒸发</text>
+
+  <rect x="632" y="632" width="560" height="150" rx="10" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="654" y="656" font-size="12.5" font-weight="700" fill="#2F6B5E" dominant-baseline="central">定型期的工程答案：把①的③④做对</text>
+  <text x="654" y="682" font-size="11" fill="#4A473F" dominant-baseline="central">① 并行 range：8~64 MiB × 8~32 并发起步</text>
+  <text x="654" y="706" font-size="11" fill="#4A473F" dominant-baseline="central">② 接收缓冲直接用 pinned 池，删掉中转拷贝</text>
+  <text x="654" y="730" font-size="11" fill="#4A473F" dominant-baseline="central">③ 解压搬去 GPU（nvCOMP 类），主存流量减半</text>
+  <text x="654" y="754" font-size="11" fill="#4A473F" dominant-baseline="central">④ 双读数：聚合吞吐 + host CPU 退休量</text>
+
+  <!-- ======== 底部结论 ======== -->
+  <rect x="48" y="794" width="1144" height="68" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="818" font-size="12" font-weight="700" fill="#2B2A26" dominant-baseline="central">记机制不记产品名：控制面/数据面分离 + RDMA 写注册缓冲 + BAR1 目的地——这三条稳定，API 与产品形态查现场文档</text>
+  <text x="70" y="844" font-size="11" fill="#4A473F" dominant-baseline="central">与 NVMe-oF、GDS 是同一手术的第三次实施：协议语义不动，只换运输层与目的地【实现/演进中，生态仍在定型期】</text>
+</svg>

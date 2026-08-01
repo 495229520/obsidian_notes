@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>监听套接字与已连接套接字，以及迭代服务器的局限</title>
+  <desc>一个监听套接字通过 accept 产出多个已连接套接字，两者在数量、五元组、能否收发数据、生命周期上都不同；下方用时间轴说明迭代服务器为什么一次只能服务一个客户端，并给出三种并发化方案。</desc>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">listenfd 只负责开门，connfd 才负责说话</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">accept 不是「接收数据」，是从队列里取出一条已经建好的连接，并为它新开一个 fd</text>
+
+  <!-- ================= Panel A ================= -->
+  <rect x="48" y="104" width="572" height="296" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 一个 listenfd，N 个 connfd</text>
+
+  <rect x="240" y="160" width="356" height="208" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="418" y="180" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">服务器进程</text>
+
+  <rect x="264" y="188" width="308" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.6"/>
+  <text x="418" y="207" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">listenfd　0.0.0.0 : 8080</text>
+  <text x="418" y="224" font-size="10.5" fill="#2C4460" text-anchor="middle">只负责 accept，不收发数据</text>
+
+  <line x1="418" y1="232" x2="418" y2="250" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="430" y="246" font-size="10.5" fill="#4A473F">accept() 产出</text>
+
+  <rect x="264" y="254" width="308" height="28" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="418" y="273" font-size="11" fill="#24473F" text-anchor="middle">connfd 5</text>
+  <rect x="264" y="288" width="308" height="28" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="418" y="307" font-size="11" fill="#24473F" text-anchor="middle">connfd 6</text>
+  <rect x="264" y="322" width="308" height="28" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="418" y="341" font-size="11" fill="#24473F" text-anchor="middle">connfd 7</text>
+
+  <rect x="72" y="254" width="144" height="28" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="144" y="273" font-size="11" fill="#6B4E28" text-anchor="middle">客户端甲</text>
+  <rect x="72" y="288" width="144" height="28" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="144" y="307" font-size="11" fill="#6B4E28" text-anchor="middle">客户端乙</text>
+  <rect x="72" y="322" width="144" height="28" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="144" y="341" font-size="11" fill="#6B4E28" text-anchor="middle">客户端丙</text>
+
+  <line x1="220" y1="268" x2="260" y2="268" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="220" y1="302" x2="260" y2="302" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="220" y1="336" x2="260" y2="336" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <text x="72" y="386" font-size="11" fill="#6B675C">三条连接共用 8080 端口，靠五元组区分</text>
+
+  <!-- ================= Panel B ================= -->
+  <rect x="636" y="104" width="556" height="296" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="660" y="130" font-size="15" font-weight="700" fill="#4A473F">B · 两种套接字的区别</text>
+
+  <rect x="660" y="146" width="508" height="26" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="660" y="172" width="508" height="42" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <rect x="660" y="214" width="508" height="42" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <rect x="660" y="256" width="508" height="42" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <rect x="660" y="298" width="508" height="42" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <line x1="790" y1="146" x2="790" y2="340" stroke="#9B968A" stroke-width="1"/>
+  <line x1="979" y1="146" x2="979" y2="340" stroke="#9B968A" stroke-width="1"/>
+
+  <text x="725" y="164" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">对比项</text>
+  <text x="884" y="164" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">listenfd</text>
+  <text x="1073" y="164" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">connfd</text>
+
+  <text x="725" y="197" font-size="11" fill="#4A473F" text-anchor="middle">数量</text>
+  <text x="884" y="197" font-size="11" fill="#4A473F" text-anchor="middle">整个进程一个</text>
+  <text x="1073" y="197" font-size="11" fill="#4A473F" text-anchor="middle">每条连接一个</text>
+
+  <text x="725" y="232" font-size="11" fill="#4A473F" text-anchor="middle">五元组</text>
+  <text x="884" y="232" font-size="11" fill="#4A473F" text-anchor="middle">对端两项通配</text>
+  <text x="884" y="248" font-size="10" fill="#6B675C" text-anchor="middle">只定死本地 IP 和端口</text>
+  <text x="1073" y="232" font-size="11" fill="#4A473F" text-anchor="middle">五项全定死</text>
+  <text x="1073" y="248" font-size="10" fill="#6B675C" text-anchor="middle">accept 时才填全</text>
+
+  <text x="725" y="282" font-size="11" fill="#4A473F" text-anchor="middle">能收发数据吗</text>
+  <text x="884" y="282" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">不能</text>
+  <text x="1073" y="282" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">能</text>
+
+  <text x="725" y="316" font-size="11" fill="#4A473F" text-anchor="middle">活多久</text>
+  <text x="884" y="316" font-size="11" fill="#4A473F" text-anchor="middle">从启动到进程退出</text>
+  <text x="1073" y="316" font-size="11" fill="#4A473F" text-anchor="middle">一条连接的时长</text>
+  <text x="1073" y="332" font-size="10" fill="#6B675C" text-anchor="middle">用完必须 close</text>
+
+  <text x="660" y="368" font-size="11" fill="#6B675C">对 listenfd 调 read 会返回 EINVAL，它不属于任何一条连接</text>
+
+  <!-- ================= Panel C ================= -->
+  <rect x="48" y="416" width="1144" height="224" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="442" font-size="15" font-weight="700" fill="#4A473F">C · 迭代服务器为什么一次只能服务一个人</text>
+
+  <text x="76" y="474" font-size="11" font-weight="700" fill="#6B675C">客户端甲</text>
+  <text x="76" y="508" font-size="11" font-weight="700" fill="#6B675C">客户端乙</text>
+  <text x="76" y="542" font-size="11" font-weight="700" fill="#6B675C">客户端丙</text>
+
+  <rect x="150" y="458" width="170" height="24" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="235" y="475" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">被处理</text>
+
+  <rect x="150" y="492" width="170" height="24" fill="#F1EFE8" stroke="#9B968A" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="235" y="509" font-size="10.5" fill="#6B675C" text-anchor="middle">在队列里干等</text>
+  <rect x="320" y="492" width="150" height="24" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="395" y="509" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">被处理</text>
+
+  <rect x="150" y="526" width="320" height="24" fill="#F1EFE8" stroke="#9B968A" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="310" y="543" font-size="10.5" fill="#6B675C" text-anchor="middle">在队列里干等</text>
+  <rect x="470" y="526" width="150" height="24" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="545" y="543" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">被处理</text>
+
+  <line x1="150" y1="562" x2="620" y2="562" stroke="#9B968A" stroke-width="1" marker-end="url(#arr)"/>
+  <text x="385" y="578" font-size="10.5" fill="#6B675C" text-anchor="middle">时间</text>
+
+  <text x="76" y="606" font-size="11" fill="#6B675C">循环体里 read 一阻塞，整个服务就停在那里</text>
+  <text x="76" y="626" font-size="11" fill="#6B675C">一个慢客户端能拖垮所有人</text>
+
+  <rect x="660" y="458" width="508" height="50" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="680" y="478" font-size="11.5" font-weight="700" fill="#2C4460">多进程：accept 后 fork，子进程处理这条连接</text>
+  <text x="680" y="498" font-size="10.5" fill="#2C4460">隔离好，崩一个不影响别人；开销最大</text>
+
+  <rect x="660" y="516" width="508" height="50" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="680" y="536" font-size="11.5" font-weight="700" fill="#24473F">多线程：accept 后起线程，共享地址空间</text>
+  <text x="680" y="556" font-size="10.5" fill="#24473F">比 fork 轻，但要自己处理数据竞争</text>
+
+  <rect x="660" y="574" width="508" height="50" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="680" y="594" font-size="11.5" font-weight="700" fill="#6B4E28">IO 多路复用：一个线程用 epoll 管全部 fd</text>
+  <text x="680" y="614" font-size="10.5" fill="#6B4E28">连接数上万时唯一撑得住的做法</text>
+
+  <text x="48" y="678" font-size="11.5" fill="#4A473F">三种方案的共同前提都是「accept 要尽快返回去接下一个」。把耗时的业务处理留在 accept 循环里，加多少队列长度都没用。</text>
+</svg>

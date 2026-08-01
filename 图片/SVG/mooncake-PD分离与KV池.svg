@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <!-- 设计系统：底色 rgb(245,244,237)；面板 #FBFBF6/#8A8574；蓝 #E3EAF4/#3D5A80/#2C4460；
+       绿 #DCE9E3/#2F6B5E/#24473F；琥珀 #F3E8D3/#B07D2B/#6B4E28；红 #F0E0DB/#A64B3C/#733428 -->
+  <title>Mooncake 式 KVCache 中心架构全景</title>
+  <desc>上方 Conductor 全局调度器按缓存命中最大化与 TTFT/TBT SLO 选择 prefill 与 decode 实例。左侧 prefill 池跑算力密集的长 prefill 并把产出的 KV 逐层写入池；中部为全集群 DRAM 与 SSD 拼成的分布式 KVCache 池，前缀命中的 KV 就近取用；右侧 decode 池从池中拉取 KV 后做访存密集的逐 token 生成，TBT 不再被别人的 prefill 阻塞。底部 Transfer Engine 以 RDMA 多网卡与拓扑感知路径执行所有 KV 搬运，并给出 P/D 分离的成本与收益对账。</desc>
+  <defs>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Mooncake：把整个推理集群围绕 KV Cache 重新组织</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">因果链——混布伤 TBT 尾延迟 → 分离凭空造出搬运需求 → 池化值得为搬运付费；网络成为新的关键资源与新的故障域</text>
+
+  <!-- ======== A · Conductor ======== -->
+  <rect x="48" y="104" width="1144" height="80" rx="10" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="70" y="126" font-size="13.5" font-weight="700" fill="#4A473F" dominant-baseline="central">A · Conductor：缓存从底层机制升格为调度第一公民</text>
+
+  <rect x="80" y="142" width="340" height="32" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="250" y="158" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">① 请求放置：前缀命中最大化</text>
+  <rect x="450" y="142" width="340" height="32" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="620" y="158" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">② 准入控制：按预测负载守 TTFT/TBT</text>
+  <rect x="820" y="142" width="340" height="32" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="990" y="158" font-size="11" fill="#4A473F" text-anchor="middle" dominant-baseline="central">③ 过载提前拒绝：保住有效吞吐</text>
+
+  <path d="M208,186 L208,198" fill="none" stroke="#8A8574" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrn)"/>
+  <path d="M620,186 L620,198" fill="none" stroke="#8A8574" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrn)"/>
+  <path d="M1032,186 L1032,198" fill="none" stroke="#8A8574" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrn)"/>
+
+  <!-- ======== B · prefill 池 ======== -->
+  <rect x="48" y="200" width="320" height="344" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="226" font-size="13" font-weight="700" fill="#4A473F" dominant-baseline="central">B · prefill 池 · 算力密集</text>
+  <text x="70" y="254" font-size="11" fill="#4A473F" dominant-baseline="central">长 prompt 一次算完，秒级占住 SM</text>
+  <text x="70" y="278" font-size="11" fill="#4A473F" dominant-baseline="central">分块流水并行，长任务连续跑</text>
+  <text x="70" y="302" font-size="11" fill="#4A473F" dominant-baseline="central">产出：首 token + 每层 K/V</text>
+
+  <rect x="70" y="326" width="276" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="208" y="347" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">关键指标：TTFT</text>
+  <text x="208" y="367" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">命中 = 取回 + 增量 prefill</text>
+
+  <rect x="70" y="398" width="276" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="208" y="419" font-size="11" font-weight="700" fill="#733428" text-anchor="middle" dominant-baseline="central">池降级时的承压方</text>
+  <text x="208" y="439" font-size="10.5" fill="#733428" text-anchor="middle" dominant-baseline="central">命中变未命中 → 重算风暴</text>
+
+  <text x="70" y="480" font-size="10.5" fill="#6B675C" dominant-baseline="central">容量规划要留 N−1 余量（5.5）</text>
+  <text x="70" y="504" font-size="10.5" fill="#6B675C" dominant-baseline="central">长任务连续跑 → 算力利用率 ↑</text>
+
+  <!-- ======== C · KVCache 池 ======== -->
+  <rect x="430" y="200" width="380" height="344" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="452" y="226" font-size="13" font-weight="700" fill="#4A473F" dominant-baseline="central">C · 分布式 KVCache 池（Mooncake Store）</text>
+  <text x="452" y="250" font-size="10.5" fill="#6B675C" dominant-baseline="central">全集群 CPU DRAM + SSD 拼成一个池</text>
+
+  <rect x="452" y="266" width="336" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="620" y="287" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">CPU DRAM 层</text>
+  <text x="620" y="307" font-size="10.5" fill="#2C4460" text-anchor="middle" dominant-baseline="central">热前缀 · chunk 粒度存取</text>
+
+  <rect x="452" y="332" width="336" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="620" y="353" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">SSD 层</text>
+  <text x="620" y="373" font-size="10.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">长段下沉 · 便宜介质独立扩容</text>
+
+  <rect x="452" y="398" width="336" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="620" y="419" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">按前缀哈希索引 chunk</text>
+  <text x="620" y="439" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">「块在哪」= 全局元数据表（7.2）</text>
+
+  <text x="452" y="480" font-size="10.5" fill="#6B675C" dominant-baseline="central">命中全局可见 → 不再被路由打散</text>
+  <text x="452" y="504" font-size="10.5" fill="#6B675C" dominant-baseline="central">chunk 比 paged block 粗：摊薄固定开销</text>
+
+  <!-- ======== D · decode 池 ======== -->
+  <rect x="872" y="200" width="320" height="344" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="894" y="226" font-size="13" font-weight="700" fill="#4A473F" dominant-baseline="central">D · decode 池 · 访存密集</text>
+  <text x="894" y="254" font-size="11" fill="#4A473F" dominant-baseline="central">逐 token 小步快跑，毫秒级一步</text>
+  <text x="894" y="278" font-size="11" fill="#4A473F" dominant-baseline="central">每步读全部历史 KV</text>
+  <text x="894" y="302" font-size="11" fill="#4A473F" dominant-baseline="central">不再被别人的长 prefill 踩踏</text>
+
+  <rect x="894" y="326" width="276" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1032" y="347" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle" dominant-baseline="central">关键指标：TBT</text>
+  <text x="1032" y="367" font-size="10.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">p99 干净 = 分离的主要收益</text>
+
+  <rect x="894" y="398" width="276" height="56" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="1032" y="419" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">混布时的老问题</text>
+  <text x="1032" y="439" font-size="10.5" fill="#4A473F" text-anchor="middle" dominant-baseline="central">一个 32k prefill 卡住所有会话</text>
+
+  <text x="894" y="480" font-size="10.5" fill="#6B675C" dominant-baseline="central">同「长任务阻塞短任务」（6.7 / 9.5）</text>
+  <text x="894" y="504" font-size="10.5" fill="#6B675C" dominant-baseline="central">按画像各自选硬件与并行度</text>
+
+  <!-- 池间搬运 -->
+  <path d="M370,300 L426,300" fill="none" stroke="#3D5A80" stroke-width="2.2" marker-end="url(#arrb)"/>
+  <text x="398" y="282" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">逐层写入</text>
+  <path d="M812,300 L868,300" fill="none" stroke="#2F6B5E" stroke-width="2.2" marker-end="url(#arrg)"/>
+  <text x="840" y="282" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">命中取回</text>
+
+  <!-- ======== E · Transfer Engine ======== -->
+  <rect x="48" y="560" width="1144" height="110" rx="10" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="584" font-size="13.5" font-weight="700" fill="#4A473F" dominant-baseline="central">E · Transfer Engine：分离制造的搬运，由它买单</text>
+
+  <rect x="72" y="602" width="256" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="200" y="622" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">RDMA 直达</text>
+  <text x="200" y="642" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">GPU 缓冲注册复用（4.4）</text>
+
+  <rect x="348" y="602" width="256" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="476" y="622" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">多网卡聚合</text>
+  <text x="476" y="642" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">单流打不满带宽</text>
+
+  <rect x="624" y="602" width="256" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="752" y="622" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">拓扑感知选路</text>
+  <text x="752" y="642" font-size="10" fill="#2C4460" text-anchor="middle" dominant-baseline="central">同 NUMA / 同 Switch（3.8）</text>
+
+  <rect x="900" y="602" width="256" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1028" y="622" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle" dominant-baseline="central">逐层流水</text>
+  <text x="1028" y="642" font-size="10" fill="#24473F" text-anchor="middle" dominant-baseline="central">算完第 L 层就发第 L 层</text>
+
+  <!-- ======== F · 分离的交易 ======== -->
+  <rect x="48" y="690" width="1144" height="88" rx="10" fill="#F1EFE8" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="70" y="714" font-size="12.5" font-weight="700" fill="#A64B3C" dominant-baseline="central">F · P/D 分离不是免费的：凭空新增每请求 GiB 级搬运</text>
+  <text x="70" y="740" font-size="11" fill="#4A473F" dominant-baseline="central">付出：每请求 GiB 级 KV 从 prefill 搬到 decode，混布架构里没有这笔账</text>
+  <text x="70" y="762" font-size="11" fill="#4A473F" dominant-baseline="central">换回：TBT p99 纯净 + 两相各自利用率——用买得到的网络带宽，换买不到的尾延迟质量</text>
+
+  <!-- ======== 底部结论 ======== -->
+  <rect x="48" y="794" width="1144" height="68" rx="8" fill="#FBFBF6" stroke="#8A8574" stroke-width="1.5"/>
+  <text x="70" y="818" font-size="12" font-weight="700" fill="#2B2A26" dominant-baseline="central">成立前提：10 GiB 走 RDMA 200 Gb/s ≈ 0.4 s，且逐层流水掩盖——网络预算不足或不做流水，分离比混布更糟</text>
+  <text x="70" y="844" font-size="11" fill="#4A473F" dominant-baseline="central">五变量因果表（吞吐 · 尾延迟 · CPU · 内存 · 网络）：任何单指标优化必须同时报告其余四列，这是评审的最低标准</text>
+</svg>

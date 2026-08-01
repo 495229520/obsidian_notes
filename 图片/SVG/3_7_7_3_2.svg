@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>五元组分用：一个端口服务多条连接</title>
+  <desc>三个客户端连到同一台服务器的 80 端口，内核用协议加源 IP、源端口、目的 IP、目的端口这五个字段把包分给不同的已连接套接字；表中列出监听套接字与三条连接的五元组，并说明端口耗尽只存在于客户端侧。</desc>
+
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">一个 80 端口服务上万连接：靠的是五元组，不是端口</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">端口不是被某个进程独占的资源；内核拿五个字段一起查表，才决定包交给哪个 socket</text>
+
+  <!-- ================= Panel A ================= -->
+  <rect x="48" y="104" width="1144" height="246" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 三条连接进同一个端口</text>
+
+  <text x="188" y="208" font-size="11.5" font-weight="700" fill="#6B675C" text-anchor="middle">客户端（源 IP : 源端口）</text>
+
+  <rect x="76" y="222" width="224" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="188" y="241" font-size="11.5" fill="#2C4460" text-anchor="middle">198.51.100.7 : 51514</text>
+  <rect x="76" y="256" width="224" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="188" y="275" font-size="11.5" fill="#2C4460" text-anchor="middle">198.51.100.7 : 51515</text>
+  <rect x="76" y="290" width="224" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="188" y="309" font-size="11.5" fill="#2C4460" text-anchor="middle">192.0.2.44 : 51514</text>
+
+  <!-- 分用盒 -->
+  <rect x="380" y="222" width="300" height="96" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="530" y="246" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">内核的分用</text>
+  <text x="530" y="270" font-size="11.5" fill="#6B4E28" text-anchor="middle">拆出五元组</text>
+  <text x="530" y="291" font-size="11.5" fill="#6B4E28" text-anchor="middle">在连接表里精确匹配</text>
+  <text x="530" y="311" font-size="11.5" fill="#6B4E28" text-anchor="middle">命中则交给该 connfd</text>
+
+  <line x1="300" y1="236" x2="376" y2="252" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="300" y1="270" x2="376" y2="270" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="300" y1="304" x2="376" y2="288" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <line x1="684" y1="252" x2="756" y2="236" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="684" y1="270" x2="756" y2="270" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="684" y1="288" x2="756" y2="304" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 服务器 -->
+  <rect x="760" y="150" width="404" height="180" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="962" y="172" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">服务器主机　203.0.113.5</text>
+
+  <rect x="780" y="182" width="364" height="30" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="962" y="202" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">listenfd　0.0.0.0 : 80　只接握手</text>
+
+  <rect x="780" y="222" width="364" height="28" rx="5" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="962" y="241" font-size="11.5" fill="#24473F" text-anchor="middle">connfd 5　accept 返回的已连接套接字</text>
+  <rect x="780" y="256" width="364" height="28" rx="5" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="962" y="275" font-size="11.5" fill="#24473F" text-anchor="middle">connfd 6</text>
+  <rect x="780" y="290" width="364" height="28" rx="5" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="962" y="309" font-size="11.5" fill="#24473F" text-anchor="middle">connfd 7</text>
+
+  <!-- ================= Panel B ================= -->
+  <rect x="48" y="366" width="1144" height="240" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="392" font-size="15" font-weight="700" fill="#4A473F">B · 内核连接表里真正记的东西</text>
+
+  <rect x="76" y="406" width="1088" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="76" y="434" width="1088" height="28" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="76" y="462" width="1088" height="28" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <rect x="76" y="490" width="1088" height="28" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <rect x="76" y="518" width="1088" height="28" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
+  <rect x="76" y="546" width="1088" height="28" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <line x1="156" y1="406" x2="156" y2="574" stroke="#9B968A" stroke-width="1"/>
+  <line x1="336" y1="406" x2="336" y2="574" stroke="#9B968A" stroke-width="1"/>
+  <line x1="446" y1="406" x2="446" y2="574" stroke="#9B968A" stroke-width="1"/>
+  <line x1="626" y1="406" x2="626" y2="574" stroke="#9B968A" stroke-width="1"/>
+  <line x1="736" y1="406" x2="736" y2="574" stroke="#9B968A" stroke-width="1"/>
+
+  <text x="116" y="425" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">协议</text>
+  <text x="246" y="425" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">源 IP</text>
+  <text x="391" y="425" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">源端口</text>
+  <text x="536" y="425" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">目的 IP</text>
+  <text x="681" y="425" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">目的端口</text>
+  <text x="950" y="425" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">内核交给谁</text>
+
+  <text x="116" y="453" font-size="11" fill="#4A473F" text-anchor="middle">TCP</text>
+  <text x="246" y="453" font-size="11" fill="#6B675C" text-anchor="middle">任意</text>
+  <text x="391" y="453" font-size="11" fill="#6B675C" text-anchor="middle">任意</text>
+  <text x="536" y="453" font-size="11" fill="#4A473F" text-anchor="middle">0.0.0.0</text>
+  <text x="681" y="453" font-size="11" fill="#4A473F" text-anchor="middle">80</text>
+  <text x="950" y="453" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">listenfd　只有找不到已连接项时才轮到它</text>
+
+  <text x="116" y="481" font-size="11" fill="#4A473F" text-anchor="middle">TCP</text>
+  <text x="246" y="481" font-size="11" fill="#4A473F" text-anchor="middle">198.51.100.7</text>
+  <text x="391" y="481" font-size="11" fill="#4A473F" text-anchor="middle">51514</text>
+  <text x="536" y="481" font-size="11" fill="#4A473F" text-anchor="middle">203.0.113.5</text>
+  <text x="681" y="481" font-size="11" fill="#4A473F" text-anchor="middle">80</text>
+  <text x="950" y="481" font-size="11" fill="#4A473F" text-anchor="middle">connfd 5</text>
+
+  <text x="116" y="509" font-size="11" fill="#4A473F" text-anchor="middle">TCP</text>
+  <text x="246" y="509" font-size="11" fill="#4A473F" text-anchor="middle">198.51.100.7</text>
+  <text x="391" y="509" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">51515</text>
+  <text x="536" y="509" font-size="11" fill="#4A473F" text-anchor="middle">203.0.113.5</text>
+  <text x="681" y="509" font-size="11" fill="#4A473F" text-anchor="middle">80</text>
+  <text x="950" y="509" font-size="11" fill="#4A473F" text-anchor="middle">connfd 6　只有源端口和上一行不同</text>
+
+  <text x="116" y="537" font-size="11" fill="#4A473F" text-anchor="middle">TCP</text>
+  <text x="246" y="537" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">192.0.2.44</text>
+  <text x="391" y="537" font-size="11" fill="#4A473F" text-anchor="middle">51514</text>
+  <text x="536" y="537" font-size="11" fill="#4A473F" text-anchor="middle">203.0.113.5</text>
+  <text x="681" y="537" font-size="11" fill="#4A473F" text-anchor="middle">80</text>
+  <text x="950" y="537" font-size="11" fill="#4A473F" text-anchor="middle">connfd 7　源端口撞了也不冲突</text>
+
+  <text x="116" y="565" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">UDP</text>
+  <text x="246" y="565" font-size="11" fill="#6B675C" text-anchor="middle">任意</text>
+  <text x="391" y="565" font-size="11" fill="#6B675C" text-anchor="middle">任意</text>
+  <text x="536" y="565" font-size="11" fill="#4A473F" text-anchor="middle">0.0.0.0</text>
+  <text x="681" y="565" font-size="11" fill="#4A473F" text-anchor="middle">80</text>
+  <text x="950" y="565" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">另一个 socket　TCP 与 UDP 端口空间独立</text>
+
+  <text x="76" y="594" font-size="11" fill="#6B675C">五个字段全部相同才算同一条连接；只要有一个不同，就是两条互不干扰的连接</text>
+
+  <!-- ================= Panel C ================= -->
+  <rect x="48" y="622" width="1144" height="124" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="648" font-size="15" font-weight="700" fill="#4A473F">C · 「端口只有 65535 个」这句话该怎么理解</text>
+
+  <rect x="72" y="660" width="548" height="74" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="94" y="682" font-size="12" font-weight="700" fill="#2C4460">客户端侧：确实有上限</text>
+  <text x="94" y="704" font-size="11.5" fill="#2C4460">连同一个「目的 IP + 目的端口」最多 28232 条</text>
+  <text x="94" y="724" font-size="11.5" fill="#2C4460">换个目的 IP 或目的端口，额度重新算</text>
+
+  <rect x="636" y="660" width="532" height="74" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="658" y="682" font-size="12" font-weight="700" fill="#24473F">服务端侧：根本不受这个数限制</text>
+  <text x="658" y="704" font-size="11.5" fill="#24473F">全程只占 1 个端口，连接再多也不变</text>
+  <text x="658" y="724" font-size="11.5" fill="#24473F">真正的天花板是 fd 上限与内存</text>
+
+  <text x="48" y="774" font-size="11.5" fill="#4A473F">28232 = 60999 − 32768 + 1，是 Linux 默认临时端口范围的宽度；压测机连不上更多连接时，先查这个，而不是怀疑服务端。</text>
+</svg>

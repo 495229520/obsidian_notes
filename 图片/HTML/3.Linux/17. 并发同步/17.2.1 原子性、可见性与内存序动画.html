@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E">
+<title>原子性、可见性与内存序动画</title>
+<!--
+Visual system: 22 / 17 / 15 / 13 / 11px type scale; warm paper #F5F4ED and panel #FBFBF6;
+8px rhythm with 14px framed surfaces; blue, green, amber, and red carry memory-state meaning;
+all state transitions use the shared 520ms cubic-bezier motion language.
+-->
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFBF6;--ink:#2B2A26;--muted:#6B675C;--faint:#9B968A;
+  --line:#D8D5C8;--grid:#D8D5C8;--gray:#F1EFE8;
+  --blue:#2467A6;--bluebg:#E1EFFA;--bluetx:#1A4F84;
+  --green:#087A5C;--greenbg:#DCF3E9;--greentx:#075A43;
+  --amber:#A66408;--amberbg:#FFF0D7;--ambertx:#764600;
+  --danger:#C34935;--dangerbg:#FAE1DC;--dangertx:#8F2B1C;
+  --code:#2E2C27;--codetext:#E8E3D6;--arrow:#5A564B;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 48px;text-wrap:pretty;}
+button{font:inherit;}
+.wrap{max-width:1240px;margin:0 auto;}
+header h1{font-size:22px;font-weight:700;line-height:1.3;text-wrap:balance;}
+header p{font-size:13px;color:var(--muted);margin-top:6px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+.bl{color:var(--bluetx);font-weight:700;}.gr{color:var(--greentx);font-weight:700;}.am{color:var(--ambertx);font-weight:700;}.dg{color:var(--dangertx);font-weight:700;}
+
+.tabs{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.tab{min-height:48px;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1.2px solid var(--line);border-radius:11px;padding:9px 16px;cursor:pointer;transition:background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab:focus-visible,.btn:focus-visible,.dot:focus-visible{outline:3px solid rgba(36,103,166,.35);outline-offset:2px;}
+.tab .t{font-weight:700;color:var(--ink);}.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(43,42,38,.16);}
+.tab.on .t,.tab.on .s{color:var(--paper);}.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:28px;margin-top:22px;align-items:start;}
+@media(max-width:1280px){.layout{grid-template-columns:minmax(0,1fr);}}
+.viz{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:24px;min-height:500px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);overflow:hidden;}
+.viz .vcap{font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;}.viz .vcap b{font-weight:700;color:var(--ink);}
+.stage-frame{position:relative;width:min(632px,100%);height:420px;margin:0 auto;}
+.stage{position:absolute;left:0;top:0;width:632px;height:420px;transform-origin:top left;}
+.layout > .right{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.desc-card{background:var(--panel);border:1.2px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.desc-head .st{font-size:17px;font-weight:700;}
+#stAct{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);padding:10px 14px;border-radius:9px;}
+#stDesc{font-size:14px;color:var(--muted);margin-top:11px;}.chip{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.2px solid;}
+.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}.cb{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.cg{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.ca{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.cd{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+
+.codebox{background:var(--code);border:1px solid #24231F;border-radius:10px;padding:12px 0;color:var(--codetext);font-family:var(--mono);font-size:13px;line-height:1.55;overflow:hidden;box-shadow:0 1px 3px rgba(60,55,40,.08);}
+.codebox .cl{min-height:24px;padding:2px 14px;white-space:pre-wrap;overflow-wrap:anywhere;transition:background .3s var(--ease),color .3s var(--ease),box-shadow .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}.codebox .cl.hl .cmt{color:#CCC8BA;}
+.codebox .kw{color:#D9B177;}.codebox .type{color:#8EB5DC;}.codebox .ord{color:#A7D7BF;}.codebox .num{color:#E0A797;}.codebox .cmt{color:#9A968B;}
+
+.controls{margin-top:22px;background:var(--panel);border:1.2px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{min-height:40px;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1.2px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s var(--ease);}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}.btn:active:not(:disabled){transform:scale(.96);}.btn:disabled{opacity:.4;cursor:default;}.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease);}.dot:hover{border-color:var(--muted);transform:scale(1.25);}.dot.done{background:var(--line);border-color:var(--line);}.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+
+/* Shared connector language: persistent path, quiet hints, filled triangle heads. */
+.arr-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.wire{--wc:var(--arrow);fill:none;stroke:var(--wc);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur) var(--ease),stroke-dashoffset var(--dur) var(--ease);}
+.warrow{--wc:var(--arrow);fill:var(--wc);stroke:none;opacity:0;transition:opacity 240ms var(--ease);}.wport{--wc:var(--arrow);fill:var(--panel);stroke:var(--wc);stroke-width:2;opacity:0;transition:opacity 240ms var(--ease);}
+.wire.on,.warrow.on,.wport.on{opacity:1;}.wire.hint{stroke-width:2;opacity:.1;}.warrow.hint,.wport.hint{opacity:.1;}.warrow.drawing{transition-delay:200ms;}
+.wire.blue,.warrow.blue,.wport.blue{--wc:var(--blue);}.wire.green,.warrow.green,.wport.green{--wc:var(--green);}.wire.amber,.warrow.amber,.wport.amber{--wc:var(--amber);}.wire.danger,.warrow.danger,.wport.danger{--wc:var(--danger);}
+
+/* Scene 1: read-modify-write. */
+.value-pod{position:absolute;left:241px;top:12px;width:150px;min-height:68px;border:1.5px solid var(--line);border-radius:11px;background:var(--paper);display:flex;align-items:center;justify-content:center;gap:7px;transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
+.value-pod .n{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1;transition:color var(--dur) var(--ease);}.value-pod .l{font-family:var(--mono);font-size:11px;color:var(--faint);}.value-pod.bad{border-color:var(--danger);background:var(--dangerbg);box-shadow:0 0 0 2px rgba(166,75,60,.12);}.value-pod.bad .n{color:var(--danger);}.value-pod.ok{border-color:var(--green);background:var(--greenbg);box-shadow:0 0 0 2px rgba(47,107,94,.12);}.value-pod.ok .n{color:var(--green);}
+.rmw-thread{position:absolute;top:98px;width:226px;min-height:236px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:12px 14px;transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.rmw-thread.a{left:36px;border-color:var(--blue);}.rmw-thread.b{left:370px;border-color:var(--green);}.rmw-thread.active{box-shadow:0 0 0 2px rgba(61,90,128,.12);}.rmw-thread.block{opacity:.5;}
+.thread-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;}.thread-head span{font-family:var(--mono);font-size:10.5px;color:var(--faint);}.rmw-thread.a .thread-head span{color:var(--blue);}.rmw-thread.b .thread-head span{color:var(--green);}.op-stack{display:flex;flex-direction:column;gap:9px;margin-top:13px;}.rmw-op{min-height:37px;border:1px solid var(--grid);border-radius:7px;background:var(--gray);font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--faint);padding:8px 10px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.rmw-op.active{color:var(--ink);border-color:var(--ink);background:var(--paper);transform:scale(1.025);box-shadow:0 0 0 1px rgba(43,42,38,.1);}.rmw-op.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}.rmw-op.lost{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);text-decoration:line-through;}
+.rmw-summary{position:absolute;left:95px;top:355px;width:442px;min-height:48px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:7px 14px;font-size:12px;font-weight:700;color:var(--muted);text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),opacity var(--dur) var(--ease);}.rmw-summary.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}.rmw-summary.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+
+/* Scenes 2 and 3: two cores, local Store Buffers, shared memory. */
+.cpu-card{position:absolute;top:43px;width:196px;min-height:263px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:12px;transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.cpu-card.left{left:14px;border-color:var(--blue);}.cpu-card.right{left:422px;border-color:var(--green);}.cpu-card.on{box-shadow:0 0 0 2px rgba(61,90,128,.12);}.cpu-card.dim{opacity:.55;}
+.cpu-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;}.cpu-head span{font-family:var(--mono);font-size:10.5px;color:var(--faint);}.cpu-card.left .cpu-head span{color:var(--blue);}.cpu-card.right .cpu-head span{color:var(--green);}.cpu-op{margin-top:11px;min-height:38px;border:1px solid var(--grid);border-radius:7px;background:var(--gray);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);padding:8px 9px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.cpu-op.on{color:var(--ink);border-color:var(--ink);background:var(--paper);box-shadow:0 0 0 1px rgba(43,42,38,.1);}.cpu-op.done{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.buffer-label{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);margin-top:12px;}.buffer-slot{min-height:38px;margin-top:5px;border:1.5px dashed var(--line);border-radius:7px;background:var(--gray);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);display:flex;align-items:center;justify-content:center;padding:7px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);}.buffer-slot.pending.blue{color:var(--bluetx);border-style:solid;border-color:var(--blue);background:var(--bluebg);transform:translateY(-2px);}.buffer-slot.pending.green{color:var(--greentx);border-style:solid;border-color:var(--green);background:var(--greenbg);transform:translateY(-2px);}.buffer-slot.drain{opacity:.45;transform:translateY(5px);}
+.reg-label{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:11px;}.register{min-height:32px;margin-top:4px;border:1px solid var(--grid);border-radius:6px;background:var(--panel);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);display:flex;align-items:center;justify-content:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease);}.register.read0{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);transform:scale(1.03);}.register.read1{color:var(--green);border-color:var(--green);background:var(--greenbg);transform:scale(1.03);}
+.shared-mem{position:absolute;left:242px;top:101px;width:148px;min-height:188px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:12px 12px 10px;transition:border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.shared-title{text-align:center;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.mem-cell{min-height:55px;margin-top:10px;border:1.5px solid var(--line);border-radius:8px;background:var(--gray);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.mem-cell .name{font-family:var(--mono);font-size:10.5px;color:var(--faint);}.mem-cell .val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--ink);}.mem-cell.blue.lit{border-color:var(--blue);background:var(--bluebg);transform:scale(1.035);box-shadow:0 0 0 1px rgba(61,90,128,.12);}.mem-cell.blue.lit .val{color:var(--blue);}.mem-cell.green.lit{border-color:var(--green);background:var(--greenbg);transform:scale(1.035);box-shadow:0 0 0 1px rgba(47,107,94,.12);}.mem-cell.green.lit .val{color:var(--green);}
+.hardware-note{position:absolute;left:20px;top:338px;width:592px;min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);padding:8px 14px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}.hardware-note.blue{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);}.hardware-note.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.hardware-note.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}.hardware-note.danger{color:var(--dangertx);border-color:var(--danger);background:var(--dangerbg);}
+.relaxed-counter{position:absolute;left:182px;top:311px;width:268px;min-height:42px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);display:flex;align-items:center;justify-content:center;gap:10px;opacity:.32;transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),color var(--dur) var(--ease);}.relaxed-counter.on{opacity:1;border-color:var(--green);background:var(--greenbg);color:var(--greentx);}.relaxed-counter .k{font-family:var(--mono);font-size:11px;font-weight:700;}.relaxed-counter .v{font-family:var(--mono);font-size:18px;font-weight:700;}
+.relaxed-stage .hardware-note{top:363px;min-height:34px;padding:6px 12px;}
+
+/* Scene 4: release / acquire publication. */
+.pub-core{position:absolute;top:61px;width:206px;min-height:254px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:12px;transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.pub-core.prod{left:16px;border-color:var(--blue);}.pub-core.cons{left:410px;border-color:var(--green);}.pub-core.on{box-shadow:0 0 0 2px rgba(61,90,128,.12);}.pub-core.dim{opacity:.55;}.pub-head{font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}.pub-head span{font-family:var(--mono);font-size:10.5px;color:var(--faint);}.prod .pub-head span{color:var(--blue);}.cons .pub-head span{color:var(--green);}
+.pub-op{min-height:63px;margin-top:17px;border:1.5px solid var(--line);border-radius:8px;background:var(--gray);padding:8px 10px;display:flex;flex-direction:column;justify-content:center;gap:2px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.pub-op .k{font-family:var(--mono);font-size:11.5px;font-weight:700;}.pub-op .s{font-size:10.5px;color:var(--faint);}.pub-op.data.on{color:var(--bluetx);border-color:var(--blue);background:var(--bluebg);transform:scale(1.025);}.pub-op.release.on{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);transform:scale(1.025);}.pub-op.acquire.on{color:var(--greentx);border-color:var(--green);background:var(--greenbg);transform:scale(1.025);}.pub-op.assert.on{color:var(--green);border-color:var(--green);background:var(--greenbg);transform:scale(1.025);box-shadow:0 0 0 2px rgba(47,107,94,.12);}
+.pub-shared{position:absolute;left:255px;top:92px;width:122px;min-height:197px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:12px 10px;}.pub-shared-title{text-align:center;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--faint);}.pub-cell{min-height:62px;margin-top:12px;border:1.5px solid var(--line);border-radius:8px;background:var(--gray);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease),transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}.pub-cell .n{font-family:var(--mono);font-size:10.5px;color:var(--faint);}.pub-cell .v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--ink);}.pub-cell.payload.lit{border-color:var(--blue);background:var(--bluebg);transform:scale(1.035);}.pub-cell.payload.lit .v{color:var(--blue);}.pub-cell.ready.lit{border-color:var(--amber);background:var(--amberbg);transform:scale(1.035);}.pub-cell.ready.lit .v{color:var(--amber);}
+.sync-label{position:absolute;left:190px;top:19px;width:252px;min-height:29px;border:1.5px solid var(--green);border-radius:999px;background:var(--greenbg);font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--greentx);display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(4px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}.sync-label.on{opacity:1;transform:translateY(0);}.pub-note{position:absolute;left:30px;top:346px;width:572px;min-height:45px;border:1.5px solid var(--line);border-radius:9px;background:var(--paper);padding:7px 14px;font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background-color var(--dur) var(--ease);}.pub-note.green{color:var(--greentx);border-color:var(--green);background:var(--greenbg);}.pub-note.amber{color:var(--ambertx);border-color:var(--amber);background:var(--amberbg);}
+
+@media(max-width:620px){body{padding:20px 16px 32px;}.viz{padding:16px;}.desc-card{padding:16px;}.controls{padding:12px 14px;gap:10px;}.dots{order:3;margin:0;width:100%;justify-content:center;}.readout{margin-left:auto;}header h1{font-size:20px;}.tab{flex:1 1 142px;}.btn{padding:8px 12px;}}
+@media(max-width:500px){
+  .stage{width:100%;}
+  .value-pod{left:calc(50% - 65px);top:12px;width:130px;min-height:58px;}.value-pod .n{font-size:24px;}.value-pod .l{font-size:10px;}
+  .rmw-thread{top:88px;width:calc(50% - 10px);min-height:228px;padding:9px;}.rmw-thread.a{left:4px;}.rmw-thread.b{left:calc(50% + 6px);}.thread-head{font-size:11px;flex-direction:column;align-items:flex-start;gap:1px;}.thread-head span{font-size:9px;}.op-stack{gap:7px;margin-top:10px;}.rmw-op{min-height:39px;font-size:10px;padding:8px 6px;}.rmw-summary{left:8px;top:334px;width:calc(100% - 16px);min-height:54px;font-size:10.5px;padding:7px 10px;}
+  .cpu-card{top:180px;width:calc(50% - 8px);min-height:250px;padding:8px;}.cpu-card.left{left:3px;}.cpu-card.right{left:calc(50% + 5px);}.cpu-head{font-size:10.5px;flex-direction:column;align-items:flex-start;gap:1px;}.cpu-head span{font-size:9px;}.cpu-op{margin-top:8px;min-height:35px;font-size:9.5px;padding:7px 6px;}.buffer-label,.reg-label{font-size:9px;margin-top:8px;}.buffer-slot{min-height:33px;margin-top:4px;font-size:9.5px;padding:6px 4px;}.register{min-height:29px;margin-top:3px;font-size:9.5px;}.shared-mem{left:calc(50% - 58px);top:45px;width:116px;min-height:122px;padding:7px;}.shared-title{font-size:9px;}.mem-cell{min-height:43px;margin-top:6px;border-radius:6px;}.mem-cell .name{font-size:9px;}.mem-cell .val{font-size:15px;}.hardware-note{left:6px;top:450px;width:calc(100% - 12px);min-height:53px;padding:7px 9px;font-size:9.5px;}
+  .relaxed-counter{left:calc(50% - 115px);top:443px;width:230px;min-height:34px;gap:7px;}.relaxed-counter .k{font-size:9.5px;}.relaxed-counter .v{font-size:15px;}.relaxed-stage .hardware-note{top:485px;min-height:34px;padding:6px 8px;font-size:9px;}
+  .pub-core{top:169px;width:calc(50% - 8px);min-height:242px;padding:8px;}.pub-core.prod{left:3px;}.pub-core.cons{left:calc(50% + 5px);}.pub-head{font-size:10.5px;flex-direction:column;align-items:flex-start;gap:1px;}.pub-head span{font-size:9px;}.pub-op{min-height:74px;margin-top:10px;padding:7px 6px;gap:1px;}.pub-op .k{font-size:9.5px;}.pub-op .s{font-size:8.5px;}.pub-shared{left:calc(50% - 52px);top:58px;width:104px;min-height:102px;padding:7px;}.pub-shared-title{font-size:9px;}.pub-cell{min-height:38px;margin-top:7px;border-radius:6px;}.pub-cell .n{font-size:9px;}.pub-cell .v{font-size:13px;}.sync-label{left:12px;top:13px;width:calc(100% - 24px);min-height:30px;padding:4px 8px;font-size:9px;text-align:center;}.pub-note{left:6px;top:440px;width:calc(100% - 12px);min-height:55px;padding:7px 9px;font-size:9.5px;}
+}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>原子性、可见性与内存序 · 从 Store Buffer 到 happens-before</h1>
+    <p>配套笔记《17.2 原子性、可见性与内存序》 · 原子 RMW · Store Buffer · relaxed · release/acquire　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div id="stAct"></div>
+        <div id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox" aria-label="当前场景代码"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev" type="button">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay" type="button">播放</button>
+    <button class="btn" id="btnNext" type="button">下一步 ›</button>
+    <div class="dots" id="dots" aria-label="步骤导航"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function escapeHtml(text){return text.replace(/[&<>]/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[ch]));}
+function highlightCpp(line){
+  const parts=line.match(/^(.*?)(\/\/.*)?$/);
+  let code=parts ? parts[1] : line;
+  const comment=parts && parts[2] ? parts[2] : '';
+  const strings=[];
+  code=code.replace(/"(?:\\.|[^"\\])*"/g,value=>{
+    strings.push(escapeHtml(value));
+    return '\u0001'+String.fromCharCode(65+strings.length-1)+'\u0001';
+  });
+  code=escapeHtml(code)
+    .replace(/\b(std|atomic|bool|int|long|while|assert)\b/g,'<span class="type">$1</span>')
+    .replace(/\b(memory_order_relaxed|memory_order_release|memory_order_acquire)\b/g,'<span class="ord">$1</span>')
+    .replace(/\b(store|load|fetch_add)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(0|1|2|42)\b/g,'<span class="num">$1</span>')
+    .replace(/\u0001([A-Z])\u0001/g,(_,name)=>'<span class="str">'+strings[name.charCodeAt(0)-65]+'</span>');
+  return code+(comment ? '<span class="cmt">'+escapeHtml(comment)+'</span>' : '');
+}
+function codePanel(lines){return lines.map((line,index)=>'<div class="cl" id="cl'+index+'">'+(line ? highlightCpp(line) : '&nbsp;')+'</div>').join('');}
+function stageFrame(id,classes,html){return '<div class="stage-frame" id="'+id+'Frame"><div class="stage '+classes+'" id="'+id+'Stage">'+html+'</div></div>';}
+function fitStage(id){
+  const base=id.endsWith('Stage')?id.slice(0,-5):id;
+  const stage=el(id),frame=el(base+'Frame');
+  if(!stage||!frame)return;
+  if(frame.clientWidth<500){
+    const compactHeight=stage.classList.contains('rmw-stage')?410:stage.classList.contains('relaxed-stage')?525:510;
+    stage.style.width='100%';
+    stage.style.height=compactHeight+'px';
+    stage.style.transform='none';
+    frame.style.height=compactHeight+'px';
+    return;
+  }
+  stage.style.width='632px';
+  stage.style.height='420px';
+  const scale=Math.min(1,frame.clientWidth/632);
+  stage.style.transform='scale('+scale+')';
+  frame.style.height=(420*scale)+'px';
+}
+
+function wireHTML(id){return '<path id="'+id+'" class="wire"></path><path id="'+id+'-head" class="warrow"></path><circle id="'+id+'-port" class="wport" r="4"></circle>';}
+function wireNodes(id){return [el(id),el(id+'-head'),el(id+'-port')];}
+function setWire(id,state,color){
+  const [path,head,port]=wireNodes(id);
+  if(!path||!head||!port)return;
+  const suffix=(state?' '+state:'')+(color?' '+color:'');
+  path.setAttribute('class','wire'+suffix);
+  head.setAttribute('class','warrow'+suffix);
+  port.setAttribute('class','wport'+suffix);
+  if(state!=='on'){
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    path.style.transition='';
+    head.classList.remove('drawing');
+  }
+}
+function drawWire(id,color,timers){
+  setWire(id,'on',color);
+  const [path,head]=wireNodes(id);
+  if(!path||reducedMotion())return;
+  const length=path.getTotalLength();
+  path.style.transition='none';
+  path.style.strokeDasharray=length;
+  path.style.strokeDashoffset=length;
+  head.classList.add('drawing');
+  void path.getBoundingClientRect();
+  path.style.transition='';
+  path.style.strokeDashoffset='0';
+  const timer=setTimeout(()=>{
+    path.style.strokeDasharray='';
+    path.style.strokeDashoffset='';
+    head.classList.remove('drawing');
+  },560);
+  timers.push(timer);
+}
+function wireController(ids,colors){
+  let active=new Set();
+  let timers=[];
+  return {
+    sync(nextIds,hints=false){
+      timers.forEach(clearTimeout);timers=[];
+      const next=new Set(nextIds);
+      const any=next.size>0;
+      ids.forEach(id=>{
+        const state=next.has(id)?'on':(!any&&hints?'hint':'');
+        if(next.has(id)&&!active.has(id))drawWire(id,colors[id],timers);
+        else setWire(id,state,colors[id]);
+      });
+      active=next;
+    },
+    destroy(){timers.forEach(clearTimeout);timers=[];active.clear();}
+  };
+}
+function relRect(stageRect,id){
+  const rect=el(id).getBoundingClientRect();
+  return {left:rect.left-stageRect.left,right:rect.right-stageRect.left,top:rect.top-stageRect.top,bottom:rect.bottom-stageRect.top,cx:(rect.left+rect.right)/2-stageRect.left,cy:(rect.top+rect.bottom)/2-stageRect.top};
+}
+function point(rect,side,offset=0){
+  if(side==='left')return {x:rect.left,y:rect.cy+offset};
+  if(side==='right')return {x:rect.right,y:rect.cy+offset};
+  return {x:rect.cx,y:rect.cy+offset};
+}
+function bezierArrow(id,from,to){
+  const path=el(id),head=el(id+'-head'),port=el(id+'-port');
+  if(!path||!head||!port)return;
+  const direction=to.x>=from.x?1:-1;
+  const baseX=to.x-direction*9;
+  const gap=Math.max(1,Math.abs(baseX-from.x));
+  const c1=from.x+direction*gap*.45;
+  const c2=baseX-direction*gap*.45;
+  path.setAttribute('d','M '+from.x+' '+from.y+' C '+c1+' '+from.y+', '+c2+' '+to.y+', '+baseX+' '+to.y);
+  head.setAttribute('d','M '+to.x+' '+to.y+' L '+baseX+' '+(to.y-5)+' L '+baseX+' '+(to.y+5)+' Z');
+  port.setAttribute('cx',from.x);port.setAttribute('cy',from.y);
+}
+function classes(id,value){el(id).className=value;}
+
+const atomicScene=(()=>{
+  const code=[
+    'int num = 0;',
+    'num++;                    // load + add + store',
+    '',
+    'std::atomic<int> atomic_num{0};',
+    'atomic_num.fetch_add(1, std::memory_order_relaxed);'
+  ];
+  const steps=[
+    {title:'步骤 0 · num++ 会展开为三步',chip:'RMW',chipC:'c0',lines:[0,1],a:['','',''],b:['','',''],value:'0',valueC:'',aC:'',bC:'',summary:'两个线程都可能在 load、add、store 的间隙交错执行。',summaryC:''},
+    {title:'步骤 1 · Thread A 先读到 num = 0',chip:'load',chipC:'cb',lines:[1],a:['active','',''],b:['','',''],value:'0',valueC:'',aC:'active',bC:'dim',summary:'A 的寄存器拿到旧值 0，此时共享 num 尚未改变。',summaryC:''},
+    {title:'步骤 2 · Thread B 也读到 num = 0',chip:'lost update',chipC:'cd',lines:[1],a:['done','',''],b:['active','',''],value:'0',valueC:'',aC:'',bC:'active',summary:'两个线程各自保存同一个旧值，更新丢失已经埋下。',summaryC:'bad'},
+    {title:'步骤 3 · 两边各自在寄存器里加 1',chip:'private state',chipC:'ca',lines:[1],a:['done','active',''],b:['done','active',''],value:'0',valueC:'',aC:'active',bC:'active',summary:'寄存器中的 0 都变成 1，但这两个加法不是共享操作。',summaryC:'amber'},
+    {title:'步骤 4 · A 先写回 num = 1',chip:'store',chipC:'cb',lines:[1],a:['done','done','active'],b:['done','done',''],value:'1',valueC:'',aC:'active',bC:'dim',summary:'A 写回后 num 暂时为 1。',summaryC:''},
+    {title:'步骤 5 · B 的写回覆盖 A',chip:'结果错误',chipC:'cd',lines:[1],a:['done','done','done'],b:['done','done','lost'],value:'1',valueC:'bad',aC:'',bC:'active',summary:'本应加两次，最终却是 1。普通 num++ 没有原子性。',summaryC:'bad'},
+    {title:'步骤 6 · fetch_add 把读改写合成原子操作',chip:'atomic RMW',chipC:'cg',lines:[3,4],a:['done','done','done'],b:['done','done','done'],value:'2',valueC:'ok',aC:'',bC:'',summary:'两个 fetch_add 在同一个原子对象的修改顺序中依次完成，结果稳定为 2。',summaryC:'ok'}
+  ];
+  function mount(){
+    const html='<div class="vcap"><b>原子性</b>：同一份 num 的读、改、写不能被拆开观察</div>'+stageFrame('rmw','rmw-stage',
+      '<div class="value-pod" id="rmwValue"><span class="l">shared num</span><span class="n" id="rmwNum">0</span></div>'+
+      '<div class="rmw-thread a" id="rmwA"><div class="thread-head">Thread A <span>blue core</span></div><div class="op-stack"><div class="rmw-op" id="ra0">① load num</div><div class="rmw-op" id="ra1">② add 1</div><div class="rmw-op" id="ra2">③ store num</div></div></div>'+
+      '<div class="rmw-thread b" id="rmwB"><div class="thread-head">Thread B <span>green core</span></div><div class="op-stack"><div class="rmw-op" id="rb0">① load num</div><div class="rmw-op" id="rb1">② add 1</div><div class="rmw-op" id="rb2">③ store num</div></div></div>'+
+      '<div class="rmw-summary" id="rmwSummary"></div>');
+    viz.innerHTML=html;
+    fitStage('rmwStage');
+  }
+  function paint(s){
+    classes('rmwA','rmw-thread a '+s.aC);classes('rmwB','rmw-thread b '+s.bC);
+    s.a.forEach((state,index)=>classes('ra'+index,'rmw-op '+state));
+    s.b.forEach((state,index)=>classes('rb'+index,'rmw-op '+state));
+    classes('rmwValue','value-pod '+s.valueC);el('rmwNum').textContent=s.value;
+    classes('rmwSummary','rmw-summary '+s.summaryC);el('rmwSummary').textContent=s.summary;
+  }
+  return {id:'atomic',label:'原子递增',sub:'read-modify-write',steps,mount,paint,code};
+})();
+
+const visibleScene=(()=>{
+  const code=[
+    'std::atomic<int> x{0};',
+    '',
+    'x.store(1, std::memory_order_relaxed);  // CPU 0',
+    'int seen = x.load(std::memory_order_relaxed); // CPU 1'
+  ];
+  const steps=[
+    {title:'步骤 0 · 两核从 x = 0 开始',chip:'hardware view',chipC:'c0',lines:[0],cpu0:'',cpu1:'',op0:'',op1:'',buf0:'empty',buf1:'empty',b0:'empty',b1:'empty',x:'0',y:'0',mx:'',my:'',r0:'seen = ?',r1:'local x = 0',r0C:'',r1C:'',wires:[],hint:true,note:'这是硬件概念图：写先进入 Store Buffer，其他核不会立刻观察到它。',noteC:''},
+    {title:'步骤 1 · CPU 0 把 x = 1 放进 Store Buffer',chip:'Store Buffer',chipC:'cb',lines:[2],cpu0:'on',cpu1:'dim',op0:'on',op1:'',buf0:'x = 1',buf1:'empty',b0:'pending blue',b1:'empty',x:'0',y:'0',mx:'',my:'',r0:'seen = ?',r1:'local x = 1',r0C:'',r1C:'read1',wires:[],hint:false,note:'CPU 0 可以继续执行，写还没有向其他核完成可见性传播。',noteC:'blue'},
+    {title:'步骤 2 · CPU 1 读取的仍可能是旧缓存值',chip:'not visible yet',chipC:'cd',lines:[3],cpu0:'dim',cpu1:'on',op0:'done',op1:'on',buf0:'x = 1',buf1:'empty',b0:'pending blue',b1:'empty',x:'0',y:'0',mx:'',my:'',r0:'seen = 0',r1:'local x = 1',r0C:'read0',r1C:'read1',wires:['sbRead0'],hint:false,note:'CPU 1 还没处理到这次写的失效信息，所以读取到的旧值是允许的。',noteC:'danger'},
+    {title:'步骤 3 · Store Buffer 排空，x 进入一致性域',chip:'propagate',chipC:'ca',lines:[2],cpu0:'on',cpu1:'dim',op0:'done',op1:'',buf0:'draining',buf1:'empty',b0:'pending blue drain',b1:'empty',x:'1',y:'0',mx:'lit',my:'',r0:'seen = 0',r1:'local x = 1',r0C:'read0',r1C:'read1',wires:['sbDrain0'],hint:false,note:'写被传播后，缓存一致性协议会让其他核的旧副本失效或更新。',noteC:'amber'},
+    {title:'步骤 4 · CPU 1 之后再读到 x = 1',chip:'visible',chipC:'cg',lines:[3],cpu0:'dim',cpu1:'on',op0:'done',op1:'done',buf0:'empty',buf1:'empty',b0:'empty',b1:'empty',x:'1',y:'0',mx:'lit',my:'',r0:'seen = 1',r1:'local x = 1',r0C:'read1',r1C:'read1',wires:['sbRead0'],hint:false,note:'可见性最终到达，但没有同步关系时，程序不能假设它恰好在某一步前到达。',noteC:'green'}
+  ];
+  const wires=['sbDrain0','sbRead0'];
+  const controller=wireController(wires,{sbDrain0:'blue',sbRead0:'danger'});
+  let observer=null;
+  function layout(){
+    fitStage('sbStage');
+    const stage=el('sbStage'),svg=el('sbSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const buf0=relRect(sr,'sbBuf0'),memX=relRect(sr,'sbMemX'),reg0=relRect(sr,'sbReg0');
+    bezierArrow('sbDrain0',point(buf0,'right'),point(memX,'left'));
+    bezierArrow('sbRead0',point(memX,'right'),point(reg0,'left'));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>Store Buffer 与可见性</b>：CPU 0 已写，不等于 CPU 1 已经看到</div>'+stageFrame('sb','visible-stage',
+      '<div class="cpu-card left" id="sbCpu0"><div class="cpu-head">CPU 0 <span>writer</span></div><div class="cpu-op" id="sbOp0">x.store(1)</div><div class="buffer-label">Store Buffer</div><div class="buffer-slot" id="sbBuf0">empty</div><div class="reg-label">local observation</div><div class="register" id="sbReg1">local x = 0</div></div>'+
+      '<div class="shared-mem"><div class="shared-title">coherent memory</div><div class="mem-cell blue" id="sbMemX"><span class="name">x</span><span class="val" id="sbX">0</span></div><div class="mem-cell green" id="sbMemY"><span class="name">cache line</span><span class="val" id="sbY">old</span></div></div>'+
+      '<div class="cpu-card right" id="sbCpu1"><div class="cpu-head">CPU 1 <span>reader</span></div><div class="cpu-op" id="sbOp1">seen = x.load()</div><div class="buffer-label">Store Buffer</div><div class="buffer-slot" id="sbBuf1">empty</div><div class="reg-label">register</div><div class="register" id="sbReg0">seen = ?</div></div>'+
+      '<svg class="arr-layer" id="sbSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg><div class="hardware-note" id="sbNote"></div>');
+    viz.innerHTML=html;
+    layout();observer=new ResizeObserver(layout);observer.observe(el('sbFrame'));
+  }
+  function paint(s){
+    layout();classes('sbCpu0','cpu-card left '+s.cpu0);classes('sbCpu1','cpu-card right '+s.cpu1);classes('sbOp0','cpu-op '+s.op0);classes('sbOp1','cpu-op '+s.op1);
+    classes('sbBuf0','buffer-slot '+s.b0);classes('sbBuf1','buffer-slot '+s.b1);el('sbBuf0').textContent=s.buf0;el('sbBuf1').textContent=s.buf1;
+    classes('sbMemX','mem-cell blue '+s.mx);classes('sbMemY','mem-cell green '+s.my);el('sbX').textContent=s.x;el('sbY').textContent=s.y;
+    classes('sbReg0','register '+s.r0C);classes('sbReg1','register '+s.r1C);el('sbReg0').textContent=s.r0;el('sbReg1').textContent=s.r1;
+    classes('sbNote','hardware-note '+s.noteC);el('sbNote').textContent=s.note;controller.sync(s.wires,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'visible',label:'Store Buffer',sub:'visibility path',steps,mount,paint,code,destroy};
+})();
+
+const relaxedScene=(()=>{
+  const code=[
+    'std::atomic<int> x{0}, y{0};',
+    'x.store(1, std::memory_order_relaxed);  // CPU 0',
+    'r0 = y.load(std::memory_order_relaxed);',
+    'y.store(1, std::memory_order_relaxed);  // CPU 1',
+    'r1 = x.load(std::memory_order_relaxed);',
+    '',
+    'counter.fetch_add(1, std::memory_order_relaxed);'
+  ];
+  const steps=[
+    {title:'步骤 0 · 两个原子位置各自有修改顺序',chip:'relaxed',chipC:'c0',lines:[0],cpu0:'',cpu1:'',op0:'',op1:'',buf0:'empty',buf1:'empty',b0:'empty',b1:'empty',x:'0',y:'0',mx:'',my:'',r0:'r0 = ?',r1:'r1 = ?',r0C:'',r1C:'',wires:[],hint:true,counter:'0',counterOn:false,note:'relaxed 保证每个原子对象本身不撕裂，也有各自的修改顺序。',noteC:''},
+    {title:'步骤 1 · CPU 0 的 x = 1 留在自己的 Store Buffer',chip:'write x',chipC:'cb',lines:[1],cpu0:'on',cpu1:'dim',op0:'on',op1:'',buf0:'x = 1',buf1:'empty',b0:'pending blue',b1:'empty',x:'0',y:'0',mx:'',my:'',r0:'r0 = ?',r1:'r1 = ?',r0C:'',r1C:'',wires:[],hint:false,counter:'0',counterOn:false,note:'这次 store 是原子的，但它没有为另一个原子 y 建立顺序。',noteC:'blue'},
+    {title:'步骤 2 · CPU 1 的 y = 1 也留在自己的 Store Buffer',chip:'write y',chipC:'cg',lines:[3],cpu0:'dim',cpu1:'on',op0:'done',op1:'on',buf0:'x = 1',buf1:'y = 1',b0:'pending blue',b1:'pending green',x:'0',y:'0',mx:'',my:'',r0:'r0 = ?',r1:'r1 = ?',r0C:'',r1C:'',wires:[],hint:false,counter:'0',counterOn:false,note:'两次写都尚未对对方的 load 成为可观察结果。',noteC:'amber'},
+    {title:'步骤 3 · CPU 0 读取 y，得到 0',chip:'r0 = 0',chipC:'cd',lines:[2],cpu0:'on',cpu1:'dim',op0:'on',op1:'done',buf0:'x = 1',buf1:'y = 1',b0:'pending blue',b1:'pending green',x:'0',y:'0',mx:'',my:'',r0:'r0 = 0',r1:'r1 = ?',r0C:'read0',r1C:'',wires:['rlRead0'],hint:false,counter:'0',counterOn:false,note:'CPU 0 读的是 y；它自己缓冲的是 x，因此仍可能从共享视图读到 y = 0。',noteC:'danger'},
+    {title:'步骤 4 · CPU 1 读取 x，也得到 0',chip:'r1 = 0',chipC:'cd',lines:[4],cpu0:'dim',cpu1:'on',op0:'done',op1:'on',buf0:'x = 1',buf1:'y = 1',b0:'pending blue',b1:'pending green',x:'0',y:'0',mx:'',my:'',r0:'r0 = 0',r1:'r1 = 0',r0C:'read0',r1C:'read0',wires:['rlRead1'],hint:false,counter:'0',counterOn:false,note:'r0 = r1 = 0 是 relaxed 下允许的结果。这是外部可观察的乱序，不是源码语句倒着执行。',noteC:'danger'},
+    {title:'步骤 5 · 两个缓冲随后排空',chip:'eventual propagation',chipC:'ca',lines:[1,3],cpu0:'on',cpu1:'on',op0:'done',op1:'done',buf0:'draining',buf1:'draining',b0:'pending blue drain',b1:'pending green drain',x:'1',y:'1',mx:'lit',my:'lit',r0:'r0 = 0',r1:'r1 = 0',r0C:'read0',r1C:'read0',wires:['rlDrain0','rlDrain1'],hint:false,counter:'0',counterOn:false,note:'之后 x 和 y 都会变成 1，但已经读到的 r0、r1 不会被回写。',noteC:'amber'},
+    {title:'步骤 6 · relaxed 的合适用途是无依赖计数',chip:'atomic counter',chipC:'cg',lines:[6],cpu0:'dim',cpu1:'dim',op0:'done',op1:'done',buf0:'empty',buf1:'empty',b0:'empty',b1:'empty',x:'1',y:'1',mx:'lit',my:'lit',r0:'r0 = 0',r1:'r1 = 0',r0C:'read0',r1C:'read0',wires:[],hint:false,counter:'2',counterOn:true,note:'独立统计可用 relaxed：两次 fetch_add 不丢更新，但它不能发布依赖数据。',noteC:'green'}
+  ];
+  const wires=['rlDrain0','rlDrain1','rlRead0','rlRead1'];
+  const controller=wireController(wires,{rlDrain0:'blue',rlDrain1:'green',rlRead0:'danger',rlRead1:'danger'});
+  let observer=null;
+  function layout(){
+    fitStage('rlStage');
+    const stage=el('rlStage'),svg=el('rlSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const b0=relRect(sr,'rlBuf0'),b1=relRect(sr,'rlBuf1'),mx=relRect(sr,'rlMemX'),my=relRect(sr,'rlMemY'),r0=relRect(sr,'rlReg0'),r1=relRect(sr,'rlReg1');
+    bezierArrow('rlDrain0',point(b0,'right'),point(mx,'left'));
+    bezierArrow('rlDrain1',point(b1,'left'),point(my,'right'));
+    bezierArrow('rlRead0',point(my,'left'),point(r0,'right'));
+    bezierArrow('rlRead1',point(mx,'right'),point(r1,'left'));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>relaxed 与乱序观察</b>：原子性仍在，跨变量的发布顺序不在</div>'+stageFrame('rl','relaxed-stage',
+      '<div class="cpu-card left" id="rlCpu0"><div class="cpu-head">CPU 0 <span>x then y</span></div><div class="cpu-op" id="rlOp0">x.store(1)</div><div class="buffer-label">Store Buffer</div><div class="buffer-slot" id="rlBuf0">empty</div><div class="reg-label">register</div><div class="register" id="rlReg0">r0 = ?</div></div>'+
+      '<div class="shared-mem"><div class="shared-title">atomic locations</div><div class="mem-cell blue" id="rlMemX"><span class="name">x</span><span class="val" id="rlX">0</span></div><div class="mem-cell green" id="rlMemY"><span class="name">y</span><span class="val" id="rlY">0</span></div></div>'+
+      '<div class="cpu-card right" id="rlCpu1"><div class="cpu-head">CPU 1 <span>y then x</span></div><div class="cpu-op" id="rlOp1">y.store(1)</div><div class="buffer-label">Store Buffer</div><div class="buffer-slot" id="rlBuf1">empty</div><div class="reg-label">register</div><div class="register" id="rlReg1">r1 = ?</div></div>'+
+      '<svg class="arr-layer" id="rlSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg><div class="relaxed-counter" id="rlCounter"><span class="k">counter.fetch_add</span><span class="v" id="rlCounterValue">0</span></div><div class="hardware-note" id="rlNote"></div>');
+    viz.innerHTML=html;layout();observer=new ResizeObserver(layout);observer.observe(el('rlFrame'));
+  }
+  function paint(s){
+    layout();classes('rlCpu0','cpu-card left '+s.cpu0);classes('rlCpu1','cpu-card right '+s.cpu1);classes('rlOp0','cpu-op '+s.op0);classes('rlOp1','cpu-op '+s.op1);
+    classes('rlBuf0','buffer-slot '+s.b0);classes('rlBuf1','buffer-slot '+s.b1);el('rlBuf0').textContent=s.buf0;el('rlBuf1').textContent=s.buf1;
+    classes('rlMemX','mem-cell blue '+s.mx);classes('rlMemY','mem-cell green '+s.my);el('rlX').textContent=s.x;el('rlY').textContent=s.y;
+    classes('rlReg0','register '+s.r0C);classes('rlReg1','register '+s.r1C);el('rlReg0').textContent=s.r0;el('rlReg1').textContent=s.r1;
+    classes('rlCounter','relaxed-counter '+(s.counterOn?'on':''));el('rlCounterValue').textContent=s.counter;
+    classes('rlNote','hardware-note '+s.noteC);el('rlNote').textContent=s.note;controller.sync(s.wires,s.hint);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'relaxed',label:'relaxed',sub:'atomic, not publication',steps,mount,paint,code,destroy};
+})();
+
+const acqRelScene=(()=>{
+  const code=[
+    'int payload = 0;',
+    'std::atomic<bool> ready{false};',
+    'payload = 42;',
+    'ready.store(true, std::memory_order_release);',
+    'while (!ready.load(std::memory_order_acquire)) {}',
+    'assert(payload == 42);'
+  ];
+  const steps=[
+    {title:'步骤 0 · 数据与标志初始都尚未发布',chip:'publication',chipC:'c0',lines:[0,1],prod:'',cons:'',data:'',release:'',acquire:'',assert:'',payload:'0',ready:'false',pC:'',rC:'',sync:false,wires:[],note:'payload 是普通数据；它只能在正确的同步关系保护下跨线程读取。',noteC:''},
+    {title:'步骤 1 · 消费者的 acquire 先读到 false',chip:'keep waiting',chipC:'c0',lines:[4],prod:'dim',cons:'on',data:'',release:'',acquire:'on',assert:'',payload:'0',ready:'false',pC:'',rC:'',sync:false,wires:[],note:'读到 false 时没有 synchronizes-with，消费者只应继续等待，不能读取 payload。',noteC:'amber'},
+    {title:'步骤 2 · 生产者先写 payload = 42',chip:'ordinary write',chipC:'cb',lines:[2],prod:'on',cons:'dim',data:'on',release:'',acquire:'',assert:'',payload:'42',ready:'false',pC:'lit',rC:'',sync:false,wires:['paData'],note:'这一步是普通写。单靠它不能把 42 安全地发布给另一个线程。',noteC:'blue'},
+    {title:'步骤 3 · release store 发布 ready = true',chip:'release',chipC:'ca',lines:[3],prod:'on',cons:'dim',data:'on',release:'on',acquire:'',assert:'',payload:'42',ready:'true',pC:'lit',rC:'lit',sync:false,wires:['paFlag'],note:'release 阻止它之前的读写下沉到 ready.store 之后。它是逻辑发布边界，不是固定的全局缓存刷新。',noteC:'amber'},
+    {title:'步骤 4 · acquire 读到该 release 写入的 true',chip:'synchronizes-with',chipC:'cg',lines:[4],prod:'on',cons:'on',data:'on',release:'on',acquire:'on',assert:'',payload:'42',ready:'true',pC:'lit',rC:'lit',sync:true,wires:['paAcquire','paHB'],note:'此时 release 与 acquire 配对，建立 synchronizes-with；之前的 payload 写被安全发布。',noteC:'green'},
+    {title:'步骤 5 · assert(payload == 42) 成立',chip:'happens-before',chipC:'cg',lines:[5],prod:'dim',cons:'on',data:'',release:'',acquire:'on',assert:'on',payload:'42',ready:'true',pC:'lit',rC:'lit',sync:true,wires:['paPayload','paHB'],note:'payload = 42 → release → acquire → assert 组成 happens-before 链，因此断言成立。',noteC:'green'}
+  ];
+  const wires=['paData','paFlag','paAcquire','paPayload','paHB'];
+  const controller=wireController(wires,{paData:'blue',paFlag:'amber',paAcquire:'green',paPayload:'green',paHB:'green'});
+  let observer=null;
+  function layout(){
+    fitStage('paStage');
+    const stage=el('paStage'),svg=el('paSvg');if(!stage||!svg)return;
+    const sr=stage.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+sr.width+' '+sr.height);
+    const data=relRect(sr,'paDataOp'),release=relRect(sr,'paReleaseOp'),acquire=relRect(sr,'paAcquireOp'),assertion=relRect(sr,'paAssertOp'),payload=relRect(sr,'paPayloadCell'),ready=relRect(sr,'paReadyCell');
+    bezierArrow('paData',point(data,'right'),point(payload,'left'));
+    bezierArrow('paFlag',point(release,'right'),point(ready,'left'));
+    bezierArrow('paAcquire',point(ready,'right'),point(acquire,'left',-15));
+    bezierArrow('paPayload',point(payload,'right'),point(assertion,'left'));
+    bezierArrow('paHB',point(release,'right'),point(acquire,'left',15));
+  }
+  function mount(){
+    const html='<div class="vcap"><b>release / acquire</b>：把 payload 的普通写通过 ready 原子地发布</div>'+stageFrame('pa','pub-stage',
+      '<div class="pub-core prod" id="paProd"><div class="pub-head">Producer <span>thread A</span></div><div class="pub-op data" id="paDataOp"><span class="k">payload = 42</span><span class="s">ordinary write</span></div><div class="pub-op release" id="paReleaseOp"><span class="k">ready.store(true)</span><span class="s">memory_order_release</span></div></div>'+
+      '<div class="pub-shared"><div class="pub-shared-title">shared state</div><div class="pub-cell payload" id="paPayloadCell"><span class="n">payload</span><span class="v" id="paPayloadValue">0</span></div><div class="pub-cell ready" id="paReadyCell"><span class="n">ready</span><span class="v" id="paReadyValue">false</span></div></div>'+
+      '<div class="pub-core cons" id="paCons"><div class="pub-head">Consumer <span>thread B</span></div><div class="pub-op acquire" id="paAcquireOp"><span class="k">ready.load()</span><span class="s">memory_order_acquire</span></div><div class="pub-op assert" id="paAssertOp"><span class="k">assert(payload == 42)</span><span class="s">ordinary read is now safe</span></div></div>'+
+      '<svg class="arr-layer" id="paSvg" preserveAspectRatio="none">'+wires.map(wireHTML).join('')+'</svg><div class="sync-label" id="paSync">release sequence read by acquire · synchronizes-with</div><div class="pub-note" id="paNote"></div>');
+    viz.innerHTML=html;layout();observer=new ResizeObserver(layout);observer.observe(el('paFrame'));
+  }
+  function paint(s){
+    layout();classes('paProd','pub-core prod '+s.prod);classes('paCons','pub-core cons '+s.cons);classes('paDataOp','pub-op data '+s.data);classes('paReleaseOp','pub-op release '+s.release);classes('paAcquireOp','pub-op acquire '+s.acquire);classes('paAssertOp','pub-op assert '+s.assert);
+    classes('paPayloadCell','pub-cell payload '+s.pC);classes('paReadyCell','pub-cell ready '+s.rC);el('paPayloadValue').textContent=s.payload;el('paReadyValue').textContent=s.ready;
+    classes('paSync','sync-label '+(s.sync?'on':''));classes('paNote','pub-note '+s.noteC);el('paNote').textContent=s.note;controller.sync(s.wires,false);
+  }
+  function destroy(){observer?.disconnect();controller.destroy();}
+  return {id:'acqrel',label:'release / acquire',sub:'publish then observe',steps,mount,paint,code,destroy};
+})();
+
+const SCENES=[atomicScene,visibleScene,relaxedScene,acqRelScene];
+const tabsBox=el('tabs');
+const stTitle=el('stTitle'),stChip=el('stChip'),stAct=el('stAct'),stDesc=el('stDesc');
+const codeBox=el('codeBox'),readout=el('readout'),dotsBox=el('dots');
+const btnPrev=el('btnPrev'),btnNext=el('btnNext'),btnPlay=el('btnPlay');
+SCENES.forEach((scene,index)=>{
+  const tab=document.createElement('button');
+  tab.type='button';tab.className='tab';tab.innerHTML='<span class="t">'+scene.label+'</span><span class="s">'+scene.sub+'</span>';
+  tab.addEventListener('click',()=>{stop();switchScene(index);});tabsBox.appendChild(tab);
+});
+
+let sceneIndex=0,stepIndex=0,dotEls=[],timer=null;
+function switchScene(index){
+  SCENES[sceneIndex]?.destroy?.();
+  sceneIndex=index;stepIndex=0;
+  [...tabsBox.children].forEach((tab,i)=>tab.classList.toggle('on',i===sceneIndex));
+  const scene=SCENES[sceneIndex];
+  scene.mount();
+  codeBox.innerHTML=codePanel(scene.code);
+  dotsBox.innerHTML='';dotEls=[];
+  scene.steps.forEach((step,index)=>{
+    const dot=document.createElement('button');
+    dot.type='button';dot.className='dot';dot.title=step.title;dot.setAttribute('aria-label',step.title);
+    dot.addEventListener('click',()=>{stop();go(index);});dotsBox.appendChild(dot);dotEls.push(dot);
+  });
+  go(0);
+}
+function go(index){
+  const steps=SCENES[sceneIndex].steps;
+  stepIndex=Math.max(0,Math.min(steps.length-1,index));
+  const step=steps[stepIndex];
+  SCENES[sceneIndex].paint(step);
+  codeBox.querySelectorAll('.cl').forEach((line,i)=>line.classList.toggle('hl',Boolean(step.lines&&step.lines.includes(i))));
+  stTitle.textContent=SCENES[sceneIndex].label;stChip.textContent=step.chip;stChip.className='chip '+step.chipC;stAct.textContent='▸ '+step.title;
+  stDesc.textContent=step.desc||step.note||step.summary||'从初始状态开始，观察每个变量何时真正对另一个线程可见。';
+  dotEls.forEach((dot,i)=>{dot.classList.toggle('now',i===stepIndex);dot.classList.toggle('done',i<stepIndex);});
+  readout.textContent=stepIndex+' / '+(steps.length-1);btnPrev.disabled=stepIndex===0;btnNext.disabled=stepIndex===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[sceneIndex].id+'&step='+stepIndex);}catch(error){}
+  if(stepIndex===steps.length-1)stop();
+}
+function play(){
+  const steps=SCENES[sceneIndex].steps;
+  if(stepIndex===steps.length-1)go(0);
+  btnPlay.textContent='暂停';
+  timer=setInterval(()=>{stepIndex<steps.length-1?go(stepIndex+1):stop();},2700);
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='播放';}
+btnPlay.addEventListener('click',()=>timer?stop():play());
+btnPrev.addEventListener('click',()=>{stop();go(stepIndex-1);});
+btnNext.addEventListener('click',()=>{stop();go(stepIndex+1);});
+document.addEventListener('keydown',event=>{
+  if(event.key==='ArrowRight'){stop();go(stepIndex+1);}else if(event.key==='ArrowLeft'){stop();go(stepIndex-1);}else if(event.key===' '){event.preventDefault();timer?stop():play();}
+});
+const hashScene=location.hash.match(/scene=(\w+)/);const hashStep=location.hash.match(/step=(\d+)/);
+let initialScene=0;if(hashScene){const found=SCENES.findIndex(scene=>scene.id===hashScene[1]);if(found>=0)initialScene=found;}
+switchScene(initialScene);if(hashStep)go(Number(hashStep[1]));
+</script>
+</body>
+</html>

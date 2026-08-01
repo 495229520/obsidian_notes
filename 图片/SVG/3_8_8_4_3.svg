@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 680" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>send 与 recv 搬的是内存</title>
+  <desc>send 只把用户缓冲区的数据拷进内核发送缓冲区就返回，真正上网由内核择机进行；recv 只是把内核接收缓冲区里此刻已有的数据拷回用户空间。据此列出四个常见误解及其对策。</desc>
+
+  <rect x="0" y="0" width="1240" height="680" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">send 和 recv 搬的是内存，不是网络</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">两端各有一对内核缓冲区，系统调用只负责用户空间与内核缓冲区之间的那次拷贝，上网的时机由内核决定</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="104" width="1144" height="270" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="134" font-size="15" font-weight="700" fill="#4A473F">A · 一次 send + 一次 recv 的完整路径</text>
+
+  <!-- host A -->
+  <rect x="72" y="150" width="410" height="200" rx="8" fill="#F3F2EB" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="92" y="176" font-size="13" font-weight="700" fill="#4A473F">主机 A · 发送端</text>
+
+  <rect x="92" y="188" width="370" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="277" y="210" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">用户空间　char buf[256]</text>
+  <text x="277" y="230" font-size="10.5" fill="#2C4460" text-anchor="middle">你的进程能直接改的那块内存</text>
+
+  <path d="M277 246 L277 282" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="292" y="268" font-size="11" font-weight="700" fill="#4A473F">① send() 一次内存拷贝，然后就返回了</text>
+
+  <rect x="92" y="286" width="370" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="277" y="308" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">内核发送缓冲区</text>
+  <text x="277" y="326" font-size="10.5" fill="#6B4E28" text-anchor="middle">收到 ACK 前，数据一直留在这里</text>
+
+  <!-- network -->
+  <path d="M482 312 L752 312" stroke="#6B5B95" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="617" y="288" font-size="11.5" font-weight="700" fill="#6B5B95" text-anchor="middle">② 内核择机组包上网</text>
+  <text x="617" y="306" font-size="10.5" fill="#6B5B95" text-anchor="middle">MSS 与拥塞窗口说了算</text>
+  <text x="617" y="336" font-size="10.5" fill="#6B5B95" text-anchor="middle">可能拆成多段，也可能合并</text>
+
+  <!-- host B -->
+  <rect x="758" y="150" width="410" height="200" rx="8" fill="#F3F2EB" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="778" y="176" font-size="13" font-weight="700" fill="#4A473F">主机 B · 接收端</text>
+
+  <rect x="778" y="188" width="370" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="963" y="210" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">用户空间　char buf[256]</text>
+  <text x="963" y="230" font-size="10.5" fill="#24473F" text-anchor="middle">recv 的返回值 = 这次拷进来多少字节</text>
+
+  <path d="M963 282 L963 246" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="978" y="268" font-size="11" font-weight="700" fill="#4A473F">③ recv() 拷走此刻有的，不等凑满</text>
+
+  <rect x="778" y="286" width="370" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="963" y="308" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">内核接收缓冲区</text>
+  <text x="963" y="326" font-size="10.5" fill="#6B4E28" text-anchor="middle">乱序段在这里排好，空余量就是通告窗口</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="390" width="1144" height="230" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="420" font-size="15" font-weight="700" fill="#4A473F">B · 四个常见误解</text>
+
+  <text x="88" y="444" font-size="11" font-weight="700" fill="#6B675C">你以为</text>
+  <text x="440" y="444" font-size="11" font-weight="700" fill="#6B675C">实际发生的</text>
+  <text x="820" y="444" font-size="11" font-weight="700" fill="#6B675C">对策</text>
+  <path d="M72 452 L1168 452" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="72" y="458" width="1096" height="32" fill="#F0E0DB"/>
+  <text x="88" y="479" font-size="11.5" fill="#733428">send 返回了，对方就收到了</text>
+  <text x="440" y="479" font-size="11.5" fill="#733428">只是拷进了本机发送缓冲区</text>
+  <text x="820" y="479" font-size="11.5" font-weight="700" fill="#733428">要确认送达，得有应用层回执</text>
+
+  <rect x="72" y="492" width="1096" height="32" fill="#EFE7DA"/>
+  <text x="88" y="513" font-size="11.5" fill="#6B4E28">send 一次，对端就 recv 一次</text>
+  <text x="440" y="513" font-size="11.5" fill="#6B4E28">字节流不保留消息边界</text>
+  <text x="820" y="513" font-size="11.5" font-weight="700" fill="#6B4E28">自己定长度头或分隔符</text>
+
+  <rect x="72" y="526" width="1096" height="32" fill="#EFE7DA"/>
+  <text x="88" y="547" font-size="11.5" fill="#6B4E28">recv 会读满我给的 buffer</text>
+  <text x="440" y="547" font-size="11.5" fill="#6B4E28">只返回此刻缓冲区里有的量</text>
+  <text x="820" y="547" font-size="11.5" font-weight="700" fill="#6B4E28">循环读到收够为止</text>
+
+  <rect x="72" y="560" width="1096" height="32" fill="#E3EAF4"/>
+  <text x="88" y="581" font-size="11.5" fill="#2C4460">close 一调，两边数据都没了</text>
+  <text x="440" y="581" font-size="11.5" fill="#2C4460">输出缓冲区内核会继续发完</text>
+  <text x="820" y="581" font-size="11.5" font-weight="700" fill="#2C4460">但输入缓冲区里没读的会被丢弃</text>
+
+  <text x="48" y="656" font-size="12" fill="#6B675C">口径：这里说的「一次拷贝」指普通 send / recv 路径；sendfile、splice、MSG_ZEROCOPY 可以省掉它，代价是接口和适用场景都更窄</text>
+</svg>

@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 710" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>fork 前后文件描述符的引用计数变化，以及少关一个的后果</title>
+  <desc>三个面板对照 fork 之前、fork 之后、父子各自 close 之后三种状态。每个面板上半是进程的 fd 表，下半是内核里两个 socket 对象及其引用计数：fork 之前是 1 和 1，fork 之后变成 2 和 2，父子各关掉不用的那一个之后回到 1 和 1。最下面的表列出漏掉某个 close 时引用计数停在几，以及由此产生的后果。</desc>
+  <defs>
+    <marker id="r1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="710" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">fork() 复制的是 fd 表，不是 socket 本身</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">该谁关不该谁关，看的是内核里那个 socket 的引用计数从几变到几</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · fork() 之前</text>
+  <text x="444" y="118" font-size="13" font-weight="700" fill="#4A473F">B · fork() 之后：两张表指同一个 socket</text>
+  <text x="832" y="118" font-size="13" font-weight="700" fill="#4A473F">C · 各自关掉不用的：计数回到 1</text>
+
+  <!-- Panel A -->
+  <rect x="48" y="132" width="372" height="344" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="124" y="160" width="220" height="104" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="234" y="186" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">唯一进程的 fd 表</text>
+  <text x="148" y="214" font-size="10.5" fill="#2C4460">3 → 监听 socket</text>
+  <text x="148" y="240" font-size="10.5" fill="#2C4460">4 → 已连接 socket</text>
+
+  <text x="80" y="318" font-size="10.5" fill="#6B675C">内核里的 socket 对象</text>
+
+  <line x1="196" y1="264" x2="176" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+  <line x1="284" y1="264" x2="306" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+
+  <rect x="80" y="336" width="146" height="104" rx="7" fill="#EDEBE3" stroke="#5F5E5A" stroke-width="1.4"/>
+  <text x="153" y="362" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">监听 socket</text>
+  <text x="153" y="406" font-size="26" font-weight="700" fill="#4A473F" text-anchor="middle">1</text>
+  <text x="153" y="428" font-size="10" fill="#6B675C" text-anchor="middle">引用计数</text>
+
+  <rect x="242" y="336" width="146" height="104" rx="7" fill="#EDEBE3" stroke="#5F5E5A" stroke-width="1.4"/>
+  <text x="315" y="362" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">已连接 socket</text>
+  <text x="315" y="406" font-size="26" font-weight="700" fill="#4A473F" text-anchor="middle">1</text>
+  <text x="315" y="428" font-size="10" fill="#6B675C" text-anchor="middle">引用计数</text>
+
+  <!-- Panel B -->
+  <rect x="436" y="132" width="372" height="344" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="452" y="160" width="172" height="104" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="538" y="186" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">父进程 fd 表</text>
+  <text x="470" y="214" font-size="10.5" fill="#2C4460">3 → 监听</text>
+  <text x="470" y="240" font-size="10.5" fill="#2C4460">4 → 已连接</text>
+
+  <rect x="636" y="160" width="156" height="104" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="714" y="186" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">子进程 fd 表</text>
+  <text x="654" y="214" font-size="10.5" fill="#24473F">3 → 监听</text>
+  <text x="654" y="240" font-size="10.5" fill="#24473F">4 → 已连接</text>
+
+  <line x1="496" y1="264" x2="516" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+  <line x1="580" y1="264" x2="682" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+  <line x1="668" y1="264" x2="562" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+  <line x1="756" y1="264" x2="724" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+
+  <rect x="468" y="336" width="146" height="104" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.6"/>
+  <text x="541" y="362" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">监听 socket</text>
+  <text x="541" y="406" font-size="26" font-weight="700" fill="#6B4E28" text-anchor="middle">2</text>
+  <text x="541" y="428" font-size="10" fill="#6B4E28" text-anchor="middle">引用计数</text>
+
+  <rect x="630" y="336" width="146" height="104" rx="7" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.6"/>
+  <text x="703" y="362" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">已连接 socket</text>
+  <text x="703" y="406" font-size="26" font-weight="700" fill="#6B4E28" text-anchor="middle">2</text>
+  <text x="703" y="428" font-size="10" fill="#6B4E28" text-anchor="middle">引用计数</text>
+
+  <!-- Panel C -->
+  <rect x="824" y="132" width="368" height="344" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="840" y="160" width="168" height="104" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="924" y="186" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">父进程 fd 表</text>
+  <text x="858" y="214" font-size="10.5" fill="#2C4460">3 → 监听</text>
+  <text x="858" y="240" font-size="10.5" fill="#9B968A">4 → 已 close</text>
+
+  <rect x="1020" y="160" width="160" height="104" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1100" y="186" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">子进程 fd 表</text>
+  <text x="1038" y="214" font-size="10.5" fill="#9B968A">3 → 已 close</text>
+  <text x="1038" y="240" font-size="10.5" fill="#24473F">4 → 已连接</text>
+
+  <line x1="884" y1="264" x2="920" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+  <line x1="1124" y1="264" x2="1096" y2="330" stroke="#5A564B" stroke-width="1.5" marker-end="url(#r1)"/>
+
+  <rect x="856" y="336" width="146" height="104" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="929" y="362" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">监听 socket</text>
+  <text x="929" y="406" font-size="26" font-weight="700" fill="#24473F" text-anchor="middle">1</text>
+  <text x="929" y="428" font-size="10" fill="#24473F" text-anchor="middle">只父进程持有</text>
+
+  <rect x="1018" y="336" width="146" height="104" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="1091" y="362" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">已连接 socket</text>
+  <text x="1091" y="406" font-size="26" font-weight="700" fill="#24473F" text-anchor="middle">1</text>
+  <text x="1091" y="428" font-size="10" fill="#24473F" text-anchor="middle">只子进程持有</text>
+
+  <!-- D 区：漏关的后果 -->
+  <text x="56" y="512" font-size="13" font-weight="700" fill="#4A473F">D · 少关一个会怎样：计数不归零，资源就不释放</text>
+
+  <rect x="48" y="528" width="1144" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="560" width="1144" height="42" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="602" width="1144" height="42" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="48" y="644" width="1144" height="42" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <line x1="348" y1="528" x2="348" y2="686" stroke="#D8D5C8" stroke-width="1.2"/>
+  <line x1="528" y1="528" x2="528" y2="686" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <text x="66" y="549" font-size="11.5" font-weight="700" fill="#4A473F">漏掉的 close</text>
+  <text x="366" y="549" font-size="11.5" font-weight="700" fill="#4A473F">引用计数</text>
+  <text x="546" y="549" font-size="11.5" font-weight="700" fill="#4A473F">实际后果</text>
+
+  <text x="66" y="587" font-size="11" fill="#733428">父进程不关 conn_fd</text>
+  <text x="366" y="587" font-size="11" fill="#733428">停在 2</text>
+  <text x="546" y="587" font-size="11" fill="#4A473F">每来一个连接漏一个 fd，很快撞上 RLIMIT_NOFILE</text>
+
+  <text x="66" y="629" font-size="11" fill="#733428">子进程已 exit，父仍不关</text>
+  <text x="366" y="629" font-size="11" fill="#733428">从 2 降到 1</text>
+  <text x="546" y="629" font-size="11" fill="#4A473F">四次挥手发不出去，连接一直挂在 ESTABLISHED</text>
+
+  <text x="66" y="671" font-size="11" fill="#733428">子进程不关 listen_fd</text>
+  <text x="366" y="671" font-size="11" fill="#733428">停在 2</text>
+  <text x="546" y="671" font-size="11" fill="#4A473F">父进程退出后端口仍被占，只要还有子进程活着</text>
+</svg>

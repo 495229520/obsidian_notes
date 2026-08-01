@@ -548,7 +548,7 @@ spec coding 让我们在做任务时顺手留下必要文档。目的不是把�
 
 虽然说我觉得个人开发者也需要工程结构，但通常不需要复杂的协作流程。
 
-[![Image 14](https://cdn3.ldstatic.com/optimized/4X/d/0/8/d083bcc907ba56ce838fb0fe5d82021b09a9caef_2_690x385.jpeg)](https://cdn3.ldstatic.com/original/4X/d/0/8/d083bcc907ba56ce838fb0fe5d82021b09a9caef.jpeg)
+[![Image 14|960](https://cdn3.ldstatic.com/optimized/4X/d/0/8/d083bcc907ba56ce838fb0fe5d82021b09a9caef_2_690x385.jpeg)](https://cdn3.ldstatic.com/original/4X/d/0/8/d083bcc907ba56ce838fb0fe5d82021b09a9caef.jpeg)
 
 当然，如果是团队协作，spec coding 的价值会更明显。
 

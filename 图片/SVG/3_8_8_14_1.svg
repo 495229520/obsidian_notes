@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+    <marker id="arrN" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9B968A"/>
+    </marker>
+  </defs>
+
+  <title>把一个文件发到 socket 的五条路径，各自拷贝几次</title>
+  <desc>read+write、mmap+write、sendfile、sendfile 配合 SG-DMA、splice 五种方式在磁盘、页缓存、用户缓冲区、socket 缓冲区、网卡之间的数据流动与拷贝次数对照。</desc>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">把一个文件发到 socket：五条路径，各自拷贝几次</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">"零拷贝"省的是 CPU 拷贝。DMA 那两次谁也省不掉——数据总得从盘上出来、总得进网卡</text>
+
+  <rect x="48" y="104" width="1144" height="452" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- user-space band -->
+  <rect x="495" y="170" width="150" height="360" fill="#F1EFE8"/>
+  <text x="570" y="546" font-size="9.5" fill="#8A8578" text-anchor="middle">用户态</text>
+
+  <!-- column headers -->
+  <rect x="155" y="124" width="150" height="40" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="230" y="149" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">磁盘</text>
+  <rect x="325" y="124" width="150" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="400" y="149" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">内核页缓存</text>
+  <rect x="495" y="124" width="150" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="570" y="149" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">用户缓冲区</text>
+  <rect x="665" y="124" width="150" height="40" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="740" y="149" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">socket 缓冲区</text>
+  <rect x="835" y="124" width="150" height="40" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="910" y="149" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">网卡</text>
+
+  <line x1="230" y1="170" x2="230" y2="530" stroke="#E3E0D6" stroke-width="1"/>
+  <line x1="400" y1="170" x2="400" y2="530" stroke="#E3E0D6" stroke-width="1"/>
+  <line x1="570" y1="170" x2="570" y2="530" stroke="#E3E0D6" stroke-width="1"/>
+  <line x1="740" y1="170" x2="740" y2="530" stroke="#E3E0D6" stroke-width="1"/>
+  <line x1="910" y1="170" x2="910" y2="530" stroke="#E3E0D6" stroke-width="1"/>
+
+  <!-- row 1: read + write -->
+  <text x="56" y="195" font-size="12" font-weight="700" fill="#2C4460">① read() + write()　最朴素的写法</text>
+  <line x1="230" y1="217" x2="396" y2="217" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="315" y="209" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <line x1="400" y1="217" x2="566" y2="217" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="485" y="209" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">CPU 拷贝</text>
+  <line x1="570" y1="217" x2="736" y2="217" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="655" y="209" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">CPU 拷贝</text>
+  <line x1="740" y1="217" x2="906" y2="217" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="825" y="209" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <text x="1000" y="199" font-size="10.5" font-weight="700" fill="#733428">CPU 拷贝 2 次</text>
+  <text x="1000" y="215" font-size="10" fill="#6B675C">上下文切换 4 次</text>
+
+  <!-- row 2: mmap + write -->
+  <text x="56" y="265" font-size="12" font-weight="700" fill="#2C4460">② mmap() + write()　省掉读进来那一次</text>
+  <line x1="230" y1="287" x2="396" y2="287" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="315" y="279" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <line x1="400" y1="287" x2="566" y2="287" stroke="#3D5A80" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrB)"/>
+  <text x="485" y="279" font-size="9.5" fill="#2C4460" text-anchor="middle">映射，不拷贝</text>
+  <line x1="570" y1="287" x2="736" y2="287" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="655" y="279" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">CPU 拷贝</text>
+  <line x1="740" y1="287" x2="906" y2="287" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="825" y="279" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <text x="1000" y="269" font-size="10.5" font-weight="700" fill="#733428">CPU 拷贝 1 次</text>
+  <text x="1000" y="285" font-size="10" fill="#6B675C">上下文切换 4 次</text>
+
+  <!-- row 3: sendfile -->
+  <text x="56" y="335" font-size="12" font-weight="700" fill="#24473F">③ sendfile()　数据完全不进用户态</text>
+  <line x1="230" y1="357" x2="396" y2="357" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="315" y="349" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <line x1="400" y1="357" x2="736" y2="357" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="570" y="349" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">绕过用户态，仍有 1 次 CPU 拷贝</text>
+  <line x1="740" y1="357" x2="906" y2="357" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="825" y="349" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <text x="1000" y="339" font-size="10.5" font-weight="700" fill="#733428">CPU 拷贝 1 次</text>
+  <text x="1000" y="355" font-size="10" font-weight="700" fill="#24473F">上下文切换 2 次</text>
+
+  <!-- row 4: sendfile + SG-DMA -->
+  <text x="56" y="405" font-size="12" font-weight="700" fill="#24473F">④ sendfile() + 网卡支持 SG-DMA　真正的零拷贝</text>
+  <line x1="230" y1="427" x2="396" y2="427" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="315" y="419" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <line x1="400" y1="427" x2="736" y2="427" stroke="#2F6B5E" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
+  <text x="570" y="419" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">只写描述符，数据没动</text>
+  <line x1="740" y1="427" x2="906" y2="427" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="825" y="419" font-size="9.5" fill="#8A8578" text-anchor="middle">SG-DMA 直接读页缓存</text>
+  <text x="1000" y="409" font-size="10.5" font-weight="700" fill="#24473F">CPU 拷贝 0 次</text>
+  <text x="1000" y="425" font-size="10" font-weight="700" fill="#24473F">上下文切换 2 次</text>
+
+  <!-- row 5: splice -->
+  <text x="56" y="475" font-size="12" font-weight="700" fill="#6B4E28">⑤ splice()　靠 pipe 中转页引用</text>
+  <line x1="230" y1="497" x2="396" y2="497" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="315" y="489" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <line x1="400" y1="497" x2="736" y2="497" stroke="#B07D2B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrA)"/>
+  <text x="570" y="489" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">经 pipe 传页引用，不拷贝</text>
+  <line x1="740" y1="497" x2="906" y2="497" stroke="#9B968A" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="825" y="489" font-size="9.5" fill="#8A8578" text-anchor="middle">DMA</text>
+  <text x="1000" y="479" font-size="10.5" font-weight="700" fill="#24473F">CPU 拷贝 0 次</text>
+  <text x="1000" y="495" font-size="10" fill="#6B675C">上下文切换 4 次</text>
+
+  <!-- card -->
+  <rect x="48" y="576" width="1144" height="84" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="600" font-size="13" font-weight="700" fill="#4A473F">用之前先确认两件事</text>
+  <text x="72" y="622" font-size="11" fill="#4A473F">① 数据不需要在用户态动。要加密、压缩、改协议头，就必须过用户缓冲区，上面这几条路一条都走不了。</text>
+  <text x="72" y="644" font-size="11" fill="#4A473F">② 拷贝不是唯一开销。小文件下 mmap 的缺页中断、sendfile 的建立成本，可能比省掉的那次 memcpy 还贵——先量再改。</text>
+
+  <text x="48" y="686" font-size="11" fill="#6B675C">③ 和 ④ 是同一个系统调用，差别只在网卡支不支持 scatter-gather DMA。所以"sendfile 是零拷贝"这句话要加个前提</text>
+</svg>
