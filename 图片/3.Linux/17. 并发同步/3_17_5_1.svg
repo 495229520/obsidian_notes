@@ -1,94 +1,137 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600">
-  <rect x="0" y="0" width="960" height="600" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 830" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
     </marker>
   </defs>
 
-  <text x="480" y="34" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
-    悲观锁 vs 乐观锁：两种处理冲突的策略思想
-  </text>
-  <text x="480" y="56" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#888">
-    左：先独占再访问（先防后用）   右：先访问提交时再检测（先用后查）
-  </text>
+  <rect x="0" y="0" width="1240" height="830" fill="#F5F4ED"/>
 
-  <!-- ============ 悲观锁 lane ============ -->
-  <rect x="50" y="86" width="380" height="40" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="240" y="106" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">悲观锁　假设「冲突经常发生」</text>
+  <title>悲观锁与乐观锁：防线摆在访问前还是提交时</title>
+  <desc>上半是同一次读-改-写在两种策略下的四步泳道，乐观一侧带失败重试回边；下半是逐项对照表与冲突率梯度。</desc>
 
-  <rect x="90" y="150" width="300" height="44" rx="8" fill="#FBE9E7" stroke="#B3261E" stroke-width="0.5"/>
-  <text x="240" y="172" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#7A1B14">① 请求加锁 → 阻塞等待（独占）</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">悲观锁与乐观锁：防线摆在访问前，还是摆在提交时</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">两者都不是具体的锁类型，而是对「冲突有多常见」的两种假设，再分别落地为 mutex 与 CAS / 版本号</text>
 
-  <rect x="90" y="222" width="300" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="240" y="244" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#633806">② 获得锁，进入临界区</text>
+  <text x="48" y="112" font-size="14" font-weight="700" fill="#4A473F">A · 同一次读-改-写，两条走法</text>
 
-  <rect x="90" y="294" width="300" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="240" y="316" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#633806">③ 读-改-写（无人能打断）</text>
+  <!-- ===== 悲观锁泳道 ===== -->
+  <rect x="56" y="124" width="1128" height="152" rx="8" fill="#F2ECE1" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="148" font-size="12" font-weight="700" fill="#8A6A3A">悲观锁 · 假设冲突经常发生</text>
 
-  <rect x="90" y="366" width="300" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="240" y="388" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#633806">④ 释放锁，唤醒等待者</text>
+  <rect x="76" y="160" width="245" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="198" y="184" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">① 先请求加锁</text>
+  <text x="198" y="204" font-size="10.5" fill="#6B4E28" text-anchor="middle">拿不到就阻塞等待</text>
 
-  <path d="M240 194 L240 220" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M240 266 L240 292" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M240 338 L240 364" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="357" y="160" width="245" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="479" y="184" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">② 拿到锁，独占进入</text>
+  <text x="479" y="204" font-size="10.5" fill="#6B4E28" text-anchor="middle">别的线程全挡在门外</text>
 
-  <rect x="90" y="440" width="300" height="58" rx="8" fill="#F3EFE4" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="240" y="461" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#633806">落地：mutex / 自旋锁 / 读写锁</text>
-  <text x="240" y="481" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#633806">数据库：SELECT ... FOR UPDATE</text>
+  <rect x="638" y="160" width="245" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="760" y="184" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 读-改-写</text>
+  <text x="760" y="204" font-size="10.5" fill="#6B4E28" text-anchor="middle">全程无人能插进来</text>
 
-  <!-- ============ 乐观锁 lane ============ -->
-  <rect x="530" y="86" width="380" height="40" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="720" y="106" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">乐观锁　假设「冲突很少发生」</text>
+  <rect x="919" y="160" width="245" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="1041" y="184" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">④ 解锁并唤醒等待者</text>
+  <text x="1041" y="204" font-size="10.5" fill="#6B4E28" text-anchor="middle">下一个才轮得上</text>
 
-  <rect x="570" y="150" width="300" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="720" y="172" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">① 不加锁，直接读 value + version</text>
+  <line x1="321" y1="192" x2="353" y2="192" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="602" y1="192" x2="634" y2="192" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="883" y1="192" x2="915" y2="192" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
 
-  <rect x="570" y="222" width="300" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="720" y="244" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">② 本地计算 new_value</text>
+  <text x="76" y="252" font-size="11" fill="#4A473F">代价花在加锁、阻塞与上下文切换上，与冲突多少无关</text>
 
-  <rect x="570" y="294" width="300" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="720" y="316" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">③ 提交时校验：version 没变？</text>
+  <!-- ===== 乐观锁泳道 ===== -->
+  <rect x="56" y="292" width="1128" height="196" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="316" font-size="12" font-weight="700" fill="#3D5A80">乐观锁 · 假设冲突很少发生</text>
 
-  <rect x="570" y="366" width="142" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="641" y="388" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#085041">✓ 没变 → 写入</text>
+  <rect x="76" y="328" width="245" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="198" y="352" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① 不加锁，直接读</text>
+  <text x="198" y="372" font-size="10.5" fill="#2C4460" text-anchor="middle">顺手记下 version</text>
 
-  <rect x="728" y="366" width="142" height="44" rx="8" fill="#FBE9E7" stroke="#B3261E" stroke-width="0.5"/>
-  <text x="799" y="388" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#7A1B14">✗ 变了 → 重试 ↺</text>
+  <rect x="357" y="328" width="245" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="479" y="352" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 本地算出新值</text>
+  <text x="479" y="372" font-size="10.5" fill="#2C4460" text-anchor="middle">期间不占任何资源</text>
 
-  <path d="M720 194 L720 220" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M720 266 L720 292" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M700 338 L645 364" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M740 338 L795 364" fill="none" stroke="#B3261E" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <!-- retry loop back -->
-  <path d="M799 410 L799 426 L560 426 L560 172 L568 172" fill="none" stroke="#B3261E"
-        stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <rect x="638" y="328" width="245" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="2"/>
+  <text x="760" y="352" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ 提交前比对 version</text>
+  <text x="760" y="372" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">没变过才允许写</text>
 
-  <rect x="570" y="440" width="300" height="58" rx="8" fill="#F3EFE4" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="720" y="461" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#085041">落地：CAS（compare_exchange）/ 版本号</text>
-  <text x="720" y="481" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#085041">数据库：UPDATE ... WHERE version=旧值</text>
+  <rect x="919" y="328" width="245" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1041" y="352" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">④ 写入并推进版本</text>
+  <text x="1041" y="372" font-size="10.5" fill="#24473F" text-anchor="middle">这一轮到此结束 ✓</text>
 
-  <text x="480" y="548" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
-    开销来源：悲观锁 = 加锁/阻塞/上下文切换　|　乐观锁 = 失败重试 / CPU 自旋
-  </text>
+  <line x1="321" y1="360" x2="353" y2="360" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="602" y1="360" x2="634" y2="360" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="883" y1="360" x2="915" y2="360" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <path d="M760,392 L760,408" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrR)"/>
+  <rect x="638" y="412" width="526" height="42" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="901" y="438" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">✗ version 已变 → 丢掉本次计算，读最新值重来</text>
+
+  <path d="M638,433 L64,433 L64,360 L72,360" fill="none" stroke="#A64B3C" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#arrR)"/>
+  <text x="240" y="426" font-size="11" font-weight="700" fill="#A64B3C">重试 ↺ 回到第 ① 步，基准换成最新值</text>
+
+  <text x="76" y="472" font-size="11" fill="#4A473F">代价花在失败重试与 CPU 自旋上，随冲突率放大</text>
+
+  <!-- ===== B 区 ===== -->
+  <text x="48" y="524" font-size="14" font-weight="700" fill="#4A473F">B · 怎么选：冲突率决定谁更便宜</text>
+
+  <rect x="56" y="536" width="740" height="222" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="558" font-size="12" font-weight="700" fill="#4A473F">逐项对照</text>
+
+  <rect x="68" y="568" width="716" height="26" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="586" font-size="11" font-weight="700" fill="#4A473F">维度</text>
+  <text x="250" y="586" font-size="11" font-weight="700" fill="#6B4E28">悲观锁</text>
+  <text x="520" y="586" font-size="11" font-weight="700" fill="#2C4460">乐观锁</text>
+
+  <text x="80" y="612" font-size="11" fill="#4A473F">基本假设</text>
+  <text x="250" y="612" font-size="11" fill="#4A473F">冲突经常发生</text>
+  <text x="520" y="612" font-size="11" fill="#4A473F">冲突很少发生</text>
+  <line x1="68" y1="620" x2="784" y2="620" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="638" font-size="11" fill="#4A473F">冲突处理</text>
+  <text x="250" y="638" font-size="11" fill="#4A473F">访问前先独占</text>
+  <text x="520" y="638" font-size="11" fill="#4A473F">提交时才校验</text>
+  <line x1="68" y1="646" x2="784" y2="646" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="664" font-size="11" fill="#4A473F">失败表现</text>
+  <text x="250" y="664" font-size="11" fill="#4A473F">阻塞等待</text>
+  <text x="520" y="664" font-size="11" fill="#4A473F">重试重算</text>
+  <line x1="68" y1="672" x2="784" y2="672" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="690" font-size="11" fill="#4A473F">开销来源</text>
+  <text x="250" y="690" font-size="11" fill="#4A473F">加锁、上下文切换</text>
+  <text x="520" y="690" font-size="11" fill="#4A473F">自旋、重复计算</text>
+  <line x1="68" y1="698" x2="784" y2="698" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="716" font-size="11" fill="#4A473F">适用场景</text>
+  <text x="250" y="716" font-size="11" fill="#4A473F">写多、临界区长</text>
+  <text x="520" y="716" font-size="11" fill="#4A473F">读多写少、临界区短</text>
+  <line x1="68" y1="724" x2="784" y2="724" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="742" font-size="11" fill="#4A473F">典型落地</text>
+  <text x="250" y="742" font-size="11" fill="#6B4E28">mutex / FOR UPDATE</text>
+  <text x="520" y="742" font-size="11" fill="#2C4460">CAS / version 列</text>
+
+  <rect x="816" y="536" width="368" height="222" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="830" y="558" font-size="12" font-weight="700" fill="#4A473F">冲突率是分水岭</text>
+
+  <rect x="828" y="570" width="344" height="54" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="842" y="590" font-size="11.5" font-weight="700" fill="#24473F">冲突罕见</text>
+  <text x="842" y="610" font-size="10.5" fill="#24473F">重试次数趋近 0，几乎零开销</text>
+
+  <rect x="828" y="634" width="344" height="54" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="842" y="654" font-size="11.5" font-weight="700" fill="#6B4E28">冲突抬头</text>
+  <text x="842" y="674" font-size="10.5" fill="#6B4E28">每失败一次就整段重算一遍</text>
+
+  <rect x="828" y="698" width="344" height="54" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="842" y="718" font-size="11.5" font-weight="700" fill="#733428">冲突频繁</text>
+  <text x="842" y="738" font-size="10.5" fill="#733428">互相挤掉提交，逼近活锁</text>
+
+  <text x="48" y="786" font-size="11.5" fill="#4A473F">乐观锁总成本 ≈ 单次操作 × (1 + 平均重试次数)，变量始终是冲突率，不是锁本身快不快。</text>
+  <text x="48" y="808" font-size="11.5" fill="#4A473F">止损手段：指数退避拉开重试间隔，或限次后转悲观锁，别让线程无限空转。</text>
 </svg>

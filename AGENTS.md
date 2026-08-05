@@ -89,18 +89,21 @@ C++高级/ (16章, ~50笔记)
 ├── 15. volatile/            [1 note]
 └── 16. C++11/               [11 notes] - auto, thread, atomic, lambda, 移动语义, chrono
 
-Linux/ (15章, ~70笔记)
+Linux/ (14章, ~70笔记)
 ├── 1. Linux系统命令/        [2 notes] - ls、echo、cd、cp、rm、chmod、vim、gcc
 ├── 2. Linux基本操作/        [2 notes] - 前期准备、环境变量
 ├── 3. Linux基础函数/        [5 notes] - 字符串、数据转换、格式化IO、权限控制
 ├── 4. Linux IO函数/         [3 notes] - 打开读写关闭、重定向同步、文件锁
-├── 5. 系统进程控制函数/     [5 notes] - 进程控制、结束进程、非局部跳转、等待函数
 ├── 6. 文件与目录函数/       [9 notes] - 基本文件、高级操作、读写、目录操作
-├── 7. 网络编程基础/         [7 notes] - IP、端口、协议、TCP基础、套接字、listen/accept
+├── 7. 网络编程基础/         [13 notes] - 分层模型、IP地址、端口、传输层协议、TCP基础、套接字、
+│                                        listen/accept；链路层与网络层协议深挖（以太网、IPv4、
+│                                        IPv6、ARP、ICMP）
 ├── 8. TCP编程/              [8 notes] - TCP原理、服务端、客户端、迭代服务器、回声、IO缓冲
 ├── 9. UDP编程/              [3 notes] - UDP原理、服务端、客户端
 ├── 10. 套接字/              [3 notes] - 套接字选项、TIME_WAIT、Nagle算法
-├── 11. 进程/                [8 notes] - 进程简介、IPC、管道、共享内存、信号量、消息队列、僵尸进程
+├── 11. 进程/                [13 notes] - 进程简介、创建与exec、结束进程、等待回收、僵尸进程、
+│                                        进程组与会话、非局部跳转、IPC、管道、共享内存、信号量、
+│                                        消息队列、多进程并发服务器
 ├── 12. 线程/                [6 notes] - 线程简介、创建运行、互斥量、信号量、销毁、并发服务器
 ├── 13. IO复用/              [4 notes] - IO复用简介、select、poll、epoll
 ├── 14. Makefile/            [4 notes] - Makefile基础进阶、CMake基础进阶
@@ -186,7 +189,7 @@ ai 编程/ (2章, ~3笔记)
 | Linux/12.线程 | windows/3.多线程 | 跨平台对比 |
 | Linux/8.TCP编程 | windows/2.网络编程 | 跨平台对比 |
 | Linux/13.IO复用 | windows/2.网络编程 | select/epoll vs IOCP |
-| Linux/11.5 信号量 | windows/3.7 信号量 | 跨平台对比 |
+| Linux/11.11 信号量 | windows/3.7 信号量 | 跨平台对比 |
 
 ### 推荐学习路径
 

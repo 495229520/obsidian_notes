@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>EventLoop 一轮循环的内部时间线与 doPendingFunctors 的 swap</title>
+  <desc>上半部分是一轮 EventLoop 的三个阶段 poll / handleEvent / doPendingFunctors 及两个状态标志带来的约束；下半部分是跨线程投递任务时 mutex 的持锁区间。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">EventLoop 一轮循环：三个阶段与两个状态标志</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">一轮里只有 poll 会睡；handleEvent 和 doPendingFunctors 都在同一个线程串行跑完，中间没有并发</text>
+
+  <!-- ============ 面板 A ============ -->
+  <rect x="48" y="104" width="1144" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="66" y="129" font-size="15" font-weight="700" fill="#4A473F">A · 一轮循环的三段</text>
+
+  <rect x="76" y="148" width="290" height="62" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="221" y="174" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">① poller.poll(timeout)</text>
+  <text x="221" y="194" font-size="10.5" fill="#6B4E28" text-anchor="middle">全轮唯一的等待点</text>
+
+  <rect x="390" y="148" width="330" height="62" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="555" y="174" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">② channel-&gt;handleEvent()</text>
+  <text x="555" y="194" font-size="10.5" fill="#2C4460" text-anchor="middle">遍历 activeChannels_ 逐个回调</text>
+
+  <rect x="744" y="148" width="290" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="889" y="174" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">③ doPendingFunctors()</text>
+  <text x="889" y="194" font-size="10.5" fill="#24473F" text-anchor="middle">跑别的线程投递来的任务</text>
+
+  <rect x="1058" y="148" width="110" height="62" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="1113" y="174" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">④ 下一轮</text>
+  <text x="1113" y="194" font-size="10.5" fill="#4A473F" text-anchor="middle">检查 quit_</text>
+
+  <line x1="366" y1="179" x2="388" y2="179" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="720" y1="179" x2="742" y2="179" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1034" y1="179" x2="1056" y2="179" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <path d="M1113,210 L1113,236 L221,236 L221,214" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="620" y="254" font-size="11" fill="#6B675C" text-anchor="middle">quit_ 为真也要等本轮跑完，跨线程 quit() 还得 wakeup 一次</text>
+
+  <rect x="76" y="266" width="290" height="104" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="92" y="290" font-size="12" font-weight="700" fill="#4A473F">timeout 从哪来</text>
+  <text x="92" y="313" font-size="11" fill="#4A473F">有 timerfd：固定值，muduo 取 10s</text>
+  <text x="92" y="334" font-size="11" fill="#4A473F">无 timerfd：最近到期定时器</text>
+  <text x="92" y="355" font-size="11" fill="#4A473F">写死 -1 则定时器永不到期</text>
+
+  <rect x="390" y="266" width="330" height="104" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="406" y="290" font-size="12" font-weight="700" fill="#733428">eventHandling_ = true</text>
+  <text x="406" y="313" font-size="11" fill="#733428">此刻 removeChannel 不能立即删</text>
+  <text x="406" y="334" font-size="11" fill="#733428">正在被遍历的 activeChannels_ 会失效</text>
+  <text x="406" y="355" font-size="11" fill="#733428">删自己以外的 Channel 同样不安全</text>
+
+  <rect x="744" y="266" width="424" height="104" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="760" y="290" font-size="12" font-weight="700" fill="#733428">callingPendingFunctors_ = true</text>
+  <text x="760" y="313" font-size="11" fill="#733428">此刻 functor 里再投递的任务，本轮已经扫不到了</text>
+  <text x="760" y="334" font-size="11" fill="#733428">所以 queueInLoop 判的是“不在本线程 或 正在跑 functor”</text>
+  <text x="760" y="355" font-size="11" fill="#733428">漏掉后半个条件，新任务会一直卡到下次有事件</text>
+
+  <!-- ============ 面板 B ============ -->
+  <rect x="48" y="414" width="1144" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="66" y="439" font-size="15" font-weight="700" fill="#4A473F">B · doPendingFunctors 为什么先 swap 再执行</text>
+
+  <rect x="64" y="452" width="1112" height="80" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="78" y="470" font-size="12" font-weight="700" fill="#3D5A80">其他线程 · worker</text>
+  <rect x="64" y="542" width="1112" height="62" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="78" y="560" font-size="12" font-weight="700" fill="#A64B3C">mutex_ 持锁区间</text>
+  <rect x="64" y="614" width="1112" height="86" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="78" y="632" font-size="12" font-weight="700" fill="#2F6B5E">EventLoop 线程</text>
+
+  <rect x="90" y="478" width="210" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="195" y="497" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① queueInLoop(cb)</text>
+  <text x="195" y="514" font-size="10.5" fill="#2C4460" text-anchor="middle">业务算完，要回写响应</text>
+
+  <rect x="326" y="478" width="210" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="431" y="497" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 加锁 push_back</text>
+  <text x="431" y="514" font-size="10.5" fill="#2C4460" text-anchor="middle">锁内只做一次入队</text>
+
+  <rect x="562" y="478" width="210" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="667" y="497" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ wakeup()</text>
+  <text x="667" y="514" font-size="10.5" fill="#2C4460" text-anchor="middle">write(eventfd, 1)</text>
+
+  <line x1="300" y1="501" x2="324" y2="501" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="536" y1="501" x2="560" y2="501" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="326" y="562" width="210" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="431" y="584" font-size="11.5" fill="#733428" text-anchor="middle">持锁：一次 push_back</text>
+  <rect x="798" y="562" width="210" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="903" y="584" font-size="11.5" fill="#733428" text-anchor="middle">持锁：一次 swap</text>
+  <text x="1150" y="584" font-size="11" fill="#6B675C" text-anchor="end">锁只按住这两段</text>
+
+  <line x1="431" y1="524" x2="431" y2="558" stroke="#A64B3C" stroke-width="1.4" marker-end="url(#arrw)"/>
+  <line x1="903" y1="640" x2="903" y2="600" stroke="#A64B3C" stroke-width="1.4" marker-end="url(#arrw)"/>
+  <line x1="667" y1="524" x2="667" y2="636" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="562" y="640" width="210" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="667" y="660" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">④ 被 eventfd 唤醒</text>
+  <text x="667" y="678" font-size="10.5" fill="#24473F" text-anchor="middle">poll 提前返回</text>
+
+  <rect x="798" y="640" width="210" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="903" y="660" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑤ swap 到局部 vector</text>
+  <text x="903" y="678" font-size="10.5" fill="#24473F" text-anchor="middle">队列当场清空</text>
+
+  <rect x="1034" y="640" width="142" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1105" y="660" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑥ 无锁逐个跑</text>
+  <text x="1105" y="678" font-size="10.5" fill="#24473F" text-anchor="middle">耗时不占临界区</text>
+
+  <line x1="772" y1="666" x2="796" y2="666" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1008" y1="666" x2="1032" y2="666" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <text x="48" y="740" font-size="13" fill="#6B675C">⑥ 阶段里 functor 再调 queueInLoop 不会死锁——锁早在 swap 之后就放了；但任务落到下一轮，所以这时必须 wakeup</text>
+</svg>

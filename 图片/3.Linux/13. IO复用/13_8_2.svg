@@ -1,80 +1,109 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" viewBox="0 0 1100 640">
-  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 600" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>连接对象的所有权边界</title>
+  <desc>左侧为连接表、TcpConnection、Socket、Channel、EventLoop 与内核 fd 之间的三类边：独占、共享、观察；右侧为三种边的图例，以及把边画反之后的后果。</desc>
   <defs>
-    <marker id="arrow-hollow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5" fill="none" stroke="#4f6f8f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr2" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
-    <style>
-      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .box-title { font: 700 17px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .box-text { font: 14px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
-      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .owner { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.3; rx: 20; }
-      .observer { fill: #f0f6ff; stroke: #2f7ab8; stroke-width: 2; rx: 18; }
-      .resource { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 18; }
-      .danger { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 18; }
-      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
-      .own-line { stroke: #4f6f8f; stroke-width: 2.2; fill: none; marker-end: url(#arrow-hollow); }
-      .weak-line { stroke: #7b8b9b; stroke-width: 1.8; stroke-dasharray: 7 7; fill: none; marker-end: url(#arrow-hollow); }
-    </style>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9B968A"/>
+    </marker>
   </defs>
 
-  <text x="550" y="48" text-anchor="middle" class="title">连接对象的所有权边界</text>
-  <text x="550" y="76" text-anchor="middle" class="subtitle">Socket / unique_fd 独占 fd，Channel 观察 fd，回调用 weak_ptr 防止悬空和引用环</text>
+  <rect x="0" y="0" width="1240" height="600" fill="#F5F4ED"/>
 
-  <rect x="72" y="136" width="220" height="104" class="owner"/>
-  <text x="182" y="168" text-anchor="middle" class="box-title">连接表</text>
-  <text x="182" y="194" text-anchor="middle" class="box-text">map&lt;name, shared_ptr&gt;</text>
-  <text x="182" y="216" text-anchor="middle" class="small">拥有活跃 TcpConnection</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">所有权边界：谁负责 close(fd)，谁只是看着它</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">同一张图上有三种边 —— 独占、共享、观察。虚线那一类是用来防悬空指针和引用环的</text>
 
-  <rect x="424" y="126" width="252" height="124" class="owner"/>
-  <text x="550" y="162" text-anchor="middle" class="box-title">TcpConnection</text>
-  <text x="550" y="188" text-anchor="middle" class="box-text">连接状态 + buffer + 回调</text>
-  <text x="550" y="212" text-anchor="middle" class="small">组合 Socket 与 Channel</text>
+  <!-- ============ A 区 ============ -->
+  <text x="48" y="118" font-size="15" font-weight="700" fill="#4A473F">A · 对象之间的三类边</text>
+  <rect x="48" y="132" width="700" height="400" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <rect x="812" y="136" width="220" height="104" class="observer"/>
-  <text x="922" y="168" text-anchor="middle" class="box-title">EventLoop / Poller</text>
-  <text x="922" y="194" text-anchor="middle" class="box-text">epoll_wait()</text>
-  <text x="922" y="216" text-anchor="middle" class="small">只监听和分发事件</text>
+  <rect x="310" y="150" width="340" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="480" y="172" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">TcpServer 连接表</text>
+  <text x="480" y="191" font-size="10.5" fill="#2C4460" text-anchor="middle">map&lt;string, shared_ptr&lt;TcpConnection&gt;&gt;</text>
 
-  <path d="M 292 188 L 422 188" class="own-line"/>
-  <text x="356" y="174" text-anchor="middle" class="small">shared_ptr</text>
-  <path d="M 676 188 L 810 188" class="weak-line"/>
-  <text x="742" y="174" text-anchor="middle" class="small">注册事件，不拥有连接</text>
+  <line x1="476" y1="206" x2="476" y2="246" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <line x1="484" y1="206" x2="484" y2="246" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <text x="498" y="232" font-size="10" fill="#4A473F">shared_ptr · 共享拥有</text>
 
-  <rect x="182" y="344" width="220" height="104" class="resource"/>
-  <text x="292" y="376" text-anchor="middle" class="box-title">Socket / unique_fd</text>
-  <text x="292" y="402" text-anchor="middle" class="box-text">独占 fd 所有权</text>
-  <text x="292" y="424" text-anchor="middle" class="small">析构时 close(fd)</text>
+  <rect x="230" y="250" width="400" height="150" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="248" y="272" font-size="13" font-weight="700" fill="#24473F">TcpConnection</text>
 
-  <rect x="500" y="344" width="220" height="104" class="observer"/>
-  <text x="610" y="376" text-anchor="middle" class="box-title">Channel</text>
-  <text x="610" y="402" text-anchor="middle" class="box-text">fd + events + callbacks</text>
-  <text x="610" y="424" text-anchor="middle" class="small">观察 fd，不 close(fd)</text>
+  <rect x="248" y="282" width="364" height="30" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="430" y="302" font-size="10.5" fill="#4A473F" text-anchor="middle">input / output buffer · 连接状态机</text>
 
-  <rect x="806" y="344" width="220" height="104" class="danger"/>
-  <text x="916" y="376" text-anchor="middle" class="box-title">回调 / Timer</text>
-  <text x="916" y="402" text-anchor="middle" class="box-text">weak_ptr.lock()</text>
-  <text x="916" y="424" text-anchor="middle" class="small">对象存在才执行</text>
+  <rect x="248" y="324" width="176" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="336" y="346" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Socket / UniqueFd</text>
+  <text x="336" y="365" font-size="10" fill="#6B4E28" text-anchor="middle">析构时 close(fd)</text>
 
-  <path d="M 498 248 C 430 290 344 306 302 342" class="own-line"/>
-  <text x="390" y="302" text-anchor="middle" class="small">unique ownership</text>
+  <rect x="436" y="324" width="176" height="60" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="524" y="346" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">Channel</text>
+  <text x="524" y="365" font-size="10" fill="#4A3F68" text-anchor="middle">fd + events + 回调</text>
 
-  <path d="M 590 250 C 602 288 608 306 610 342" class="own-line"/>
-  <text x="655" y="302" text-anchor="middle" class="small">组合</text>
+  <rect x="62" y="250" width="140" height="66" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="132" y="272" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">EventLoop · Poller</text>
+  <text x="132" y="290" font-size="10" fill="#6B675C" text-anchor="middle">epoll_wait()</text>
+  <text x="132" y="306" font-size="10" fill="#6B675C" text-anchor="middle">只存 Channel*</text>
+  <line x1="204" y1="283" x2="226" y2="283" stroke="#9B968A" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
 
-  <path d="M 720 396 L 804 396" class="weak-line"/>
-  <text x="760" y="382" text-anchor="middle" class="small">weak_ptr tie</text>
+  <rect x="62" y="334" width="140" height="66" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="132" y="356" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">定时器 · 异步回调</text>
+  <text x="132" y="374" font-size="10" fill="#6B675C" text-anchor="middle">weak_ptr 观察</text>
+  <text x="132" y="390" font-size="10" fill="#6B675C" text-anchor="middle">lock() 成功才用</text>
+  <line x1="204" y1="367" x2="226" y2="367" stroke="#9B968A" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
 
-  <path d="M 610 344 C 672 296 800 284 922 242" class="weak-line"/>
-  <text x="778" y="300" text-anchor="middle" class="small">epoll 中可保存 Channel 指针</text>
+  <rect x="300" y="456" width="290" height="54" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="445" y="478" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">内核：conn_fd</text>
+  <text x="445" y="497" font-size="10" fill="#733428" text-anchor="middle">关掉后号码立刻可被复用</text>
 
-  <rect x="128" y="516" width="385" height="64" class="note"/>
-  <text x="320" y="544" text-anchor="middle" class="box-title">拥有关系</text>
-  <text x="320" y="566" text-anchor="middle" class="small">连接表和临时回调用 shared_ptr，fd 用独占 RAII 对象管理</text>
+  <line x1="336" y1="400" x2="336" y2="452" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr2)"/>
+  <text x="192" y="432" font-size="10" fill="#4A473F">独占：只有它 close</text>
+  <line x1="524" y1="400" x2="524" y2="452" stroke="#9B968A" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
+  <text x="536" y="432" font-size="10" fill="#4A473F">观察：只关注事件</text>
 
-  <rect x="588" y="516" width="385" height="64" class="note"/>
-  <text x="780" y="544" text-anchor="middle" class="box-title">观察关系</text>
-  <text x="780" y="566" text-anchor="middle" class="small">Channel / Timer / 异步回调不强拥有连接，避免悬空和引用环</text>
+  <!-- ============ B 区 ============ -->
+  <text x="768" y="118" font-size="15" font-weight="700" fill="#4A473F">B · 边的语义，与画反之后的后果</text>
+  <rect x="768" y="132" width="424" height="400" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="784" y="160" font-size="11" font-weight="700" fill="#6B675C">三种边</text>
+
+  <line x1="784" y1="182" x2="844" y2="182" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr2)"/>
+  <text x="856" y="186" font-size="10.5" fill="#4A473F">独占：唯一的 RAII 拥有者</text>
+
+  <line x1="784" y1="208" x2="844" y2="208" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <line x1="784" y1="215" x2="844" y2="215" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <text x="856" y="215" font-size="10.5" fill="#4A473F">共享：连接表与回调共同延寿</text>
+
+  <line x1="784" y1="243" x2="844" y2="243" stroke="#9B968A" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
+  <text x="856" y="247" font-size="10.5" fill="#4A473F">观察：不延寿，用前先检查</text>
+
+  <rect x="784" y="275" width="180" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="964" y="275" width="212" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="794" y="294" font-size="11" font-weight="700" fill="#4A473F">把边画反了</text>
+  <text x="974" y="294" font-size="11" font-weight="700" fill="#4A473F">后果</text>
+
+  <rect x="784" y="303" width="180" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="964" y="303" width="212" height="44" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="794" y="330" font-size="10.5" fill="#4A473F">Channel 也 close(fd)</text>
+  <text x="974" y="322" font-size="10.5" fill="#733428">重复 close，第二次关掉</text>
+  <text x="974" y="338" font-size="10.5" fill="#733428">的是被复用的新连接</text>
+
+  <rect x="784" y="347" width="180" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="964" y="347" width="212" height="44" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="794" y="374" font-size="10.5" fill="#4A473F">Channel 强持 shared_ptr</text>
+  <text x="974" y="366" font-size="10.5" fill="#733428">Conn ⇄ Channel 引用环</text>
+  <text x="974" y="382" font-size="10.5" fill="#733428">计数永远降不到 0</text>
+
+  <rect x="784" y="391" width="180" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="964" y="391" width="212" height="44" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="794" y="418" font-size="10.5" fill="#4A473F">回调裸捕获 this</text>
+  <text x="974" y="410" font-size="10.5" fill="#733428">回调排队期间对象析构</text>
+  <text x="974" y="426" font-size="10.5" fill="#733428">执行时访问悬空内存</text>
+
+  <text x="784" y="470" font-size="11" font-weight="700" fill="#6B675C">怎么记</text>
+  <text x="784" y="492" font-size="10.5" fill="#4A473F">需要它活着 → shared_ptr</text>
+  <text x="784" y="510" font-size="10.5" fill="#4A473F">只想知道它还在不在 → weak_ptr</text>
+
+  <text x="48" y="572" font-size="11.5" fill="#4A473F">一个 fd 只能有一个 RAII 拥有者；别的对象要么共享连接对象的生命周期，要么退回到观察关系，没有第三种。</text>
 </svg>

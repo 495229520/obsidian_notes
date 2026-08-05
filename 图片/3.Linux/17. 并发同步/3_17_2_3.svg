@@ -1,78 +1,121 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640">
-  <rect x="0" y="0" width="960" height="640" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
     </marker>
   </defs>
-  <title>acquire / release 配对建立 happens-before</title>
-  <desc>线程 A 的 release 写与线程 B 读到该值的 acquire 配对，拼成跨线程 happens-before 链。</desc>
 
-  <text x="480" y="32" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
-    acquire / release 配对建立 happens-before
-  </text>
-  <text x="480" y="56" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
-    release 之前的写，对「读到该值的」acquire 之后全部可见
-  </text>
+  <rect x="0" y="0" width="1240" height="780" fill="#F5F4ED"/>
 
-  <!-- Thread A -->
-  <rect x="60" y="100" width="360" height="40" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="240" y="120" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">线程 A（生产者）</text>
+  <title>acquire / release：两道单向闸拼出 happens-before</title>
+  <desc>上半部分是两个线程的闸门与 synchronizes-with 配对，中间是 happens-before 传递链，下半部分列出被禁止与仍然合法的重排、以及配对成立的前提。</desc>
 
-  <rect x="60" y="200" width="360" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
-  <text x="240" y="222" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#444441">data = 42;        // ① 普通写</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">acquire / release：两道单向闸，拼出一条 happens-before 链</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">难点不在「谁挡谁」，而在闸是单向的 —— 分不清哪些重排仍然合法，就会以为自己拿到了根本没有的保证</text>
 
-  <rect x="60" y="304" width="360" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="240" y="326" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">② ready.store(true, release);</text>
+  <text x="48" y="108" font-size="14" font-weight="700" fill="#4A473F">A · release 的写，与「确实读到该值的」acquire 读配对</text>
 
-  <!-- Thread B -->
-  <rect x="540" y="100" width="360" height="40" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="720" y="120" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">线程 B（消费者）</text>
+  <rect x="56" y="118" width="1128" height="292" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <rect x="540" y="304" width="360" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="720" y="326" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#085041">③ while(!ready.load(acquire));</text>
+  <text x="90" y="142" font-size="12" font-weight="700" fill="#3D5A80">线程 A（生产者）</text>
+  <text x="718" y="142" font-size="12" font-weight="700" fill="#8A6A3A">线程 B（消费者）</text>
 
-  <rect x="540" y="408" width="360" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
-  <text x="720" y="430" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#444441">④ assert(data == 42);  // 保证成立</text>
+  <rect x="76" y="152" width="460" height="248" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="704" y="152" width="460" height="248" rx="8" fill="#F4EFE6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <!-- A internal order -->
-  <path d="M240 244 L240 304" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <!-- B internal order -->
-  <path d="M720 348 L720 408" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="96" y="172" width="420" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="306" y="199" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">① data = 42;　　// 普通写，不是原子</text>
 
-  <!-- synchronizes-with -->
-  <path d="M420 326 C480 326 480 326 540 326" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="480" y="300" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#0F6E56">synchronizes-with</text>
-  <text x="480" y="352" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#0F6E56">（B 读到 A 写入的 true）</text>
+  <line x1="90" y1="236" x2="522" y2="236" stroke="#2F6B5E" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="516" y="230" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="end">release 闸 · 闸上方的写不许下沉</text>
 
-  <!-- release barrier -->
-  <line x1="60" y1="288" x2="420" y2="288" stroke="#0F6E56" stroke-width="0.5" stroke-dasharray="3 3"/>
-  <text x="240" y="278" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#0F6E56">↑ release：上方写不可下沉</text>
+  <rect x="96" y="252" width="420" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="306" y="279" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">② ready.store(true, release);</text>
 
-  <!-- acquire barrier -->
-  <line x1="540" y1="364" x2="900" y2="364" stroke="#0F6E56" stroke-width="0.5" stroke-dasharray="3 3"/>
-  <text x="720" y="376" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#0F6E56">↓ acquire：下方读不可上浮</text>
+  <text x="96" y="330" font-size="11" fill="#4A473F">闸只挡一个方向：② 之后的写完全可以被挪到 ② 之前，</text>
+  <text x="96" y="350" font-size="11" fill="#4A473F">标准并不禁止 —— 别拿 release 当「到此为止」的分隔符用。</text>
 
-  <!-- happens-before chain -->
-  <rect x="200" y="512" width="560" height="84" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
-  <text x="480" y="536" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">happens-before 传递链</text>
-  <text x="480" y="560" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#3C3489">① data=42  →  ② release store  →  ③ acquire load  →  ④ read data</text>
-  <text x="480" y="580" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">三段拼接，A 的写对 B 可见，无需 seq_cst 的全局开销</text>
+  <rect x="724" y="172" width="420" height="44" rx="7" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="934" y="199" font-size="11.5" fill="#4A473F" text-anchor="middle">③ 读到 true 之前，B 看不到 ① 的任何效果</text>
+
+  <rect x="724" y="252" width="420" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="934" y="279" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">③ while (!ready.load(acquire));</text>
+
+  <line x1="718" y1="318" x2="1150" y2="318" stroke="#2F6B5E" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="724" y="336" font-size="10.5" font-weight="700" fill="#2F6B5E">acquire 闸 · 闸下方的读不许上浮</text>
+
+  <rect x="724" y="346" width="420" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="934" y="373" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">④ assert(data == 42);　// 一定成立</text>
+
+  <line x1="540" y1="274" x2="700" y2="274" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="620" y="256" font-size="11.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">synchronizes-with</text>
+  <text x="620" y="296" font-size="10.5" fill="#2F6B5E" text-anchor="middle">前提：B 真的读到了 true</text>
+
+  <!-- happens-before 链 -->
+  <rect x="56" y="422" width="1128" height="72" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="70" y="444" font-size="12" font-weight="700" fill="#4A3F68">三段拼接成一条 happens-before 链，不必动用 seq_cst 的全局开销</text>
+
+  <rect x="76" y="452" width="246" height="32" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="199" y="473" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">① data = 42</text>
+  <rect x="346" y="452" width="246" height="32" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="469" y="473" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">② release store</text>
+  <rect x="616" y="452" width="246" height="32" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="739" y="473" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">③ acquire load</text>
+  <rect x="886" y="452" width="246" height="32" rx="6" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="1009" y="473" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">④ 读到 data = 42</text>
+
+  <line x1="326" y1="468" x2="342" y2="468" stroke="#6B5B95" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="596" y1="468" x2="612" y2="468" stroke="#6B5B95" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="866" y1="468" x2="882" y2="468" stroke="#6B5B95" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- B 区 -->
+  <text x="48" y="524" font-size="14" font-weight="700" fill="#4A473F">B · 闸挡住了什么，以及配对什么时候根本不成立</text>
+
+  <rect x="56" y="536" width="560" height="180" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="558" font-size="12" font-weight="700" fill="#4A473F">这四种重排，两种禁止两种合法</text>
+
+  <line x1="68" y1="568" x2="604" y2="568" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="590" font-size="11.5" fill="#4A473F">① 的普通写下沉到 ② 之后</text>
+  <text x="446" y="590" font-size="11.5" font-weight="700" fill="#733428">✗ release 禁止</text>
+
+  <line x1="68" y1="602" x2="604" y2="602" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="624" font-size="11.5" fill="#4A473F">② 之后的写上浮到 ② 之前</text>
+  <text x="446" y="624" font-size="11.5" font-weight="700" fill="#24473F">✓ 标准允许</text>
+
+  <line x1="68" y1="636" x2="604" y2="636" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="658" font-size="11.5" fill="#4A473F">④ 的读上浮到 ③ 之前</text>
+  <text x="446" y="658" font-size="11.5" font-weight="700" fill="#733428">✗ acquire 禁止</text>
+
+  <line x1="68" y1="670" x2="604" y2="670" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="692" font-size="11.5" fill="#4A473F">③ 之前的读下沉到 ③ 之后</text>
+  <text x="446" y="692" font-size="11.5" font-weight="700" fill="#24473F">✓ 标准允许</text>
+
+  <line x1="68" y1="704" x2="604" y2="704" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="632" y="536" width="552" height="180" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="646" y="558" font-size="12" font-weight="700" fill="#4A473F">配对成立的四个前提，缺一条链就断</text>
+
+  <line x1="644" y1="568" x2="1172" y2="568" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="656" y="590" font-size="11.5" fill="#4A473F">读写的是同一个原子变量</text>
+  <text x="940" y="590" font-size="11.5" fill="#6B675C">不同变量之间不产生配对</text>
+
+  <line x1="644" y1="602" x2="1172" y2="602" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="656" y="624" font-size="11.5" font-weight="700" fill="#733428">acquire 确实读到了那个值</text>
+  <text x="940" y="624" font-size="11.5" font-weight="700" fill="#733428">没读到就什么保证都没有</text>
+
+  <line x1="644" y1="636" x2="1172" y2="636" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="656" y="658" font-size="11.5" fill="#4A473F">两端都不能降成 relaxed</text>
+  <text x="940" y="658" font-size="11.5" fill="#6B675C">链断在 relaxed 那一环</text>
+
+  <line x1="644" y1="670" x2="1172" y2="670" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="656" y="692" font-size="11.5" fill="#4A473F">release 与 acquire 成对出现</text>
+  <text x="940" y="692" font-size="11.5" fill="#6B675C">单独一个没有任何意义</text>
+
+  <line x1="644" y1="704" x2="1172" y2="704" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="48" y="748" font-size="11.5" fill="#4A473F">最常踩的坑是第二条：③ 若读到的是旧的 false 然后放弃等待，就没有 synchronizes-with，④ 的断言可能失败。</text>
+  <text x="48" y="770" font-size="11.5" fill="#4A473F">所以先写 seq_cst 跑对，等真出现瓶颈、且能把这条链完整说出来时，再下放到 acquire / release（第 4 节）。</text>
 </svg>

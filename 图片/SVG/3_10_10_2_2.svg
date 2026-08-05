@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 650" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>SO_REUSEADDR、SO_REUSEPORT 与 tcp_tw_reuse 的作用范围对照</title>
+  <desc>上半部分把服务端和客户端的套接字调用链画成两行，指出 EADDRINUSE 和 EADDRNOTAVAIL 分别在哪一步报出来；下半部分用三张卡片对照三个开关各自解决什么、不解决什么、谁受益。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="650" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">三个「复用」开关管的不是同一件事</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">看它作用在调用链的哪一步，就知道它能救谁；名字像不代表能互相替代</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="102" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 两条调用链上，报错分别出在哪一步</text>
+
+  <text x="92" y="186" font-size="12.5" font-weight="700" fill="#4A473F">服务端</text>
+  <rect x="180" y="158" width="170" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="265" y="185" font-size="12" fill="#4A473F" text-anchor="middle">socket()</text>
+  <rect x="370" y="158" width="170" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="455" y="185" font-size="12" fill="#2C4460" text-anchor="middle">setsockopt()</text>
+  <rect x="560" y="158" width="170" height="44" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="645" y="185" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">bind()</text>
+  <rect x="750" y="158" width="170" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="835" y="185" font-size="12" fill="#4A473F" text-anchor="middle">listen()</text>
+  <rect x="940" y="158" width="170" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1025" y="185" font-size="12" fill="#4A473F" text-anchor="middle">accept()</text>
+
+  <line x1="645" y1="202" x2="645" y2="220" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="645" y="238" font-size="11.5" fill="#733428" text-anchor="middle">端口还被 TIME_WAIT 占着，这里报 EADDRINUSE</text>
+
+  <text x="92" y="290" font-size="12.5" font-weight="700" fill="#4A473F">客户端</text>
+  <rect x="180" y="262" width="170" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="265" y="289" font-size="12" fill="#4A473F" text-anchor="middle">socket()</text>
+  <rect x="370" y="262" width="170" height="44" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="455" y="289" font-size="12" fill="#6B4E28" text-anchor="middle">sysctl 已生效</text>
+  <rect x="560" y="262" width="170" height="44" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="645" y="289" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">connect()</text>
+
+  <line x1="645" y1="306" x2="645" y2="322" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="645" y="340" font-size="11.5" fill="#733428" text-anchor="middle">本地端口全卡在 TIME_WAIT，这里报 EADDRNOTAVAIL</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="370" width="1144" height="230" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="398" font-size="15" font-weight="700" fill="#4A473F">B · 三张卡片，别记混</text>
+
+  <rect x="72" y="414" width="350" height="170" rx="7" fill="#F4F2EA" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="92" y="440" font-size="12.5" font-weight="700" fill="#2C4460">SO_REUSEADDR</text>
+  <text x="92" y="468" font-size="11.5" fill="#2B2A26">socket 选项，bind 之前设</text>
+  <text x="92" y="494" font-size="11.5" fill="#2B2A26">让 bind 绕过 TIME_WAIT 占用</text>
+  <text x="92" y="520" font-size="11.5" fill="#733428">不能让两个 socket 同时 listen</text>
+  <text x="92" y="552" font-size="11.5" font-weight="700" fill="#2C4460">受益方：重启中的服务端</text>
+
+  <rect x="446" y="414" width="350" height="170" rx="7" fill="#F4F2EA" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="466" y="440" font-size="12.5" font-weight="700" fill="#24473F">SO_REUSEPORT</text>
+  <text x="466" y="468" font-size="11.5" fill="#2B2A26">多个 socket 绑同一个 IP:port</text>
+  <text x="466" y="494" font-size="11.5" fill="#2B2A26">内核按四元组哈希分发连接</text>
+  <text x="466" y="520" font-size="11.5" fill="#733428">和 TIME_WAIT 没有关系</text>
+  <text x="466" y="552" font-size="11.5" font-weight="700" fill="#24473F">受益方：多进程监听同一端口</text>
+
+  <rect x="820" y="414" width="348" height="170" rx="7" fill="#F4F2EA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="840" y="440" font-size="12.5" font-weight="700" fill="#6B4E28">tcp_tw_reuse</text>
+  <text x="840" y="468" font-size="11.5" fill="#2B2A26">sysctl，不是 socket 选项</text>
+  <text x="840" y="494" font-size="11.5" fill="#2B2A26">拿 TIME_WAIT 的端口发新连接</text>
+  <text x="840" y="520" font-size="11.5" fill="#733428">只作用于出方向，救不了服务端</text>
+  <text x="840" y="552" font-size="11.5" font-weight="700" fill="#6B4E28">受益方：大量短连接的客户端</text>
+
+  <text x="48" y="628" font-size="11.5" fill="#6B675C">另有一个 tcp_tw_recycle：在 NAT 环境下会误丢正常连接，已于 Linux 4.12 移除，老调优文章里看到就跳过</text>
+</svg>

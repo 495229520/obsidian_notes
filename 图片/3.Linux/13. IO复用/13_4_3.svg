@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 600" width="1240" height="600"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>EPOLLOUT 按需注册：短写、输出缓冲区与三层反压</title>
+  <desc>Reactor 写路径：先直接 write，短写后把剩余留在应用输出缓冲区并临时注册 EPOLLOUT，写空后取消。附三层缓冲写满时的表现与常驻监听的代价。</desc>
+
+  <rect x="0" y="0" width="1240" height="600" fill="rgb(245, 244, 237)"/>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">EPOLLOUT 按需注册：欠账时才挂上，写空就摘掉</text>
+  <text x="48" y="74" font-size="14" fill="#6B675C">大多数时候 socket 都是可写的，常驻监听等于让事件循环空转</text>
+
+  <!-- A 区 -->
+  <rect x="40" y="96" width="1160" height="204" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="60" y="122" font-size="15" font-weight="700" fill="#4A473F">A · 一次响应的写路径，走完才回到 epoll_wait</text>
+
+  <rect x="62" y="140" width="164" height="52" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="144" y="162" font-size="12.5" font-weight="700" text-anchor="middle" fill="#4A473F">业务生成响应</text>
+  <text x="144" y="180" font-size="10.5" text-anchor="middle" fill="#6B675C">还没进内核</text>
+
+  <rect x="256" y="140" width="164" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="338" y="162" font-size="12.5" font-weight="700" text-anchor="middle" fill="#2C4460">输出缓冲区为空？</text>
+  <text x="338" y="180" font-size="10.5" text-anchor="middle" fill="#4A473F">是就别绕弯</text>
+
+  <rect x="450" y="140" width="164" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="532" y="162" font-size="12.5" font-weight="700" text-anchor="middle" fill="#2C4460">直接 write(fd)</text>
+  <text x="532" y="180" font-size="10.5" text-anchor="middle" fill="#4A473F">省一次事件往返</text>
+
+  <rect x="644" y="140" width="164" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="726" y="162" font-size="12.5" font-weight="700" text-anchor="middle" fill="#6B4E28">短写 n &lt; len</text>
+  <text x="726" y="180" font-size="10.5" text-anchor="middle" fill="#6B4E28">或返回 EAGAIN</text>
+
+  <rect x="838" y="140" width="164" height="52" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="920" y="162" font-size="12.5" font-weight="700" text-anchor="middle" fill="#6B4E28">剩余进输出缓冲区</text>
+  <text x="920" y="180" font-size="10.5" text-anchor="middle" fill="#6B4E28">这就是欠账</text>
+
+  <rect x="1032" y="140" width="146" height="52" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1105" y="162" font-size="12.5" font-weight="700" text-anchor="middle" fill="#733428">MOD 加 EPOLLOUT</text>
+  <text x="1105" y="180" font-size="10.5" text-anchor="middle" fill="#733428">临时挂上</text>
+
+  <line x1="228" y1="166" x2="251" y2="166" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="422" y1="166" x2="445" y2="166" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="616" y1="166" x2="639" y2="166" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="810" y1="166" x2="833" y2="166" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1004" y1="166" x2="1027" y2="166" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="256" y="220" width="164" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="338" y="242" font-size="12.5" font-weight="700" text-anchor="middle" fill="#2C4460">EPOLLOUT 触发</text>
+  <text x="338" y="260" font-size="10.5" text-anchor="middle" fill="#4A473F">发送缓冲区腾出</text>
+
+  <rect x="450" y="220" width="164" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="532" y="242" font-size="12.5" font-weight="700" text-anchor="middle" fill="#2C4460">接着写欠账</text>
+  <text x="532" y="260" font-size="10.5" text-anchor="middle" fill="#4A473F">可能又是短写</text>
+
+  <rect x="644" y="220" width="164" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="726" y="242" font-size="12.5" font-weight="700" text-anchor="middle" fill="#24473F">缓冲区写空</text>
+  <text x="726" y="260" font-size="10.5" text-anchor="middle" fill="#24473F">欠账还清</text>
+
+  <rect x="838" y="220" width="164" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="920" y="242" font-size="12.5" font-weight="700" text-anchor="middle" fill="#24473F">MOD 去掉 EPOLLOUT</text>
+  <text x="920" y="260" font-size="10.5" text-anchor="middle" fill="#24473F">回到只关注读</text>
+
+  <line x1="422" y1="246" x2="445" y2="246" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="616" y1="246" x2="639" y2="246" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="810" y1="246" x2="833" y2="246" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M1105 194 L1105 208 L338 208 L338 214" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <text x="1032" y="248" font-size="11.5" fill="#6B675C">写空才摘</text>
+
+  <!-- B 区 -->
+  <rect x="40" y="316" width="640" height="212" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="60" y="342" font-size="15" font-weight="700" fill="#4A473F">B · 三层缓冲，各自写满时的表现</text>
+
+  <rect x="62" y="356" width="190" height="32" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="252" y="356" width="200" height="32" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="452" y="356" width="206" height="32" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="157" y="377" font-size="11.5" font-weight="700" text-anchor="middle" fill="#4A473F">在哪一层</text>
+  <text x="352" y="377" font-size="11.5" font-weight="700" text-anchor="middle" fill="#4A473F">满了会怎样</text>
+  <text x="555" y="377" font-size="11.5" font-weight="700" text-anchor="middle" fill="#4A473F">该做的事</text>
+
+  <rect x="62" y="388" width="190" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="252" y="388" width="200" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="452" y="388" width="206" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="157" y="410" font-size="11.5" text-anchor="middle" fill="#4A473F">应用输出缓冲区</text>
+  <text x="352" y="410" font-size="11.5" text-anchor="middle" fill="#733428">没上限就一路涨到 OOM</text>
+  <text x="555" y="410" font-size="11.5" text-anchor="middle" fill="#4A473F">设高水位，触发反压</text>
+
+  <rect x="62" y="422" width="190" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="252" y="422" width="200" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="452" y="422" width="206" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="157" y="444" font-size="11.5" text-anchor="middle" fill="#4A473F">内核 sndbuf</text>
+  <text x="352" y="444" font-size="11.5" text-anchor="middle" fill="#6B4E28">write 短写或 EAGAIN</text>
+  <text x="555" y="444" font-size="11.5" text-anchor="middle" fill="#4A473F">挂 EPOLLOUT 等腾位</text>
+
+  <rect x="62" y="456" width="190" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="252" y="456" width="200" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="452" y="456" width="206" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="157" y="478" font-size="11.5" text-anchor="middle" fill="#4A473F">在途 inflight</text>
+  <text x="352" y="478" font-size="11.5" text-anchor="middle" fill="#24473F">受 rwnd 和 cwnd 限住</text>
+  <text x="555" y="478" font-size="11.5" text-anchor="middle" fill="#4A473F">不归应用管</text>
+
+  <text x="62" y="512" font-size="11.5" fill="#6B675C">反压只能做在第一层：底下两层满了，应用唯一能做的是别再往里塞</text>
+
+  <!-- C 区 -->
+  <rect x="700" y="316" width="500" height="212" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="720" y="342" font-size="15" font-weight="700" fill="#4A473F">C · 常驻监听的代价</text>
+
+  <rect x="722" y="358" width="220" height="64" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="832" y="380" font-size="12.5" font-weight="700" text-anchor="middle" fill="#733428">常驻 EPOLLOUT</text>
+  <text x="832" y="399" font-size="11" text-anchor="middle" fill="#733428">几乎每轮都报可写</text>
+  <text x="832" y="415" font-size="11" text-anchor="middle" fill="#733428">事件循环空转烧 CPU</text>
+
+  <rect x="962" y="358" width="220" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1072" y="380" font-size="12.5" font-weight="700" text-anchor="middle" fill="#24473F">按需 EPOLLOUT</text>
+  <text x="1072" y="399" font-size="11" text-anchor="middle" fill="#24473F">只在有欠账时返回</text>
+  <text x="1072" y="415" font-size="11" text-anchor="middle" fill="#24473F">空闲连接不打扰</text>
+
+  <text x="722" y="450" font-size="11.5" fill="#6B675C">LT 下最明显：只要还写得下就一直报</text>
+  <text x="722" y="472" font-size="11.5" fill="#6B675C">ET 下次数少，但短写照样要接住</text>
+  <text x="722" y="494" font-size="11.5" fill="#6B675C">EPOLLOUT 说的是「有空位」，不是「已送达」</text>
+
+  <text x="48" y="572" font-size="13" fill="#6B675C">一句话：有欠账才挂 EPOLLOUT，还清就摘掉；读事件常驻，写事件按需</text>
+</svg>

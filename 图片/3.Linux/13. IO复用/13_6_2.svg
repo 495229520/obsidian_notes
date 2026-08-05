@@ -1,90 +1,108 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="680" viewBox="0 0 1100 680">
-  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>多线程 Reactor：one loop per thread 的主从结构与连接交接</title>
+  <desc>面板 A 是 main loop 只 accept、sub loop 管 I/O、worker pool 跑业务的三层结构；面板 B 是新连接从 main loop 到 sub loop 的投递交接时序，核心是 epoll_ctl 由 sub loop 自己调。</desc>
   <defs>
-    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2f5f8f"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
-    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4f8f55"/>
+    <marker id="arrw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
     </marker>
-    <marker id="arrow-dash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#8d6e63" stroke-width="1.8"/>
-    </marker>
-    <style>
-      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .box-title { font: 700 18px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .box-text { font: 15px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
-      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .main-loop { fill: #eaf4ff; stroke: #2f7ab8; stroke-width: 2.5; rx: 22; }
-      .sub-loop { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.5; rx: 20; }
-      .conn { fill: #fff8e8; stroke: #d49b38; stroke-width: 1.8; rx: 12; }
-      .worker { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2.5; rx: 22; }
-      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
-      .blue-line { stroke: #2f5f8f; stroke-width: 3; fill: none; marker-end: url(#arrow-blue); }
-      .green-line { stroke: #4f8f55; stroke-width: 2.5; fill: none; marker-end: url(#arrow-green); }
-      .dash-line { stroke: #8d6e63; stroke-width: 2.3; stroke-dasharray: 8 7; fill: none; marker-end: url(#arrow-dash); }
-    </style>
   </defs>
 
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="550" y="48" text-anchor="middle" class="title">多线程 Reactor：one loop per thread</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="550" y="76" text-anchor="middle" class="subtitle">main loop 接收连接，sub loops 管理 I/O，worker pool 执行耗时业务</text>
+  <rect x="0" y="0" width="1240" height="700" fill="#F5F4ED"/>
 
-  <rect x="55" y="195" width="220" height="170" class="main-loop"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="165" y="238" text-anchor="middle" class="box-title">Main EventLoop</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="165" y="270" text-anchor="middle" class="box-text">Acceptor</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="165" y="296" text-anchor="middle" class="small">listen_fd 可读</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="165" y="318" text-anchor="middle" class="small">accept 新连接</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">多线程 Reactor：main 只 accept，sub 管 I/O，worker 跑业务</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">核心不是「多线程」，是一个连接只归属一个 EventLoop —— 跨线程的操作一律投递，不直接碰状态</text>
 
-  <rect x="378" y="122" width="265" height="128" class="sub-loop"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="510" y="152" text-anchor="middle" class="box-title">Sub EventLoop 0</text>
-  <rect x="408" y="174" width="95" height="42" class="conn"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="455" y="200" text-anchor="middle" class="small">Conn A</text>
-  <rect x="518" y="174" width="95" height="42" class="conn"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="565" y="200" text-anchor="middle" class="small">Conn B</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="510" y="236" text-anchor="middle" class="small">read / write / close</text>
+  <!-- ============ 面板 A：主从结构 ============ -->
+  <rect x="48" y="104" width="1144" height="356" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="66" y="129" font-size="15" font-weight="700" fill="#4A473F">A · 三层结构与数据流向</text>
 
-  <rect x="378" y="286" width="265" height="128" class="sub-loop"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="510" y="316" text-anchor="middle" class="box-title">Sub EventLoop 1</text>
-  <rect x="408" y="338" width="95" height="42" class="conn"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="455" y="364" text-anchor="middle" class="small">Conn C</text>
-  <rect x="518" y="338" width="95" height="42" class="conn"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="565" y="364" text-anchor="middle" class="small">Conn D</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="510" y="400" text-anchor="middle" class="small">read / write / close</text>
+  <!-- main loop -->
+  <rect x="76" y="150" width="260" height="280" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="206" y="178" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">Main EventLoop</text>
+  <rect x="96" y="196" width="220" height="46" rx="7" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="206" y="214" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Acceptor</text>
+  <text x="206" y="232" font-size="10.5" fill="#2C4460" text-anchor="middle">listen_fd · accept4()</text>
+  <text x="206" y="258" font-size="11" fill="#2C4460" text-anchor="middle">不碰任何 conn_fd 的事件表</text>
+  <text x="206" y="278" font-size="11" fill="#2C4460" text-anchor="middle">只拿到一个 int</text>
+  <text x="206" y="298" font-size="11" fill="#2C4460" text-anchor="middle">注册动作包成 functor 投递</text>
+  <text x="206" y="318" font-size="11" fill="#2C4460" text-anchor="middle">随后立刻回到自己的循环</text>
 
-  <rect x="378" y="450" width="265" height="128" class="sub-loop"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="510" y="480" text-anchor="middle" class="box-title">Sub EventLoop N</text>
-  <rect x="408" y="502" width="95" height="42" class="conn"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="455" y="528" text-anchor="middle" class="small">Conn X</text>
-  <rect x="518" y="502" width="95" height="42" class="conn"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="565" y="528" text-anchor="middle" class="small">Conn Y</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="510" y="564" text-anchor="middle" class="small">read / write / close</text>
+  <!-- sub loops -->
+  <rect x="402" y="150" width="250" height="96" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="527" y="176" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Sub EventLoop 0</text>
+  <rect x="420" y="188" width="86" height="40" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="463" y="213" font-size="10.5" fill="#6B4E28" text-anchor="middle">Conn A</text>
+  <rect x="514" y="188" width="86" height="40" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="557" y="213" font-size="10.5" fill="#6B4E28" text-anchor="middle">Conn B</text>
+  <text x="527" y="236" font-size="10.5" fill="#24473F" text-anchor="middle">该连接的 read / write / close</text>
 
-  <rect x="790" y="240" width="250" height="190" class="worker"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="915" y="282" text-anchor="middle" class="box-title">Worker Thread Pool</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="915" y="316" text-anchor="middle" class="box-text">耗时业务处理</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="915" y="344" text-anchor="middle" class="small">数据库 / 计算 / 外部调用</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="915" y="376" text-anchor="middle" class="small">完成后 queueInLoop()</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="915" y="398" text-anchor="middle" class="small">eventfd wakeup 所属 loop</text>
+  <rect x="402" y="258" width="250" height="96" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="527" y="284" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Sub EventLoop 1</text>
+  <rect x="420" y="296" width="86" height="40" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="463" y="321" font-size="10.5" fill="#6B4E28" text-anchor="middle">Conn C</text>
+  <rect x="514" y="296" width="86" height="40" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="557" y="321" font-size="10.5" fill="#6B4E28" text-anchor="middle">Conn D</text>
+  <text x="527" y="344" font-size="10.5" fill="#24473F" text-anchor="middle">该连接的 read / write / close</text>
 
-  <path d="M 275 260 C 318 210 340 176 376 172" class="blue-line"/>
-  <path d="M 275 280 L 376 350" class="blue-line"/>
-  <path d="M 275 312 C 318 396 340 506 376 514" class="blue-line"/>
+  <rect x="402" y="366" width="250" height="64" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="527" y="390" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Sub EventLoop N</text>
+  <text x="527" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">连接数通常按核数分</text>
 
-  <path d="M 643 185 C 700 205 735 260 788 300" class="green-line"/>
-  <path d="M 643 350 L 788 335" class="green-line"/>
-  <path d="M 643 520 C 704 500 740 420 788 380" class="green-line"/>
+  <!-- worker pool -->
+  <rect x="872" y="150" width="296" height="230" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="1020" y="178" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">Worker Thread Pool</text>
+  <rect x="892" y="196" width="256" height="42" rx="7" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1020" y="222" font-size="11" fill="#733428" text-anchor="middle">耗时业务 / 计算 / 外部调用</text>
+  <text x="1020" y="258" font-size="11" fill="#733428" text-anchor="middle">不直接持有连接 fd</text>
+  <text x="1020" y="278" font-size="11" fill="#733428" text-anchor="middle">算完 queueInLoop() 回投</text>
+  <text x="1020" y="298" font-size="11" fill="#733428" text-anchor="middle">eventfd 唤醒所属 loop</text>
+  <text x="1020" y="318" font-size="11" fill="#733428" text-anchor="middle">写响应仍由该 loop 执行</text>
+  <text x="1020" y="338" font-size="11" fill="#733428" text-anchor="middle">不碰别的线程的 Channel</text>
 
-  <path d="M 790 410 C 710 555 560 625 510 582" class="dash-line"/>
-  <path d="M 790 392 C 710 470 565 455 510 416" class="dash-line"/>
-  <path d="M 790 305 C 716 208 575 248 510 252" class="dash-line"/>
+  <!-- 正交连线：main → sub -->
+  <line x1="336" y1="196" x2="400" y2="196" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="336" y1="306" x2="400" y2="306" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="336" y1="398" x2="400" y2="398" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="368" y="252" font-size="10.5" fill="#6B675C" text-anchor="middle">投递注册任务</text>
 
-  <rect x="86" y="470" width="230" height="92" class="note"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="201" y="500" text-anchor="middle" class="box-title">分工原则</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="201" y="526" text-anchor="middle" class="small">一个连接只归属一个 EventLoop</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="201" y="548" text-anchor="middle" class="small">worker 不直接长期占有 fd</text>
+  <!-- 正交连线：sub ↔ worker 四条车道 -->
+  <line x1="652" y1="196" x2="870" y2="196" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrw)"/>
+  <line x1="870" y1="240" x2="652" y2="240" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="652" y1="306" x2="870" y2="306" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrw)"/>
+  <line x1="870" y1="336" x2="652" y2="336" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="760" y="186" font-size="10.5" fill="#733428" text-anchor="middle">投递业务</text>
+  <text x="760" y="354" font-size="10.5" fill="#6B675C" text-anchor="middle">回投写响应</text>
 
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="324" y="210" text-anchor="middle" class="small">分配新连接</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="718" y="288" text-anchor="middle" class="small">投递业务</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="706" y="600" text-anchor="middle" class="small">回投写响应</text>
+  <text x="76" y="444" font-size="11" fill="#6B675C">Sub loop 之间不直接通信；连接一旦分配就固定归属，跨线程操作一律走投递</text>
+
+  <!-- ============ 面板 B：交接时序 ============ -->
+  <rect x="48" y="470" width="1144" height="230" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="66" y="495" font-size="15" font-weight="700" fill="#4A473F">B · 新连接如何交到 sub loop：只投递，不代做</text>
+
+  <rect x="76" y="512" width="330" height="152" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="92" y="538" font-size="12.5" font-weight="700" fill="#2C4460">main loop 线程</text>
+  <text x="92" y="560" font-size="11" fill="#2C4460">① listen_fd 可读 → accept4()</text>
+  <text x="92" y="580" font-size="11" fill="#2C4460">② 按轮询选一个 sub loop</text>
+  <text x="92" y="600" font-size="11" fill="#2C4460">③ 投递 functor，write(eventfd)</text>
+
+  <rect x="430" y="512" width="330" height="152" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="446" y="538" font-size="12.5" font-weight="700" fill="#733428">sub loop 线程</text>
+  <text x="446" y="560" font-size="11" fill="#733428">④ 正阻塞在 epoll_wait 上</text>
+  <text x="446" y="580" font-size="11" fill="#733428">⑤ eventfd 可读，提前返回</text>
+  <text x="446" y="600" font-size="11" fill="#733428">⑥ 取出任务，自己 epoll_ctl(ADD)</text>
+
+  <rect x="784" y="512" width="384" height="152" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="800" y="538" font-size="12.5" font-weight="700" fill="#6B4E28">为什么 main 不能自己注册</text>
+  <text x="800" y="560" font-size="11" fill="#6B4E28">epoll_ctl 改的是 sub 的事件表</text>
+  <text x="800" y="580" font-size="11" fill="#6B4E28">sub 此刻可能正阻塞在等待上</text>
+  <text x="800" y="600" font-size="11" fill="#6B4E28">两边同时动同一实例 = 竞态</text>
+  <text x="800" y="620" font-size="11" fill="#6B4E28">投递 + 唤醒则完全顺序化</text>
+
+  <line x1="406" y1="560" x2="428" y2="560" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="760" y1="560" x2="782" y2="560" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <text x="48" y="686" font-size="11.5" fill="#4A473F">SO_REUSEPORT：每个线程各自 socket / bind / listen，内核按四元组哈希直接投进某个线程的 accept 队列</text>
 </svg>

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" width="1240" height="660"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>select 一次调用：三段 O(n) 与值-结果参数</title>
+  <desc>拆开一次 select 调用：用户重建位图、拷贝三份 fd_set 进内核、内核按 nfds 线性扫描、睡在等待队列、回写只保留就绪位、用户再用 FD_ISSET 扫一遍。解释每轮必须重建 fd_set 的原因和三条固有限制。</desc>
+
+  <rect x="0" y="0" width="1240" height="660" fill="rgb(245, 244, 237)"/>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">select 一次调用：三段 O(n)，和一个值-结果参数</text>
+  <text x="48" y="74" font-size="14" fill="#6B675C">每轮都要 FD_ZERO 重建的原因，藏在倒数第二步的回写里</text>
+
+  <!-- A 区 -->
+  <rect x="40" y="96" width="1160" height="174" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="60" y="122" font-size="15" font-weight="700" fill="#4A473F">A · 拆开一次 select，看它把时间花在哪</text>
+
+  <rect x="62" y="142" width="132" height="58" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="128" y="166" font-size="12.5" font-weight="700" text-anchor="middle" fill="#4A473F">FD_ZERO + FD_SET</text>
+  <text x="128" y="186" font-size="11" text-anchor="middle" fill="#6B675C">每轮重建位图</text>
+
+  <rect x="226" y="142" width="132" height="58" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="292" y="166" font-size="12.5" font-weight="700" text-anchor="middle" fill="#6B4E28">① copy_from_user</text>
+  <text x="292" y="186" font-size="11" text-anchor="middle" fill="#6B4E28">拷 3 份 fd_set</text>
+
+  <rect x="390" y="142" width="132" height="58" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="456" y="166" font-size="12.5" font-weight="700" text-anchor="middle" fill="#6B4E28">② 内核线性扫描</text>
+  <text x="456" y="186" font-size="11" text-anchor="middle" fill="#6B4E28">for 0..nfds-1</text>
+
+  <rect x="554" y="142" width="132" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="620" y="166" font-size="12.5" font-weight="700" text-anchor="middle" fill="#2C4460">f_op-&gt;poll</text>
+  <text x="620" y="186" font-size="11" text-anchor="middle" fill="#4A473F">逐个问就绪没</text>
+
+  <rect x="718" y="142" width="132" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="784" y="166" font-size="12.5" font-weight="700" text-anchor="middle" fill="#2C4460">没就绪就睡</text>
+  <text x="784" y="186" font-size="11" text-anchor="middle" fill="#4A473F">挂上等待队列</text>
+
+  <rect x="882" y="142" width="132" height="58" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="948" y="166" font-size="12.5" font-weight="700" text-anchor="middle" fill="#733428">copy_to_user</text>
+  <text x="948" y="186" font-size="11" text-anchor="middle" fill="#733428">只留就绪位</text>
+
+  <rect x="1046" y="142" width="132" height="58" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.8"/>
+  <text x="1112" y="166" font-size="12.5" font-weight="700" text-anchor="middle" fill="#6B4E28">③ FD_ISSET 再扫</text>
+  <text x="1112" y="186" font-size="11" text-anchor="middle" fill="#6B4E28">找出是哪几个</text>
+
+  <line x1="196" y1="171" x2="221" y2="171" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="360" y1="171" x2="385" y2="171" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="524" y1="171" x2="549" y2="171" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="688" y1="171" x2="713" y2="171" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="852" y1="171" x2="877" y2="171" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="1016" y1="171" x2="1041" y2="171" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <text x="62" y="226" font-size="11.5" fill="#6B4E28">①②③ 三段都按 nfds 走，不按就绪个数走</text>
+  <text x="62" y="250" font-size="11.5" fill="#733428">红色那步是关键：内核把没就绪的位清掉了</text>
+
+  <!-- B 区 -->
+  <rect x="40" y="286" width="590" height="204" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="60" y="312" font-size="15" font-weight="700" fill="#4A473F">B · fd_set 是值-结果参数</text>
+
+  <text x="64" y="338" font-size="11.5" fill="#6B675C">调用前：想监控 3、7、9</text>
+  <rect x="64" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="106" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="148" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="190" y="346" width="42" height="34" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <rect x="232" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="274" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="316" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="358" y="346" width="42" height="34" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <rect x="400" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="442" y="346" width="42" height="34" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <rect x="484" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="526" y="346" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="85" y="368" font-size="11" text-anchor="middle" fill="#9B968A">0</text>
+  <text x="127" y="368" font-size="11" text-anchor="middle" fill="#9B968A">1</text>
+  <text x="169" y="368" font-size="11" text-anchor="middle" fill="#9B968A">2</text>
+  <text x="211" y="368" font-size="11.5" font-weight="700" text-anchor="middle" fill="#6B4E28">3</text>
+  <text x="253" y="368" font-size="11" text-anchor="middle" fill="#9B968A">4</text>
+  <text x="295" y="368" font-size="11" text-anchor="middle" fill="#9B968A">5</text>
+  <text x="337" y="368" font-size="11" text-anchor="middle" fill="#9B968A">6</text>
+  <text x="379" y="368" font-size="11.5" font-weight="700" text-anchor="middle" fill="#6B4E28">7</text>
+  <text x="421" y="368" font-size="11" text-anchor="middle" fill="#9B968A">8</text>
+  <text x="463" y="368" font-size="11.5" font-weight="700" text-anchor="middle" fill="#6B4E28">9</text>
+  <text x="505" y="368" font-size="11" text-anchor="middle" fill="#9B968A">10</text>
+  <text x="547" y="368" font-size="11" text-anchor="middle" fill="#9B968A">11</text>
+
+  <text x="64" y="402" font-size="11.5" fill="#6B675C">返回后：只剩 7 这一位</text>
+  <rect x="64" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="106" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="148" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="190" y="410" width="42" height="34" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <rect x="232" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="274" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="316" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="358" y="410" width="42" height="34" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <rect x="400" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="442" y="410" width="42" height="34" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <rect x="484" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="526" y="410" width="42" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="211" y="432" font-size="11.5" font-weight="700" text-anchor="middle" fill="#733428">清</text>
+  <text x="379" y="432" font-size="11.5" font-weight="700" text-anchor="middle" fill="#24473F">7</text>
+  <text x="463" y="432" font-size="11.5" font-weight="700" text-anchor="middle" fill="#733428">清</text>
+
+  <text x="64" y="470" font-size="11.5" fill="#6B675C">3 和 9 的位被内核清掉，下一轮必须重新 FD_SET</text>
+
+  <!-- C 区 -->
+  <rect x="650" y="286" width="550" height="204" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="670" y="312" font-size="15" font-weight="700" fill="#4A473F">C · 三条改不掉的硬伤</text>
+
+  <rect x="672" y="328" width="230" height="32" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <rect x="902" y="328" width="276" height="32" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="787" y="349" font-size="11.5" font-weight="700" text-anchor="middle" fill="#4A473F">限制</text>
+  <text x="1040" y="349" font-size="11.5" font-weight="700" text-anchor="middle" fill="#4A473F">实际后果</text>
+
+  <rect x="672" y="360" width="230" height="38" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="902" y="360" width="276" height="38" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="787" y="384" font-size="11.5" text-anchor="middle" fill="#4A473F">FD_SETSIZE = 1024</text>
+  <text x="1040" y="384" font-size="11.5" text-anchor="middle" fill="#733428">fd 值 ≥ 1024 就写越界</text>
+
+  <rect x="672" y="398" width="230" height="38" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="902" y="398" width="276" height="38" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="787" y="422" font-size="11.5" text-anchor="middle" fill="#4A473F">nfds 是最大 fd + 1</text>
+  <text x="1040" y="422" font-size="11.5" text-anchor="middle" fill="#6B4E28">按最大值扫，不按个数扫</text>
+
+  <rect x="672" y="436" width="230" height="38" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="902" y="436" width="276" height="38" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="787" y="460" font-size="11.5" text-anchor="middle" fill="#4A473F">timeout 会被改写</text>
+  <text x="1040" y="460" font-size="11.5" text-anchor="middle" fill="#6B4E28">Linux 特有，循环里要重设</text>
+
+  <!-- 底部成本条 -->
+  <rect x="40" y="506" width="1160" height="64" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="62" y="522" width="146" height="34" rx="7" fill="#EDEBE3" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="135" y="545" font-size="12" font-weight="700" text-anchor="middle" fill="#4A473F">每轮固定成本</text>
+  <rect x="238" y="522" width="220" height="34" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="348" y="545" font-size="11.5" text-anchor="middle" fill="#4A473F">重建位图</text>
+  <rect x="478" y="522" width="220" height="34" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="588" y="545" font-size="11.5" text-anchor="middle" fill="#6B4E28">拷贝 3 份 fd_set</text>
+  <rect x="718" y="522" width="220" height="34" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="828" y="545" font-size="11.5" text-anchor="middle" fill="#6B4E28">内核扫 nfds 个</text>
+  <rect x="958" y="522" width="220" height="34" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="1068" y="545" font-size="11.5" text-anchor="middle" fill="#6B4E28">用户再扫 nfds 个</text>
+
+  <text x="48" y="616" font-size="13" fill="#6B675C">poll 只拆掉了第一项和 1024 上限；后三项要等到 epoll 把监控集合留在内核才消失</text>
+</svg>

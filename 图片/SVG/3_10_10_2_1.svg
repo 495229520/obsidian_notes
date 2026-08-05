@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>TIME_WAIT 的 2MSL 窗口在拦截什么</title>
+  <desc>上半部分把主动关闭方发出最后一个 ACK 之后的 60 秒画成一条时间轴，标出这段窗口会拦下对方重传的 FIN 和旧连接迷路的报文；中间列出没有这段窗口时的两种失败；下半解释 2MSL 里的 2 是怎么来的。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">TIME_WAIT 的这 60 秒在拦两样东西</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">一样是对方重传的 FIN，一样是旧连接迷路的报文；两样都要求这个四元组暂时不能被别人占</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="102" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 主动关闭方发出最后一个 ACK 之后的 60 秒</text>
+
+  <rect x="280" y="150" width="280" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="300" y="174" font-size="12.5" font-weight="700" fill="#2C4460">① 对方重传的 FIN</text>
+  <text x="300" y="194" font-size="11.5" fill="#2C4460">连接还在，重发一次 ACK</text>
+
+  <rect x="660" y="150" width="280" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="680" y="174" font-size="12.5" font-weight="700" fill="#24473F">② 旧连接迷路的报文</text>
+  <text x="680" y="194" font-size="11.5" fill="#24473F">四元组有主，直接丢弃</text>
+
+  <line x1="420" y1="206" x2="420" y2="230" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="800" y1="206" x2="800" y2="230" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="140" y="234" width="980" height="42" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.6"/>
+  <text x="630" y="260" font-size="12.5" fill="#6B4E28" text-anchor="middle">TIME_WAIT · 这个四元组被占住，任何人都不能拿它建新连接</text>
+
+  <line x1="140" y1="228" x2="140" y2="290" stroke="#9B968A" stroke-width="1.2"/>
+  <line x1="1120" y1="228" x2="1120" y2="290" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="140" y="308" font-size="11.5" fill="#4A473F">t = 0 · 发出最后的 ACK</text>
+  <text x="1120" y="308" font-size="11.5" fill="#4A473F" text-anchor="end">t = 60s · 四元组释放</text>
+
+  <text x="140" y="334" font-size="11" fill="#6B675C">Linux 把它写死成 60 秒，内核常量 TCP_TIMEWAIT_LEN</text>
+  <text x="640" y="334" font-size="11" fill="#6B675C">没有任何 sysctl 能改这个值</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="370" width="1144" height="150" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="398" font-size="15" font-weight="700" fill="#4A473F">B · 假如发完 ACK 就直接 CLOSED，两种事故</text>
+
+  <rect x="72" y="412" width="530" height="92" rx="7" fill="#F4F2EA" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="92" y="436" font-size="12.5" font-weight="700" fill="#733428">最后那个 ACK 丢了</text>
+  <text x="92" y="460" font-size="11.5" fill="#2B2A26">对方卡在 LAST_ACK，超时后重传 FIN</text>
+  <text x="92" y="484" font-size="11.5" fill="#2B2A26">撞上已关闭的端口，换回来一个 RST</text>
+
+  <rect x="638" y="412" width="530" height="92" rx="7" fill="#F4F2EA" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="658" y="436" font-size="12.5" font-weight="700" fill="#733428">旧报文还在网络里绕</text>
+  <text x="658" y="460" font-size="11.5" fill="#2B2A26">新连接刚好复用了同一个四元组</text>
+  <text x="658" y="484" font-size="11.5" fill="#2B2A26">旧数据被当成新连接的数据收下</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="538" width="1144" height="110" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="566" font-size="15" font-weight="700" fill="#4A473F">C · 为什么是 2 倍 MSL</text>
+
+  <rect x="92" y="582" width="290" height="42" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="237" y="608" font-size="12" fill="#24473F" text-anchor="middle">旧报文最多活 1 个 MSL</text>
+  <text x="410" y="608" font-size="14" fill="#4A473F" text-anchor="middle">+</text>
+  <rect x="438" y="582" width="330" height="42" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="603" y="608" font-size="12" fill="#2C4460" text-anchor="middle">对方的重传最多再花 1 个 MSL</text>
+  <text x="796" y="608" font-size="14" fill="#4A473F" text-anchor="middle">=</text>
+  <rect x="824" y="582" width="200" height="42" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="924" y="608" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">2 × MSL</text>
+  <text x="1044" y="608" font-size="11.5" fill="#6B675C">一去一回</text>
+
+  <text x="48" y="678" font-size="11.5" fill="#6B675C">常见误解：tcp_fin_timeout 改的是 FIN_WAIT_2 的等待上限，和 TIME_WAIT 的 60 秒没有关系</text>
+</svg>

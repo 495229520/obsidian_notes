@@ -1,93 +1,135 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" width="960" height="620">
-  <rect x="0" y="0" width="960" height="620" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrP" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
     </marker>
   </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="#F5F4ED"/>
+
   <title>可见性的硬件根源：Store Buffer 与 Invalidate Queue</title>
-  <desc>CPU0 的写堵在 Store Buffer，CPU1 的失效堵在 Invalidate Queue，导致另一核暂时看不到最新值。</desc>
+  <desc>上半部分是一次「明明写了却读不到」的双核过程，下半部分是 MESI 四态与三道屏障各排空哪个缓冲。</desc>
 
-  <text x="480" y="32" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
-    可见性的硬件根源：Store Buffer 与 Invalidate Queue
-  </text>
-  <text x="480" y="56" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
-    写不会立刻落到缓存/内存，失效也不会立刻处理 → 另一核暂时看不到最新值
-  </text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">可见性的根源：MESI 是对的，坏在两个异步缓冲</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">为了不让 CPU 停下来等确认，硬件把一致性从「立刻」降级成了「迟早」—— 屏障就是把「迟早」拉回「立刻」</text>
 
-  <!-- column headers -->
-  <text x="240" y="92" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">CPU 0（写者）</text>
-  <text x="720" y="92" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">CPU 1（读者）</text>
-  <line x1="60" y1="106" x2="420" y2="106" stroke="#5F5E5A" stroke-width="0.5"/>
-  <line x1="540" y1="106" x2="900" y2="106" stroke="#5F5E5A" stroke-width="0.5"/>
-  <line x1="480" y1="120" x2="480" y2="450" stroke="#5F5E5A" stroke-width="0.5" stroke-dasharray="4 5"/>
+  <text x="48" y="108" font-size="14" font-weight="700" fill="#4A473F">A · 一次「明明写了却读不到」是怎么发生的</text>
 
-  <!-- CPU0 boxes -->
-  <rect x="60" y="124" width="360" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="240" y="146" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">执行单元：x = 1;  flag = 1;</text>
+  <rect x="56" y="118" width="1128" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <rect x="60" y="228" width="360" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="240" y="248" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">Store Buffer（写缓冲）</text>
-  <text x="240" y="268" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#633806">写先排队于此，稍后才刷入缓存</text>
+  <text x="90" y="142" font-size="12" font-weight="700" fill="#3D5A80">CPU 0（写者）</text>
+  <text x="778" y="142" font-size="12" font-weight="700" fill="#8A6A3A">CPU 1（读者）</text>
 
-  <rect x="60" y="344" width="360" height="80" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
-  <text x="240" y="366" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#444441">L1 Cache</text>
-  <text x="240" y="388" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#444441">x = 0    flag = 0</text>
-  <text x="240" y="406" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#5F5E5A">（尚未收到新值）</text>
+  <rect x="76" y="152" width="400" height="238" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="764" y="152" width="400" height="238" rx="8" fill="#F4EFE6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <!-- CPU1 boxes -->
-  <rect x="540" y="124" width="360" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="720" y="146" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#633806">执行单元：while(flag==0); read x;</text>
+  <!-- CPU0 -->
+  <rect x="96" y="168" width="360" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="276" y="195" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">执行单元：x = 1; flag = 1;</text>
 
-  <rect x="540" y="228" width="360" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
-  <text x="720" y="248" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">Invalidate Queue（失效队列）</text>
-  <text x="720" y="268" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">失效消息先排队，缓存暂未更新</text>
+  <rect x="96" y="244" width="360" height="52" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="276" y="266" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Store Buffer（写缓冲）</text>
+  <text x="276" y="285" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">x=1、flag=1 都还堵在这里</text>
 
-  <rect x="540" y="344" width="360" height="80" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
-  <text x="720" y="366" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#444441">L1 Cache（旧副本）</text>
-  <text x="720" y="388" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#444441">x = 0    flag = 0</text>
-  <text x="720" y="406" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#5F5E5A">（仍读到旧值）</text>
+  <rect x="96" y="328" width="360" height="48" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="276" y="350" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">CPU0 L1</text>
+  <text x="276" y="368" font-size="10.5" fill="#4A473F" text-anchor="middle">x=0  flag=0：新值还没进来</text>
 
-  <!-- shared memory bus -->
-  <rect x="300" y="484" width="360" height="60" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="480" y="506" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">主存 / 末级缓存（MESI 一致性域）</text>
-  <text x="480" y="528" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#085041">缓存间通过总线交换 Read / Invalidate 消息</text>
+  <!-- CPU1 -->
+  <rect x="784" y="168" width="360" height="44" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="964" y="195" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">执行单元：while (flag == 0);</text>
 
-  <!-- arrows -->
-  <path d="M240 168 L240 228" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M240 284 L240 344" fill="none" stroke="#854F0B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-  <text x="300" y="314" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#854F0B">延迟刷入</text>
+  <rect x="784" y="244" width="360" height="52" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="964" y="266" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">Invalidate Queue（失效队列）</text>
+  <text x="964" y="285" font-size="10.5" font-weight="700" fill="#4A3F68" text-anchor="middle">先回 ack，稍后才真失效</text>
 
-  <path d="M720 284 L720 344" fill="none" stroke="#534AB7" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-  <text x="780" y="314" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#534AB7">延迟失效</text>
+  <rect x="784" y="328" width="360" height="48" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.5"/>
+  <text x="964" y="350" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">CPU1 L1（旧副本）</text>
+  <text x="964" y="368" font-size="10.5" fill="#4A473F" text-anchor="middle">flag=0：执行单元读的就是这</text>
 
-  <path d="M330 424 L370 484" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M630 484 L590 424" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- 总线 -->
+  <rect x="496" y="152" width="248" height="238" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="620" y="228" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">总线 · MESI 一致性域</text>
+  <text x="620" y="250" font-size="10.5" fill="#24473F" text-anchor="middle">交换 Read / Invalidate</text>
+  <text x="620" y="288" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">协议本身没有错</text>
+  <text x="620" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">错在两端各压了一层队列</text>
 
-  <text x="480" y="580" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
-    内存屏障的作用：强制排空 Store Buffer / Invalidate Queue，使写对其他核可见
-  </text>
+  <!-- 箭头 -->
+  <line x1="276" y1="212" x2="276" y2="240" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="290" y="232" font-size="10.5" fill="#4A473F">写完就返回，不等确认</text>
+
+  <line x1="276" y1="296" x2="276" y2="324" stroke="#8A6A3A" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrA)"/>
+  <text x="290" y="316" font-size="10.5" font-weight="700" fill="#8A6A3A">延迟刷入</text>
+
+  <line x1="460" y1="352" x2="492" y2="352" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="748" y1="270" x2="780" y2="270" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <line x1="964" y1="296" x2="964" y2="324" stroke="#6B5B95" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrP)"/>
+  <text x="978" y="316" font-size="10.5" font-weight="700" fill="#6B5B95">延迟失效</text>
+
+  <text x="70" y="404" font-size="11" fill="#4A473F">两端各拖一小会儿，中间就出现了一个窗口：写方以为写完了，读方还在读旧值，谁都没做错。</text>
+
+  <!-- B 区 -->
+  <text x="48" y="434" font-size="14" font-weight="700" fill="#4A473F">B · 硬件给的四个状态，和你能用的三道屏障</text>
+
+  <rect x="56" y="446" width="560" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="468" font-size="12" font-weight="700" fill="#4A473F">MESI：一条缓存行只处于其中一个状态</text>
+
+  <line x1="68" y1="478" x2="604" y2="478" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="501" font-size="11.5" font-weight="700" fill="#733428">M · Modified</text>
+  <text x="200" y="501" font-size="11.5" fill="#4A473F">本核已改，唯一最新副本，内存是旧的</text>
+
+  <line x1="68" y1="514" x2="604" y2="514" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="537" font-size="11.5" font-weight="700" fill="#6B4E28">E · Exclusive</text>
+  <text x="200" y="537" font-size="11.5" fill="#4A473F">只有本核有副本，且与内存一致</text>
+
+  <line x1="68" y1="550" x2="604" y2="550" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="573" font-size="11.5" font-weight="700" fill="#24473F">S · Shared</text>
+  <text x="200" y="573" font-size="11.5" fill="#4A473F">多核共享只读副本，与内存一致</text>
+
+  <line x1="68" y1="586" x2="604" y2="586" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="609" font-size="11.5" font-weight="700" fill="#4A3F68">I · Invalid</text>
+  <text x="200" y="609" font-size="11.5" fill="#4A473F">本核副本失效，用之前必须重读</text>
+
+  <line x1="68" y1="622" x2="604" y2="622" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="639" font-size="11" fill="#6B675C">状态靠总线消息切换 —— 光看这张表，一致性是立刻生效的。</text>
+
+  <rect x="632" y="446" width="552" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="646" y="468" font-size="12" font-weight="700" fill="#4A473F">三道屏障：各自排空一个缓冲</text>
+
+  <rect x="644" y="478" width="528" height="28" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="497" font-size="11" font-weight="700" fill="#4A473F">屏障</text>
+  <text x="790" y="497" font-size="11" font-weight="700" fill="#4A473F">指令</text>
+  <text x="882" y="497" font-size="11" font-weight="700" fill="#4A473F">排空谁</text>
+  <text x="1032" y="497" font-size="11" font-weight="700" fill="#4A473F">换来什么保证</text>
+
+  <line x1="644" y1="506" x2="1172" y2="506" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="531" font-size="11.5" font-weight="700" fill="#6B4E28">写屏障</text>
+  <text x="790" y="531" font-size="11.5" fill="#4A473F">sfence</text>
+  <text x="882" y="531" font-size="11.5" font-weight="700" fill="#6B4E28">Store Buffer</text>
+  <text x="1032" y="531" font-size="11.5" fill="#4A473F">障前的写先于障后可见</text>
+
+  <line x1="644" y1="542" x2="1172" y2="542" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="567" font-size="11.5" font-weight="700" fill="#4A3F68">读屏障</text>
+  <text x="790" y="567" font-size="11.5" fill="#4A473F">lfence</text>
+  <text x="882" y="567" font-size="11.5" font-weight="700" fill="#4A3F68">Invalidate Queue</text>
+  <text x="1032" y="567" font-size="11.5" fill="#4A473F">障后的读一定见最新值</text>
+
+  <line x1="644" y1="578" x2="1172" y2="578" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="603" font-size="11.5" font-weight="700" fill="#733428">全屏障</text>
+  <text x="790" y="603" font-size="11.5" fill="#4A473F">mfence</text>
+  <text x="882" y="603" font-size="11.5" font-weight="700" fill="#733428">两个都排空</text>
+  <text x="1032" y="603" font-size="11.5" fill="#4A473F">禁止跨屏障重排，最贵</text>
+
+  <line x1="644" y1="614" x2="1172" y2="614" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="646" y="633" font-size="11" fill="#6B675C">屏障排的是缓冲，不是缓存 —— 它并不「刷新缓存」，只是不许再往后拖。</text>
+
+  <text x="48" y="678" font-size="11.5" fill="#4A473F">记住对应关系就够了：写方的问题在 Store Buffer，读方的问题在 Invalidate Queue，一发一收各堵一头。</text>
+  <text x="48" y="700" font-size="11.5" fill="#4A473F">实践中别手写 sfence / mfence：用 std::atomic + memory_order，让编译器按目标平台挑最省的那条（2.3 → 第 3 节）。</text>
 </svg>

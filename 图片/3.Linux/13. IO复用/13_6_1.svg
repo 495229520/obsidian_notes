@@ -1,78 +1,96 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620">
-  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>单线程 Reactor：就绪事件的分发链路与分工边界</title>
+  <desc>面板 A 是 fd 就绪事件从 Poller 到 EventLoop 再到具体回调的分发链路；面板 B 对照 epoll 负责发现、EventLoop 负责分发、Handler 负责真正 I/O 的三方分工。</desc>
   <defs>
-    <marker id="arrow-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2f5f8f"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
-    <marker id="arrow-soft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#6f7f8f" stroke-width="1.8"/>
-    </marker>
-    <style>
-      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .box-title { font: 700 18px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .box-text { font: 15px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
-      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .fd { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 16; }
-      .poller { fill: #eaf4ff; stroke: #2f7ab8; stroke-width: 2.5; rx: 20; }
-      .loop { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.5; rx: 20; }
-      .handler { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 16; }
-      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
-      .main-line { stroke: #2f5f8f; stroke-width: 3; fill: none; marker-end: url(#arrow-main); }
-      .soft-line { stroke: #6f7f8f; stroke-width: 2; fill: none; marker-end: url(#arrow-soft); }
-    </style>
   </defs>
 
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="500" y="48" text-anchor="middle" class="title">单线程 Reactor：就绪事件分发流程</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="500" y="76" text-anchor="middle" class="subtitle">epoll 负责发现就绪，EventLoop 负责分发，Handler 负责真正的 read / write / accept</text>
+  <rect x="0" y="0" width="1240" height="700" fill="#F5F4ED"/>
 
-  <rect x="54" y="130" width="170" height="70" class="fd"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="158" text-anchor="middle" class="box-title">listen_fd</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="181" text-anchor="middle" class="small">新连接到达</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">单线程 Reactor：epoll 发现就绪，EventLoop 分发给回调</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">epoll_wait 只回答「哪些 fd 就绪」；Channel 把它翻译回对象和回调，read / write 仍由应用完成</text>
 
-  <rect x="54" y="270" width="170" height="70" class="fd"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="298" text-anchor="middle" class="box-title">conn_fd1</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="321" text-anchor="middle" class="small">可读 / 可写</text>
+  <!-- ============ 面板 A：分发链路 ============ -->
+  <rect x="48" y="104" width="1144" height="352" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="66" y="129" font-size="15" font-weight="700" fill="#4A473F">A · 一次就绪事件的分发链路</text>
 
-  <rect x="54" y="410" width="170" height="70" class="fd"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="438" text-anchor="middle" class="box-title">conn_fd2</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="139" y="461" text-anchor="middle" class="small">关闭 / 异常</text>
+  <!-- 列 1：fd 事件源 -->
+  <rect x="76" y="152" width="180" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="166" y="176" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">listen_fd</text>
+  <text x="166" y="198" font-size="10.5" fill="#6B4E28" text-anchor="middle">新连接到达 · EPOLLIN</text>
 
-  <rect x="320" y="238" width="220" height="150" class="poller"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="430" y="283" text-anchor="middle" class="box-title">Poller</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="430" y="312" text-anchor="middle" class="box-text">epoll_wait()</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="430" y="338" text-anchor="middle" class="small">返回 active channels</text>
+  <rect x="76" y="232" width="180" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="166" y="256" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">conn_fd</text>
+  <text x="166" y="278" font-size="10.5" fill="#6B4E28" text-anchor="middle">数据可读 · EPOLLIN</text>
 
-  <rect x="645" y="238" width="220" height="150" class="loop"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="755" y="281" text-anchor="middle" class="box-title">EventLoop</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="755" y="310" text-anchor="middle" class="box-text">遍历就绪 Channel</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="755" y="336" text-anchor="middle" class="small">handleEvent()</text>
+  <rect x="76" y="312" width="180" height="64" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="166" y="336" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">conn_fd</text>
+  <text x="166" y="358" font-size="10.5" fill="#6B4E28" text-anchor="middle">可写 / 关闭 · EPOLLOUT·HUP</text>
 
-  <rect x="650" y="110" width="260" height="70" class="handler"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="138" text-anchor="middle" class="box-title">Acceptor::handleRead()</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="161" text-anchor="middle" class="small">accept 新连接</text>
+  <!-- 列 2：Poller -->
+  <rect x="320" y="170" width="210" height="190" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="425" y="244" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">Poller</text>
+  <text x="425" y="268" font-size="10.5" fill="#2C4460" text-anchor="middle">epoll_wait() 返回就绪 fd</text>
+  <text x="425" y="290" font-size="10.5" fill="#2C4460" text-anchor="middle">组成 activeChannels</text>
 
-  <rect x="650" y="420" width="260" height="70" class="handler"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="448" text-anchor="middle" class="box-title">TcpConnection::handleRead()</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="471" text-anchor="middle" class="small">recv 到 input buffer</text>
+  <!-- 列 3：EventLoop -->
+  <rect x="590" y="170" width="230" height="190" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="705" y="244" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">EventLoop</text>
+  <text x="705" y="268" font-size="10.5" fill="#24473F" text-anchor="middle">遍历 activeChannels_</text>
+  <text x="705" y="290" font-size="10.5" fill="#24473F" text-anchor="middle">逐个 handleEvent()</text>
 
-  <rect x="650" y="510" width="260" height="70" class="handler"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="538" text-anchor="middle" class="box-title">handleWrite / Close</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="780" y="561" text-anchor="middle" class="small">send 剩余数据或清理连接</text>
+  <!-- 列 4：Handler -->
+  <rect x="878" y="152" width="290" height="64" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1023" y="176" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">Acceptor::handleRead</text>
+  <text x="1023" y="198" font-size="10.5" fill="#4A3F68" text-anchor="middle">accept4() 新连接</text>
 
-  <path d="M 224 165 C 260 165 275 250 318 280" class="main-line"/>
-  <path d="M 224 305 L 318 305" class="main-line"/>
-  <path d="M 224 445 C 262 445 278 370 318 342" class="main-line"/>
-  <path d="M 540 313 L 643 313" class="main-line"/>
+  <rect x="878" y="232" width="290" height="64" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1023" y="256" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">TcpConnection::handleRead</text>
+  <text x="1023" y="278" font-size="10.5" fill="#4A3F68" text-anchor="middle">recv 到 input buffer</text>
 
-  <path d="M 780 238 C 780 210 780 200 780 182" class="soft-line"/>
-  <path d="M 780 388 C 780 405 780 408 780 418" class="soft-line"/>
-  <path d="M 805 388 C 830 425 830 475 805 508" class="soft-line"/>
+  <rect x="878" y="312" width="290" height="64" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1023" y="336" font-size="13" font-weight="700" fill="#4A3F68" text-anchor="middle">handleWrite / Close</text>
+  <text x="1023" y="358" font-size="10.5" fill="#4A3F68" text-anchor="middle">发完 buffer 或清理连接</text>
 
-  <rect x="304" y="438" width="260" height="86" class="note"/>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="434" y="468" text-anchor="middle" class="box-title">关键边界</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="434" y="493" text-anchor="middle" class="small">epoll 只通知“就绪”</text>
-  <text font-family="Arial, 'Microsoft YaHei', sans-serif" x="434" y="515" text-anchor="middle" class="small">应用仍要自己 read / write</text>
+  <!-- 正交连线：三条水平车道 -->
+  <line x1="256" y1="184" x2="318" y2="184" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="256" y1="264" x2="318" y2="264" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="256" y1="344" x2="318" y2="344" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="530" y1="264" x2="588" y2="264" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="820" y1="184" x2="876" y2="184" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="820" y1="264" x2="876" y2="264" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="820" y1="344" x2="876" y2="344" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
 
-  <path d="M 540 388 C 590 430 608 465 646 455" class="soft-line"/>
+  <text x="76" y="392" font-size="11" fill="#6B675C">每个 fd 绑定一个 Channel：fd + 关注事件 + 回调</text>
+  <text x="76" y="412" font-size="11" fill="#6B675C">epoll 面向 fd，Reactor 面向对象</text>
+
+  <!-- ============ 面板 B：分工边界 ============ -->
+  <rect x="48" y="420" width="1144" height="186" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="66" y="445" font-size="15" font-weight="700" fill="#4A473F">B · 各司其职：发现 / 分发 / 执行</text>
+
+  <rect x="76" y="462" width="330" height="124" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="92" y="490" font-size="12.5" font-weight="700" fill="#2C4460">epoll_wait() 只回答「谁就绪」</text>
+  <text x="92" y="512" font-size="11" fill="#2C4460">哪些 fd 可读 / 可写 / 异常</text>
+  <text x="92" y="532" font-size="11" fill="#2C4460">不关心 fd 背后是哪个对象</text>
+  <text x="92" y="552" font-size="11" fill="#2C4460">更不会调用任何回调</text>
+  <text x="92" y="572" font-size="11" fill="#2C4460">返回的是就绪信号，不是数据</text>
+
+  <rect x="430" y="462" width="340" height="124" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="446" y="490" font-size="12.5" font-weight="700" fill="#24473F">EventLoop + Channel 负责分发</text>
+  <text x="446" y="512" font-size="11" fill="#24473F">就绪事件 → 找到 Channel 与回调</text>
+  <text x="446" y="532" font-size="11" fill="#24473F">EPOLLOUT 按需注册、发完取消</text>
+  <text x="446" y="552" font-size="11" fill="#24473F">关闭时避开已释放的对象</text>
+  <text x="446" y="572" font-size="11" fill="#24473F">eventfd / timerfd 支撑唤醒与定时</text>
+
+  <rect x="794" y="462" width="330" height="124" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="810" y="490" font-size="12.5" font-weight="700" fill="#4A3F68">Handler 完成真正的 I/O</text>
+  <text x="810" y="512" font-size="11" fill="#4A3F68">read / write 由应用自己调用</text>
+  <text x="810" y="532" font-size="11" fill="#4A3F68">epoll 只通知就绪，不搬运数据</text>
+  <text x="810" y="552" font-size="11" fill="#4A3F68">数据进 input / output buffer</text>
+  <text x="810" y="572" font-size="11" fill="#4A3F68">ERR / HUP / RDHUP 统一收口</text>
+
+  <text x="48" y="632" font-size="11.5" fill="#733428">data.ptr 常指向 Channel —— 生命周期必须清晰，否则回调访问已释放对象（RAII 与延迟销毁见 13.8）</text>
+  <text x="48" y="656" font-size="11.5" fill="#4A473F">ET 模式：可读事件要循环读到 EAGAIN，残留数据可能不再触发通知</text>
 </svg>

@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 750" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>pthread_cond_wait 的原子过程</title>
+  <desc>以「等待线程动作 / mutex 归属 / cond 等待队列」三行状态，拆解 pthread_cond_wait 的五个阶段，并解释丢失唤醒与 while 重查。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="750" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">pthread_cond_wait 的原子过程：为什么配 mutex、为什么用 while</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">「释放锁」与「进入等待队列」是同一个不可分割的步骤 —— 这就是解锁到睡眠之间丢不了通知的原因</text>
+
+  <text x="48" y="116" font-size="15" font-weight="700" fill="#4A473F">A · pthread_cond_wait 的内部时序</text>
+
+  <!-- A 面板 -->
+  <rect x="56" y="126" width="1128" height="204" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="374" y="130" width="200" height="196" rx="8" fill="#FBF4E7" stroke="#B07D2B" stroke-width="1.2" stroke-dasharray="5 4"/>
+
+  <!-- 行标签 -->
+  <text x="66" y="216" font-size="11.5" font-weight="700" fill="#4A473F">等待线程</text>
+  <text x="66" y="268" font-size="11.5" font-weight="700" fill="#4A473F">mutex 归属</text>
+  <text x="66" y="306" font-size="11.5" font-weight="700" fill="#4A473F">cond 等待队列</text>
+
+  <!-- 表头 -->
+  <rect x="174" y="136" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="270" y="157" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">① 持锁检查条件</text>
+  <rect x="378" y="136" width="192" height="32" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="474" y="157" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">② 原子释放锁并睡眠</text>
+  <rect x="582" y="136" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="678" y="157" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">③ 他人改状态并通知</text>
+  <rect x="786" y="136" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="882" y="157" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">④ 重新抢 mutex</text>
+  <rect x="990" y="136" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1086" y="157" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">⑤ 返回后重查条件</text>
+
+  <!-- 行 1：等待线程动作 -->
+  <rect x="174" y="174" width="192" height="68" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="270" y="204" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">lock(&amp;m)</text>
+  <text x="270" y="224" font-size="10.5" fill="#2C4460" text-anchor="middle">while (queue_size == 0)</text>
+
+  <rect x="378" y="174" width="192" height="68" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="2"/>
+  <text x="474" y="196" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">cond_wait(&amp;c, &amp;m)</text>
+  <text x="474" y="215" font-size="10.5" fill="#6B4E28" text-anchor="middle">入等待队列 → 解锁 → 挂起</text>
+  <text x="474" y="233" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">三件事不可分割</text>
+
+  <rect x="582" y="174" width="192" height="68" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="678" y="196" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">另一线程 lock(&amp;m)</text>
+  <text x="678" y="215" font-size="10.5" fill="#24473F" text-anchor="middle">queue_size++ 后 signal</text>
+  <text x="678" y="233" font-size="10.5" fill="#24473F" text-anchor="middle">再 unlock(&amp;m)</text>
+
+  <rect x="786" y="174" width="192" height="68" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="882" y="204" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">wait 内部再 lock(&amp;m)</text>
+  <text x="882" y="224" font-size="10.5" fill="#2C4460" text-anchor="middle">抢不到就继续阻塞</text>
+
+  <rect x="990" y="174" width="192" height="68" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1086" y="204" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">wait 返回，回到 while</text>
+  <text x="1086" y="224" font-size="10.5" fill="#2C4460" text-anchor="middle">仍不成立就再 wait</text>
+
+  <!-- 行 2：mutex 归属 -->
+  <rect x="174" y="248" width="192" height="32" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="270" y="269" font-size="11" fill="#4A473F" text-anchor="middle">本线程持有</text>
+  <rect x="378" y="248" width="192" height="32" rx="6" fill="#F1EFE8" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="474" y="269" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">已释放</text>
+  <rect x="582" y="248" width="192" height="32" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="678" y="269" font-size="11" fill="#4A473F" text-anchor="middle">通知线程持有</text>
+  <rect x="786" y="248" width="192" height="32" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="882" y="269" font-size="11" fill="#4A473F" text-anchor="middle">争用中，抢到才返回</text>
+  <rect x="990" y="248" width="192" height="32" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1086" y="269" font-size="11" fill="#4A473F" text-anchor="middle">本线程持有</text>
+
+  <!-- 行 3：cond 等待队列 -->
+  <rect x="174" y="286" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="270" y="307" font-size="11" fill="#4A473F" text-anchor="middle">尚未入队</text>
+  <rect x="378" y="286" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="474" y="307" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">本线程已在队上</text>
+  <rect x="582" y="286" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="678" y="307" font-size="11" fill="#4A473F" text-anchor="middle">被移出队列</text>
+  <rect x="786" y="286" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="882" y="307" font-size="11" fill="#4A473F" text-anchor="middle">已不在队上</text>
+  <rect x="990" y="286" width="192" height="32" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1086" y="307" font-size="11" fill="#4A473F" text-anchor="middle">不满足则再次入队</text>
+
+  <text x="56" y="352" font-size="11.5" fill="#4A473F">② 在内核里不可分割：要么还持锁没入队，要么已入队且锁已放开</text>
+  <text x="56" y="372" font-size="11.5" font-weight="700" fill="#733428">不存在「已解锁但还没睡」的中间态，所以窗口期为零</text>
+
+  <!-- B 区 -->
+  <text x="56" y="404" font-size="15" font-weight="700" fill="#4A473F">B · 反例：假如「解锁」和「睡眠」可以分开</text>
+  <rect x="56" y="414" width="556" height="252" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="68" y="448" width="532" height="54" rx="7" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="68" y="532" width="532" height="54" rx="7" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="218" y="444" width="228" height="146" rx="7" fill="#F0E0DB" fill-opacity="0.5" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <text x="80" y="440" font-size="11.5" font-weight="700" fill="#3D5A80">消费者</text>
+  <text x="332" y="440" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">危险窗口：没持锁，也没在等待队列上</text>
+  <text x="80" y="524" font-size="11.5" font-weight="700" fill="#2F6B5E">生产者</text>
+
+  <rect x="78" y="456" width="132" height="38" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="144" y="472" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">unlock(&amp;m)</text>
+  <text x="144" y="488" font-size="10.5" fill="#2C4460" text-anchor="middle">准备进入睡眠</text>
+
+  <rect x="452" y="456" width="140" height="38" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="522" y="472" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">此时才睡下</text>
+  <text x="522" y="488" font-size="10.5" fill="#733428" text-anchor="middle">通知已经错过</text>
+
+  <rect x="240" y="540" width="186" height="38" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="333" y="556" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">lock → push → signal</text>
+  <text x="333" y="572" font-size="10.5" fill="#24473F" text-anchor="middle">等待队列上没有线程</text>
+
+  <line x1="210" y1="475" x2="448" y2="475" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="333" y1="536" x2="333" y2="500" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrRed)"/>
+
+  <rect x="68" y="598" width="532" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="334" y="620" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">signal 不排队也不存储，这次唤醒直接丢弃</text>
+  <text x="334" y="640" font-size="10.5" fill="#733428" text-anchor="middle">消费者随后睡下 → lost wakeup，永远醒不来</text>
+
+  <!-- C 区 -->
+  <text x="628" y="404" font-size="15" font-weight="700" fill="#4A473F">C · 为什么是 while 而不是 if</text>
+  <rect x="628" y="414" width="556" height="252" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="640" y="430" width="150" height="30" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="715" y="450" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">情形</text>
+  <rect x="790" y="430" width="222" height="30" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="901" y="450" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">wait 返回时的真实状态</text>
+  <rect x="1012" y="430" width="160" height="30" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1092" y="450" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">写成 if 的后果</text>
+
+  <rect x="640" y="464" width="150" height="46" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="715" y="491" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">虚假唤醒</text>
+  <rect x="790" y="464" width="222" height="46" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="901" y="491" font-size="10.5" fill="#4A473F" text-anchor="middle">没有人 signal，条件未变</text>
+  <rect x="1012" y="464" width="160" height="46" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1092" y="491" font-size="10.5" fill="#733428" text-anchor="middle">直接去取空队列</text>
+
+  <rect x="640" y="514" width="150" height="46" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="715" y="541" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">唤醒被抢先</text>
+  <rect x="790" y="514" width="222" height="46" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="901" y="541" font-size="10.5" fill="#4A473F" text-anchor="middle">另一 worker 先抢到锁取走</text>
+  <rect x="1012" y="514" width="160" height="46" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1092" y="541" font-size="10.5" fill="#733428" text-anchor="middle">取到 NULL 后崩溃</text>
+
+  <rect x="640" y="564" width="150" height="46" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="715" y="591" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">关闭 broadcast</text>
+  <rect x="790" y="564" width="222" height="46" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="901" y="591" font-size="10.5" fill="#4A473F" text-anchor="middle">stop = 1，队列仍为空</text>
+  <rect x="1012" y="564" width="160" height="46" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1092" y="591" font-size="10.5" fill="#733428" text-anchor="middle">把退出信号当成任务</text>
+
+  <rect x="640" y="622" width="532" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="906" y="645" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">wait 返回只代表「可能变了」，不代表条件成立</text>
+
+  <text x="56" y="702" font-size="11.5" fill="#4A473F">signal / broadcast 的调用者不必持有 mutex，但在持锁时通知可以避免竞态与唤醒顺序问题。</text>
+  <text x="56" y="724" font-size="11.5" fill="#4A473F">条件变量不保存状态：真正的条件永远是 queue_size、stop 这些共享变量，wait 只负责睡眠与唤醒。</text>
+</svg>

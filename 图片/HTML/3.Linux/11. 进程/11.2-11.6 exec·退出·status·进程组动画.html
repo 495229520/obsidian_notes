@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>进程控制函数动画 · exec 家族 · 退出出口 · stdio 缓冲区 · status 位布局 · 进程组</title>
+<style>
+:root{
+  --paper:#F5F4ED;--panel:#FBFAF6;--ink:#3E3D39;--muted:#5F5E5A;--faint:#8a887f;
+  --line:#c9c7bf;--grid:#e2e0d7;
+  --blue:#185FA5;--bluebg:#E6F1FB;
+  --green:#0F6E56;--greenbg:#E1F5EE;
+  --brown:#9A5B0E;--brownbg:#FAEEDA;
+  --danger:#B3402F;--dangerbg:#F6E0DB;
+  --gray:#F1EFE8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.34,.02,.2,1);--dur:520ms;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--paper);color:var(--ink);}
+body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;padding:28px 32px 44px;text-wrap:pretty;}
+.wrap{max-width:1180px;margin:0 auto;}
+header h1{font-size:22px;font-weight:600;letter-spacing:.4px;}
+header p{font-size:13px;color:var(--muted);margin-top:5px;}
+header kbd{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray);padding:1px 5px;border-radius:4px;}
+
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;}
+.tab{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 17px;cursor:pointer;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:2px;align-items:flex-start;}
+.tab:hover{border-color:var(--muted);transform:translateY(-1px);}
+.tab .t{font-weight:600;color:var(--ink);}
+.tab .s{font-size:10.5px;color:var(--faint);font-family:var(--mono);}
+.tab.on{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(62,61,57,.18);}
+.tab.on .t,.tab.on .s{color:var(--paper);}
+.tab.on .s{opacity:.75;}
+
+.layout{display:grid;grid-template-columns:626px 1fr;gap:26px;margin-top:22px;align-items:start;}
+@media(max-width:1080px){.layout{grid-template-columns:1fr;}}
+.viz{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:22px;min-height:452px;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.viz .vcap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.viz .vcap b{color:var(--ink);}
+.stage{position:relative;width:578px;height:340px;margin:2px auto 0;}
+
+/* 通用底部提示条 */
+.note{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:11.5px;font-weight:600;padding:7px 10px;border-radius:9px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);transition:all var(--dur) var(--ease);}
+.note.ok{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.note.warn{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.note.bad{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.note.info{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+
+/* ===== 场景 1：exec 家族 ===== */
+.ex-pane{position:absolute;left:0;right:0;top:0;height:290px;transition:opacity var(--dur) var(--ease);}
+.ex-pane.hide{opacity:0;pointer-events:none;}
+.ex-sws{display:flex;gap:10px;}
+.ex-sw{flex:1;border:1.5px solid var(--grid);border-radius:10px;background:var(--paper);padding:8px 11px;transition:all var(--dur) var(--ease);}
+.ex-sw b{display:block;font-family:var(--mono);font-size:14px;color:var(--faint);transition:color var(--dur) var(--ease);}
+.ex-sw span{font-size:10.5px;color:var(--faint);}
+.ex-sw.on{border-color:var(--blue);background:var(--bluebg);box-shadow:0 2px 8px rgba(24,95,165,.12);}
+.ex-sw.on b{color:var(--blue);}
+.ex-sw.on span{color:var(--blue);}
+.ex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
+.ex-fn{border:1.5px solid var(--grid);border-radius:10px;background:var(--paper);padding:9px 11px;opacity:.34;transition:all var(--dur) var(--ease);}
+.ex-fn b{display:block;font-family:var(--mono);font-size:13px;font-weight:700;}
+.ex-fn span{font-size:10px;color:var(--muted);font-family:var(--mono);}
+.ex-fn.lit{opacity:1;border-color:var(--blue);background:var(--bluebg);}
+.ex-fn.lit b{color:var(--blue);}
+.ex-fn.alt{opacity:1;border-color:var(--green);background:var(--greenbg);}
+.ex-fn.alt b{color:var(--green);}
+.ex-fn.core{opacity:1;border-color:var(--ink);background:var(--gray);box-shadow:0 2px 8px rgba(60,55,40,.1);}
+.ex-shape{margin-top:12px;}
+.ex-sh{display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;border-radius:9px;border:1.5px solid var(--grid);background:var(--paper);margin-bottom:6px;opacity:.38;transition:all var(--dur) var(--ease);}
+.ex-sh i{font-style:normal;font-family:var(--mono);font-size:12px;font-weight:700;width:16px;flex:none;color:var(--faint);transition:color var(--dur) var(--ease);}
+.ex-sh span{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;}
+.ex-sh.lit{opacity:1;border-color:var(--blue);background:var(--bluebg);}
+.ex-sh.lit i{color:var(--blue);}
+.ex-sh.alt{opacity:1;border-color:var(--green);background:var(--greenbg);}
+.ex-sh.alt i{color:var(--green);}
+.ex-hd{display:flex;gap:8px;font-size:10.5px;font-weight:700;color:var(--faint);margin-bottom:6px;letter-spacing:.3px;}
+.ex-hd i{font-style:normal;flex:none;}
+.ex-hd i.gr{flex:1 1 0;min-width:0;}
+.ex-row{display:flex;align-items:center;gap:8px;height:34px;margin-bottom:6px;}
+.ex-key{width:92px;font-size:11.5px;font-weight:700;color:var(--muted);flex:none;}
+.ex-cell{flex:1;height:100%;display:flex;align-items:center;padding:0 10px;border-radius:8px;border:1.5px solid var(--grid);background:var(--paper);font-family:var(--mono);font-size:11px;color:var(--muted);transition:all var(--dur) var(--ease);white-space:nowrap;overflow:hidden;}
+.ex-bar{width:30px;flex:none;text-align:center;font-family:var(--mono);font-size:11px;color:var(--faint);}
+.ex-row.swap .ex-cell.after{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);font-weight:700;}
+.ex-row.keep .ex-cell.after{border-color:var(--green);background:var(--greenbg);color:var(--green);font-weight:700;}
+.ex-row.half .ex-cell.after{border-color:var(--brown);background:var(--brownbg);color:var(--brown);font-weight:700;}
+.ex-row.focus .ex-cell{box-shadow:0 0 0 2px rgba(62,61,57,.14);}
+.ex-row.focus .ex-key{color:var(--ink);}
+
+/* ===== 场景 2：四个退出出口 ===== */
+.xt-ent{position:absolute;left:0;width:104px;height:32px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11.5px;font-weight:700;border-radius:8px;border:1.5px solid var(--grid);background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);}
+.xt-ent.on{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.xt-ent.on.h{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.xt-ent.on.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.xt-cell{position:absolute;top:30px;width:112px;height:74px;border-radius:10px;border:1.5px solid var(--grid);background:var(--paper);padding:8px 9px;opacity:.4;transition:all var(--dur) var(--ease);}
+.xt-cell b{display:block;font-size:11.5px;color:var(--ink);}
+.xt-cell span{display:block;font-size:10px;color:var(--muted);margin-top:3px;line-height:1.45;}
+.xt-cell.lit{opacity:1;border-color:var(--blue);background:var(--bluebg);box-shadow:0 2px 10px rgba(24,95,165,.14);}
+.xt-cell.done{opacity:1;border-color:var(--line);background:var(--gray);}
+.xt-cell.skip{opacity:.5;border-style:dashed;border-color:var(--danger);background:var(--paper);}
+.xt-gate{position:absolute;top:30px;left:486px;width:90px;height:74px;border-radius:10px;border:1.5px solid var(--line);background:var(--gray);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:all var(--dur) var(--ease);}
+.xt-gate b{font-family:var(--mono);font-size:12px;}
+.xt-gate span{font-size:10px;color:var(--muted);}
+.xt-gate.lit{border-color:var(--ink);background:var(--paper);box-shadow:0 2px 10px rgba(60,55,40,.12);}
+.xt-by{position:absolute;left:110px;width:372px;height:0;border-top:2px dashed var(--brown);opacity:0;transition:opacity var(--dur) var(--ease);}
+.xt-by::after{content:'';position:absolute;right:-1px;top:-5px;border:5px solid transparent;border-left:8px solid var(--brown);}
+.xt-by.d{border-top-color:var(--danger);}
+.xt-by.d::after{border-left-color:var(--danger);}
+.xt-by.show{opacity:1;}
+.xt-bl{position:absolute;left:110px;width:372px;text-align:center;font-family:var(--mono);font-size:10px;font-weight:700;opacity:0;transition:opacity var(--dur) var(--ease);}
+.xt-bl.show{opacity:1;}
+.xt-div{position:absolute;left:0;right:0;top:186px;font-size:11px;font-weight:700;color:var(--faint);text-align:center;border-top:1.5px solid var(--grid);padding-top:6px;}
+.xt-k{position:absolute;top:214px;width:134px;height:58px;border-radius:9px;border:1.5px solid var(--grid);background:var(--paper);padding:8px 9px;opacity:.4;transition:all var(--dur) var(--ease);}
+.xt-k b{display:block;font-size:11.5px;}
+.xt-k span{font-size:10px;color:var(--muted);}
+.xt-k.lit{opacity:1;border-color:var(--green);background:var(--greenbg);}
+.xt-k.lit b{color:var(--green);}
+.xt-tok{position:absolute;width:96px;height:26px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:0;z-index:3;transition:left var(--dur) var(--ease),top var(--dur) var(--ease),opacity var(--dur) var(--ease),background var(--dur) var(--ease),border-color var(--dur) var(--ease);}
+
+/* ===== 场景 3：fork 与 stdio 缓冲区 ===== */
+.bf-mode{position:absolute;top:0;height:30px;width:283px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;border-radius:8px;border:1.5px solid var(--grid);background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);}
+.bf-mode.on{color:var(--ink);border-color:var(--ink);background:var(--gray);}
+.bf-mode.on.warn{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.bf-lane{position:absolute;left:0;right:0;height:74px;border:1.5px solid var(--grid);border-radius:11px;background:var(--paper);transition:opacity var(--dur) var(--ease);}
+.bf-tag{position:absolute;left:12px;top:8px;font-size:10.5px;font-weight:700;color:var(--muted);}
+.bf-proc{position:absolute;left:12px;top:28px;width:150px;height:34px;border-radius:8px;border:1.5px solid var(--blue);background:var(--bluebg);color:var(--blue);font-family:var(--mono);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all var(--dur) var(--ease);}
+.bf-proc.c{border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.bf-ar{position:absolute;left:170px;top:44px;width:34px;height:0;border-top:2px solid var(--line);}
+.bf-ar::after{content:'';position:absolute;right:-1px;top:-5px;border:5px solid transparent;border-left:8px solid var(--line);}
+.bf-buf{position:absolute;left:214px;top:22px;right:12px;height:46px;border-radius:9px;border:1.5px dashed var(--line);background:var(--gray);display:flex;align-items:center;gap:9px;padding:0 12px;transition:all var(--dur) var(--ease);}
+.bf-buf b{font-size:10.5px;color:var(--muted);font-weight:700;}
+.bf-chip{font-family:var(--mono);font-size:12px;font-weight:700;padding:3px 11px;border-radius:7px;border:1.5px solid var(--line);background:var(--paper);color:var(--faint);transition:all var(--dur) var(--ease);}
+.bf-chip.full{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.bf-buf.hot{border-style:solid;border-color:var(--brown);background:var(--brownbg);}
+.bf-copy{position:absolute;left:78px;top:118px;height:32px;width:0;border-left:2px dashed var(--brown);opacity:0;transition:opacity var(--dur) var(--ease);}
+.bf-cl{position:absolute;left:92px;top:120px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--brown);background:var(--brownbg);border:1.5px solid var(--brown);border-radius:7px;padding:2px 9px;opacity:0;transition:opacity var(--dur) var(--ease);}
+.bf-cl.show,.bf-copy.show{opacity:1;}
+.bf-out{position:absolute;left:0;right:0;top:234px;height:66px;border:1.5px solid var(--grid);border-radius:11px;background:var(--paper);padding:8px 12px;transition:all var(--dur) var(--ease);}
+.bf-outh{font-size:10.5px;font-weight:700;color:var(--muted);}
+.bf-lines{display:flex;gap:8px;margin-top:6px;}
+.bf-line{width:88px;height:26px;border-radius:7px;border:1.5px dashed var(--line);background:var(--gray);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11.5px;font-weight:700;color:transparent;transition:all var(--dur) var(--ease);}
+.bf-line.on{border-style:solid;border-color:var(--green);background:var(--greenbg);color:var(--green);}
+.bf-line.dup{border-style:solid;border-color:var(--danger);background:var(--dangerbg);color:var(--danger);}
+
+/* ===== 场景 4：status 位布局 ===== */
+.st-val{position:absolute;left:0;right:0;top:0;height:38px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted);}
+.st-val b{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--ink);transition:color var(--dur) var(--ease);}
+.st-val em{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--faint);}
+.st-val .tagx{margin-left:auto;font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1.5px solid var(--line);background:var(--gray);color:var(--muted);transition:all var(--dur) var(--ease);}
+.st-val .tagx.b{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.st-val .tagx.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.st-val .tagx.g{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.st-bits{position:absolute;left:0;right:0;top:48px;display:flex;gap:24px;}
+.st-half{display:flex;gap:3px;}
+.st-bit{width:30px;height:52px;border-radius:7px;border:1.5px solid var(--grid);background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all var(--dur) var(--ease);}
+.st-bit b{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--faint);transition:color var(--dur) var(--ease);}
+.st-bit i{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--faint);}
+.st-bit.code{border-color:var(--blue);background:var(--bluebg);}
+.st-bit.code b{color:var(--blue);}
+.st-bit.sig{border-color:var(--danger);background:var(--dangerbg);}
+.st-bit.sig b{color:var(--danger);}
+.st-bit.core{border-color:var(--brown);background:var(--brownbg);}
+.st-bit.core b{color:var(--brown);}
+.st-bit.sent{border-color:var(--green);background:var(--greenbg);}
+.st-bit.sent b{color:var(--green);}
+.st-halfl{position:absolute;top:104px;font-size:10px;font-weight:700;color:var(--faint);font-family:var(--mono);}
+.st-rows{position:absolute;left:0;right:0;top:126px;}
+.st-r{display:flex;align-items:center;gap:10px;height:32px;padding:0 12px;border-radius:9px;border:1.5px solid var(--grid);background:var(--paper);margin-bottom:6px;opacity:.42;transition:all var(--dur) var(--ease);}
+.st-r b{font-size:11.5px;width:78px;flex:none;}
+.st-r span{font-size:11px;color:var(--muted);font-family:var(--mono);}
+.st-r.lit{opacity:1;box-shadow:0 2px 8px rgba(60,55,40,.08);}
+.st-r.lit.b{border-color:var(--blue);background:var(--bluebg);}
+.st-r.lit.d{border-color:var(--danger);background:var(--dangerbg);}
+.st-r.lit.h{border-color:var(--brown);background:var(--brownbg);}
+.st-chain{position:absolute;left:0;right:0;top:250px;display:flex;align-items:center;gap:8px;}
+.st-c{flex:1;height:34px;border-radius:9px;border:1.5px solid var(--grid);background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint);transition:all var(--dur) var(--ease);}
+.st-c.on{color:var(--ink);border-color:var(--ink);background:var(--gray);}
+.st-c.hit{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.st-c.trap{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.st-ar{font-size:12px;color:var(--faint);flex:none;}
+
+/* ===== 场景 5：进程组与前台组 ===== */
+.pg-sess{position:absolute;left:0;right:0;top:0;height:270px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);padding:10px 12px;transition:all var(--dur) var(--ease);}
+.pg-sess.dim{opacity:.4;}
+.pg-sh{display:flex;align-items:center;gap:9px;font-size:11.5px;font-weight:700;color:var(--muted);}
+.pg-tty{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--gray);}
+.pg-tp{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);border:1.5px solid var(--blue);background:var(--bluebg);border-radius:999px;padding:2px 11px;transition:all var(--dur) var(--ease);}
+.pg-tp.moved{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.pg-grp{margin-top:9px;border:1.5px solid var(--grid);border-radius:10px;background:var(--gray);padding:8px 10px;transition:all var(--dur) var(--ease);}
+.pg-grp.fg{border-color:var(--blue);background:var(--bluebg);}
+.pg-grp.bgnow{border-color:var(--brown);background:var(--brownbg);}
+.pg-gh{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--muted);}
+.pg-gh em{font-style:normal;font-size:10px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;transition:all var(--dur) var(--ease);}
+.pg-ps{display:flex;gap:8px;margin-top:7px;}
+.pg-ps.one .pg-p{flex:0 0 174px;}
+.pg-p{flex:1;height:60px;border-radius:9px;border:1.5px solid var(--line);background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:var(--mono);font-size:11.5px;font-weight:700;transition:all var(--dur) var(--ease);}
+.pg-p small{font-size:9.5px;font-weight:600;color:var(--faint);transition:color var(--dur) var(--ease);}
+.pg-p.hit{border-color:var(--danger);background:var(--dangerbg);color:var(--danger);transform:translateY(-2px);}
+.pg-p.hit small{color:var(--danger);}
+.pg-p.stop{border-color:var(--brown);background:var(--brownbg);color:var(--brown);}
+.pg-p.stop small{color:var(--brown);}
+.pg-bar{position:absolute;left:0;right:0;top:284px;height:40px;border-radius:9px;border:1.5px solid var(--line);background:var(--gray);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--muted);transition:all var(--dur) var(--ease);}
+.pg-bar.d{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.pg-bar.h{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.pg-bar.g{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.pg-bar.b{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+
+.right{display:flex;flex-direction:column;gap:16px;}
+.desc-card{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px 20px;min-height:196px;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.desc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.desc-head .st{font-size:17px;font-weight:600;}
+.act{margin-top:14px;font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:9px 13px;border-radius:9px;}
+.chip{font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid;}
+.chip.c0{color:var(--muted);border-color:var(--line);background:var(--gray);}
+.chip.cb{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+.chip.cg{color:var(--green);border-color:var(--green);background:var(--greenbg);}
+.chip.ch{color:var(--brown);border-color:var(--brown);background:var(--brownbg);}
+.chip.cd{color:var(--danger);border-color:var(--danger);background:var(--dangerbg);}
+.desc-body{margin-top:10px;font-size:14px;color:var(--muted);}
+.desc-body b{color:var(--ink);}
+.desc-body .bl{color:var(--blue);font-weight:600;}
+.desc-body .gr{color:var(--green);font-weight:600;}
+.desc-body .dg{color:var(--danger);font-weight:600;}
+.desc-body .hb{color:var(--brown);font-weight:600;}
+.codebox{background:#2E2C27;border-radius:11px;padding:12px 0;font-family:var(--mono);font-size:12px;line-height:1.62;color:#D8D5CC;white-space:pre;overflow:hidden;box-shadow:0 2px 8px rgba(46,44,39,.18);}
+.codebox .cmt{color:#8F8B80;} .codebox .kw{color:#E3A44C;} .codebox .str{color:#9FBF7F;} .codebox .num{color:#C99AC4;}
+.codebox .cl{padding:2px 17px;min-height:19px;transition:background .3s var(--ease),color .3s var(--ease);}
+.codebox .cl.hl{background:rgba(52,122,198,.52);box-shadow:inset 4px 0 0 #82B4E8;color:#F7F4EA;}
+.codebox .cl.hl .cmt{color:#CCC8BA;}
+
+.controls{margin-top:22px;background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(60,55,40,.04);}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 16px;cursor:pointer;transition:background .15s var(--ease),transform .1s var(--ease),border-color .15s;}
+.btn:hover:not(:disabled){background:var(--gray);border-color:var(--muted);}
+.btn:active:not(:disabled){transform:scale(.96);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);min-width:92px;}
+.dots{display:flex;gap:7px;margin:0 auto;flex-wrap:wrap;}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);background:transparent;cursor:pointer;padding:0;transition:all .25s var(--ease);}
+.dot:hover{border-color:var(--muted);transform:scale(1.25);}
+.dot.done{background:var(--line);border-color:var(--line);}
+.dot.now{background:var(--ink);border-color:var(--ink);transform:scale(1.35);}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-width:44px;text-align:center;}
+@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>进程控制函数动画 · exec 家族 · 退出出口 · status 位布局 · 进程组</h1>
+    <p>配套笔记《11.2 进程创建与程序替换》《11.3 结束进程》《11.6 进程组与会话》《11.4 等待与回收》　·　上方切场景，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放</p>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="layout">
+    <section class="viz" id="viz"></section>
+    <section class="right">
+      <div class="desc-card">
+        <div class="desc-head"><span class="st" id="stTitle"></span><span class="chip" id="stChip"></span></div>
+        <div class="act" id="stAct"></div>
+        <div class="desc-body" id="stDesc"></div>
+      </div>
+      <div class="codebox" id="codeBox"></div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+</div>
+
+<script>
+const viz=document.getElementById('viz');
+const el=id=>document.getElementById(id);
+const codeOf=lines=>lines.map(l=>'<div class="cl">'+l+'</div>').join('');
+const setCls=(node,base,extra)=>{node.className=base+(extra?' '+extra:'');};
+
+/* ========== 场景 1：exec 家族 ========== */
+const execScene=(()=>{
+  const code=codeOf([
+    '<span class="kw">char</span> *args[] = {<span class="str">"ls"</span>, <span class="str">"-l"</span>, <span class="kw">NULL</span>};',
+    'execvp(<span class="str">"ls"</span>, args);        <span class="cmt">// p：在 PATH 里搜索</span>',
+    'perror(<span class="str">"exec"</span>);            <span class="cmt">// 只有失败才走到这行</span>',
+    '_exit(<span class="num">127</span>);                  <span class="cmt">// 失败路径必须退出</span>',
+    '',
+    'execl  (<span class="str">"/bin/ls"</span>, <span class="str">"ls"</span>, <span class="str">"-l"</span>, (<span class="kw">char</span> *)<span class="kw">NULL</span>);',
+    'execlp (<span class="str">"ls"</span>,      <span class="str">"ls"</span>, <span class="str">"-l"</span>, (<span class="kw">char</span> *)<span class="kw">NULL</span>);',
+    'execle (<span class="str">"/bin/ls"</span>, <span class="str">"ls"</span>, (<span class="kw">char</span> *)<span class="kw">NULL</span>, envp);',
+    'execv  (<span class="str">"/bin/ls"</span>, args);',
+    'execvp (<span class="str">"ls"</span>,      args);',
+    'execvpe(<span class="str">"ls"</span>,      args, envp);',
+  ]);
+  // 六个函数：[名字, l/v, p, e]
+  const FNS=[['execl','l','—','—'],['execlp','l','p','—'],['execle','l','—','e'],
+             ['execv','v','—','—'],['execvp','v','p','—'],['execvpe','v','p','e']];
+  // 分界线六行：[属性, exec 之前, exec 之后, 类别]
+  const ROWS=[
+    ['代码段','a.out 的 .text','/bin/ls 的 .text','swap'],
+    ['数据段与堆','gval=10 · malloc 的块','全新，旧内容没了','swap'],
+    ['栈','main 的局部变量','新程序的栈','swap'],
+    ['PID','2001','2001 · 一个数都没变','keep'],
+    ['已打开的 fd','fd 3 → log.txt','fd 3 → log.txt','keep'],
+    ['信号处置','SIGINT → handler','SIGINT → 默认动作','half'],
+  ];
+  const steps=[
+    {title:'步骤 0 · 六个名字不用背',chip:'正交开关',chipC:'c0',lines:[5,6,7,8,9,10],
+     pane:'A',sw:[0,0,0],fn:['','','','','',''],
+     note:'l/v · p · e 三个开关，六个名字是它们的组合',noteC:'',
+     desc:'<code>execl</code> 到 <code>execvpe</code> 看着像六个不同的函数，其实是<b>三个独立开关</b>的组合：参数怎么交、要不要查 PATH、环境变量谁给。记开关就够了。'},
+    {title:'步骤 1 · l 与 v：参数怎么交给新程序',chip:'l / v',chipC:'cb',lines:[5,8],
+     pane:'A',sw:[1,0,0],fn:['lit','lit','lit','alt','alt','alt'],sh:['lit','alt'],
+     note:'l = 可变参数列表 · v = argv 数组',noteC:'info',
+     desc:'<span class="bl">l（list）</span>把参数一个个写在调用里；<span class="gr">v（vector）</span>先拼好 <code>argv[]</code> 数组再整个传进去。参数个数编译期定不下来时只能用 v。<br><br>l 系列末尾那个 <code>(char *)NULL</code> <b>不能简写成裸 <code>NULL</code></b>：裸 NULL 在某些平台展开成 <code>int</code> 的 0，压进可变参数栈时宽度和指针不一致，<code>execl</code> 找不到列表末尾就会一路往下读。'},
+    {title:'步骤 2 · p：要不要在 PATH 里找',chip:'p',chipC:'cb',lines:[6,9,10],
+     pane:'A',sw:[0,1,0],fn:['','lit','','','lit','lit'],
+     note:'带 p 传文件名 · 不带 p 必须给完整路径',noteC:'info',
+     desc:'带 <code>p</code> 的三个接受 <code>"ls"</code> 这样的文件名，按 <code>PATH</code> 逐个目录去找；不带 <code>p</code> 的必须给 <code>/bin/ls</code>。这一位决定的是<b>第一个参数怎么解释</b>。'},
+    {title:'步骤 3 · e：环境变量谁给',chip:'e',chipC:'cb',lines:[7,10],
+     pane:'A',sw:[0,0,1],fn:['','','lit','','','lit'],
+     note:'带 e 传 envp 数组 · 不带 e 沿用当前的 environ',noteC:'info',
+     desc:'带 <code>e</code> 的多收一个 <code>envp[]</code>，新程序看到的就是你给的那份；不带 <code>e</code> 的直接继承调用者的 <code>environ</code>。要给子程序一个干净环境，就得走 e 这一路。'},
+    {title:'步骤 4 · 真正的系统调用只有一个',chip:'execve',chipC:'ch',lines:[],
+     pane:'A',sw:[1,1,1],fn:['','','','','','core'],
+     note:'内核只提供 execve()，另外五个是 libc 的包装',noteC:'warn',
+     desc:'内核只认 <code>execve(path, argv, envp)</code>。<code>l</code> 系列在库里把可变参数拼成数组，<code>p</code> 系列在库里按 PATH 拼路径，最后都落到同一个系统调用上。<code>strace</code> 里只会看到 <code>execve</code>。'},
+    {title:'步骤 5 · exec 那一刻的分界线',chip:'换与不换',chipC:'cd',lines:[1],
+     pane:'B',rows:[1,1,1,1,1,1],focus:-1,
+     note:'地址空间整个换掉 · PID 和 fd 原样留下',noteC:'bad',
+     desc:'<code>exec</code> 不创建进程。前三行<span class="dg">整个换掉</span>：代码、数据、堆、栈都是新程序的。后三行<span class="gr">留下来</span>：PID 一个数没变，已打开的 fd 也跟着跨过去。信号处置只复位<b>装了 handler 的那些</b>，屏蔽字保留。'},
+    {title:'步骤 6 · fd 会跨过 exec，所以要主动堵',chip:'两个坑',chipC:'cd',lines:[2,3],
+     pane:'B',rows:[1,1,1,1,1,1],focus:4,
+     note:'O_CLOEXEC 封住 fd · exec 后面必须紧跟错误处理',noteC:'bad',
+     desc:'fd 存活这条既是能力也是漏洞：shell 的重定向靠它，但你的日志 fd、数据库连接也会一起漏给子程序。<code>open</code> 时加 <code>O_CLOEXEC</code> 就地封住。另一个坑是 <code>exec</code> <b>只有失败才返回</b>，后面不接 <code>perror</code> + <code>_exit</code>，子进程会带着父进程的代码继续往下跑。'},
+  ];
+  function mount(){
+    let h='<div class="stage">';
+    h+='<div class="ex-pane" id="exA">';
+    h+='<div class="ex-sws">';
+    h+='<div class="ex-sw" id="exS0"><b>l / v</b><span>参数怎么交</span></div>';
+    h+='<div class="ex-sw" id="exS1"><b>p</b><span>要不要查 PATH</span></div>';
+    h+='<div class="ex-sw" id="exS2"><b>e</b><span>环境变量谁给</span></div>';
+    h+='</div><div class="ex-grid">';
+    FNS.forEach((f,i)=>{h+='<div class="ex-fn" id="exF'+i+'"><b>'+f[0]+'</b><span>'+f[1]+' · '+f[2]+' · '+f[3]+'</span></div>';});
+    h+='</div><div class="ex-shape">';
+    h+='<div class="ex-sh" id="exH0"><i>l</i><span>execl(path, "ls", "-l", (char *)NULL)　← 末尾必须写 (char *)NULL</span></div>';
+    h+='<div class="ex-sh" id="exH1"><i>v</i><span>char *argv[] = {"ls", "-l", NULL};　execv(path, argv)</span></div>';
+    h+='</div></div>';
+    h+='<div class="ex-pane hide" id="exB"><div class="ex-hd"><i style="width:92px">　</i><i class="gr">exec 之前</i><i style="width:30px"></i><i class="gr">exec 之后</i></div>';
+    ROWS.forEach((r,i)=>{
+      h+='<div class="ex-row" id="exR'+i+'"><span class="ex-key">'+r[0]+'</span>';
+      h+='<span class="ex-cell before">'+r[1]+'</span><span class="ex-bar">→</span><span class="ex-cell after">'+r[2]+'</span></div>';
+    });
+    h+='</div>';
+    h+='<div class="note" id="exNote"></div></div>';
+    viz.innerHTML='<div class="vcap"><b>exec 系列</b>：三个开关拼出六个名字 · 换掉地址空间，留下 PID 与 fd</div>'+h;
+  }
+  function paint(s){
+    el('exA').classList.toggle('hide',s.pane!=='A');
+    el('exB').classList.toggle('hide',s.pane!=='B');
+    if(s.sw)for(let i=0;i<3;i++)el('exS'+i).classList.toggle('on',!!s.sw[i]);
+    if(s.fn)FNS.forEach((f,i)=>setCls(el('exF'+i),'ex-fn',s.fn[i]));
+    for(let i=0;i<2;i++)setCls(el('exH'+i),'ex-sh',s.sh?s.sh[i]:'');
+    ROWS.forEach((r,i)=>{
+      const on=s.rows&&s.rows[i];
+      setCls(el('exR'+i),'ex-row',(on?r[3]:'')+(s.focus===i?' focus':''));
+    });
+    const n=el('exNote');n.textContent=s.note;setCls(n,'note',s.noteC);
+  }
+  return {id:'exec',label:'exec 家族',sub:'l/v · p · e · 分界线',steps,mount,paint,code};
+})();
+
+/* ========== 场景 2：四个退出出口 ========== */
+const exitScene=(()=>{
+  const code=codeOf([
+    '<span class="kw">void</span> cleanup(<span class="kw">void</span>) { fputs(<span class="str">"bye\\n"</span>, stderr); }',
+    '',
+    '<span class="kw">int</span> main(<span class="kw">void</span>) {',
+    '    atexit(cleanup);      <span class="cmt">// ① 只在 exit / main 返回时跑</span>',
+    '    printf(<span class="str">"in buffer"</span>);  <span class="cmt">// 没有 \\n，一直躺在缓冲区</span>',
+    '    <span class="kw">exit</span>(<span class="num">0</span>);              <span class="cmt">// ①②③ 走满，再进 _exit(2)</span>',
+    '}',
+    '',
+    '<span class="cmt">// _exit(0);   跳过 ①②③，直接进内核</span>',
+    '<span class="cmt">// abort();    raise(SIGABRT)，不刷缓冲、留 core</span>',
+    '<span class="cmt">// return 0;   等价 exit(0)，多一次局部变量析构</span>',
+  ]);
+  const ENT=[['return','从 main 返回',8],['exit(0)','标准出口',48],['_exit(0)','系统调用',88],['abort()','SIGABRT',128]];
+  const CELLS=[['① atexit','逆序跑注册的清理函数 3→2→1',120],
+               ['② 刷 stdio','缓冲区里的字这时才写出去，然后关流',240],
+               ['③ 删 tmpfile','tmpfile() 建的临时文件在此清掉',360]];
+  const KS=[['关闭所有 fd','',0],['释放全部内存','',146],['给父进程发 SIGCHLD','',292],['留下退出状态','等父进程 wait',438]];
+  const steps=[
+    {title:'步骤 0 · 四个出口，差别全在用户态',chip:'总览',chipC:'c0',lines:[5,8,9,10],
+     ent:['','','',''],cells:['','',''],gate:0,by1:0,by2:0,ks:[0,0,0,0],
+     tok:null,msg:'左边四个入口 · 中间三段清理 · 右边内核那半段',msgC:'',
+     desc:'进程自己走的终止出口有四个。它们的区别不是「死没死」，而是<b>死之前 libc 替你做了多少收尾</b>——中间那三格，谁走谁不走。'},
+    {title:'步骤 1 · exit() 进第 ① 格：atexit 逆序',chip:'LIFO',chipC:'cb',lines:[3],
+     ent:['','on','',''],cells:['lit','',''],gate:0,by1:0,by2:0,ks:[0,0,0,0],
+     tok:{l:128,t:112,txt:'exit(0)',cls:''},msg:'注册 1→2→3，执行 3→2→1',msgC:'',
+     desc:'先跑 <code>atexit()</code> / <code>on_exit()</code> 注册的函数，顺序<b>倒过来</b>。逆序不是随便定的：后注册的清理往往依赖先注册的还没被拆掉，倒着跑才保证释放方向和获取方向相反。'},
+    {title:'步骤 2 · 第 ② 格：刷新并关闭 stdio 流',chip:'关键格',chipC:'ch',lines:[4],
+     ent:['','on','',''],cells:['done','lit',''],gate:0,by1:0,by2:0,ks:[0,0,0,0],
+     tok:{l:248,t:112,txt:'exit(0)',cls:''},msg:'没有 \\n 的那句 printf，到这一格才真正写出去',msgC:'warn',
+     desc:'<code>printf</code> 只是把字节放进用户态缓冲区，不等于写出去了。第 ② 格才做真正的 <code>write</code>。<span class="hb">这一格是下一个场景整段故事的起点</span>——它跳过与否，决定输出打一遍还是两遍。'},
+    {title:'步骤 3 · 第 ③ 格，然后落到 _exit(2)',chip:'交给内核',chipC:'cb',lines:[5],
+     ent:['','on','',''],cells:['done','done','lit'],gate:1,by1:0,by2:0,ks:[0,0,0,0],
+     tok:{l:483,t:112,txt:'→ _exit',cls:''},msg:'三格走完，exit() 自己调用 _exit(2)',msgC:'ok',
+     desc:'删掉 <code>tmpfile()</code> 建的临时文件，用户态的活就干完了。<code>exit()</code> 最后一步是<b>调用 <code>_exit(2)</code></b>——它不是内核调用的替代品，是它的外包装。'},
+    {title:'步骤 4 · _exit() 从下面绕过去',chip:'跳过三格',chipC:'ch',lines:[8],
+     ent:['','','on h',''],cells:['skip','skip','skip'],gate:1,by1:1,by2:0,ks:[0,0,0,0],
+     tok:{l:483,t:112,txt:'_exit(0)',cls:''},msg:'缓冲区不刷、atexit 不跑、临时文件不删',msgC:'warn',
+     desc:'<code>_exit()</code> 是真正的系统调用，直接进内核。三格全部跳过：<b>缓冲区里的字就此丢掉</b>，注册的清理函数一个也不跑。这正是 <code>fork</code> 后子进程失败路径要的行为。'},
+    {title:'步骤 5 · abort() 走信号这条路',chip:'拦不住',chipC:'cd',lines:[9],
+     ent:['','','','on d'],cells:['skip','skip','skip'],gate:1,by1:0,by2:1,ks:[0,0,0,0],
+     tok:{l:483,t:112,txt:'SIGABRT',cls:'d'},msg:'留 core · 父进程读到 WIFSIGNALED，WTERMSIG 返回 6',msgC:'bad',
+     desc:'<code>abort()</code> 给自己发 <code>SIGABRT</code>。它先把这个信号从阻塞集里放出来；就算你装了 handler 并正常返回，它也会把处置恢复成默认再发一次，<span class="dg">拦不住</span>。glibc 2.27 起明确<b>不刷缓冲区</b>，所以 abort 前那句 <code>printf</code> 很可能根本没落盘——排错信息走 <code>stderr</code>，它是无缓冲的。'},
+    {title:'步骤 6 · 内核那半段谁走都一样',chip:'收口',chipC:'cg',lines:[10],
+     ent:['on','on','on h','on d'],cells:['','',''],gate:1,by1:0,by2:0,ks:[1,1,1,1],
+     tok:{l:240,t:112,txt:'↓ 进内核',cls:''},msg:'四个出口在这里汇成同一条路',msgC:'ok',
+     desc:'不管从哪个出口进来，内核做的事都一样：关 fd、还内存、给父进程发 <code>SIGCHLD</code>、把退出状态扣在 <code>task_struct</code> 里等人来取。<code>return 0</code> 和 <code>exit(0)</code> 也是同一条路，差别只有 <code>return</code> 会先销毁 <code>main</code> 的局部变量——写 C 无所谓，写 C++ 就是析构函数跑不跑。'},
+  ];
+  function mount(){
+    let h='<div class="stage">';
+    ENT.forEach((e,i)=>{h+='<div class="xt-ent" id="xtE'+i+'" style="top:'+e[2]+'px">'+e[0]+'</div>';});
+    CELLS.forEach((c,i)=>{h+='<div class="xt-cell" id="xtC'+i+'" style="left:'+c[2]+'px"><b>'+c[0]+'</b><span>'+c[1]+'</span></div>';});
+    h+='<div class="xt-gate" id="xtGate"><b>_exit(2)</b><span>进内核</span></div>';
+    h+='<div class="xt-by" id="xtBy1" style="top:166px"></div><div class="xt-bl" id="xtBl1" style="top:144px;color:var(--brown)">_exit() 绕过 ①②③，直接进内核</div>';
+    h+='<div class="xt-by d" id="xtBy2" style="top:166px"></div><div class="xt-bl" id="xtBl2" style="top:144px;color:var(--danger)">abort() 走 SIGABRT，同样绕过</div>';
+    h+='<div class="xt-div">内核接手 · 以下四步谁走都一样</div>';
+    KS.forEach((k,i)=>{h+='<div class="xt-k" id="xtK'+i+'" style="left:'+k[2]+'px"><b>'+k[0]+'</b><span>'+k[1]+'</span></div>';});
+    h+='<div class="xt-tok" id="xtTok">exit(0)</div>';
+    h+='<div class="note" id="xtMsg"></div></div>';
+    viz.innerHTML='<div class="vcap"><b>四个终止出口</b>：三段用户态清理谁走谁跳过 · 内核那半段完全相同</div>'+h;
+  }
+  function paint(s){
+    ENT.forEach((e,i)=>setCls(el('xtE'+i),'xt-ent',s.ent[i]));
+    CELLS.forEach((c,i)=>setCls(el('xtC'+i),'xt-cell',s.cells[i]));
+    el('xtGate').classList.toggle('lit',!!s.gate);
+    el('xtBy1').classList.toggle('show',!!s.by1);el('xtBl1').classList.toggle('show',!!s.by1);
+    el('xtBy2').classList.toggle('show',!!s.by2);el('xtBl2').classList.toggle('show',!!s.by2);
+    KS.forEach((k,i)=>el('xtK'+i).classList.toggle('lit',!!s.ks[i]));
+    const t=el('xtTok');
+    if(s.tok){t.style.left=s.tok.l+'px';t.style.top=s.tok.t+'px';t.textContent=s.tok.txt;t.style.opacity=1;
+      t.style.background=s.tok.cls==='d'?'var(--danger)':'var(--ink)';
+      t.style.borderColor=s.tok.cls==='d'?'var(--danger)':'var(--ink)';}
+    else t.style.opacity=0;
+    const m=el('xtMsg');m.textContent=s.msg;setCls(m,'note',s.msgC);
+  }
+  return {id:'exit',label:'退出出口',sub:'exit · _exit · abort',steps,mount,paint,code};
+})();
+
+/* ========== 场景 3：fork 与 stdio 缓冲区 ========== */
+const bufScene=(()=>{
+  const code=codeOf([
+    'printf(<span class="str">"hi\\n"</span>);      <span class="cmt">// 先落进 stdio 缓冲区</span>',
+    '<span class="kw">if</span> (fork() == <span class="num">0</span>)',
+    '    <span class="kw">exit</span>(<span class="num">0</span>);         <span class="cmt">// 子进程刷掉自己那份副本</span>',
+    'wait(<span class="kw">NULL</span>);',
+    '<span class="kw">exit</span>(<span class="num">0</span>);             <span class="cmt">// 父进程再刷自己那份</span>',
+    '',
+    '<span class="cmt">// $ ./a.out          →  hi        行缓冲，fork 时已空</span>',
+    '<span class="cmt">// $ ./a.out &gt; f.txt  →  hi hi     全缓冲，副本刷两次</span>',
+    '',
+    '<span class="kw">if</span> (fork() == <span class="num">0</span>)',
+    '    _exit(<span class="num">0</span>);        <span class="cmt">// 不碰缓冲区，输出只出现一次</span>',
+  ]);
+  const steps=[
+    {title:'步骤 0 · printf 把字节交给谁',chip:'用户态',chipC:'c0',lines:[0],
+     mode:[0,0],pBuf:'"hi\\n"',pFull:1,cShow:0,cBuf:'',cFull:0,copy:0,
+     out:'输出目标',lines2:['',''],cls2:['',''],
+     msg:'数据在 libc 的缓冲区里，还没进内核',msgC:'',
+     desc:'<code>printf("hi\\n")</code> 返回时，那 3 个字节躺在<b>用户态的 stdio 缓冲区</b>里。什么时候写出去，取决于这个流的缓冲模式——而缓冲模式取决于 stdout 接的是什么。'},
+    {title:'步骤 1 · 接终端：行缓冲，遇 \\n 就刷',chip:'行缓冲',chipC:'cg',lines:[0,6],
+     mode:[1,0],pBuf:'空',pFull:0,cShow:0,cBuf:'',cFull:0,copy:0,
+     out:'终端',lines2:['hi',''],cls2:['on',''],
+     msg:'./a.out → 缓冲区当场清空',msgC:'ok',
+     desc:'stdout 连着终端时是<span class="gr">行缓冲</span>：遇到 <code>\\n</code> 立刻 <code>write</code> 出去。这一刻缓冲区已经空了——后面无论 fork 多少次，都没有副本可复制。'},
+    {title:'步骤 2 · 重定向到文件：全缓冲，字还在',chip:'全缓冲',chipC:'ch',lines:[0,7],
+     mode:[0,1],pBuf:'"hi\\n"',pFull:1,cShow:0,cBuf:'',cFull:0,copy:0,
+     out:'f.txt',lines2:['',''],cls2:['',''],
+     msg:'./a.out > f.txt → 缓冲区仍有 "hi\\n"',msgC:'warn',
+     desc:'同一个可执行文件，只是把 stdout 重定向到 <code>f.txt</code>，缓冲模式就变成<span class="hb">全缓冲</span>：攒满或流关闭才刷。<b>代码一个字没改，缓冲区状态却完全不同</b>——bug 的分水岭就在这里。'},
+    {title:'步骤 3 · fork() 连缓冲区一起复制',chip:'复制',chipC:'cd',lines:[1],
+     mode:[0,1],pBuf:'"hi\\n"',pFull:1,cShow:1,cBuf:'"hi\\n"',cFull:1,copy:1,
+     out:'f.txt',lines2:['',''],cls2:['',''],
+     msg:'子进程得到一份一模一样的缓冲区副本',msgC:'bad',
+     desc:'缓冲区是<b>普通的用户态内存</b>，<code>fork()</code> 复制地址空间时不会把它挑出来跳过。于是父子各握着一份 <code>"hi\\n"</code>，谁都还没写出去。'},
+    {title:'步骤 4 · 子进程 exit(0)，刷出副本',chip:'第一遍',chipC:'ch',lines:[2],
+     mode:[0,1],pBuf:'"hi\\n"',pFull:1,cShow:1,cBuf:'空',cFull:0,copy:0,
+     out:'f.txt',lines2:['hi',''],cls2:['on',''],
+     msg:'子走了上一场景的第 ② 格',msgC:'warn',
+     desc:'子进程 <code>exit(0)</code> 会走完那三格清理，第 ② 格把<span class="gr">它那份副本</span>写进 <code>f.txt</code>。到这里一切正常，文件里就一行。'},
+    {title:'步骤 5 · 父进程再刷一次，出现第二行',chip:'重复输出',chipC:'cd',lines:[4,7],
+     mode:[0,1],pBuf:'空',pFull:0,cShow:1,cBuf:'空',cFull:0,copy:0,
+     out:'f.txt',lines2:['hi','hi'],cls2:['on','dup'],
+     msg:'一句 printf，文件里两行 hi',msgC:'bad',
+     desc:'父进程退出时刷自己那份，<span class="dg">同一段文字出现两遍</span>。接终端跑一百次都正常，一重定向就翻车——因为行缓冲模式下 fork 时缓冲区本来就是空的。这类 bug 只在改了输出去向之后才现身。'},
+    {title:'步骤 6 · 子进程改用 _exit()',chip:'解法',chipC:'cg',lines:[9,10],
+     mode:[0,1],pBuf:'空',pFull:0,cShow:1,cBuf:'丢弃',cFull:0,copy:0,
+     out:'f.txt',lines2:['hi',''],cls2:['on',''],
+     msg:'副本随地址空间一起丢掉，输出只出现一次',msgC:'ok',
+     desc:'<code>_exit(0)</code> 跳过第 ② 格，子进程那份副本随地址空间销毁，一个字节都不写。<b>还有一件事：<code>atexit()</code> 注册的信息也被 <code>fork</code> 复制了</b>——子进程走 <code>exit</code> 会把父进程的清理逻辑再跑一遍。释放连接、写日志、删文件跑两次，后果比多打一行字严重得多。'},
+  ];
+  function mount(){
+    let h='<div class="stage">';
+    h+='<div class="bf-mode" id="bfM0" style="left:0">stdout → 终端（行缓冲）</div>';
+    h+='<div class="bf-mode" id="bfM1" style="left:295px">stdout → f.txt（全缓冲）</div>';
+    h+='<div class="bf-lane" style="top:42px"><span class="bf-tag">父进程 PID 1000</span>';
+    h+='<div class="bf-proc">printf("hi\\n")</div><div class="bf-ar"></div>';
+    h+='<div class="bf-buf" id="bfPbuf"><b>stdio 缓冲区</b><span class="bf-chip" id="bfPchip">空</span></div></div>';
+    h+='<div class="bf-copy" id="bfCopy"></div><div class="bf-cl" id="bfCl">fork 把缓冲区也复制了一份</div>';
+    h+='<div class="bf-lane" id="bfLaneC" style="top:152px"><span class="bf-tag">子进程 PID 2001</span>';
+    h+='<div class="bf-proc c">fork() 出来的副本</div><div class="bf-ar"></div>';
+    h+='<div class="bf-buf" id="bfCbuf"><b>stdio 缓冲区</b><span class="bf-chip" id="bfCchip">空</span></div></div>';
+    h+='<div class="bf-out"><div class="bf-outh" id="bfOutH">输出目标</div><div class="bf-lines">';
+    h+='<div class="bf-line" id="bfL0">hi</div><div class="bf-line" id="bfL1">hi</div>';
+    h+='</div></div>';
+    h+='<div class="note" id="bfMsg"></div></div>';
+    viz.innerHTML='<div class="vcap"><b>fork 与 stdio 缓冲区</b>：接终端正常，一重定向就打两遍</div>'+h;
+  }
+  function paint(s){
+    el('bfM0').className='bf-mode'+(s.mode[0]?' on':'');
+    el('bfM1').className='bf-mode'+(s.mode[1]?' on warn':'');
+    el('bfPchip').textContent=s.pBuf;el('bfPchip').className='bf-chip'+(s.pFull?' full':'');
+    el('bfPbuf').className='bf-buf'+(s.pFull?' hot':'');
+    el('bfLaneC').style.opacity=s.cShow?1:.22;
+    el('bfCchip').textContent=s.cBuf||'—';el('bfCchip').className='bf-chip'+(s.cFull?' full':'');
+    el('bfCbuf').className='bf-buf'+(s.cFull?' hot':'');
+    el('bfCopy').classList.toggle('show',!!s.copy);el('bfCl').classList.toggle('show',!!s.copy);
+    el('bfOutH').textContent='输出目标 · '+s.out;
+    for(let i=0;i<2;i++){const L=el('bfL'+i);L.textContent=s.lines2[i]||'hi';setCls(L,'bf-line',s.cls2[i]);}
+    const m=el('bfMsg');m.textContent=s.msg;setCls(m,'note',s.msgC);
+  }
+  return {id:'buffer',label:'stdio 缓冲区',sub:'fork 后打两遍',steps,mount,paint,code};
+})();
+
+/* ========== 场景 4：status 位布局 ========== */
+const statusScene=(()=>{
+  const code=codeOf([
+    '<span class="kw">int</span> status;',
+    'waitpid(pid, &amp;status, <span class="num">0</span>);',
+    '',
+    '<span class="kw">if</span> (WIFEXITED(status))                 <span class="cmt">// 低字节 == 0？</span>',
+    '    printf(<span class="str">"%d\\n"</span>, WEXITSTATUS(status));  <span class="cmt">// 取高字节</span>',
+    '<span class="kw">else if</span> (WIFSIGNALED(status))          <span class="cmt">// 低 7 位是信号号</span>',
+    '    printf(<span class="str">"sig %d\\n"</span>, WTERMSIG(status));',
+    '<span class="kw">else if</span> (WIFSTOPPED(status))           <span class="cmt">// 低字节 == 0x7F</span>',
+    '    printf(<span class="str">"stop %d\\n"</span>, WSTOPSIG(status));',
+    '',
+    '<span class="cmt">// exit(42) → status = 42 &lt;&lt; 8 = 10752</span>',
+    '<span class="cmt">// SIGKILL  → status = 9，低 7 位就是 9</span>',
+    '<span class="cmt">// exit(-1) → 读回 255，退出码只有 8 位</span>',
+  ]);
+  // bits：长度 16，index 0 = bit15 … index 15 = bit0；cls 同长
+  const B=(hi,lo)=>{const v=(hi<<8)|lo,out=[];for(let b=15;b>=0;b--)out.push((v>>b)&1);return out;};
+  const C=(kind)=>{ // 每一位的语义色
+    const out=[];
+    for(let b=15;b>=0;b--){
+      if(kind==='exit')      out.push(b>=8?'code':'');
+      else if(kind==='sig')  out.push(b===7?'core':(b<7?'sig':''));
+      else if(kind==='stop') out.push(b>=8?'sig':'sent');
+      else out.push('');
+    }
+    return out;
+  };
+  const steps=[
+    {title:'步骤 0 · status 不是退出码',chip:'先破一个误解',chipC:'cd',lines:[10],
+     val:'10752',hex:'0x2A00',tag:'exit(42) 之后',tagC:'',
+     bits:B(42,0),cls:C(''),rows:[0,0,0],chain:['','',''],msg:'exit(42) 之后 status = 10752，不是 42',msgC:'bad',
+     desc:'子进程 <code>exit(42)</code>，父进程 <code>wait</code> 回来的 <code>status</code> 是 <b>10752</b>。<code>if (status == 42)</code> <span class="dg">永远为假</span>。这是本节最容易踩的地方——<code>status</code> 是一个打包好的位字段，不是那个数本身。'},
+    {title:'步骤 1 · 高字节放退出码',chip:'42 << 8',chipC:'cb',lines:[10],
+     val:'10752',hex:'0x2A00 = 00101010 00000000',tag:'正常退出',tagC:'b',
+     bits:B(42,0),cls:C('exit'),rows:[1,0,0],chain:['on','',''],msg:'高字节 = 42 · 低字节 = 0 就是「正常退出」的标记',msgC:'info',
+     desc:'摊开成 16 位就清楚了：高字节 <code>00101010</code> 正是 42，低字节全 0。内核的编码规则是<b>低字节说「怎么没的」，高字节说「具体是多少」</b>。低字节为 0 就代表「正常退出」，这也是 <code>WIFEXITED</code> 检查的东西。'},
+    {title:'步骤 2 · 两个宏各管一半',chip:'判类型 + 取值',chipC:'cb',lines:[3,4],
+     val:'10752',hex:'0x2A00',tag:'WIFEXITED 为真',tagC:'g',
+     bits:B(42,0),cls:C('exit'),rows:[1,0,0],chain:['hit','',''],msg:'WIFEXITED 判类型 · WEXITSTATUS 取值，两个宏各管一半',msgC:'ok',
+     desc:'<code>WIFEXITED</code> 看低字节，回答「是不是正常退出」；<code>WEXITSTATUS</code> 把高字节取出来，回答「退出码是多少」。<b>一个判类型，一个取值，缺一不可。</b>'},
+    {title:'步骤 3 · 被信号打死：低 7 位换成信号号',chip:'SIGKILL = 9',chipC:'cd',lines:[5,6,11],
+     val:'9',hex:'0x0009 = 00000000 00001001',tag:'WIFSIGNALED 为真',tagC:'d',
+     bits:B(0,9),cls:C('sig'),rows:[0,1,0],chain:['','hit',''],msg:'信号号在低 7 位 · bit7 单独留给 core dump 标志',msgC:'bad',
+     desc:'编码整个反过来：信号号挤在<span class="dg">低 7 位</span>，第 7 位单独留给 <b>core dump 标志</b>，高字节空着。所以 <code>WTERMSIG</code> 取的是低 7 位，<code>WCOREDUMP</code> 看的就是那一位（glibc 扩展，用前先 <code>#ifdef</code>）。'},
+    {title:'步骤 4 · 停止状态：0x7F 当哨兵',chip:'SIGTSTP = 20',chipC:'ch',lines:[7,8],
+     val:'5247',hex:'0x147F = 00010100 01111111',tag:'WIFSTOPPED 为真',tagC:'',
+     bits:B(20,0x7F),cls:C('stop'),rows:[0,0,1],chain:['','','hit'],msg:'0x7F 在前两种编码里都不可能出现，所以能当哨兵',msgC:'warn',
+     desc:'第三种编码：低字节钉死成 <code>0x7F</code> 当<span class="gr">哨兵</span>，信号号挪到高字节去。这个值在前两种编码里都不可能出现，内核靠它区分「停止」和「终止」。要看到这一路，<code>waitpid</code> 得带上 <code>WUNTRACED</code>。'},
+    {title:'步骤 5 · 顺序不能颠倒',chip:'静默的坑',chipC:'cd',lines:[3,5,7],
+     val:'9',hex:'被 SIGKILL 打死的 status',tag:'WEXITSTATUS 读回 0',tagC:'d',
+     bits:B(0,9),cls:C('sig'),rows:[0,1,0],chain:['trap','hit',''],msg:'类型判错，取值一定错，而且不会报任何错',msgC:'bad',
+     desc:'对着一个被 <code>SIGKILL</code> 打死的 <code>status</code> 调 <code>WEXITSTATUS</code>，<b>语法完全合法</b>，读回来是 0 —— 看着像执行成功，实际进程是被打死的。<span class="dg">先用 <code>WIF*</code> 问清楚属于哪一类，才知道该去高字节还是低字节取值。</span>'},
+    {title:'步骤 6 · 8 位的天花板与 shell 的另一套账',chip:'收口',chipC:'cg',lines:[12],
+     val:'255',hex:'exit(-1) 之后 WEXITSTATUS 的结果',tag:'退出码只有 8 位',tagC:'',
+     bits:B(255,0),cls:C('exit'),rows:[1,0,0],chain:['hit','',''],msg:'echo $? 的 128+N 是 shell 的账本，和这张位图不是一套',msgC:'ok',
+     desc:'退出码就一个字节：<code>exit(-1)</code> 读回 255，<code>exit(256)</code> 读回 0。想传更大的值只能另找通道（管道、共享内存）。另外，<code>echo $?</code> 看到的 137 是 bash 自己算的 <code>128+9</code>，<b>那是 shell 的展示约定，和这张位图不是一套编码</b>，别混着推。'},
+  ];
+  function mount(){
+    let h='<div class="stage">';
+    h+='<div class="st-val">status = <b id="stV">0</b><em id="stH"></em><span class="tagx" id="stTag"></span></div>';
+    h+='<div class="st-bits"><div class="st-half">';
+    for(let b=15;b>=8;b--)h+='<div class="st-bit" id="stB'+b+'"><b>0</b><i>'+b+'</i></div>';
+    h+='</div><div class="st-half">';
+    for(let b=7;b>=0;b--)h+='<div class="st-bit" id="stB'+b+'"><b>0</b><i>'+b+'</i></div>';
+    h+='</div></div>';
+    h+='<div class="st-halfl" style="left:0">高字节 bit15–8</div><div class="st-halfl" style="left:285px">低字节 bit7–0</div>';
+    h+='<div class="st-rows">';
+    h+='<div class="st-r b" id="stR0"><b>正常退出</b><span>低字节 = 0，退出码放在高字节</span></div>';
+    h+='<div class="st-r d" id="stR1"><b>信号终止</b><span>低 7 位 = 信号号，bit7 = core 标志</span></div>';
+    h+='<div class="st-r h" id="stR2"><b>停止</b><span>低字节 = 0x7F 哨兵，信号号在高字节</span></div>';
+    h+='</div>';
+    h+='<div class="st-chain"><div class="st-c" id="stC0">WIFEXITED</div><span class="st-ar">›</span>';
+    h+='<div class="st-c" id="stC1">WIFSIGNALED</div><span class="st-ar">›</span><div class="st-c" id="stC2">WIFSTOPPED</div></div>';
+    h+='<div class="note" id="stMsg"></div></div>';
+    viz.innerHTML='<div class="vcap"><b>status 位布局</b>：低字节说「怎么没的」，高字节说「具体是多少」</div>'+h;
+  }
+  function paint(s){
+    el('stV').textContent=s.val;el('stH').textContent=s.hex;
+    const t=el('stTag');t.textContent=s.tag;setCls(t,'tagx',s.tagC);
+    for(let i=0;i<16;i++){
+      const b=15-i,node=el('stB'+b);
+      node.querySelector('b').textContent=s.bits[i];
+      setCls(node,'st-bit',s.cls[i]);
+    }
+    const rc=['b','d','h'];
+    for(let i=0;i<3;i++)setCls(el('stR'+i),'st-r '+rc[i],s.rows[i]?'lit':'');
+    for(let i=0;i<3;i++)setCls(el('stC'+i),'st-c',s.chain[i]);
+    const m=el('stMsg');m.textContent=s.msg;setCls(m,'note',s.msgC);
+  }
+  return {id:'status',label:'status 位布局',sub:'exit(42) → 10752',steps,mount,paint,code};
+})();
+
+/* ========== 场景 5：进程组与前台组 ========== */
+const pgScene=(()=>{
+  const code=codeOf([
+    'setpgid(<span class="num">0</span>, <span class="num">0</span>);                 <span class="cmt">// 把自己变成新组的组长</span>',
+    '',
+    'kill(-pgid, SIGTERM);          <span class="cmt">// 负号 = 整个进程组</span>',
+    'killpg(pgid, SIGTERM);         <span class="cmt">// 同一件事，意图写在名字里</span>',
+    '',
+    'tcsetpgrp(STDIN_FILENO, pgid); <span class="cmt">// fg 改的就是终端记的值</span>',
+    'pid_t fg = tcgetpgrp(STDIN_FILENO);',
+    '',
+    '<span class="kw">if</span> (fork() &gt; <span class="num">0</span>) _exit(<span class="num">0</span>);      <span class="cmt">// 先 fork，保证自己不是组长</span>',
+    'setsid();                      <span class="cmt">// 新会话 + 新组 + 丢掉控制终端</span>',
+    '',
+    '<span class="cmt">// kill(0, sig)  → 自己所在的整组，包括自己</span>',
+  ]);
+  const steps=[
+    {title:'步骤 0 · 一条管道是三个进程、一个组',chip:'PGID',chipC:'c0',lines:[0],
+     tpgid:'tpgid = 4712',tpMoved:0,fgOn:1,bgOn:0,p:['','','',''],dim:0,
+     bar:'ls | grep foo | wc -l　→　三个 PID，一个 PGID 4712',barC:'',
+     desc:'敲一条管道命令，起来的是三个进程。内核没法凭「看起来像一条命令」认出这个整体，所以在 PID 之上加了一层身份：<b>进程组</b>。<span class="bl">PGID 就是组长的 PID</span>——这里是第一个进程 <code>ls</code> 的 4712。'},
+    {title:'步骤 1 · 三层身份，范围层层放大',chip:'PID / PGID / SID',chipC:'cb',lines:[],
+     tpgid:'tpgid = 4712',tpMoved:0,fgOn:1,bgOn:1,p:['','','',''],dim:0,
+     bar:'PID 认一个进程 · PGID 认一个作业 · SID 认一次登录',barC:'b',
+     desc:'再往上还有<b>会话</b>，对应一次登录或一个终端窗口。一个会话里最多挂一个控制终端、同一时刻只有一个前台组、后台组要多少有多少。<code>&amp;</code> 起来的每个作业各占一个组。'},
+    {title:'步骤 2 · Ctrl+C 打的是整个前台组',chip:'SIGINT',chipC:'cd',lines:[2],
+     tpgid:'tpgid = 4712',tpMoved:0,fgOn:1,bgOn:1,p:['hit','hit','hit',''],dim:0,
+     bar:'Ctrl+C → SIGINT → 进程组 4712 的每一个成员',barC:'d',
+     desc:'终端把 <code>Ctrl+C</code> 翻译成 <code>SIGINT</code>，发给<span class="dg">整个前台进程组</span>，三个进程一起收到。<code>Ctrl+Z</code>（SIGTSTP）和 <code>Ctrl+\\</code>（SIGQUIT）同理。这是进程组存在的头号理由：一次投递打中一批。'},
+    {title:'步骤 3 · 后台组在同一会话，但收不到',chip:'边界',chipC:'ch',lines:[0],
+     tpgid:'tpgid = 4712',tpMoved:0,fgOn:1,bgOn:1,p:['hit','hit','hit',''],dim:0,
+     bar:'sleep 100 & 在组 4730，Ctrl+C 打不到它',barC:'h',
+     desc:'<code>sleep 100 &amp;</code> 起来的作业自己占一个组。同一个会话、同一个终端，但不在前台组里，所以 <code>Ctrl+C</code> 与它无关。<b>建一个新组，本质上就是划一条边界</b>，把「要一起收信号的」和「不该被波及的」分开——这也是 <code>setpgid(0, 0)</code> 在做的事。'},
+    {title:'步骤 4 · 「谁在前台」记在终端里',chip:'tcsetpgrp',chipC:'cb',lines:[5,6],
+     tpgid:'tpgid = 4730',tpMoved:1,fgOn:0,bgOn:1,p:['','','',''],dim:0,
+     bar:'fg %1 → tcsetpgrp(fd, 4730) → 前台组换人',barC:'b',
+     desc:'进程自己并不知道是不是前台。这条信息<b>是终端的属性</b>，内核要用时拿终端里记的那个 PGID 去比对。<code>fg</code> 和 <code>bg</code> 的核心就是 <code>tcsetpgrp()</code> 改这个值——也正因为它是终端的属性，一个终端同一时刻只能有一个前台组。'},
+    {title:'步骤 5 · 后台组去读终端会被停住',chip:'SIGTTIN',chipC:'ch',lines:[],
+     tpgid:'tpgid = 4712',tpMoved:0,fgOn:1,bgOn:1,p:['','','','stop'],dim:0,
+     bar:'后台读 stdin → SIGTTIN → jobs 显示 Stopped (tty input)',barC:'h',
+     desc:'前后台的差别不止收不收信号。后台组去<b>读</b>终端，内核发 <code>SIGTTIN</code> 把整组停住；去<b>写</b>终端默认放行，所以后台任务的输出会直接糊在屏幕上。想拦住写，<code>stty tostop</code>。'},
+    {title:'步骤 6 · kill 的 pid 带符号 · setsid 脱离会话',chip:'收口',chipC:'cg',lines:[2,3,8,9,11],
+     tpgid:'无控制终端',tpMoved:1,fgOn:0,bgOn:0,p:['','','',''],dim:1,
+     bar:'守护进程 · 新会话 SID 5001 · Ctrl+C 和 SIGHUP 都够不着',barC:'g',
+     desc:'<code>kill</code> 的第一个参数是<b>带符号</b>的：<code>&gt;0</code> 单个进程，<code>==0</code> 自己所在的整组（包括自己），<code>&lt;-1</code> 指定组，<code>==-1</code> 几乎所有。变量忘了赋值留成 0 就是事故。<code>killpg(pgid, sig)</code> 把那个负号写成了名字。<br><br><code>setsid()</code> 一次做三件事：新建会话、新建进程组、<span class="gr">丢掉控制终端</span>。它<b>要求调用者不是组长</b>，所以守护进程得先 <code>fork</code> 一次让子进程去调。脱离会话之后，终端断开时的 <code>SIGHUP</code> 从一开始就发不到它头上。'},
+  ];
+  function mount(){
+    let h='<div class="stage">';
+    h+='<div class="pg-sess" id="pgSess"><div class="pg-sh">会话 SID 4700<span class="pg-tty">控制终端 /dev/pts/0</span><span class="pg-tp" id="pgTp">tpgid = 4712</span></div>';
+    h+='<div class="pg-grp fg" id="pgG0"><div class="pg-gh">进程组 4712　<em>前台</em></div><div class="pg-ps">';
+    h+='<div class="pg-p" id="pgP0">ls<small>PID 4712 · 组长</small></div>';
+    h+='<div class="pg-p" id="pgP1">grep foo<small>PID 4713</small></div>';
+    h+='<div class="pg-p" id="pgP2">wc -l<small>PID 4714</small></div>';
+    h+='</div></div>';
+    h+='<div class="pg-grp" id="pgG1"><div class="pg-gh">进程组 4730　<em>后台</em></div><div class="pg-ps one">';
+    h+='<div class="pg-p" id="pgP3">sleep 100 &amp;<small>PID 4730 · 组长</small></div>';
+    h+='</div></div></div>';
+    h+='<div class="pg-bar" id="pgBar"></div>';
+    h+='</div>';
+    viz.innerHTML='<div class="vcap"><b>进程组与会话</b>：终端信号发给整个前台组 · 前台是终端的属性</div>'+h;
+  }
+  function paint(s){
+    const tp=el('pgTp');tp.textContent=s.tpgid;tp.classList.toggle('moved',!!s.tpMoved);
+    setCls(el('pgG0'),'pg-grp',s.fgOn?'fg':'');
+    setCls(el('pgG1'),'pg-grp',s.bgOn&&!s.fgOn?'bgnow':'');
+    el('pgG1').style.opacity=s.bgOn?1:.35;
+    for(let i=0;i<4;i++)setCls(el('pgP'+i),'pg-p',s.p[i]);
+    el('pgSess').classList.toggle('dim',!!s.dim);
+    const b=el('pgBar');b.textContent=s.bar;setCls(b,'pg-bar',s.barC);
+  }
+  return {id:'pgroup',label:'进程组与会话',sub:'前台组 · kill 符号',steps,mount,paint,code};
+})();
+
+/* ========== 引擎 ========== */
+const SCENES=[execScene,exitScene,bufScene,statusScene,pgScene];
+const tabsBox=document.getElementById('tabs');
+const stTitle=document.getElementById('stTitle'),stChip=document.getElementById('stChip'),stAct=document.getElementById('stAct'),stDesc=document.getElementById('stDesc');
+const codeBox=document.getElementById('codeBox'),readout=document.getElementById('readout'),dotsBox=document.getElementById('dots');
+const btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnPlay=document.getElementById('btnPlay');
+
+SCENES.forEach((sc,i)=>{const b=document.createElement('button');b.className='tab';b.innerHTML='<span class="t">'+sc.label+'</span><span class="s">'+sc.sub+'</span>';b.onclick=()=>{stop();switchScene(i);};tabsBox.appendChild(b);});
+let si=0,cur=0,dotEls=[];
+function switchScene(i){
+  si=i;cur=0;
+  [...tabsBox.children].forEach((t,idx)=>t.classList.toggle('on',idx===si));
+  SCENES[si].mount();codeBox.innerHTML=SCENES[si].code;
+  dotsBox.innerHTML='';dotEls=[];
+  SCENES[si].steps.forEach((s,idx)=>{const d=document.createElement('button');d.className='dot';d.title=s.title;d.onclick=()=>{stop();go(idx);};dotsBox.appendChild(d);dotEls.push(d);});
+  go(0);
+}
+function go(i){
+  const steps=SCENES[si].steps;cur=Math.max(0,Math.min(steps.length-1,i));const s=steps[cur];
+  SCENES[si].paint(s);
+  codeBox.querySelectorAll('.cl').forEach((ln,idx)=>ln.classList.toggle('hl',!!(s.lines&&s.lines.includes(idx))));
+  stTitle.textContent=SCENES[si].label;stChip.textContent=s.chip;stChip.className='chip '+s.chipC;stAct.innerHTML='▸ '+s.title;stDesc.innerHTML=s.desc;
+  dotEls.forEach((d,idx)=>{d.classList.toggle('now',idx===cur);d.classList.toggle('done',idx<cur);});
+  readout.textContent=cur+' / '+(steps.length-1);
+  btnPrev.disabled=cur===0;btnNext.disabled=cur===steps.length-1;
+  try{history.replaceState(null,'','#scene='+SCENES[si].id+'&step='+cur);}catch(e){}
+  if(cur===steps.length-1)stop();
+}
+let timer=null,ms=2800;
+function play(){const steps=SCENES[si].steps;if(cur===steps.length-1)go(0);btnPlay.textContent='⏸ 暂停';timer=setInterval(()=>{cur<SCENES[si].steps.length-1?go(cur+1):stop();},ms);}
+function stop(){if(timer){clearInterval(timer);timer=null;}btnPlay.textContent='▶ 播放';}
+btnPlay.onclick=()=>timer?stop():play();
+btnPrev.onclick=()=>{stop();go(cur-1);};
+btnNext.onclick=()=>{stop();go(cur+1);};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();go(cur+1);}else if(e.key==='ArrowLeft'){stop();go(cur-1);}else if(e.key===' '){e.preventDefault();timer?stop():play();}});
+const hm=location.hash.match(/scene=(\w+)/),sm=location.hash.match(/step=(\d+)/);
+let initScene=0;if(hm){const idx=SCENES.findIndex(x=>x.id===hm[1]);if(idx>=0)initScene=idx;}
+switchScene(initScene);if(sm)go(+sm[1]);
+</script>
+</body>
+</html>

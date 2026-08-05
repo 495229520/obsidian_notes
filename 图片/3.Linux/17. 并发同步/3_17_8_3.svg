@@ -1,73 +1,134 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 480" width="940" height="480">
-  <rect x="0" y="0" width="940" height="480" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 840" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrP" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
     </marker>
   </defs>
-  <title>读多写少：shared_ptr 原子替换（双缓冲）</title>
-  <desc>读者持有旧快照的 shared_ptr 无锁读取，写者构造新副本后原子替换指针，旧快照引用计数归零后回收。</desc>
 
-  <text x="470" y="30" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
-    读多写少：shared_ptr 原子替换（双缓冲）
-  </text>
-  <text x="470" y="54" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
-    读者无锁读旧快照，写者造新副本后原子换指针，引用计数归零自动回收旧版
-  </text>
+  <rect x="0" y="0" width="1240" height="840" fill="#F5F4ED"/>
 
-  <rect x="80" y="100" width="300" height="70" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="230" y="124" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#0C447C">读者线程</text>
-  <text x="230" y="146" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#0C447C">g = ptr.load(); 读 *g（无锁）</text>
+  <title>读多写少的三级台阶：读写锁、双缓冲原子替换与 RCU</title>
+  <desc>上半用四个时刻的引用计数快照展示双缓冲下新旧版本的共存与回收时机；下半对照 shared_mutex、atomic shared_ptr 双缓冲与 RCU 在读侧开销、写侧开销、数据新鲜度上的取舍。</desc>
 
-  <rect x="560" y="100" width="300" height="70" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="710" y="124" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">写者线程</text>
-  <text x="710" y="146" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#633806">造 v2 → ptr.store(v2)（原子）</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">读多写少的三级台阶：读写锁 → 双缓冲原子替换 → RCU</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">每上一级，读侧写共享变量的次数就更少；代价是写侧更贵、读到的数据更可能是上一版</text>
 
-  <rect x="320" y="235" width="300" height="60" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
-  <text x="470" y="255" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">atomic&lt;shared_ptr&lt;Data&gt;&gt;</text>
-  <text x="470" y="277" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">当前指针</text>
+  <text x="48" y="112" font-size="14" font-weight="700" fill="#4A473F">A · 双缓冲的四个时刻：旧版本什么时候才真的被回收</text>
 
-  <rect x="80" y="355" width="320" height="60" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="240" y="375" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#085041">快照 v1（旧）</text>
-  <text x="240" y="397" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#085041">引用计数归零后回收</text>
+  <rect x="56" y="124" width="1128" height="320" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <rect x="540" y="355" width="320" height="60" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="700" y="375" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#085041">快照 v2（新）</text>
-  <text x="700" y="397" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#085041">指针现指向此版本</text>
+  <text x="70" y="150" font-size="12" font-weight="700" fill="#4A473F">方框里的 rc 是 shared_ptr 的引用计数，回收时机完全由它决定</text>
 
-  <!-- 读者持有旧快照 -->
-  <path d="M225 170 L235 355" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="170" y="262" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#185FA5">持有旧快照继续读</text>
-  <!-- 写者造新副本 -->
-  <path d="M715 170 L705 355" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="785" y="262" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#854F0B">构造新副本</text>
-  <!-- 写者原子 store -->
-  <path d="M560 150 L612 235" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="556" y="196" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#854F0B">原子 store</text>
-  <!-- 指针指向 v2 -->
-  <path d="M520 285 L600 355" fill="none" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="600" y="318" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#3C3489">现指向 v2</text>
+  <rect x="68" y="160" width="264" height="250" rx="7" fill="#F7F6F0" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="68" y="160" width="264" height="26" rx="7" fill="#EDEBE3"/>
+  <text x="200" y="178" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">t1 · 读者 R1 取快照</text>
+  <rect x="130" y="196" width="140" height="30" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="200" y="216" font-size="10.5" font-weight="700" fill="#6B5B95" text-anchor="middle">cfg</text>
+  <path d="M200,226 L200,244 L145,244 L145,262" fill="none" stroke="#6B5B95" stroke-width="1.5" marker-end="url(#arrP)"/>
+  <rect x="90" y="264" width="110" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="145" y="286" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">v1</text>
+  <text x="145" y="306" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">rc = 2</text>
+  <rect x="212" y="264" width="106" height="56" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="265" y="296" font-size="10" fill="#6B675C" text-anchor="middle">v2 尚不存在</text>
+  <text x="82" y="346" font-size="10" fill="#4A473F">cfg 一份 + R1 手里一份</text>
+  <text x="82" y="366" font-size="10" fill="#4A473F">R1 之后一直读这一份</text>
+  <text x="82" y="386" font-size="10" fill="#4A473F">读侧只做一次原子 load</text>
 
-  <text x="470" y="440" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
-    读者全程无锁；写者以一次完整拷贝换取读侧零阻塞，适合读远多于写、可容忍读到稍旧数据的场景
-  </text>
+  <rect x="348" y="160" width="264" height="250" rx="7" fill="#F7F6F0" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="348" y="160" width="264" height="26" rx="7" fill="#EDEBE3"/>
+  <text x="480" y="178" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">t2 · 写者拷出新副本</text>
+  <rect x="410" y="196" width="140" height="30" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="480" y="216" font-size="10.5" font-weight="700" fill="#6B5B95" text-anchor="middle">cfg</text>
+  <path d="M480,226 L480,244 L425,244 L425,262" fill="none" stroke="#6B5B95" stroke-width="1.5" marker-end="url(#arrP)"/>
+  <rect x="370" y="264" width="110" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="425" y="286" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">v1</text>
+  <text x="425" y="306" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">rc = 2</text>
+  <rect x="492" y="264" width="106" height="56" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="545" y="286" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">v2</text>
+  <text x="545" y="306" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">rc = 1</text>
+  <text x="362" y="346" font-size="10" fill="#4A473F">写者在自己的副本上改</text>
+  <text x="362" y="366" font-size="10" fill="#4A473F">还没发布，读者一无所知</text>
+  <text x="362" y="386" font-size="10" fill="#4A473F">这一步是整份拷贝，最贵</text>
+
+  <rect x="628" y="160" width="264" height="250" rx="7" fill="#F7F6F0" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="628" y="160" width="264" height="26" rx="7" fill="#EDEBE3"/>
+  <text x="760" y="178" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">t3 · 一次原子 store</text>
+  <rect x="690" y="196" width="140" height="30" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.6"/>
+  <text x="760" y="216" font-size="10.5" font-weight="700" fill="#6B5B95" text-anchor="middle">cfg</text>
+  <path d="M760,226 L760,244 L825,244 L825,262" fill="none" stroke="#6B5B95" stroke-width="1.5" marker-end="url(#arrP)"/>
+  <rect x="650" y="264" width="110" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="705" y="286" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">v1</text>
+  <text x="705" y="306" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">rc = 1</text>
+  <rect x="772" y="264" width="106" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="825" y="286" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">v2</text>
+  <text x="825" y="306" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">rc = 2</text>
+  <text x="642" y="346" font-size="10" fill="#4A473F">新来的 R2 读到的是 v2</text>
+  <text x="642" y="366" font-size="10" fill="#4A473F">R1 手里仍是完整的 v1</text>
+  <text x="642" y="386" font-size="10" fill="#4A473F">切换本身只是一次指针写</text>
+
+  <rect x="908" y="160" width="264" height="250" rx="7" fill="#F7F6F0" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="908" y="160" width="264" height="26" rx="7" fill="#EDEBE3"/>
+  <text x="1040" y="178" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">t4 · 旧版本自动回收</text>
+  <rect x="970" y="196" width="140" height="30" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="1040" y="216" font-size="10.5" font-weight="700" fill="#6B5B95" text-anchor="middle">cfg</text>
+  <path d="M1040,226 L1040,244 L1105,244 L1105,262" fill="none" stroke="#6B5B95" stroke-width="1.5" marker-end="url(#arrP)"/>
+  <rect x="930" y="264" width="110" height="56" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="985" y="286" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">v1</text>
+  <text x="985" y="306" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">rc = 0 → 析构</text>
+  <rect x="1052" y="264" width="106" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="1105" y="286" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">v2</text>
+  <text x="1105" y="306" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">rc = 2</text>
+  <text x="922" y="346" font-size="10" fill="#4A473F">R1 用完，最后一个引用没了</text>
+  <text x="922" y="366" font-size="10" fill="#4A473F">写者不必等任何读者</text>
+  <text x="922" y="386" font-size="10" fill="#4A473F">回收时机由引用计数决定</text>
+
+  <text x="70" y="430" font-size="10.5" font-weight="700" fill="#24473F">读者拿到的永远是某一版的完整快照，绝不会看到改到一半的数据 —— 这是双缓冲最值钱的性质</text>
+
+  <text x="48" y="478" font-size="14" font-weight="700" fill="#4A473F">B · 三级台阶的取舍</text>
+
+  <rect x="56" y="490" width="1128" height="252" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="68" y="512" width="1104" height="26" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="530" font-size="10.5" font-weight="700" fill="#4A473F">方案</text>
+  <text x="290" y="530" font-size="10.5" font-weight="700" fill="#4A473F">读侧开销</text>
+  <text x="520" y="530" font-size="10.5" font-weight="700" fill="#4A473F">写侧开销</text>
+  <text x="750" y="530" font-size="10.5" font-weight="700" fill="#4A473F">读到的数据</text>
+  <text x="912" y="530" font-size="10.5" font-weight="700" fill="#4A473F">什么时候用</text>
+
+  <line x1="68" y1="600" x2="1172" y2="600" stroke="#E4E1D6" stroke-width="1"/>
+  <line x1="68" y1="660" x2="1172" y2="660" stroke="#E4E1D6" stroke-width="1"/>
+  <line x1="68" y1="720" x2="1172" y2="720" stroke="#E4E1D6" stroke-width="1"/>
+
+  <text x="80" y="560" font-size="11" font-weight="700" fill="#6B4E28">std::shared_mutex</text>
+  <text x="290" y="560" font-size="10.5" fill="#4A473F">拿共享锁，仍要改同一份计数</text>
+  <text x="520" y="560" font-size="10.5" fill="#733428">独占，所有读者停下等</text>
+  <text x="750" y="560" font-size="10.5" font-weight="700" fill="#24473F">一定是最新</text>
+  <text x="912" y="560" font-size="10.5" fill="#4A473F">读写比不悬殊、临界区短</text>
+  <text x="80" y="582" font-size="10" fill="#6B675C">读者也在写同一条 cache line，核数越多越糟，见下一张图</text>
+
+  <text x="80" y="620" font-size="11" font-weight="700" fill="#2C4460">atomic&lt;shared_ptr&gt; 双缓冲</text>
+  <text x="290" y="620" font-size="10.5" font-weight="700" fill="#24473F">一次原子 load，不阻塞</text>
+  <text x="520" y="620" font-size="10.5" fill="#733428">整份拷贝一次</text>
+  <text x="750" y="620" font-size="10.5" fill="#6B4E28">可能是上一版</text>
+  <text x="912" y="620" font-size="10.5" fill="#4A473F">配置热更新：读极多写极少</text>
+  <text x="80" y="642" font-size="10" fill="#6B675C">写侧代价随数据规模线性增长，大对象要慎用</text>
+
+  <text x="80" y="680" font-size="11" font-weight="700" fill="#6B5B95">RCU</text>
+  <text x="290" y="680" font-size="10.5" font-weight="700" fill="#24473F">近似为零，读侧不写共享变量</text>
+  <text x="520" y="680" font-size="10.5" fill="#733428">拷贝 + 等宽限期</text>
+  <text x="750" y="680" font-size="10.5" fill="#6B4E28">可能是上一版</text>
+  <text x="912" y="680" font-size="10.5" fill="#4A473F">内核；用户态要专门库</text>
+  <text x="80" y="702" font-size="10" fill="#6B675C">宽限期要等所有读者离开临界区，回收被推迟</text>
+
+  <text x="80" y="732" font-size="10.5" font-weight="700" fill="#733428">往下走的前提是业务能容忍读到稍旧的数据；不能容忍时，第一级才是唯一选择</text>
+
+  <text x="48" y="772" font-size="11.5" fill="#4A473F">读写锁在读极多时反而可能不快：共享计数本身就是被所有核反复争抢的写点，并发度越高越明显。</text>
+  <text x="48" y="794" font-size="11.5" fill="#4A473F">双缓冲把「拷贝」这笔一次性成本挪到写侧，换来读侧完全无锁——只有写少到几乎可忽略时这笔账才划算。</text>
+  <text x="48" y="816" font-size="11.5" fill="#4A473F">三级台阶只解决「读多写少」，读写都密集的场景应该回头去拆数据、分片、或改成无共享。</text>
 </svg>

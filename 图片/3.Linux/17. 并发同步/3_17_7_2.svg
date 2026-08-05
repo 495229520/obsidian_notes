@@ -1,67 +1,133 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 485" width="940" height="485">
-  <rect x="0" y="0" width="940" height="485" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 856" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
     </marker>
   </defs>
-  <title>共享内存中的进程共享 mutex</title>
-  <desc>两进程 mmap 同一物理页，页中存放设置了 PTHREAD_PROCESS_SHARED 的 pthread_mutex_t，从而实现跨进程互斥。</desc>
 
-  <text x="470" y="30" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
-    共享内存中的进程共享 mutex
-  </text>
-  <text x="470" y="54" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#5F5E5A">
-    两进程 mmap 同一物理页；mutex 须设 PTHREAD_PROCESS_SHARED 才能跨进程生效
-  </text>
+  <rect x="0" y="0" width="1240" height="856" fill="#F5F4ED"/>
 
-  <!-- 进程 A -->
-  <rect x="60" y="100" width="250" height="120" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="185" y="124" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#0C447C">进程 A</text>
-  <text x="185" y="150" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#0C447C">虚拟地址 0x7f..a000</text>
-  <text x="185" y="172" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#0C447C">ptr = mmap(shm_fd, ...)</text>
-  <text x="185" y="194" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#0C447C">pthread_mutex_lock(&amp;ptr-&gt;mtx)</text>
+  <title>共享内存中的进程共享锁：同一物理页、pshared 属性与 robust 善后</title>
+  <desc>上半是两进程 mmap 同一物理页、锁对象住在页里的结构布局，以及 PROCESS_PRIVATE 与 PROCESS_SHARED 的差别；下半是持锁进程崩溃后 EOWNERDEAD 到 consistent 的四步善后时间线与 ENOTRECOVERABLE 反例。</desc>
 
-  <!-- 进程 B -->
-  <rect x="630" y="100" width="250" height="120" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="755" y="124" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#633806">进程 B</text>
-  <text x="755" y="150" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#633806">虚拟地址 0x7f..3000（可不同）</text>
-  <text x="755" y="172" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#633806">ptr = mmap(shm_fd, ...)</text>
-  <text x="755" y="194" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#633806">pthread_mutex_lock(&amp;ptr-&gt;mtx)</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">把锁放进共享内存：同一物理页 + pshared 属性 + robust 善后，三样缺一不可</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">少了属性，锁在共享内存里也不跨进程；少了 robust，持锁者崩一次这把锁就再也醒不过来</text>
 
-  <!-- 共享物理页（path 容器） -->
-  <path d="M298 290 H642 A8 8 0 0 1 650 298 V392 A8 8 0 0 1 642 400 H298 A8 8 0 0 1 290 392 V298 A8 8 0 0 1 298 290 Z"
-        fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
-  <text x="470" y="312" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#3C3489">共享内存物理页</text>
-  <text x="470" y="332" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" fill="#3C3489">shm_open + ftruncate</text>
+  <text x="48" y="112" font-size="14" font-weight="700" fill="#4A473F">A · 锁对象住在两进程共同映射的那一页里</text>
 
-  <rect x="320" y="350" width="300" height="40" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="470" y="370" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#085041">pthread_mutex_t（PTHREAD_PROCESS_SHARED）</text>
+  <rect x="56" y="124" width="1128" height="266" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <path d="M185 220 L380 290" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M755 220 L560 290" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="250" y="262" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#185FA5">mmap 映射</text>
-  <text x="690" y="262" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#854F0B">mmap 映射</text>
+  <rect x="76" y="146" width="292" height="118" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="222" y="170" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">进程 A</text>
+  <text x="222" y="192" font-size="10.5" fill="#2C4460" text-anchor="middle">虚拟地址 0x7f2a_a000</text>
+  <text x="222" y="214" font-size="10.5" fill="#2C4460" text-anchor="middle">sh = mmap(fd, MAP_SHARED)</text>
+  <text x="222" y="240" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">pthread_mutex_lock(&amp;sh-&gt;mtx)</text>
 
-  <text x="470" y="440" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
-    同一物理页可映射到不同虚拟地址；先 pthread_mutexattr_setpshared 再 pthread_mutex_init
-  </text>
+  <rect x="872" y="146" width="292" height="118" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="1018" y="170" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">进程 B</text>
+  <text x="1018" y="192" font-size="10.5" fill="#6B4E28" text-anchor="middle">虚拟地址 0x7f81_3000</text>
+  <text x="1018" y="214" font-size="10.5" fill="#6B4E28" text-anchor="middle">sh = mmap(fd, MAP_SHARED)</text>
+  <text x="1018" y="240" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">pthread_mutex_lock(&amp;sh-&gt;mtx)</text>
+
+  <rect x="424" y="140" width="392" height="130" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="620" y="162" font-size="12" font-weight="700" fill="#6B5B95" text-anchor="middle">同一物理页 · shm_open + ftruncate</text>
+
+  <rect x="440" y="176" width="132" height="46" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="506" y="196" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">mtx</text>
+  <text x="506" y="213" font-size="9.5" fill="#24473F" text-anchor="middle">40 B</text>
+  <rect x="572" y="176" width="132" height="46" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="638" y="196" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">cond</text>
+  <text x="638" y="213" font-size="9.5" fill="#24473F" text-anchor="middle">48 B</text>
+  <rect x="704" y="176" width="96" height="46" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="752" y="196" font-size="10.5" font-weight="700" fill="#4A473F" text-anchor="middle">ready</text>
+  <text x="752" y="213" font-size="9.5" fill="#4A473F" text-anchor="middle">4 B</text>
+
+  <text x="620" y="243" font-size="10" fill="#6B5B95" text-anchor="middle">struct Shared —— 同步状态与业务数据同页</text>
+  <text x="620" y="260" font-size="10" font-weight="700" fill="#6B5B95" text-anchor="middle">只由创建者 init 一次，其它进程直接用</text>
+
+  <line x1="368" y1="200" x2="418" y2="200" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="393" y="190" font-size="10" font-weight="700" fill="#3D5A80" text-anchor="middle">mmap</text>
+  <line x1="872" y1="200" x2="822" y2="200" stroke="#8A6A3A" stroke-width="1.8" marker-end="url(#arrA)"/>
+  <text x="847" y="190" font-size="10" font-weight="700" fill="#8A6A3A" text-anchor="middle">mmap</text>
+
+  <rect x="76" y="288" width="520" height="86" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="92" y="310" font-size="11.5" font-weight="700" fill="#733428">PTHREAD_PROCESS_PRIVATE（默认属性）</text>
+  <text x="92" y="332" font-size="10.5" fill="#733428">等待队列按「本进程内的地址」记账</text>
+  <text x="92" y="354" font-size="10.5" font-weight="700" fill="#733428">锁躺在共享页里也没用，两边各锁各的</text>
+
+  <rect x="644" y="288" width="520" height="86" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="660" y="310" font-size="11.5" font-weight="700" fill="#24473F">setpshared(PTHREAD_PROCESS_SHARED)</text>
+  <text x="660" y="332" font-size="10.5" fill="#24473F">改按共享页记账，futex 才能跨进程排队</text>
+  <text x="660" y="354" font-size="10.5" font-weight="700" fill="#24473F">条件变量要用 condattr 单独设，漏一个白搭</text>
+
+  <text x="48" y="424" font-size="14" font-weight="700" fill="#4A473F">B · robust 锁：持锁进程死在临界区之后，下一个人怎么收拾残局</text>
+
+  <rect x="56" y="436" width="1128" height="316" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="68" y="460" width="1104" height="56" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="84" y="493" font-size="11" font-weight="700" fill="#4A473F">P1 持锁者</text>
+
+  <rect x="176" y="470" width="164" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="258" y="493" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">lock() 成功</text>
+  <rect x="360" y="470" width="220" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="470" y="493" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">改到一半，不变量已破</text>
+  <rect x="600" y="470" width="180" height="36" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="690" y="493" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">kill -9 / 段错误</text>
+  <text x="812" y="493" font-size="10.5" fill="#6B675C">此后 P1 不再存在，unlock 永远不会来</text>
+
+  <rect x="68" y="534" width="1104" height="56" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="84" y="567" font-size="11" font-weight="700" fill="#4A473F">P2 后来者</text>
+
+  <rect x="360" y="544" width="220" height="36" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="470" y="567" font-size="10.5" fill="#4A473F" text-anchor="middle">lock() 阻塞等待中</text>
+  <rect x="812" y="544" width="252" height="36" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="938" y="567" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">lock() 返回 EOWNERDEAD</text>
+
+  <path d="M690,506 L690,526 L938,526 L938,542" fill="none" stroke="#A64B3C" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrR)"/>
+  <text x="702" y="519" font-size="10" font-weight="700" fill="#A64B3C">内核发现 owner 已死，把锁移交给下一个等待者</text>
+
+  <rect x="68" y="604" width="264" height="92" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="82" y="626" font-size="11" font-weight="700" fill="#2C4460">① 拿到 EOWNERDEAD</text>
+  <text x="82" y="648" font-size="10.5" fill="#2C4460">这不是失败，锁已经归你</text>
+  <text x="82" y="670" font-size="10.5" fill="#2C4460">当成「上一任死在里面了」</text>
+  <text x="82" y="690" font-size="10" fill="#6B675C">rc = pthread_mutex_lock(&amp;mtx)</text>
+
+  <rect x="348" y="604" width="264" height="92" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="362" y="626" font-size="11" font-weight="700" fill="#6B4E28">② 修复共享数据</text>
+  <text x="362" y="648" font-size="10.5" fill="#6B4E28">把不变量改回自洽状态</text>
+  <text x="362" y="670" font-size="10.5" fill="#6B4E28">修不好就别声明可用</text>
+  <text x="362" y="690" font-size="10" fill="#6B675C">repair_invariants(sh)</text>
+
+  <rect x="628" y="604" width="264" height="92" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="642" y="626" font-size="11" font-weight="700" fill="#24473F">③ 声明锁重新可用</text>
+  <text x="642" y="648" font-size="10.5" fill="#24473F">清掉「owner 已死」标记</text>
+  <text x="642" y="670" font-size="10.5" font-weight="700" fill="#24473F">漏掉这一步是最常见错误</text>
+  <text x="642" y="690" font-size="10" fill="#6B675C">pthread_mutex_consistent(&amp;mtx)</text>
+
+  <rect x="908" y="604" width="264" height="92" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="922" y="626" font-size="11" font-weight="700" fill="#4A473F">④ 照常 unlock</text>
+  <text x="922" y="648" font-size="10.5" fill="#4A473F">之后与普通锁毫无区别</text>
+  <text x="922" y="670" font-size="10.5" fill="#4A473F">别的等待者正常被唤醒</text>
+  <text x="922" y="690" font-size="10" fill="#6B675C">pthread_mutex_unlock(&amp;mtx)</text>
+
+  <rect x="68" y="708" width="1104" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="84" y="730" font-size="11" font-weight="700" fill="#733428">跳过 ③ 直接 unlock</text>
+  <text x="240" y="730" font-size="10.5" fill="#733428">→ 锁转入 ENOTRECOVERABLE，此后每次 lock 都返回它</text>
+  <text x="672" y="730" font-size="10.5" font-weight="700" fill="#733428">→ 只能 destroy 后重建，共享数据一并作废</text>
+
+  <text x="48" y="786" font-size="11.5" fill="#4A473F">EOWNERDEAD 的价值不是「自动修好」，而是把「上一任死在临界区」这件事告诉你，让你有机会亲自兜底。</text>
+  <text x="48" y="808" font-size="11.5" fill="#4A473F">修不好数据时，正确做法是不调 consistent，主动让锁进入 ENOTRECOVERABLE，逼上层重建，而不是揣着坏数据继续跑。</text>
+  <text x="48" y="830" font-size="11.5" fill="#4A473F">相比之下内核信号量不必操心这些：状态在内核，进程死了计数还在，代价是只能表达计数而非任意临界区。</text>
 </svg>

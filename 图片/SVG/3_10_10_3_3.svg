@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 792" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>TCP_NODELAY、TCP_CORK、MSG_MORE、TCP_QUICKACK 对照</title>
+  <desc>上半用三行示意同一条发送队列在默认、NODELAY、CORK 三种设置下的放行判定；中间是四个选项的生效端、行为、解除方式和常见坑；下半按场景给出该动哪个开关。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="792" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">三个开关管的是同一条发送队列的不同出口</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">TCP_NODELAY 把闸门拆了，TCP_CORK 再加一道闸门，MSG_MORE 是只管一次调用的 CORK</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="102" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 同一次小块 write，三种设置下的三种走向</text>
+
+  <rect x="72" y="152" width="210" height="54" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="92" y="185" font-size="12.5" font-weight="700" fill="#4A473F">默认 · Nagle 开着</text>
+  <line x1="282" y1="179" x2="330" y2="179" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="338" y="152" width="330" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="358" y="185" font-size="11.5" fill="#2C4460">满 MSS，或在途没有小段，才发</text>
+  <line x1="668" y1="179" x2="716" y2="179" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="724" y="152" width="200" height="54" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="824" y="185" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">小段等 ACK</text>
+  <text x="944" y="185" font-size="11" fill="#6B675C">延迟长短取决于对端何时回 ACK</text>
+
+  <rect x="72" y="218" width="210" height="54" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="92" y="251" font-size="12.5" font-weight="700" fill="#4A473F">TCP_NODELAY</text>
+  <line x1="282" y1="245" x2="330" y2="245" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="338" y="218" width="330" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="358" y="251" font-size="11.5" fill="#2C4460">跳过判定，直接往下推</text>
+  <line x1="668" y1="245" x2="716" y2="245" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="724" y="218" width="200" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="824" y="251" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">小段立刻发</text>
+  <text x="944" y="251" font-size="11" fill="#6B675C">设上的那一刻会顺手推出积压数据</text>
+
+  <rect x="72" y="284" width="210" height="54" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="92" y="317" font-size="12.5" font-weight="700" fill="#4A473F">TCP_CORK</text>
+  <line x1="282" y1="311" x2="330" y2="311" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="338" y="284" width="330" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="358" y="317" font-size="11.5" fill="#2C4460">不满 MSS 的一律扣住</text>
+  <line x1="668" y1="311" x2="716" y2="311" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="724" y="284" width="200" height="54" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="824" y="317" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">最多扣 200 ms</text>
+  <text x="944" y="317" font-size="11" fill="#6B675C">解除 CORK 或超时，才轮到它发</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="370" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="392" font-size="15" font-weight="700" fill="#4A473F">B · 四个选项的对照</text>
+
+  <rect x="72" y="404" width="1096" height="30" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="86" y="424" font-size="11.5" font-weight="700" fill="#4A473F">选项</text>
+  <text x="266" y="424" font-size="11.5" font-weight="700" fill="#4A473F">生效端</text>
+  <text x="376" y="424" font-size="11.5" font-weight="700" fill="#4A473F">它做什么</text>
+  <text x="676" y="424" font-size="11.5" font-weight="700" fill="#4A473F">怎么关掉</text>
+  <text x="926" y="424" font-size="11.5" font-weight="700" fill="#4A473F">常见的坑</text>
+
+  <rect x="72" y="434" width="1096" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="461" font-size="11" fill="#2B2A26">TCP_NODELAY</text>
+  <text x="266" y="461" font-size="11" fill="#2B2A26">发送端</text>
+  <text x="376" y="461" font-size="11" fill="#2B2A26">小段不再等 ACK</text>
+  <text x="676" y="461" font-size="11" fill="#2B2A26">传 0 再 setsockopt</text>
+  <text x="926" y="461" font-size="11" fill="#733428">管不到对端的延迟确认</text>
+
+  <rect x="72" y="478" width="1096" height="44" fill="#F4F2EA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="505" font-size="11" fill="#2B2A26">TCP_CORK</text>
+  <text x="266" y="505" font-size="11" fill="#2B2A26">发送端</text>
+  <text x="376" y="505" font-size="11" fill="#2B2A26">不满 MSS 一律扣住</text>
+  <text x="676" y="505" font-size="11" fill="#2B2A26">传 0，或等满 200 ms</text>
+  <text x="926" y="505" font-size="11" fill="#733428">忘了解除就白等 200 ms</text>
+
+  <rect x="72" y="522" width="1096" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="549" font-size="11" fill="#2B2A26">MSG_MORE</text>
+  <text x="266" y="549" font-size="11" fill="#2B2A26">发送端</text>
+  <text x="376" y="549" font-size="11" fill="#2B2A26">这一次 send 先别发</text>
+  <text x="676" y="549" font-size="11" fill="#2B2A26">下一次 send 不带它</text>
+  <text x="926" y="549" font-size="11" fill="#733428">只对当次调用生效</text>
+
+  <rect x="72" y="566" width="1096" height="44" fill="#F4F2EA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="593" font-size="11" fill="#2B2A26">TCP_QUICKACK</text>
+  <text x="266" y="593" font-size="11" fill="#2B2A26">接收端</text>
+  <text x="376" y="593" font-size="11" fill="#2B2A26">这一侧不延迟确认</text>
+  <text x="676" y="593" font-size="11" fill="#2B2A26">内核自己会切回去</text>
+  <text x="926" y="593" font-size="11" fill="#733428">不粘，每次读完要重设</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="638" width="1144" height="130" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="660" font-size="15" font-weight="700" fill="#4A473F">C · 先看写法，再决定动哪个开关</text>
+
+  <rect x="72" y="672" width="352" height="80" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="92" y="696" font-size="12" font-weight="700" fill="#24473F">请求由好几段拼成</text>
+  <text x="92" y="718" font-size="11.5" fill="#24473F">先合并成一次 writev</text>
+  <text x="92" y="740" font-size="11.5" fill="#24473F">改完通常不用再动选项</text>
+
+  <rect x="444" y="672" width="352" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="464" y="696" font-size="12" font-weight="700" fill="#2C4460">本来就是一次写完的小包</text>
+  <text x="464" y="718" font-size="11.5" fill="#2C4460">发送端设 TCP_NODELAY</text>
+  <text x="464" y="740" font-size="11.5" fill="#2C4460">交互式服务默认就该开</text>
+
+  <rect x="816" y="672" width="352" height="80" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="836" y="696" font-size="12" font-weight="700" fill="#6B4E28">响应头 + 大文件一起发</text>
+  <text x="836" y="718" font-size="11.5" fill="#6B4E28">TCP_CORK 配 sendfile</text>
+  <text x="836" y="740" font-size="11.5" fill="#6B4E28">发完记得把 CORK 解除</text>
+</svg>

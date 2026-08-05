@@ -1,77 +1,117 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600">
-  <rect x="0" y="0" width="960" height="600" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 710" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
   </defs>
 
-  <text x="480" y="34" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="15" font-weight="500" fill="#444441">
-    原子性缺失：num++ 的读-改-写交错
-  </text>
-  <text x="480" y="56" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">
-    两个线程各自 +1，预期 num=2，实际丢失一次更新得到 num=1
-  </text>
+  <rect x="0" y="0" width="1240" height="710" fill="#F5F4ED"/>
 
-  <!-- timeline axis -->
-  <line x1="480" y1="90" x2="480" y2="530" stroke="#BBBAB2" stroke-width="1.5" stroke-dasharray="4 4"/>
-  <text x="480" y="84" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#888"> 时间 ↓ </text>
+  <title>num++ 不是原子操作：读-改-写交错导致更新丢失</title>
+  <desc>上半部分逐时刻追踪两个线程各加一次 1 时寄存器与内存的取值，下半部分给出指令层的根因与三种写法的对照。</desc>
 
-  <!-- lane headers -->
-  <rect x="60" y="90" width="300" height="40" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="210" y="110" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">线程 A：reg_A = num; reg_A+1; num = reg_A</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">num++ 不是原子操作：一次交错就丢掉一次更新</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">丢的不是精度，是整整一次自增 —— 线程越多、跑得越久丢得越多，可它在测试里偏偏很难复现</text>
 
-  <rect x="600" y="90" width="300" height="40" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="750" y="110" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">线程 B：reg_B = num; reg_B+1; num = reg_B</text>
+  <text x="48" y="108" font-size="14" font-weight="700" fill="#4A473F">A · 逐时刻追踪：两个线程各 +1，num 却只涨了 1</text>
 
-  <!-- step boxes: A on left, B on right, ordered by time -->
-  <!-- t1: A load -->
-  <rect x="60" y="160" width="300" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="210" y="182" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">① load：reg_A ← num (0)</text>
+  <rect x="56" y="118" width="1128" height="252" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <!-- t2: B load -->
-  <rect x="600" y="220" width="300" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="750" y="242" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#633806">② load：reg_B ← num (0)</text>
+  <rect x="68" y="130" width="1104" height="28" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="149" font-size="11" font-weight="700" fill="#4A473F">时刻</text>
+  <text x="156" y="149" font-size="11" font-weight="700" fill="#3D5A80">线程 A</text>
+  <text x="496" y="149" font-size="11" font-weight="700" fill="#8A6A3A">线程 B</text>
+  <text x="836" y="149" font-size="11" font-weight="700" fill="#4A473F">内存 num</text>
+  <text x="946" y="149" font-size="11" font-weight="700" fill="#4A473F">这一步发生了什么</text>
 
-  <!-- t3: A add+store -->
-  <rect x="60" y="280" width="300" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="210" y="302" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#0C447C">③ add+store：num ← 1</text>
+  <line x1="68" y1="158" x2="1172" y2="158" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="183" font-size="11.5" font-weight="700" fill="#4A473F">t₀</text>
+  <text x="156" y="183" font-size="11.5" fill="#9B968A">—</text>
+  <text x="496" y="183" font-size="11.5" fill="#9B968A">—</text>
+  <text x="836" y="183" font-size="12" font-weight="700" fill="#24473F">0</text>
+  <text x="946" y="183" font-size="11.5" fill="#4A473F">初始状态，两个线程都还没动</text>
 
-  <!-- t4: B add+store overwrite -->
-  <rect x="600" y="340" width="300" height="44" rx="8" fill="#FBE9E7" stroke="#B3261E" stroke-width="0.5"/>
-  <text x="750" y="362" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="13" fill="#7A1B14">④ add+store：num ← 1（覆盖了 ③）</text>
+  <line x1="68" y1="198" x2="1172" y2="198" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="223" font-size="11.5" font-weight="700" fill="#4A473F">t₁</text>
+  <text x="156" y="223" font-size="11.5" font-weight="700" fill="#2C4460">① load：reg_A ← 0</text>
+  <text x="836" y="223" font-size="12" font-weight="700" fill="#24473F">0</text>
+  <text x="946" y="223" font-size="11.5" fill="#4A473F">A 把旧值读进寄存器</text>
 
-  <!-- num value tracker on axis -->
-  <circle cx="480" cy="182" r="5" fill="#185FA5"/>
-  <circle cx="480" cy="242" r="5" fill="#854F0B"/>
-  <circle cx="480" cy="302" r="5" fill="#185FA5"/>
-  <circle cx="480" cy="362" r="5" fill="#B3261E"/>
+  <rect x="68" y="238" width="1104" height="40" fill="#F0E0DB" opacity="0.55"/>
+  <line x1="68" y1="238" x2="1172" y2="238" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="263" font-size="11.5" font-weight="700" fill="#4A473F">t₂</text>
+  <text x="156" y="263" font-size="11.5" fill="#9B968A">（被切走）</text>
+  <text x="496" y="263" font-size="11.5" font-weight="700" fill="#6B4E28">② load：reg_B ← 0</text>
+  <text x="836" y="263" font-size="12" font-weight="700" fill="#24473F">0</text>
+  <text x="946" y="263" font-size="11.5" font-weight="700" fill="#733428">病灶：B 也读到 0</text>
 
-  <!-- connectors -->
-  <path d="M360 182 L475 182" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M600 242 L485 242" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M360 302 L475 302" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M600 362 L485 362" fill="none" stroke="#B3261E" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="68" y1="278" x2="1172" y2="278" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="303" font-size="11.5" font-weight="700" fill="#4A473F">t₃</text>
+  <text x="156" y="303" font-size="11.5" font-weight="700" fill="#2C4460">③ add + store：num ← 1</text>
+  <text x="836" y="303" font-size="12" font-weight="700" fill="#24473F">1</text>
+  <text x="946" y="303" font-size="11.5" fill="#4A473F">A 的 +1 正常生效</text>
 
-  <!-- result -->
-  <rect x="300" y="450" width="360" height="64" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="480" y="474" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">最终 num = 1（而非 2）</text>
-  <text x="480" y="498" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#085041">两次 load 都读到旧值 0，后写覆盖先写 → 更新丢失</text>
+  <line x1="68" y1="318" x2="1172" y2="318" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="343" font-size="11.5" font-weight="700" fill="#4A473F">t₄</text>
+  <text x="496" y="343" font-size="11.5" font-weight="700" fill="#733428">④ add + store：num ← 1</text>
+  <text x="836" y="343" font-size="12" font-weight="700" fill="#733428">1</text>
+  <text x="946" y="343" font-size="11.5" font-weight="700" fill="#733428">用手里陈旧的 0+1 盖掉 ③</text>
 
-  <text x="480" y="554" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" fill="#444441">
-    根因：读-改-写三步之间可被打断，不是一个不可分割的整体
-  </text>
+  <line x1="68" y1="358" x2="1172" y2="358" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="48" y="396" font-size="14" font-weight="700" fill="#4A473F">B · 根因在指令层，修法也只能在指令层</text>
+
+  <rect x="56" y="408" width="560" height="220" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="430" font-size="12" font-weight="700" fill="#4A473F">num++ 编译出三条指令，两处可被切走</text>
+
+  <rect x="76" y="442" width="290" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="90" y="469" font-size="12" font-weight="700" fill="#2C4460">mov  eax, [num]</text>
+  <text x="380" y="469" font-size="11.5" fill="#4A473F">① 读进寄存器</text>
+
+  <line x1="76" y1="495" x2="366" y2="495" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="380" y="499" font-size="10.5" font-weight="700" fill="#A64B3C">可切走</text>
+
+  <rect x="76" y="506" width="290" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="90" y="533" font-size="12" font-weight="700" fill="#2C4460">add  eax, 1</text>
+  <text x="380" y="533" font-size="11.5" fill="#4A473F">② 寄存器里加一</text>
+
+  <line x1="76" y1="559" x2="366" y2="559" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="380" y="563" font-size="10.5" font-weight="700" fill="#A64B3C">可切走</text>
+
+  <rect x="76" y="570" width="290" height="42" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="90" y="597" font-size="12" font-weight="700" fill="#2C4460">mov  [num], eax</text>
+  <text x="380" y="597" font-size="11.5" fill="#4A473F">③ 写回内存</text>
+
+  <rect x="632" y="408" width="552" height="220" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="646" y="430" font-size="12" font-weight="700" fill="#4A473F">三种写法的对照</text>
+
+  <rect x="644" y="440" width="528" height="28" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="459" font-size="11" font-weight="700" fill="#4A473F">写法</text>
+  <text x="838" y="459" font-size="11" font-weight="700" fill="#4A473F">x86 上落成什么</text>
+  <text x="994" y="459" font-size="11" font-weight="700" fill="#4A473F">能被切开吗</text>
+  <text x="1088" y="459" font-size="11" font-weight="700" fill="#4A473F">评价</text>
+
+  <line x1="644" y1="468" x2="1172" y2="468" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="495" font-size="11.5" font-weight="700" fill="#733428">num++</text>
+  <text x="838" y="495" font-size="11.5" fill="#4A473F">mov / add / mov</text>
+  <text x="994" y="495" font-size="11.5" font-weight="700" fill="#733428">能，两处</text>
+  <text x="1088" y="495" font-size="11.5" fill="#733428">快，但会丢</text>
+
+  <line x1="644" y1="512" x2="1172" y2="512" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="539" font-size="11.5" font-weight="700" fill="#24473F">atomic 的 ++ / fetch_add</text>
+  <text x="838" y="539" font-size="11.5" fill="#4A473F">lock add 一条</text>
+  <text x="994" y="539" font-size="11.5" font-weight="700" fill="#24473F">不能</text>
+  <text x="1088" y="539" font-size="11.5" font-weight="700" fill="#24473F">计数首选</text>
+
+  <line x1="644" y1="556" x2="1172" y2="556" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="654" y="583" font-size="11.5" font-weight="700" fill="#4A473F">mutex 包住 num++</text>
+  <text x="838" y="583" font-size="11.5" fill="#4A473F">lock / unlock 一对</text>
+  <text x="994" y="583" font-size="11.5" font-weight="700" fill="#24473F">不能</text>
+  <text x="1088" y="583" font-size="11.5" fill="#4A473F">重，但护多变量</text>
+
+  <line x1="644" y1="600" x2="1172" y2="600" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="646" y="618" font-size="11" fill="#6B675C">lock 前缀在缓存一致性层面独占该缓存行，别的核插不进这条读-改-写。</text>
+
+  <text x="48" y="664" font-size="11.5" fill="#4A473F">看 t₂ 那一行：错的不是「加法」，而是两个线程都以为手里的值还是最新的 —— 后写的必然盖掉先写的。</text>
+  <text x="48" y="686" font-size="11.5" fill="#4A473F">所以修法不是加判断、加 volatile，而是让读-改-写整体不可分割。原子性只管这一件事，可见性和有序性还得另算（1.2 / 1.3）。</text>
 </svg>

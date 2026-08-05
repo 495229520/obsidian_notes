@@ -1,76 +1,115 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620">
-  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 680" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow-hollow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5" fill="none" stroke="#4f6f8f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
-    <style>
-      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .box-title { font: 700 17px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .box-text { font: 14px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
-      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .kernel { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 18; }
-      .fd { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 18; }
-      .poller { fill: #f0f6ff; stroke: #2f7ab8; stroke-width: 2.2; rx: 18; }
-      .loop { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.4; rx: 20; }
-      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
-      .line { stroke: #4f6f8f; stroke-width: 2.2; fill: none; marker-end: url(#arrow-hollow); }
-      .soft-line { stroke: #7b8b9b; stroke-width: 1.8; fill: none; marker-end: url(#arrow-hollow); }
-      .dash { stroke: #8a98a8; stroke-width: 1.6; stroke-dasharray: 7 7; fill: none; }
-    </style>
   </defs>
+  <title>timerfd 到期次数的累积与 expirations 的处理策略</title>
+  <desc>周期 100ms 的 timerfd 遇上一次 320ms 的慢回调，内核计数器累积到 3；下方给出 itimerspec 字段语义与拿到 expirations 后的四种做法。</desc>
 
-  <text x="500" y="48" text-anchor="middle" class="title">timerfd：把定时器到期纳入 epoll</text>
-  <text x="500" y="76" text-anchor="middle" class="subtitle">时间事件先让 timerfd 可读，再由 EventLoop 读取到期次数并执行回调</text>
+  <rect x="0" y="0" width="1240" height="680" fill="#F5F4ED"/>
 
-  <rect x="80" y="132" width="230" height="94" class="loop"/>
-  <text x="195" y="164" text-anchor="middle" class="box-title">设置定时任务</text>
-  <text x="195" y="188" text-anchor="middle" class="box-text">timerfd_settime()</text>
-  <text x="195" y="209" text-anchor="middle" class="small">一次性或周期触发</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">timerfd 读出来的不是「到期了」，是「你欠了几次」</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">周期 100ms 的定时器，EventLoop 卡了 320ms —— 一次 read 拿到 3，回调到底跑几次得你自己定</text>
 
-  <rect x="386" y="132" width="230" height="94" class="kernel"/>
-  <text x="501" y="164" text-anchor="middle" class="box-title">内核定时器</text>
-  <text x="501" y="188" text-anchor="middle" class="box-text">CLOCK_MONOTONIC</text>
-  <text x="501" y="209" text-anchor="middle" class="small">按到期时间计数</text>
+  <text x="56" y="116" font-size="14" font-weight="700" fill="#4A473F">A · 一个 100ms 周期定时器，遇上一次 320ms 的慢回调</text>
 
-  <rect x="690" y="132" width="230" height="94" class="fd"/>
-  <text x="805" y="164" text-anchor="middle" class="box-title">timerfd 可读</text>
-  <text x="805" y="188" text-anchor="middle" class="box-text">expirations += n</text>
-  <text x="805" y="209" text-anchor="middle" class="small">到期次数累加</text>
+  <rect x="56" y="128" width="1128" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
 
-  <path d="M 310 179 L 384 179" class="line"/>
-  <path d="M 616 179 L 688 179" class="line"/>
+  <text x="72" y="152" font-size="11.5" font-weight="700" fill="#8A6A3A">内核里 timerfd 的到期计数</text>
 
-  <rect x="116" y="318" width="210" height="94" class="poller"/>
-  <text x="221" y="350" text-anchor="middle" class="box-title">epoll_wait()</text>
-  <text x="221" y="374" text-anchor="middle" class="box-text">返回 EPOLLIN</text>
-  <text x="221" y="395" text-anchor="middle" class="small">timerfd 进入就绪列表</text>
+  <!-- 计数台阶 -->
+  <path d="M140,246 H390 V220 H640 V194 H890 V168 H940 V246 H1140" fill="none" stroke="#B07D2B" stroke-width="2"/>
+  <circle cx="390" cy="220" r="3.5" fill="#B07D2B"/>
+  <circle cx="640" cy="194" r="3.5" fill="#B07D2B"/>
+  <circle cx="890" cy="168" r="3.5" fill="#B07D2B"/>
 
-  <rect x="395" y="318" width="210" height="94" class="fd"/>
-  <text x="500" y="350" text-anchor="middle" class="box-title">read(timerfd)</text>
-  <text x="500" y="374" text-anchor="middle" class="box-text">读取 uint64_t</text>
-  <text x="500" y="395" text-anchor="middle" class="small">得到累计到期次数</text>
+  <text x="265" y="238" font-size="11" fill="#6B4E28" text-anchor="middle">0</text>
+  <text x="515" y="212" font-size="11" fill="#6B4E28" text-anchor="middle">1</text>
+  <text x="765" y="186" font-size="11" fill="#6B4E28" text-anchor="middle">2</text>
+  <text x="915" y="160" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">3</text>
+  <text x="1040" y="238" font-size="11" fill="#6B4E28" text-anchor="middle">0</text>
 
-  <rect x="674" y="318" width="210" height="94" class="loop"/>
-  <text x="779" y="350" text-anchor="middle" class="box-title">timer callback</text>
-  <text x="779" y="374" text-anchor="middle" class="box-text">执行到期任务</text>
-  <text x="779" y="395" text-anchor="middle" class="small">必要时重新设置 timerfd</text>
+  <text x="962" y="196" font-size="11.5" font-weight="700" fill="#A64B3C">read() 一次取走 3</text>
 
-  <path d="M 805 226 C 805 276 221 266 221 316" class="line"/>
-  <path d="M 326 365 L 393 365" class="line"/>
-  <path d="M 605 365 L 672 365" class="line"/>
+  <!-- 到期竖虚线 -->
+  <line x1="390" y1="222" x2="390" y2="330" stroke="#C3B79E" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="640" y1="196" x2="640" y2="330" stroke="#C3B79E" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="890" y1="170" x2="890" y2="330" stroke="#C3B79E" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="940" y1="170" x2="940" y2="330" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="4 4"/>
 
-  <path d="M 779 412 C 805 472 605 502 520 430" class="soft-line"/>
-  <text x="690" y="488" text-anchor="middle" class="small">周期任务或最近到期时间变化时，重新 arm timerfd</text>
+  <text x="72" y="266" font-size="11.5" font-weight="700" fill="#2F6B5E">EventLoop 在干什么</text>
 
-  <rect x="95" y="482" width="380" height="76" class="note"/>
-  <text x="285" y="512" text-anchor="middle" class="box-title">timerfd 负责“最近一次唤醒”</text>
-  <text x="285" y="537" text-anchor="middle" class="small">多个业务定时任务仍需要 timer queue / 最小堆 / 时间轮管理</text>
+  <rect x="140" y="276" width="150" height="26" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="215" y="294" font-size="10.5" fill="#4A473F" text-anchor="middle">空闲</text>
 
-  <rect x="560" y="482" width="345" height="76" class="note"/>
-  <text x="732" y="512" text-anchor="middle" class="box-title">必须读取到期次数</text>
-  <text x="732" y="537" text-anchor="middle" class="small">read 后 fd 才不再持续保持可读</text>
+  <rect x="290" y="276" width="650" height="26" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="615" y="294" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">卡在一个 320ms 的慢回调里，回不到 epoll_wait</text>
 
-  <path d="M 501 226 C 501 260 500 284 500 316" class="dash"/>
+  <rect x="940" y="276" width="200" height="26" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1040" y="294" font-size="10.5" fill="#24473F" text-anchor="middle">读 timerfd 并派发</text>
+
+  <!-- 时间轴 -->
+  <line x1="140" y1="330" x2="1150" y2="330" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="140" y1="330" x2="140" y2="337" stroke="#5A564B" stroke-width="1"/>
+  <line x1="390" y1="330" x2="390" y2="337" stroke="#5A564B" stroke-width="1"/>
+  <line x1="640" y1="330" x2="640" y2="337" stroke="#5A564B" stroke-width="1"/>
+  <line x1="890" y1="330" x2="890" y2="337" stroke="#5A564B" stroke-width="1"/>
+  <line x1="1140" y1="330" x2="1140" y2="337" stroke="#5A564B" stroke-width="1"/>
+
+  <text x="140" y="354" font-size="10" fill="#6B675C" text-anchor="middle">0</text>
+  <text x="390" y="354" font-size="10" fill="#6B675C" text-anchor="middle">100</text>
+  <text x="640" y="354" font-size="10" fill="#6B675C" text-anchor="middle">200</text>
+  <text x="890" y="354" font-size="10" fill="#6B675C" text-anchor="middle">300</text>
+  <text x="1140" y="354" font-size="10" fill="#6B675C" text-anchor="middle">400</text>
+  <text x="1168" y="336" font-size="10" fill="#6B675C">ms</text>
+
+  <!-- B 区：itimerspec -->
+  <text x="56" y="406" font-size="14" font-weight="700" fill="#4A473F">B · itimerspec：一次性还是周期，由这两个字段决定</text>
+
+  <rect x="56" y="418" width="548" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="68" y="437" font-size="11.5" font-weight="700" fill="#4A473F">字段 / 取值</text>
+  <text x="248" y="437" font-size="11.5" font-weight="700" fill="#4A473F">语义</text>
+
+  <rect x="56" y="446" width="548" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="68" y="466" font-size="11" font-weight="700" fill="#2C4460">it_value</text>
+  <text x="248" y="466" font-size="11" fill="#4A473F">第一次到期时间，设 0 等于停表</text>
+
+  <rect x="56" y="476" width="548" height="30" fill="#F7F6F0" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="68" y="496" font-size="11" font-weight="700" fill="#2C4460">it_interval</text>
+  <text x="248" y="496" font-size="11" fill="#4A473F">之后的重复周期，0 表示只响一次</text>
+
+  <rect x="56" y="506" width="548" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="68" y="526" font-size="11" font-weight="700" fill="#2C4460">flags = 0</text>
+  <text x="248" y="526" font-size="11" fill="#4A473F">it_value 按相对当前时刻算</text>
+
+  <rect x="56" y="536" width="548" height="30" fill="#F7F6F0" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="68" y="556" font-size="11" font-weight="700" fill="#2C4460">TFD_TIMER_ABSTIME</text>
+  <text x="248" y="556" font-size="11" fill="#4A473F">it_value 按绝对时刻算</text>
+
+  <!-- C 区：处理策略 -->
+  <text x="636" y="406" font-size="14" font-weight="700" fill="#4A473F">C · 拿到 expirations = 3 之后，回调跑几次</text>
+
+  <rect x="636" y="418" width="548" height="28" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="648" y="437" font-size="11.5" font-weight="700" fill="#4A473F">做法</text>
+  <text x="846" y="437" font-size="11.5" font-weight="700" fill="#4A473F">后果</text>
+
+  <rect x="636" y="446" width="548" height="30" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="648" y="466" font-size="11" fill="#4A473F">读了但忽略次数</text>
+  <text x="846" y="466" font-size="11" fill="#4A473F">少跑两次，节奏被慢回调拉长</text>
+
+  <rect x="636" y="476" width="548" height="30" fill="#F7F6F0" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="648" y="496" font-size="11" fill="#4A473F">补跑 3 次</text>
+  <text x="846" y="496" font-size="11" fill="#4A473F">追平进度，但可能连锁雪崩</text>
+
+  <rect x="636" y="506" width="548" height="30" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="648" y="526" font-size="11" font-weight="700" fill="#24473F">跑 1 次 + 重排下次</text>
+  <text x="846" y="526" font-size="11" font-weight="700" fill="#24473F">心跳与超时检查的常见选择</text>
+
+  <rect x="636" y="536" width="548" height="30" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="648" y="556" font-size="11" font-weight="700" fill="#733428">干脆不 read</text>
+  <text x="846" y="556" font-size="11" fill="#733428">LT 下 fd 一直可读，循环空转跑满 CPU</text>
+
+  <text x="56" y="612" font-size="11.5" fill="#4A473F">read() 返回的 uint64_t 是「自上次 read 以来累计到期几次」，不是「现在到期了」—— EventLoop 越忙，这个数越大。</text>
+  <text x="56" y="638" font-size="11.5" fill="#4A473F">timerfd 只提供一个到期时刻。上百个业务定时任务的排序、取消与重排，仍要靠最小堆或时间轮，见 13.9。</text>
 </svg>

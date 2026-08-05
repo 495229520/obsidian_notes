@@ -1,2 +1,119 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="960px" height="540px" viewBox="0 0 960 540" version="1.1"><rect x="0" y="0" width="960" height="540" fill="rgb(245, 244, 237)" /><defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="5" orient="auto" viewBox="0 0 10 10"><path d="M2 1 L8 5 L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></marker></defs><text font-size="15" font-weight="500" fill="#444441" font-family="system-ui, sans-serif" x="480" y="32" text-anchor="middle" dominant-baseline="central">条件变量 vs 信号量：内部状态与唤醒机制对比</text><rect fill="#EFF5FB" stroke="#185FA5" stroke-width="0.8" x="40" y="70" width="420" height="420" rx="10" /><text font-size="14" font-weight="500" fill="#0C447C" font-family="system-ui, sans-serif" x="250" y="96" text-anchor="middle" dominant-baseline="central">条件变量 (Condition Variable)</text><rect fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5" x="70" y="120" width="360" height="56" rx="8" /><text font-size="12" fill="#3C3489" font-family="system-ui, sans-serif" x="250" y="140" text-anchor="middle" dominant-baseline="central">无内部计数器 / 状态<tspan x="250" dy="15.6">条件由外部谓词 + mutex 保护的共享变量表达</tspan></text><rect fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5" x="70" y="196" width="360" height="44" rx="8" /><text font-size="12" fill="#444441" font-family="system-ui, sans-serif" x="250" y="218" text-anchor="middle" dominant-baseline="central">必须配合 mutex + while(谓词) 使用</text><rect fill="#FBE9E7" stroke="#B3261E" stroke-width="0.5" x="70" y="260" width="360" height="56" rx="8" /><text font-size="12" fill="#7A1B14" font-family="system-ui, sans-serif" x="250" y="280" text-anchor="middle" dominant-baseline="central">signal 无「记忆」：<tspan x="250" dy="15.6">若此刻没有线程在等，信号丢失</tspan></text><rect fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5" x="70" y="336" width="360" height="44" rx="8" /><text font-size="12" fill="#085041" font-family="system-ui, sans-serif" x="250" y="358" text-anchor="middle" dominant-baseline="central">可表达任意复杂条件（size&gt;0 &amp;&amp; !stop）</text><rect fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5" x="70" y="400" width="360" height="56" rx="8" /><text font-size="12" fill="#0C447C" font-family="system-ui, sans-serif" x="250" y="420" text-anchor="middle" dominant-baseline="central">适用场景<tspan x="250" dy="15.6">复杂等待条件、生产者-消费者、线程池</tspan></text><rect fill="#FBF6EE" stroke="#854F0B" stroke-width="0.8" x="500" y="70" width="420" height="420" rx="10" /><text font-size="14" font-weight="500" fill="#633806" font-family="system-ui, sans-serif" x="710" y="96" text-anchor="middle" dominant-baseline="central">信号量 (Semaphore)</text><rect fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5" x="530" y="120" width="360" height="56" rx="8" /><text font-size="12" fill="#633806" font-family="system-ui, sans-serif" x="710" y="140" text-anchor="middle" dominant-baseline="central">内部维护一个非负整数计数器<tspan x="710" dy="15.6">P 操作 -1，V 操作 +1，到 0 时阻塞</tspan></text><rect fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5" x="530" y="196" width="360" height="44" rx="8" /><text font-size="12" fill="#444441" font-family="system-ui, sans-serif" x="710" y="218" text-anchor="middle" dominant-baseline="central">无需配合 mutex（自身操作已是原子的）</text><rect fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5" x="530" y="260" width="360" height="56" rx="8" /><text font-size="12" fill="#085041" font-family="system-ui, sans-serif" x="710" y="280" text-anchor="middle" dominant-baseline="central">post 有「记忆」：<tspan x="710" dy="15.6">即使没有线程在等，计数仍 +1 保留</tspan></text><rect fill="#FBE9E7" stroke="#B3261E" stroke-width="0.5" x="530" y="336" width="360" height="44" rx="8" /><text font-size="12" fill="#7A1B14" font-family="system-ui, sans-serif" x="710" y="358" text-anchor="middle" dominant-baseline="central">只能表达简单计数条件（count &gt; 0）</text><rect fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5" x="530" y="400" width="360" height="56" rx="8" /><text font-size="12" fill="#633806" font-family="system-ui, sans-serif" x="710" y="420" text-anchor="middle" dominant-baseline="central">适用场景<tspan x="710" dy="15.6">资源池计数、并发槽位、简单 P-C</tspan></text><text font-size="13" font-weight="500" fill="#444441" font-family="system-ui, sans-serif" x="480" y="514" text-anchor="middle" dominant-baseline="central">关键区别：信号量有「记忆」（计数不丢），条件变量有「灵活性」（任意谓词）</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 780" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="780" fill="#F5F4ED"/>
+
+  <title>条件变量与信号量：通知早于等待时，两者的结局不同</title>
+  <desc>上半是同一段时序在条件变量与信号量下的两种结局；下半是六个维度的对照表与选型规则。</desc>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">条件变量与信号量：分水岭在「有没有记忆」</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">两者都能做等待-通知；真正决定选型的是通知早于等待时会发生什么，以及条件能否只用一个计数表达</text>
+
+  <text x="48" y="108" font-size="14" font-weight="700" fill="#4A473F">A · 同一段时序，两种结局</text>
+
+  <!-- 左：条件变量 -->
+  <rect x="56" y="118" width="560" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="144" font-size="13" font-weight="700" fill="#2C4460">条件变量 · signal 没有记忆</text>
+
+  <rect x="70" y="160" width="532" height="54" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="84" y="182" font-size="11.5" font-weight="700" fill="#6B4E28">t1 · 通知方 signal()</text>
+  <text x="84" y="201" font-size="10.5" fill="#6B4E28">等待队列为空，信号被直接丢弃</text>
+
+  <line x1="336" y1="218" x2="336" y2="236" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="70" y="240" width="532" height="54" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="84" y="262" font-size="11.5" font-weight="700" fill="#2C4460">t2 · 等待方 cond_wait()</text>
+  <text x="84" y="281" font-size="10.5" fill="#2C4460">迟到一步，什么都没等到，睡下</text>
+
+  <line x1="336" y1="298" x2="336" y2="316" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="70" y="320" width="532" height="54" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.6"/>
+  <text x="84" y="342" font-size="11.5" font-weight="700" fill="#733428">结局 · 唤醒丢失</text>
+  <text x="84" y="361" font-size="10.5" font-weight="700" fill="#733428">没有下一次 signal 就一直睡下去</text>
+
+  <text x="70" y="400" font-size="11" fill="#4A473F">记忆在谓词里，不在条件变量里 —— 所以谓词必须由 mutex 保护</text>
+
+  <!-- 右：信号量 -->
+  <rect x="624" y="118" width="560" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="638" y="144" font-size="13" font-weight="700" fill="#6B4E28">信号量 · post 把计数留在那里</text>
+
+  <rect x="638" y="160" width="532" height="54" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="652" y="182" font-size="11.5" font-weight="700" fill="#6B4E28">t1 · 通知方 sem_post()</text>
+  <text x="652" y="201" font-size="10.5" fill="#6B4E28">无人等待，计数 0 → 1 留着</text>
+
+  <line x1="904" y1="218" x2="904" y2="236" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="638" y="240" width="532" height="54" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="652" y="262" font-size="11.5" font-weight="700" fill="#2C4460">t2 · 等待方 sem_wait()</text>
+  <text x="652" y="281" font-size="10.5" fill="#2C4460">计数 &gt; 0，立即 -1 通过，不睡</text>
+
+  <line x1="904" y1="298" x2="904" y2="316" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="638" y="320" width="532" height="54" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="652" y="342" font-size="11.5" font-weight="700" fill="#24473F">结局 · 不会丢唤醒</text>
+  <text x="652" y="361" font-size="10.5" font-weight="700" fill="#24473F">与 P、V 的先后顺序无关</text>
+
+  <text x="638" y="400" font-size="11" fill="#4A473F">代价：能表达的条件只剩「计数 &gt; 0」这一种</text>
+
+  <!-- B 区 -->
+  <text x="48" y="452" font-size="14" font-weight="700" fill="#4A473F">B · 六个维度的对照，与一条选型规则</text>
+
+  <rect x="56" y="464" width="700" height="212" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="68" y="474" width="676" height="26" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="80" y="492" font-size="11" font-weight="700" fill="#4A473F">维度</text>
+  <text x="288" y="492" font-size="11" font-weight="700" fill="#2C4460">条件变量</text>
+  <text x="520" y="492" font-size="11" font-weight="700" fill="#6B4E28">信号量</text>
+
+  <text x="80" y="518" font-size="11" fill="#4A473F">内部状态</text>
+  <text x="288" y="518" font-size="11" fill="#4A473F">无</text>
+  <text x="520" y="518" font-size="11" fill="#4A473F">非负整数计数器</text>
+  <line x1="68" y1="526" x2="744" y2="526" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="544" font-size="11" fill="#4A473F">是否配锁</text>
+  <text x="288" y="544" font-size="11" fill="#4A473F">必须配 mutex</text>
+  <text x="520" y="544" font-size="11" fill="#4A473F">自身原子，不必</text>
+  <line x1="68" y1="552" x2="744" y2="552" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="570" font-size="11" fill="#4A473F">能表达的条件</text>
+  <text x="288" y="570" font-size="11" font-weight="700" fill="#24473F">任意谓词</text>
+  <text x="520" y="570" font-size="11" fill="#733428">仅「计数 &gt; 0」</text>
+  <line x1="68" y1="578" x2="744" y2="578" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="596" font-size="11" fill="#4A473F">唤醒丢失</text>
+  <text x="288" y="596" font-size="11" fill="#733428">可能，靠 while 兜底</text>
+  <text x="520" y="596" font-size="11" font-weight="700" fill="#24473F">不会</text>
+  <line x1="68" y1="604" x2="744" y2="604" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="622" font-size="11" fill="#4A473F">批量唤醒</text>
+  <text x="288" y="622" font-size="11" font-weight="700" fill="#24473F">broadcast 一次全叫</text>
+  <text x="520" y="622" font-size="11" fill="#733428">只能循环 post</text>
+  <line x1="68" y1="630" x2="744" y2="630" stroke="#D8D5C8" stroke-width="1"/>
+
+  <text x="80" y="648" font-size="11" fill="#4A473F">典型场景</text>
+  <text x="288" y="648" font-size="11" fill="#4A473F">线程池、状态机</text>
+  <text x="520" y="648" font-size="11" fill="#4A473F">资源池、并发槽位</text>
+  <line x1="68" y1="656" x2="744" y2="656" stroke="#D8D5C8" stroke-width="1"/>
+
+  <rect x="772" y="464" width="412" height="212" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="786" y="486" font-size="12" font-weight="700" fill="#4A473F">选型规则</text>
+
+  <rect x="784" y="496" width="388" height="50" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="798" y="516" font-size="11.5" font-weight="700" fill="#24473F">等的是「某个计数 &gt; 0」</text>
+  <text x="798" y="534" font-size="10.5" fill="#24473F">且不牵扯别的共享状态 → 用信号量</text>
+
+  <rect x="784" y="554" width="388" height="50" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="798" y="574" font-size="11.5" font-weight="700" fill="#2C4460">条件牵涉多个变量</text>
+  <text x="798" y="592" font-size="10.5" fill="#2C4460">或要 broadcast、要复合判断 → 条件变量</text>
+
+  <rect x="784" y="612" width="388" height="50" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="798" y="632" font-size="11.5" font-weight="700" fill="#4A473F">两种写法都还要 mutex</text>
+  <text x="798" y="650" font-size="10.5" fill="#4A473F">信号量管准入，mutex 管队列一致性</text>
+
+  <text x="48" y="712" font-size="11.5" fill="#4A473F">信号量版的生产者-消费者仍要 mutex：empty / filled 两个计数管「什么时候能操作」，mutex 管 head、tail 的一致性。</text>
+  <text x="48" y="734" font-size="11.5" fill="#4A473F">所以选型问的不是「哪个更强」，而是「你在等的那个条件，能不能塞进一个非负整数里」。</text>
+</svg>

@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 872" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>num++ 的读改写交错导致丢失更新</title>
+  <desc>上半把 num++ 拆成读、改、写三条指令，并标出两条指令之间可以被调度打断；中间用六个时刻的三轨道表格展示两个线程交错执行后 num 只涨了 1；下半对比互斥量和原子操作两种修法，并澄清 volatile 不解决原子性。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="872" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">num++ 是三条指令，两个线程一交错就会丢掉一次加法</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">丢的不是那次加法，是「读到的旧值」：两个线程都基于同一个 0 算出了 1，后写的把先写的盖掉了</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="102" width="1144" height="190" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · num++ 在 CPU 上是三步，不是一步</text>
+
+  <rect x="72" y="150" width="300" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="92" y="176" font-size="12.5" font-weight="700" fill="#2C4460">① 读</text>
+  <text x="92" y="200" font-size="11.5" fill="#2C4460">mov eax, [num]</text>
+  <text x="92" y="220" font-size="11" fill="#2C4460">内存 → 寄存器</text>
+  <line x1="374" y1="190" x2="466" y2="190" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="470" y="150" width="300" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="490" y="176" font-size="12.5" font-weight="700" fill="#2C4460">② 改</text>
+  <text x="490" y="200" font-size="11.5" fill="#2C4460">add eax, 1</text>
+  <text x="490" y="220" font-size="11" fill="#2C4460">只动寄存器，内存没变</text>
+  <line x1="772" y1="190" x2="864" y2="190" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="868" y="150" width="300" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="888" y="176" font-size="12.5" font-weight="700" fill="#2C4460">③ 写</text>
+  <text x="888" y="200" font-size="11.5" fill="#2C4460">mov [num], eax</text>
+  <text x="888" y="220" font-size="11" fill="#2C4460">寄存器 → 内存</text>
+
+  <text x="420" y="245" font-size="10.5" fill="#733428" text-anchor="middle">缝隙 ①</text>
+  <text x="818" y="245" font-size="10.5" fill="#733428" text-anchor="middle">缝隙 ②</text>
+
+  <rect x="72" y="252" width="1096" height="28" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="88" y="271" font-size="11.5" fill="#733428">这两处缝隙随时可能被调度打断，别的线程就在这时候读走了旧值</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="310" width="1144" height="340" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="332" font-size="15" font-weight="700" fill="#4A473F">B · 两个线程交错执行，两次 ++ 只涨了 1</text>
+
+  <text x="325" y="352" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">T1</text>
+  <text x="478" y="352" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">T2</text>
+  <text x="631" y="352" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">T3</text>
+  <text x="784" y="352" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">T4</text>
+  <text x="937" y="352" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">T5</text>
+  <text x="1090" y="352" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">T6</text>
+
+  <!-- 线程 A -->
+  <rect x="72" y="362" width="170" height="48" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="88" y="384" font-size="12" font-weight="700" fill="#4A473F">线程 A</text>
+  <text x="88" y="402" font-size="10.5" fill="#6B675C">寄存器 eax</text>
+  <rect x="250" y="362" width="150" height="48" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="325" y="391" font-size="11" fill="#2C4460" text-anchor="middle">读 → eax = 0</text>
+  <rect x="403" y="362" width="150" height="48" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="556" y="362" width="150" height="48" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="631" y="391" font-size="11" fill="#2C4460" text-anchor="middle">eax = 0 + 1 = 1</text>
+  <rect x="709" y="362" width="150" height="48" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="862" y="362" width="150" height="48" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="937" y="391" font-size="11" fill="#2C4460" text-anchor="middle">写回 num = 1</text>
+  <rect x="1015" y="362" width="150" height="48" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+
+  <!-- 内存 -->
+  <rect x="72" y="418" width="170" height="48" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="88" y="440" font-size="12" font-weight="700" fill="#4A473F">内存里的 num</text>
+  <text x="88" y="458" font-size="10.5" fill="#6B675C">真正的共享值</text>
+  <rect x="250" y="418" width="150" height="48" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="325" y="447" font-size="12" fill="#4A473F" text-anchor="middle">0</text>
+  <rect x="403" y="418" width="150" height="48" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="478" y="447" font-size="12" fill="#4A473F" text-anchor="middle">0</text>
+  <rect x="556" y="418" width="150" height="48" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="631" y="447" font-size="12" fill="#4A473F" text-anchor="middle">0</text>
+  <rect x="709" y="418" width="150" height="48" rx="5" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="784" y="447" font-size="12" fill="#4A473F" text-anchor="middle">0</text>
+  <rect x="862" y="418" width="150" height="48" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="937" y="443" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">1</text>
+  <text x="937" y="459" font-size="10" fill="#24473F" text-anchor="middle">A 写的</text>
+  <rect x="1015" y="418" width="150" height="48" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="1090" y="443" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">1</text>
+  <text x="1090" y="459" font-size="10" fill="#733428" text-anchor="middle">被 B 又盖成 1</text>
+
+  <!-- 线程 B -->
+  <rect x="72" y="474" width="170" height="48" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="88" y="496" font-size="12" font-weight="700" fill="#4A473F">线程 B</text>
+  <text x="88" y="514" font-size="10.5" fill="#6B675C">寄存器 eax</text>
+  <rect x="250" y="474" width="150" height="48" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="403" y="474" width="150" height="48" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="478" y="503" font-size="11" fill="#24473F" text-anchor="middle">读 → eax = 0</text>
+  <rect x="556" y="474" width="150" height="48" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="709" y="474" width="150" height="48" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="784" y="503" font-size="11" fill="#24473F" text-anchor="middle">eax = 0 + 1 = 1</text>
+  <rect x="862" y="474" width="150" height="48" rx="5" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="1015" y="474" width="150" height="48" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1090" y="503" font-size="11" fill="#24473F" text-anchor="middle">写回 num = 1</text>
+
+  <rect x="72" y="540" width="1096" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="92" y="564" font-size="12.5" font-weight="700" fill="#733428">结果 num = 1，期望是 2</text>
+  <text x="92" y="586" font-size="11.5" fill="#733428">B 在 T2 读到的还是 0，它算出的 1 在 T6 盖掉了 A 在 T5 写的 1</text>
+
+  <text x="72" y="622" font-size="11.5" fill="#6B675C">num-- 同理。四个线程各跑 25000 次，撞上这种交错是必然，不是偶然</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="668" width="1144" height="180" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="694" font-size="15" font-weight="700" fill="#4A473F">C · 两种修法，都是把三条指令变成不可分割的一段</text>
+
+  <rect x="72" y="706" width="536" height="86" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="92" y="730" font-size="12.5" font-weight="700" fill="#24473F">互斥量 pthread_mutex</text>
+  <text x="92" y="752" font-size="11.5" fill="#24473F">lock 到 unlock 之间别的线程进不来</text>
+  <text x="92" y="774" font-size="11.5" fill="#24473F">开销大，但能护住任意长的临界区</text>
+
+  <rect x="632" y="706" width="536" height="86" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="652" y="730" font-size="12.5" font-weight="700" fill="#2C4460">原子操作 std::atomic</text>
+  <text x="652" y="752" font-size="11.5" fill="#2C4460">编译成一条 lock xadd，硬件保证</text>
+  <text x="652" y="774" font-size="11.5" fill="#2C4460">快得多，但只护得住单个变量</text>
+
+  <rect x="72" y="804" width="1096" height="28" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="88" y="823" font-size="11.5" fill="#6B4E28">把 num 声明成 volatile 没有用：它管的是编译器优化，不管原子性</text>
+</svg>

@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 870" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>pthread_cancel 从发出请求到 pthread_join 的完整链路</title>
+  <desc>上半把取消流程拆成六步：发请求、等到取消点、检查标记、逆序执行 cleanup handlers、线程终止、join 回收；中间画 cleanup 栈的注册顺序与 LIFO 执行顺序，以及正常结束和被取消两条路径；下半说明取消点的范围、纯计算循环为什么退不出、以及 pthread_testcancel 的用法。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="870" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">pthread_cancel 不是杀线程，是挂一个标记等线程自己走到取消点</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">从发出请求到 pthread_join 拿到 PTHREAD_CANCELED，中间有六步，第二步可能永远不发生</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="102" width="1144" height="238" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 取消请求走完全程要经过的六步</text>
+
+  <rect x="75" y="152" width="194" height="86" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="93" y="176" font-size="12.5" font-weight="700" fill="#2C4460">① 发出请求</text>
+  <text x="93" y="200" font-size="11" fill="#2C4460">pthread_cancel(tid)</text>
+  <text x="93" y="222" font-size="11" fill="#2C4460">调用立刻返回</text>
+  <line x1="269" y1="195" x2="297" y2="195" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="299" y="152" width="194" height="86" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.6"/>
+  <text x="317" y="176" font-size="12.5" font-weight="700" fill="#6B4E28">② 等到取消点</text>
+  <text x="317" y="200" font-size="11" fill="#6B4E28">sleep / read / write</text>
+  <text x="317" y="222" font-size="11" fill="#6B4E28">纯计算循环走不到</text>
+  <line x1="493" y1="195" x2="521" y2="195" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="523" y="152" width="194" height="86" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="541" y="176" font-size="12.5" font-weight="700" fill="#2C4460">③ 检查到标记</text>
+  <text x="541" y="200" font-size="11" fill="#2C4460">进入退出流程</text>
+  <text x="541" y="222" font-size="11" fill="#2C4460">不再跑普通代码</text>
+  <line x1="717" y1="195" x2="745" y2="195" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="747" y="152" width="194" height="86" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="765" y="176" font-size="12.5" font-weight="700" fill="#24473F">④ 跑 cleanup</text>
+  <text x="765" y="200" font-size="11" fill="#24473F">后 push 的先执行</text>
+  <text x="765" y="222" font-size="11" fill="#24473F">展开见 B 区</text>
+  <line x1="941" y1="195" x2="969" y2="195" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <rect x="971" y="152" width="194" height="86" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="989" y="176" font-size="12.5" font-weight="700" fill="#4A473F">⑤ 线程终止</text>
+  <text x="989" y="200" font-size="11" fill="#6B675C">退出状态被记下</text>
+  <text x="989" y="222" font-size="11" fill="#6B675C">等 join 来取</text>
+
+  <rect x="75" y="254" width="1090" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="95" y="278" font-size="12.5" font-weight="700" fill="#24473F">⑥ pthread_join(tid, &amp;retval)</text>
+  <text x="95" y="299" font-size="11.5" fill="#24473F">retval 拿到 PTHREAD_CANCELED</text>
+  <text x="420" y="299" font-size="11.5" fill="#24473F">也就是 (void*)-1</text>
+  <text x="650" y="299" font-size="11.5" fill="#24473F">joinable 线程这一步不能省</text>
+
+  <text x="75" y="330" font-size="11" fill="#6B675C">① 到 ② 之间隔多久由目标线程决定，可能永远走不到</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="358" width="1144" height="290" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="386" font-size="15" font-weight="700" fill="#4A473F">B · cleanup handlers 按 LIFO 出栈，两条路径都要走</text>
+
+  <text x="72" y="414" font-size="12" font-weight="700" fill="#4A473F">注册顺序（push）</text>
+  <rect x="72" y="426" width="300" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="92" y="453" font-size="11.5" fill="#2C4460">① push cleanup_memory</text>
+  <rect x="72" y="482" width="300" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="92" y="509" font-size="11.5" fill="#2C4460">② push cleanup_file</text>
+  <text x="72" y="546" font-size="11" fill="#6B675C">后 push 的压在栈顶</text>
+
+  <line x1="380" y1="476" x2="412" y2="476" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <text x="420" y="414" font-size="12" font-weight="700" fill="#4A473F">cleanup 栈</text>
+  <rect x="420" y="426" width="240" height="44" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="440" y="453" font-size="11.5" fill="#6B4E28">栈顶 · cleanup_file</text>
+  <rect x="420" y="482" width="240" height="44" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="440" y="509" font-size="11.5" fill="#6B4E28">栈底 · cleanup_memory</text>
+  <text x="420" y="546" font-size="11" fill="#6B675C">退出时从栈顶往下弹</text>
+
+  <line x1="668" y1="476" x2="700" y2="476" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <text x="712" y="414" font-size="12" font-weight="700" fill="#4A473F">执行顺序（LIFO）</text>
+  <rect x="712" y="426" width="456" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="732" y="453" font-size="11.5" fill="#24473F">先 cleanup_file，关掉文件</text>
+  <rect x="712" y="482" width="456" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="732" y="509" font-size="11.5" fill="#24473F">再 cleanup_memory，释放 buffer</text>
+  <text x="712" y="546" font-size="11" fill="#6B675C">和 push 的顺序正好相反</text>
+
+  <rect x="72" y="560" width="536" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="92" y="584" font-size="12.5" font-weight="700" fill="#2C4460">路径一 · 正常结束</text>
+  <text x="92" y="606" font-size="11.5" fill="#2C4460">代码跑到 pthread_cleanup_pop(1)</text>
+  <text x="92" y="626" font-size="11" fill="#6B675C">传 0 就只弹出不执行</text>
+
+  <rect x="632" y="560" width="536" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="652" y="584" font-size="12.5" font-weight="700" fill="#733428">路径二 · 被 cancel</text>
+  <text x="652" y="606" font-size="11.5" fill="#733428">取消点上直接进入退出流程</text>
+  <text x="652" y="626" font-size="11" fill="#6B675C">pthread 自动展开还没 pop 的项</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="666" width="1144" height="180" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="694" font-size="15" font-weight="700" fill="#4A473F">C · 取消点：走不到就退不出去</text>
+
+  <rect x="72" y="706" width="352" height="124" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="92" y="730" font-size="12.5" font-weight="700" fill="#2C4460">哪些函数是取消点</text>
+  <text x="92" y="752" font-size="11.5" fill="#2C4460">sleep / nanosleep</text>
+  <text x="92" y="774" font-size="11.5" fill="#2C4460">read / write / recv / send</text>
+  <text x="92" y="796" font-size="11.5" fill="#2C4460">pthread_cond_wait / join</text>
+  <text x="92" y="818" font-size="11" fill="#6B675C">完整清单见 man 7 pthreads</text>
+
+  <rect x="444" y="706" width="352" height="124" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="464" y="730" font-size="12.5" font-weight="700" fill="#733428">纯计算循环退不出去</text>
+  <text x="464" y="752" font-size="11.5" fill="#733428">while (1) { calc(); }</text>
+  <text x="464" y="774" font-size="11.5" fill="#733428">一个取消点都没有</text>
+  <text x="464" y="796" font-size="11.5" fill="#733428">请求一直挂着不生效</text>
+  <text x="464" y="818" font-size="11" fill="#6B675C">线程会跑到进程结束为止</text>
+
+  <rect x="816" y="706" width="352" height="124" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="836" y="730" font-size="12.5" font-weight="700" fill="#24473F">自己造一个取消点</text>
+  <text x="836" y="752" font-size="11.5" fill="#24473F">循环里加 pthread_testcancel()</text>
+  <text x="836" y="774" font-size="11.5" fill="#24473F">有请求就在这里退出</text>
+  <text x="836" y="796" font-size="11.5" fill="#24473F">没有就原样往下跑</text>
+  <text x="836" y="818" font-size="11" fill="#6B675C">开销很小，可以放心加</text>
+</svg>

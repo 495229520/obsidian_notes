@@ -1,89 +1,120 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="960" height="560">
-  <rect x="0" y="0" width="960" height="560" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700"
+     role="img" aria-labelledby="title desc"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title id="title">条件变量驱动的线程池：有界队列上的任务接力</title>
+  <desc id="desc">上方泳道展示提交者加锁、检查容量、入队、通知 not_empty 并解锁；中间展示 mutex、任务队列、not_empty 与 not_full；下方展示 worker 被唤醒、重新加锁、出队、通知 not_full、解锁并在锁外执行任务。底部总结队列为空、队列已满与关闭三种边界状态。</desc>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
     </marker>
   </defs>
 
-  <text x="480" y="36" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">
-    条件变量驱动的线程池
-  </text>
-  <text x="480" y="58" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">
-    队列只在加锁时访问，真正任务在解锁后执行
-  </text>
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
 
-  <rect x="50" y="110" width="170" height="76" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
-  <text x="135" y="136" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#0C447C">I/O 线程</text>
-  <text x="135" y="162" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#0C447C">解析请求并提交 task</text>
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">条件变量驱动的线程池：有界队列上的一次任务接力</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">mutex 只保护 queue / stop；cond 负责睡眠与唤醒；真正的 task 必须在解锁后执行</text>
 
-  <rect x="300" y="86" width="170" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
-  <text x="385" y="108" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#444441">pthread_mutex_t</text>
+  <text x="48" y="116" font-size="13" font-weight="700" fill="#4A473F">A · 正常路径：提交者向右，worker 接棒后向左</text>
 
-  <rect x="300" y="190" width="170" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
-  <text x="385" y="212" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">pthread_cond_t</text>
+  <!-- 提交者泳道 -->
+  <rect x="48" y="128" width="1144" height="88" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="64" y="151" font-size="12" font-weight="700" fill="#3D5A80">提交者 · main / I/O thread</text>
 
-  <rect x="300" y="294" width="360" height="86" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
-  <text x="480" y="318" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#085041">任务队列 task queue</text>
-  <text x="480" y="344" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">head / tail / queue_size / queue_capacity</text>
-  <text x="480" y="366" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#085041">由 mutex 保护，状态变化后 signal / broadcast</text>
+  <rect x="180" y="158" width="170" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="265" y="184" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">① lock + 检查状态</text>
 
-  <rect x="740" y="96" width="170" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="825" y="116" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">worker 1</text>
-  <text x="825" y="138" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">等待 not_empty</text>
+  <rect x="382" y="158" width="210" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="487" y="184" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 满则 wait(not_full)</text>
 
-  <rect x="740" y="214" width="170" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="825" y="234" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">worker 2</text>
-  <text x="825" y="256" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">取任务后解锁</text>
+  <rect x="624" y="158" width="170" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="709" y="184" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ push task</text>
 
-  <rect x="740" y="332" width="170" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
-  <text x="825" y="352" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#633806">worker N</text>
-  <text x="825" y="374" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#633806">执行 task->func</text>
+  <rect x="826" y="158" width="310" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="981" y="184" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">④ signal(not_empty) → unlock</text>
 
-  <rect x="300" y="454" width="360" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
-  <text x="480" y="474" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#3C3489">stop + broadcast</text>
-  <text x="480" y="496" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#3C3489">关闭时唤醒所有等待线程并 join 回收</text>
+  <line x1="350" y1="179" x2="376" y2="179" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="592" y1="179" x2="618" y2="179" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="794" y1="179" x2="820" y2="179" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
 
-  <path d="M220 148 C252 148 260 316 300 316" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="255" y="234" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">push task</text>
+  <!-- 共享状态泳道 -->
+  <rect x="48" y="226" width="1144" height="132" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="64" y="249" font-size="12" font-weight="700" fill="#2F6B5E">共享状态 · ThreadPool</text>
 
-  <path d="M385 130 L385 190" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="430" y="160" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">保护条件</text>
+  <rect x="180" y="266" width="260" height="72" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="310" y="291" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">pthread_mutex_t mutex</text>
+  <text x="310" y="316" font-size="10.5" fill="#6B675C" text-anchor="middle">保护 head / tail / size / stop</text>
 
-  <path d="M470 212 C570 212 610 124 740 124" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="605" y="168" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">signal</text>
+  <text x="500" y="276" font-size="11" font-weight="700" fill="#24473F">有界任务队列</text>
+  <rect x="500" y="286" width="44" height="34" rx="3" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="548" y="286" width="44" height="34" rx="3" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="596" y="286" width="44" height="34" rx="3" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="644" y="286" width="44" height="34" rx="3" fill="#FBFBF6" stroke="#8FB1A7" stroke-width="1.1"/>
+  <rect x="692" y="286" width="44" height="34" rx="3" fill="#FBFBF6" stroke="#8FB1A7" stroke-width="1.1"/>
+  <rect x="740" y="286" width="44" height="34" rx="3" fill="#FBFBF6" stroke="#8FB1A7" stroke-width="1.1"/>
+  <text x="522" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">T1</text>
+  <text x="570" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">T2</text>
+  <text x="618" y="308" font-size="10.5" fill="#24473F" text-anchor="middle">T3</text>
+  <text x="642" y="338" font-size="10.5" fill="#6B675C" text-anchor="middle">queue_size = 3 / capacity = 6</text>
 
-  <path d="M660 338 C700 338 700 242 740 242" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="704" y="292" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">pop task</text>
+  <rect x="844" y="258" width="314" height="88" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <line x1="844" y1="302" x2="1158" y2="302" stroke="#C8C0D8" stroke-width="1"/>
+  <text x="864" y="285" font-size="11.5" font-weight="700" fill="#5B4A83">not_empty</text>
+  <text x="1138" y="285" font-size="10.5" fill="#5B4A83" text-anchor="end">push 后唤醒 worker</text>
+  <text x="864" y="329" font-size="11.5" font-weight="700" fill="#5B4A83">not_full</text>
+  <text x="1138" y="329" font-size="10.5" fill="#5B4A83" text-anchor="end">pop 后唤醒提交者</text>
 
-  <path d="M740 360 C700 360 700 358 660 358" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="704" y="360" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">队列变少</text>
+  <path d="M265,200 L265,260" fill="none" stroke="#5A564B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <path d="M487,200 L487,238 L820,238 L820,324 L838,324" fill="none" stroke="#6B5B95" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <path d="M709,200 L709,280" fill="none" stroke="#2F6B5E" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrg)"/>
+  <path d="M981,200 L981,252" fill="none" stroke="#6B5B95" stroke-width="1.4" marker-end="url(#arr)"/>
 
-  <path d="M480 380 L480 454" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="535" y="418" text-anchor="middle" dominant-baseline="central"
-        font-family="system-ui,sans-serif" font-size="12" font-weight="400" fill="#444441">关闭流程</text>
+  <!-- worker 泳道 -->
+  <rect x="48" y="368" width="1144" height="104" rx="8" fill="#F4EDE0" stroke="#D8D5C8" stroke-width="1.1"/>
+  <text x="64" y="391" font-size="12" font-weight="700" fill="#8A6A3A">worker pool · 初始等待 not_empty</text>
+
+  <rect x="826" y="404" width="310" height="46" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="981" y="432" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">⑤ wait 返回 + 重新获得 mutex</text>
+
+  <rect x="624" y="404" width="170" height="46" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="709" y="432" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">⑥ pop task</text>
+
+  <rect x="382" y="404" width="210" height="46" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="487" y="432" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">⑦ signal(not_full) → unlock</text>
+
+  <rect x="180" y="404" width="170" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="265" y="432" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">⑧ task→func(arg)</text>
+
+  <path d="M1158,280 L1176,280 L1176,382 L981,382 L981,398" fill="none" stroke="#6B5B95" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="826" y1="427" x2="800" y2="427" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="624" y1="427" x2="598" y2="427" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="382" y1="427" x2="356" y2="427" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrg)"/>
+  <path d="M709,398 L709,326" fill="none" stroke="#2F6B5E" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arrg)"/>
+  <path d="M487,398 L487,352 L1000,352 L1000,346" fill="none" stroke="#6B5B95" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <text x="265" y="465" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">锁外执行：慢任务不堵住队列</text>
+
+  <!-- 边界状态 -->
+  <text x="48" y="506" font-size="13" font-weight="700" fill="#4A473F">B · 三种边界状态：条件变量不保存条件，真正条件都在共享变量里</text>
+
+  <rect x="48" y="522" width="350" height="104" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="68" y="550" font-size="12.5" font-weight="700" fill="#5B4A83">队列空 · queue_size == 0</text>
+  <text x="68" y="576" font-size="11.5" fill="#5B4A83">worker：wait(not_empty)</text>
+  <text x="68" y="600" font-size="11.5" fill="#5B4A83">push 后 signal，唤醒一个 worker</text>
+
+  <rect x="420" y="522" width="350" height="104" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="440" y="550" font-size="12.5" font-weight="700" fill="#6B4E28">队列满 · size == capacity</text>
+  <text x="440" y="576" font-size="11.5" fill="#6B4E28">提交者：wait(not_full)</text>
+  <text x="440" y="600" font-size="11.5" fill="#6B4E28">pop 后 signal，释放一个队列槽位</text>
+
+  <rect x="792" y="522" width="400" height="104" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="812" y="550" font-size="12.5" font-weight="700" fill="#733428">关闭 · stop == 1</text>
+  <text x="812" y="576" font-size="11.5" fill="#733428">broadcast(not_empty + not_full)</text>
+  <text x="812" y="600" font-size="11.5" fill="#733428">队列清空后退出，owner join 全部 worker</text>
+
+  <rect x="48" y="646" width="1144" height="32" rx="6" fill="#DCE9E3" stroke="#8FB1A7" stroke-width="1"/>
+  <text x="620" y="667" font-size="11.5" fill="#24473F" text-anchor="middle">锁的边界：检查 / push / pop / stop 在锁内；task→func(arg) 在锁外</text>
 </svg>

@@ -1,70 +1,105 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" viewBox="0 0 1100 640">
-  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 680" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>一次定时器到期的完整回合</title>
+  <desc>三条泳道分别是 EventLoop 线程、内存中的 TimerQueue、内核 timerfd，编号 ①–⑧ 串起从 addTimer 到重新 arm 的一整轮；底部列出三处最常见的漏做。</desc>
   <defs>
-    <marker id="arrow-hollow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5" fill="none" stroke="#4f6f8f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr3" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
-    <style>
-      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .box-title { font: 700 17px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .box-text { font: 14px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
-      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .queue { fill: #f0f6ff; stroke: #2f7ab8; stroke-width: 2.2; rx: 20; }
-      .timerfd { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 18; }
-      .loop { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.3; rx: 20; }
-      .task { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 16; }
-      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
-      .line { stroke: #4f6f8f; stroke-width: 2.2; fill: none; marker-end: url(#arrow-hollow); }
-      .soft-line { stroke: #7b8b9b; stroke-width: 1.8; fill: none; marker-end: url(#arrow-hollow); }
-      .dash { stroke: #8a98a8; stroke-width: 1.6; stroke-dasharray: 7 7; fill: none; }
-    </style>
   </defs>
 
-  <text x="550" y="48" text-anchor="middle" class="title">timer queue 与 timerfd 的分工</text>
-  <text x="550" y="76" text-anchor="middle" class="subtitle">timer queue 管理所有业务定时任务，timerfd 只负责唤醒最近一次到期</text>
+  <rect x="0" y="0" width="1240" height="680" fill="#F5F4ED"/>
 
-  <rect x="70" y="132" width="260" height="260" class="queue"/>
-  <text x="200" y="166" text-anchor="middle" class="box-title">TimerQueue</text>
-  <text x="200" y="192" text-anchor="middle" class="box-text">最小堆 / 时间轮</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">一次定时器到期的完整回合：timerfd 是闹钟，TimerQueue 才是主体</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">读掉那 8 个字节、批量取出所有到期项、用新堆顶重新 arm —— 三步漏掉任意一步都会出问题</text>
 
-  <rect x="108" y="220" width="184" height="42" class="task"/>
-  <text x="200" y="247" text-anchor="middle" class="small">connA: 10:00:03</text>
-  <rect x="108" y="272" width="184" height="42" class="task"/>
-  <text x="200" y="299" text-anchor="middle" class="small">connB: 10:00:07</text>
-  <rect x="108" y="324" width="184" height="42" class="task"/>
-  <text x="200" y="351" text-anchor="middle" class="small">heartbeat: 10:00:10</text>
+  <!-- 泳道背景 -->
+  <rect x="48" y="110" width="1144" height="136" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="62" y="132" font-size="12" font-weight="700" fill="#3D5A80">用户态 · EventLoop 线程</text>
+  <rect x="48" y="256" width="1144" height="136" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="62" y="278" font-size="12" font-weight="700" fill="#2F6B5E">用户态 · TimerQueue（纯内存，成千上万个任务）</text>
+  <rect x="48" y="402" width="1144" height="126" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="62" y="424" font-size="12" font-weight="700" fill="#6B5B95">内核 · timerfd（CLOCK_MONOTONIC，只记一个时刻）</text>
 
-  <rect x="432" y="150" width="236" height="110" class="timerfd"/>
-  <text x="550" y="185" text-anchor="middle" class="box-title">timerfd</text>
-  <text x="550" y="211" text-anchor="middle" class="box-text">只设置最近到期时间</text>
-  <text x="550" y="235" text-anchor="middle" class="small">timerfd_settime(top.expireTime)</text>
+  <!-- ① -->
+  <rect x="88" y="300" width="196" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="186" y="324" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">① addTimer(when, cb)</text>
+  <text x="186" y="344" font-size="10.5" fill="#24473F" text-anchor="middle">插入最小堆或有序 set</text>
 
-  <rect x="780" y="150" width="236" height="110" class="loop"/>
-  <text x="898" y="185" text-anchor="middle" class="box-title">epoll_wait()</text>
-  <text x="898" y="211" text-anchor="middle" class="box-text">timerfd 可读</text>
-  <text x="898" y="235" text-anchor="middle" class="small">返回 EPOLLIN</text>
+  <!-- ② -->
+  <rect x="88" y="444" width="196" height="58" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="186" y="468" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">② timerfd_settime()</text>
+  <text x="186" y="488" font-size="10.5" fill="#4A3F68" text-anchor="middle">只设堆顶那一个时刻</text>
 
-  <rect x="432" y="368" width="236" height="110" class="loop"/>
-  <text x="550" y="403" text-anchor="middle" class="box-title">执行到期任务</text>
-  <text x="550" y="429" text-anchor="middle" class="box-text">getExpired(now)</text>
-  <text x="550" y="453" text-anchor="middle" class="small">取出所有 expireTime &lt;= now</text>
+  <!-- 到期 -->
+  <rect x="316" y="444" width="196" height="58" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="414" y="468" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">到期</text>
+  <text x="414" y="488" font-size="10.5" fill="#6B4E28" text-anchor="middle">内核把 timerfd 置可读</text>
 
-  <rect x="780" y="368" width="236" height="110" class="timerfd"/>
-  <text x="898" y="403" text-anchor="middle" class="box-title">重新 arm timerfd</text>
-  <text x="898" y="429" text-anchor="middle" class="box-text">读取新的堆顶</text>
-  <text x="898" y="453" text-anchor="middle" class="small">准备下一次唤醒</text>
+  <!-- ③ -->
+  <rect x="316" y="154" width="196" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="414" y="178" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ epoll_wait 返回</text>
+  <text x="414" y="198" font-size="10.5" fill="#2C4460" text-anchor="middle">timerfd 上的 EPOLLIN</text>
 
-  <path d="M 330 222 L 430 205" class="line"/>
-  <text x="382" y="197" text-anchor="middle" class="small">top()</text>
-  <path d="M 668 205 L 778 205" class="line"/>
-  <path d="M 898 260 C 898 322 550 304 550 366" class="line"/>
-  <path d="M 668 423 L 778 423" class="line"/>
-  <path d="M 898 368 C 910 314 642 310 580 262" class="soft-line"/>
+  <!-- ④ -->
+  <rect x="544" y="154" width="196" height="58" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="2"/>
+  <text x="642" y="178" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">④ read(fd, &amp;n, 8)</text>
+  <text x="642" y="198" font-size="10.5" fill="#733428" text-anchor="middle">不读就会一直触发</text>
 
-  <path d="M 432 423 C 348 438 260 418 218 394" class="dash"/>
-  <text x="320" y="455" text-anchor="middle" class="small">到期任务执行后从队列移除；重复任务再插回队列</text>
+  <!-- ⑤ -->
+  <rect x="544" y="300" width="196" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="642" y="324" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑤ getExpired(now)</text>
+  <text x="642" y="344" font-size="10.5" fill="#24473F" text-anchor="middle">取出全部 expire ≤ now</text>
 
-  <rect x="178" y="532" width="744" height="52" class="note"/>
-  <text x="550" y="563" text-anchor="middle" class="small">关键点：一个 EventLoop 通常只需要一个 timerfd；大量业务定时器由内存中的 TimerQueue 管理</text>
+  <!-- ⑥ -->
+  <rect x="772" y="154" width="196" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="870" y="178" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑥ 逐个执行 cb()</text>
+  <text x="870" y="198" font-size="10.5" fill="#2C4460" text-anchor="middle">重活丢给线程池</text>
+
+  <!-- ⑦ -->
+  <rect x="772" y="300" width="196" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="870" y="324" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑦ 重复任务重插入</text>
+  <text x="870" y="344" font-size="10.5" fill="#24473F" text-anchor="middle">一次性任务直接丢弃</text>
+
+  <!-- ⑨ 回环 -->
+  <rect x="1000" y="154" width="180" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1090" y="178" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">⑨ 回到 epoll_wait</text>
+  <text x="1090" y="198" font-size="10.5" fill="#2C4460" text-anchor="middle">本轮定时器处理结束</text>
+
+  <!-- 数据结构选型 -->
+  <rect x="1000" y="300" width="180" height="58" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1090" y="322" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">最小堆 or 有序 set</text>
+  <text x="1090" y="340" font-size="10" fill="#6B675C" text-anchor="middle">要支持 cancel 就用 set</text>
+
+  <!-- ⑧ -->
+  <rect x="1000" y="444" width="180" height="58" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1090" y="468" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">⑧ 按新堆顶再 arm</text>
+  <text x="1090" y="488" font-size="10.5" fill="#4A3F68" text-anchor="middle">队列空则不设</text>
+
+  <!-- 箭头 -->
+  <line x1="186" y1="358" x2="186" y2="440" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="284" y1="473" x2="312" y2="473" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="414" y1="444" x2="414" y2="216" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="512" y1="183" x2="540" y2="183" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="642" y1="212" x2="642" y2="296" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="742" y1="318" x2="862" y2="218" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="870" y1="212" x2="870" y2="296" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="968" y1="183" x2="996" y2="183" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+  <line x1="970" y1="340" x2="1058" y2="440" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr3)"/>
+
+  <!-- 底部：三处漏做 -->
+  <text x="48" y="562" font-size="15" font-weight="700" fill="#4A473F">三处最常见的漏做</text>
+
+  <rect x="48" y="576" width="364" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="62" y="598" font-size="11.5" font-weight="700" fill="#733428">漏掉 ④：不读那 8 字节</text>
+  <text x="62" y="618" font-size="10.5" fill="#733428">LT 下 epoll_wait 立刻再次返回，空转烧满一个核</text>
+
+  <rect x="428" y="576" width="364" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="442" y="598" font-size="11.5" font-weight="700" fill="#733428">漏掉 ⑤：只执行堆顶一个</text>
+  <text x="442" y="618" font-size="10.5" fill="#733428">同一时刻到期的其他任务被推迟到下一轮</text>
+
+  <rect x="808" y="576" width="384" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="822" y="598" font-size="11.5" font-weight="700" fill="#733428">漏掉 ⑧：执行完不重新 arm</text>
+  <text x="822" y="618" font-size="10.5" fill="#733428">timerfd 再也不响，后续定时任务集体失效</text>
+
+  <text x="48" y="664" font-size="11.5" fill="#4A473F">时钟必须用 CLOCK_MONOTONIC：管理员改系统时间或 NTP 回拨时，CLOCK_REALTIME 会让所有超时判断一起失准。</text>
 </svg>

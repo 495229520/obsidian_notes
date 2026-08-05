@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>signal() 的两套语义差异与 sigaction() 的确定行为，以及信号打断主循环之后的两种收场</title>
+  <desc>上半对照 System V 与 BSD/glibc 两套 signal 语义在重置、屏蔽、系统调用重启三方面的差别，并给出 sigaction 把这些写进参数的做法；下半是一条被 SIGCHLD 打断的主循环时间轴，说明 sleep 会提前返回而慢系统调用取决于有没有 SA_RESTART。</desc>
+  <defs>
+    <marker id="v1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">signal() 的行为随平台变，sigaction() 才把它钉死</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">同一句 signal(SIGCHLD, h)，在两套历史语义下跑出来不是一回事，而代码里看不出区别</text>
+
+  <text x="56" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 同一句 signal() 的两种语义，和不受平台摆布的第三种写法</text>
+
+  <rect x="56" y="134" width="362" height="190" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="78" y="160" font-size="12.5" font-weight="700" fill="#733428">System V 语义：早期 Unix</text>
+  <text x="78" y="188" font-size="11" fill="#733428">handler 一触发就被重置成 SIG_DFL</text>
+  <text x="78" y="212" font-size="11" fill="#733428">得在 handler 里再 signal() 一次</text>
+  <text x="78" y="236" font-size="11" fill="#733428">重置到重装之间有窗口，会漏</text>
+  <text x="78" y="260" font-size="11" fill="#733428">执行期间不屏蔽同种信号，可能重入</text>
+  <text x="78" y="284" font-size="11" fill="#733428">被打断的慢系统调用返回 EINTR</text>
+  <text x="78" y="308" font-size="11" fill="#6B675C">今天很少见，但标准允许</text>
+
+  <rect x="439" y="134" width="362" height="190" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="461" y="160" font-size="12.5" font-weight="700" fill="#6B4E28">BSD 语义：今天的 glibc</text>
+  <text x="461" y="188" font-size="11" fill="#6B4E28">handler 不重置，装一次一直有效</text>
+  <text x="461" y="212" font-size="11" fill="#6B4E28">执行期间自动屏蔽同种信号</text>
+  <text x="461" y="236" font-size="11" fill="#6B4E28">慢系统调用自动重启</text>
+  <text x="461" y="260" font-size="11" fill="#6B4E28">也就是隐含带上了 SA_RESTART</text>
+  <text x="461" y="284" font-size="11" font-weight="700" fill="#733428">但这是 glibc 的选择，不是标准</text>
+  <text x="461" y="308" font-size="11" fill="#6B675C">换个 libc 就可能变回左边那套</text>
+
+  <rect x="822" y="134" width="362" height="190" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="844" y="160" font-size="12.5" font-weight="700" fill="#24473F">sigaction()：把语义写进参数</text>
+  <text x="844" y="188" font-size="11" fill="#24473F">sa_flags 显式声明要不要重启</text>
+  <text x="844" y="212" font-size="11" fill="#24473F">sa_mask 显式声明期间屏蔽谁</text>
+  <text x="844" y="236" font-size="11" fill="#24473F">行为写在调用处，不看平台脸色</text>
+  <text x="844" y="260" font-size="11" fill="#24473F">POSIX 推荐的写法</text>
+  <text x="844" y="284" font-size="11" font-weight="700" fill="#24473F">新代码一律用它</text>
+  <text x="844" y="308" font-size="11" fill="#6B675C">signal() 只留给 SIG_IGN 这种</text>
+
+  <text x="56" y="366" font-size="13" font-weight="700" fill="#4A473F">B · handler 跑完之后，主循环回到哪里</text>
+
+  <rect x="56" y="382" width="400" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="256" y="404" font-size="11" fill="#2C4460" text-anchor="middle">父进程 sleep(1)，刚睡到 0.4 秒</text>
+  <rect x="470" y="382" width="180" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="560" y="404" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">SIGCHLD 到达</text>
+  <rect x="664" y="382" width="180" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="754" y="404" font-size="11" fill="#733428" text-anchor="middle">handler 里收干净</text>
+  <rect x="858" y="382" width="326" height="34" rx="6" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="1021" y="404" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">回到断点，但 sleep 不会自己续上</text>
+
+  <line x1="456" y1="399" x2="466" y2="399" stroke="#5A564B" stroke-width="1.6" marker-end="url(#v1)"/>
+  <line x1="650" y1="399" x2="660" y2="399" stroke="#5A564B" stroke-width="1.6" marker-end="url(#v1)"/>
+  <line x1="844" y1="399" x2="854" y2="399" stroke="#5A564B" stroke-width="1.6" marker-end="url(#v1)"/>
+
+  <rect x="56" y="450" width="556" height="140" rx="8" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="78" y="476" font-size="12.5" font-weight="700" fill="#6B4E28">sleep()：提前返回，SA_RESTART 也救不了</text>
+  <text x="78" y="504" font-size="11" fill="#6B4E28">返回值是没睡完的秒数，不是 0</text>
+  <text x="78" y="528" font-size="11" fill="#6B4E28">主循环的节奏会被子进程的死亡打乱</text>
+  <text x="78" y="552" font-size="11" fill="#6B4E28">想睡满，拿返回值再睡一次</text>
+  <text x="78" y="576" font-size="11" fill="#6B675C">nanosleep 才有续睡所需的剩余时间</text>
+
+  <rect x="628" y="450" width="556" height="140" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="650" y="476" font-size="12.5" font-weight="700" fill="#2C4460">慢系统调用：看有没有 SA_RESTART</text>
+  <text x="650" y="504" font-size="11" fill="#2C4460">read / accept / waitpid 阻塞中被打断</text>
+  <text x="650" y="528" font-size="11" fill="#2C4460">带 SA_RESTART：内核自动重来，代码无感</text>
+  <text x="650" y="552" font-size="11" fill="#2C4460">不带：返回 -1 并置 EINTR，得自己重试</text>
+  <text x="650" y="576" font-size="11" font-weight="700" fill="#2C4460">这个分支不写，服务器迟早偶发出错</text>
+
+  <text x="68" y="648" font-size="11.5" fill="#4A473F">handler 里那句 printf 只是为了看效果。它不是异步信号安全的函数，正式代码里不能用，也别忘了进出各存一次 errno。</text>
+  <text x="68" y="672" font-size="11.5" fill="#4A473F">SIGCHLD 属于标准信号，内核只记「有没有」不记「有几个」，所以 handler 里必须循环 waitpid 收到返回值不再大于 0 为止。</text>
+</svg>

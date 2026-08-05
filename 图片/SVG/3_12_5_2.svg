@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 892" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>joinable 与 detached 线程的生命周期对照，以及僵尸线程的辨析</title>
+  <desc>上半把两种线程的生命周期画成并排时间线，标出 joinable 线程 return 之后到被 join 之间的那段保留窗口；中间列出线程结束时各自保留和回收了什么；下半对比内核层面的僵尸进程和用户态说法的僵尸线程，两者没有关系。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="892" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">joinable 和 detached：线程跑完之后，剩下的那点东西谁来收</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">「僵尸线程」只是 joinable 线程 return 之后没人 join，和 ps 里那个 Z 状态的僵尸进程没有关系</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="102" width="1144" height="268" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 两条时间线，差别全在最后一段</text>
+
+  <text x="72" y="180" font-size="12.5" font-weight="700" fill="#4A473F">joinable</text>
+  <text x="72" y="198" font-size="11" fill="#6B675C">创建时的默认状态</text>
+  <rect x="170" y="162" width="200" height="40" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="270" y="187" font-size="11.5" fill="#2C4460" text-anchor="middle">线程运行中</text>
+  <rect x="370" y="162" width="440" height="40" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.8"/>
+  <text x="590" y="187" font-size="11.5" fill="#6B4E28" text-anchor="middle">已 return，退出状态和 TCB 还留着</text>
+  <line x1="810" y1="148" x2="810" y2="212" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="818" y="145" font-size="11" fill="#24473F">pthread_join()</text>
+  <rect x="814" y="162" width="336" height="40" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="982" y="187" font-size="11.5" fill="#24473F" text-anchor="middle">栈和 TCB 释放，返回值取走</text>
+
+  <line x1="370" y1="208" x2="370" y2="222" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="370" y1="222" x2="810" y2="222" stroke="#A64B3C" stroke-width="1.5"/>
+  <line x1="810" y1="208" x2="810" y2="222" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="590" y="242" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">这段窗口就是所谓的「僵尸线程」</text>
+
+  <text x="72" y="290" font-size="12.5" font-weight="700" fill="#4A473F">detached</text>
+  <text x="72" y="308" font-size="11" fill="#6B675C">detach 之后</text>
+  <rect x="170" y="272" width="200" height="40" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="270" y="297" font-size="11.5" fill="#2C4460" text-anchor="middle">线程运行中</text>
+  <rect x="370" y="272" width="780" height="40" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="760" y="297" font-size="11.5" fill="#4A473F" text-anchor="middle">return 的同时自动回收，没有等待窗口</text>
+  <text x="370" y="338" font-size="11" fill="#6B675C">这条线上再调 pthread_join() 会返回 EINVAL</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="388" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="410" font-size="15" font-weight="700" fill="#4A473F">B · 线程结束的那一刻，各自留下什么</text>
+
+  <rect x="72" y="422" width="1096" height="30" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="86" y="442" font-size="11.5" font-weight="700" fill="#4A473F">项目</text>
+  <text x="426" y="442" font-size="11.5" font-weight="700" fill="#4A473F">joinable（默认）</text>
+  <text x="804" y="442" font-size="11.5" font-weight="700" fill="#4A473F">detached</text>
+
+  <rect x="72" y="452" width="1096" height="36" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="475" font-size="11" fill="#2B2A26">线程栈</text>
+  <text x="426" y="475" font-size="11" fill="#2B2A26">join 之后才释放</text>
+  <text x="804" y="475" font-size="11" fill="#2B2A26">return 时立刻释放</text>
+
+  <rect x="72" y="488" width="1096" height="36" fill="#F4F2EA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="511" font-size="11" fill="#2B2A26">退出状态与返回值</text>
+  <text x="426" y="511" font-size="11" fill="#2B2A26">保留着，等人来取</text>
+  <text x="804" y="511" font-size="11" fill="#2B2A26">直接丢弃，取不到</text>
+
+  <rect x="72" y="524" width="1096" height="36" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="547" font-size="11" fill="#2B2A26">pthread_join</text>
+  <text x="426" y="547" font-size="11" fill="#2B2A26">必须调一次，且只能一次</text>
+  <text x="804" y="547" font-size="11" fill="#2B2A26">调了返回 EINVAL</text>
+
+  <rect x="72" y="560" width="1096" height="36" fill="#F4F2EA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="583" font-size="11" fill="#2B2A26">忘了回收会怎样</text>
+  <text x="426" y="583" font-size="11" fill="#733428">每条线程漏一份栈和 TCB</text>
+  <text x="804" y="583" font-size="11" fill="#24473F">不会漏</text>
+
+  <rect x="72" y="596" width="1096" height="36" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="86" y="619" font-size="11" fill="#2B2A26">malloc / fd / 持有的锁</text>
+  <text x="426" y="619" font-size="11" fill="#733428">两种都不管，得自己清</text>
+  <text x="804" y="619" font-size="11" fill="#733428">两种都不管，得自己清</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="656" width="1144" height="212" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="678" font-size="15" font-weight="700" fill="#4A473F">C · 僵尸线程和僵尸进程完全是两回事，只是名字撞了</text>
+
+  <rect x="72" y="690" width="536" height="130" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="92" y="714" font-size="12.5" font-weight="700" fill="#733428">僵尸进程 · 内核里真有这个状态</text>
+  <text x="92" y="738" font-size="11.5" fill="#733428">ps 里 STAT 显示 Z，进程名带 &lt;defunct&gt;</text>
+  <text x="92" y="760" font-size="11.5" fill="#733428">子进程已终止，父进程还没 wait()</text>
+  <text x="92" y="782" font-size="11.5" fill="#733428">内核保留 task_struct 和退出码</text>
+  <text x="92" y="804" font-size="11" fill="#6B675C">父进程退出后由 init 收养并回收</text>
+
+  <rect x="632" y="690" width="536" height="130" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="652" y="714" font-size="12.5" font-weight="700" fill="#6B4E28">僵尸线程 · 只是一种说法</text>
+  <text x="652" y="738" font-size="11.5" fill="#6B4E28">ps 和 top 里看不到，没有 Z 状态</text>
+  <text x="652" y="760" font-size="11.5" fill="#6B4E28">joinable 线程 return 后一直没人 join</text>
+  <text x="652" y="782" font-size="11.5" fill="#6B4E28">pthread 库在用户态留着栈和 TCB</text>
+  <text x="652" y="804" font-size="11" fill="#6B675C">只能靠 join 或 detach 收掉</text>
+
+  <rect x="72" y="832" width="1096" height="28" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="88" y="851" font-size="11.5" fill="#4A473F">查线程泄漏：看 /proc/&lt;pid&gt;/status 的 Threads 和 VmSize</text>
+  <text x="700" y="851" font-size="11.5" fill="#733428">不是看 ps 里的 STAT</text>
+</svg>

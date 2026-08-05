@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>回调里销毁自己：handleEvent 的栈帧与 tie 守卫</title>
+  <desc>对照有无 weak_ptr tie_ 时，TcpConnection 引用计数在 handleEvent 六个阶段的变化，说明守卫为什么能把析构推迟到栈帧退出之后。</desc>
+
+  <rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">回调里销毁自己：栈帧还没退，对象已经没了</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">closeCallback_ 会把连接从 map 里擦掉；若这是最后一个 shared_ptr，Channel 就在 handleEvent() 中途被析构</text>
+
+  <!-- 阶段列头 -->
+  <text x="282" y="128" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">① 进入 handleEvent</text>
+  <text x="446" y="128" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">② 触发 closeCallback_</text>
+  <text x="610" y="128" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">③ handleClose() 里</text>
+  <text x="774" y="128" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">④ conns_.erase(name)</text>
+  <text x="938" y="128" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">⑤ 回到 handleEvent</text>
+  <text x="1102" y="128" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">⑥ 栈帧退出</text>
+
+  <!-- 行 A：无守卫 -->
+  <rect x="56" y="140" width="1128" height="110" rx="8" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.3"/>
+  <line x1="200" y1="140" x2="200" y2="250" stroke="#DCC7C0" stroke-width="1"/>
+  <line x1="364" y1="140" x2="364" y2="250" stroke="#DCC7C0" stroke-width="1"/>
+  <line x1="528" y1="140" x2="528" y2="250" stroke="#DCC7C0" stroke-width="1"/>
+  <line x1="692" y1="140" x2="692" y2="250" stroke="#DCC7C0" stroke-width="1"/>
+  <line x1="856" y1="140" x2="856" y2="250" stroke="#DCC7C0" stroke-width="1"/>
+  <line x1="1020" y1="140" x2="1020" y2="250" stroke="#DCC7C0" stroke-width="1"/>
+
+  <text x="70" y="180" font-size="13" font-weight="700" fill="#733428">✗ 直接分派</text>
+  <text x="70" y="204" font-size="10.5" fill="#733428">conn 引用计数</text>
+  <text x="70" y="226" font-size="10.5" fill="#733428">只有 map 一份</text>
+
+  <text x="282" y="182" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">计数 = 1</text>
+  <text x="282" y="208" font-size="10.5" fill="#733428" text-anchor="middle">只有 conns_ 持有</text>
+
+  <text x="446" y="182" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">计数 = 1</text>
+  <text x="446" y="208" font-size="10.5" fill="#733428" text-anchor="middle">进入连接的回调</text>
+
+  <text x="610" y="182" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">计数 = 1</text>
+  <text x="610" y="208" font-size="10.5" fill="#733428" text-anchor="middle">removeChannel()</text>
+
+  <text x="774" y="182" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">计数 1 → 0</text>
+  <text x="774" y="208" font-size="10.5" fill="#733428" text-anchor="middle">~TcpConnection</text>
+  <text x="774" y="228" font-size="10.5" fill="#733428" text-anchor="middle">~Channel 一并执行</text>
+
+  <text x="938" y="182" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">对象已释放</text>
+  <text x="938" y="208" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">读 revents_ → UAF</text>
+
+  <text x="1102" y="182" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">行为未定义</text>
+  <text x="1102" y="208" font-size="10.5" fill="#733428" text-anchor="middle">可能崩，也可能不崩</text>
+
+  <!-- 行 B：tie 守卫 -->
+  <rect x="56" y="258" width="1128" height="110" rx="8" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.3"/>
+  <line x1="200" y1="258" x2="200" y2="368" stroke="#C3D6CD" stroke-width="1"/>
+  <line x1="364" y1="258" x2="364" y2="368" stroke="#C3D6CD" stroke-width="1"/>
+  <line x1="528" y1="258" x2="528" y2="368" stroke="#C3D6CD" stroke-width="1"/>
+  <line x1="692" y1="258" x2="692" y2="368" stroke="#C3D6CD" stroke-width="1"/>
+  <line x1="856" y1="258" x2="856" y2="368" stroke="#C3D6CD" stroke-width="1"/>
+  <line x1="1020" y1="258" x2="1020" y2="368" stroke="#C3D6CD" stroke-width="1"/>
+
+  <text x="70" y="298" font-size="13" font-weight="700" fill="#24473F">✓ tie 守卫</text>
+  <text x="70" y="322" font-size="10.5" fill="#24473F">分派前先 lock()</text>
+  <text x="70" y="344" font-size="10.5" fill="#24473F">栈上多一份</text>
+
+  <text x="282" y="300" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">计数 1 → 2</text>
+  <text x="282" y="326" font-size="10.5" fill="#24473F" text-anchor="middle">guard = tie_.lock()</text>
+
+  <text x="446" y="300" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">计数 = 2</text>
+  <text x="446" y="326" font-size="10.5" fill="#24473F" text-anchor="middle">guard 仍在栈上</text>
+
+  <text x="610" y="300" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">计数 = 2</text>
+  <text x="610" y="326" font-size="10.5" fill="#24473F" text-anchor="middle">removeChannel()</text>
+
+  <text x="774" y="300" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">计数 2 → 1</text>
+  <text x="774" y="326" font-size="10.5" fill="#24473F" text-anchor="middle">erase 不触发析构</text>
+
+  <text x="938" y="300" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">计数 = 1</text>
+  <text x="938" y="326" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">读 revents_ 安全</text>
+
+  <text x="1102" y="300" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">计数 1 → 0</text>
+  <text x="1102" y="326" font-size="10.5" fill="#24473F" text-anchor="middle">此刻才真正释放</text>
+
+  <!-- C 区：代码对照 -->
+  <text x="56" y="392" font-size="14" font-weight="700" fill="#4A473F">C · 差别只在开头这三行</text>
+
+  <rect x="56" y="402" width="548" height="176" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="72" y="426" font-size="12" font-weight="700" fill="#733428">✗ 教学版：直接按位分派</text>
+  <text x="72" y="452" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">if (revents_ &amp; EPOLLHUP) closeCallback_();</text>
+  <text x="72" y="473" font-size="11" fill="#733428" font-family="'SF Mono',Menlo,Consolas,monospace">//  ↑ 里面 conns_.erase，计数归零</text>
+  <text x="72" y="494" font-size="11" fill="#733428" font-family="'SF Mono',Menlo,Consolas,monospace">//    TcpConnection 和 Channel 一起没</text>
+  <text x="72" y="515" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">if (revents_ &amp; EPOLLIN) readCallback_();</text>
+  <text x="72" y="536" font-size="11" font-weight="700" fill="#733428" font-family="'SF Mono',Menlo,Consolas,monospace">//  ↑ this 已是野指针</text>
+  <text x="72" y="562" font-size="10.5" fill="#733428">崩不崩看运气，内存没被覆盖时看起来还能跑</text>
+
+  <rect x="636" y="402" width="548" height="176" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="652" y="426" font-size="12" font-weight="700" fill="#24473F">✓ muduo 的写法：先探活再分派</text>
+  <text x="652" y="452" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">std::shared_ptr&lt;void&gt; guard;</text>
+  <text x="652" y="473" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">if (tied_) {</text>
+  <text x="652" y="494" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">  guard = tie_.lock();   // 探活 + 续命</text>
+  <text x="652" y="515" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">  if (!guard) return;    // 已死则跳过</text>
+  <text x="652" y="536" font-size="11" fill="#4A473F" font-family="'SF Mono',Menlo,Consolas,monospace">}</text>
+  <text x="652" y="562" font-size="11" font-weight="700" fill="#24473F" font-family="'SF Mono',Menlo,Consolas,monospace">handleEventWithGuard();</text>
+
+  <text x="56" y="622" font-size="11.5" fill="#4A473F">tie_ 是 weak_ptr，本身不延长生命周期；它的作用是在分派前把对象提升成 shared_ptr，让本轮的析构推迟到栈帧退出之后。</text>
+  <text x="56" y="648" font-size="11.5" fill="#4A473F">前提是 TcpConnection 由 shared_ptr 管理，并在 connectEstablished() 里调用 channel_-&gt;tie(shared_from_this())。</text>
+  <text x="56" y="674" font-size="11.5" fill="#4A473F">guard 的作用域必须包住整个分派过程 —— 只包住 closeCallback_() 一句没用，后面的 readCallback_() 照样踩空。</text>
+</svg>

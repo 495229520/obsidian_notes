@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 828" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Nagle 算法的判定过程</title>
+  <desc>上半部分用报文长度示意 Nagle 要解决的头部开销问题；中间是内核每次 write 之后依次问的三个问题和三条出口；下半对比 RFC 896 原版规则和 Linux 采用的 Minshall 变体。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="828" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">Nagle 只决定一件事：这个不满 MSS 的段，现在发还是先攒着</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">它本身不带任何定时器；攒着的时候在等的是对方的 ACK，而不是等某个时间到点</text>
+
+  <!-- ============ Panel A ============ -->
+  <rect x="48" y="102" width="1144" height="232" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 它要解决的问题：40 字节的头，送 1 字节的数据</text>
+
+  <text x="72" y="160" font-size="12.5" font-weight="700" fill="#733428">逐字节写 · 4 个包</text>
+  <rect x="72"  y="176" width="76" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="148" y="176" width="6"  height="34" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="180" y="176" width="76" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="256" y="176" width="6"  height="34" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="288" y="176" width="76" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="364" y="176" width="6"  height="34" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="396" y="176" width="76" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="472" y="176" width="6"  height="34" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="72" y="232" font-size="11" fill="#6B675C">灰段是 40B 头，蓝段是 1B 数据</text>
+  <text x="72" y="256" font-size="11.5" fill="#2B2A26">4 个包 · 头部 160B · 数据 4B</text>
+  <text x="72" y="278" font-size="11.5" font-weight="700" fill="#733428">有效载荷 2.4%</text>
+
+  <text x="632" y="160" font-size="12.5" font-weight="700" fill="#24473F">攒到一起 · 1 个包</text>
+  <rect x="632" y="176" width="76" height="34" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="708" y="176" width="24" height="34" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="632" y="232" font-size="11" fill="#6B675C">同样是 40B 头，一次带走 4B</text>
+  <text x="632" y="256" font-size="11.5" fill="#2B2A26">1 个包 · 头部 40B · 数据 4B</text>
+  <text x="632" y="278" font-size="11.5" font-weight="700" fill="#24473F">有效载荷 9.1%</text>
+
+  <rect x="72" y="296" width="1096" height="28" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="88" y="315" font-size="11.5" fill="#4A473F">RFC 896（1984）：Telnet 每敲一个键，网上就多一个 41 字节的包</text>
+
+  <!-- ============ Panel B ============ -->
+  <rect x="48" y="352" width="1144" height="282" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="380" font-size="15" font-weight="700" fill="#4A473F">B · 每次 write 之后，内核依次问三个问题</text>
+
+  <rect x="72" y="400" width="356" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="90" y="422" font-size="12.5" font-weight="700" fill="#2C4460">① 这一段满 MSS 吗</text>
+  <text x="90" y="442" font-size="11" fill="#2C4460">以太网上典型值 1460 字节</text>
+  <text x="456" y="418" font-size="10" fill="#4A473F" text-anchor="middle">满</text>
+  <line x1="428" y1="427" x2="484" y2="427" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="492" y="400" width="186" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="585" y="432" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">立即发</text>
+  <text x="700" y="432" font-size="11.5" fill="#4A473F">大块写从来不会被 Nagle 拦住</text>
+
+  <rect x="72" y="466" width="356" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="90" y="488" font-size="12.5" font-weight="700" fill="#2C4460">② 在途有没确认的小段吗</text>
+  <text x="90" y="508" font-size="11" fill="#2C4460">Linux 只看小段，见 C 区</text>
+  <text x="456" y="484" font-size="10" fill="#4A473F" text-anchor="middle">没有</text>
+  <line x1="428" y1="493" x2="484" y2="493" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="492" y="466" width="186" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="585" y="498" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">立即发</text>
+  <text x="700" y="498" font-size="11.5" fill="#4A473F">空闲之后的第一次小写不排队</text>
+
+  <rect x="72" y="532" width="356" height="54" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.4"/>
+  <text x="90" y="554" font-size="12.5" font-weight="700" fill="#4A473F">③ 两条都不成立</text>
+  <text x="90" y="574" font-size="11" fill="#6B675C">是小段，且在途有小段</text>
+  <line x1="428" y1="559" x2="484" y2="559" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="492" y="532" width="186" height="54" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.6"/>
+  <text x="585" y="564" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">压进发送队列</text>
+  <text x="700" y="564" font-size="11.5" fill="#4A473F">等 ACK 回来，或后续数据凑满 MSS</text>
+
+  <rect x="72" y="598" width="1096" height="28" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="88" y="617" font-size="11.5" fill="#6B4E28">整条路径上唯一的解锁事件是 ACK 到达</text>
+
+  <!-- ============ Panel C ============ -->
+  <rect x="48" y="652" width="1144" height="152" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="680" font-size="15" font-weight="700" fill="#4A473F">C · 课本写法和 Linux 实现差一条：只有小段才挡路</text>
+
+  <rect x="72" y="696" width="536" height="90" rx="7" fill="#F4F2EA" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="92" y="720" font-size="12.5" font-weight="700" fill="#733428">RFC 896 原版</text>
+  <text x="92" y="742" font-size="11.5" fill="#2B2A26">在途有任何未确认数据就攒着</text>
+  <text x="92" y="764" font-size="11.5" fill="#2B2A26">满段之后的小段也得排队</text>
+
+  <rect x="632" y="696" width="536" height="90" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="652" y="720" font-size="12.5" font-weight="700" fill="#24473F">Linux · Minshall 变体</text>
+  <text x="652" y="742" font-size="11.5" fill="#24473F">只有在途的小段才挡路</text>
+  <text x="652" y="764" font-size="11.5" fill="#24473F">tcp_minshall_check() 判这条</text>
+</svg>

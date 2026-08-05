@@ -1,69 +1,103 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620">
-  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 750" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow-hollow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5" fill="none" stroke="#4f6f8f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
-    <style>
-      .title { font: 700 28px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .lane-title { font: 700 18px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
-      .box-title { font: 700 17px Arial, "Microsoft YaHei", sans-serif; fill: #243447; }
-      .box-text { font: 14px Arial, "Microsoft YaHei", sans-serif; fill: #31465a; }
-      .small { font: 13px Arial, "Microsoft YaHei", sans-serif; fill: #5b6773; }
-      .worker { fill: #fff8e8; stroke: #d49b38; stroke-width: 2; rx: 18; }
-      .queue { fill: #f0f6ff; stroke: #2f7ab8; stroke-width: 2; rx: 18; }
-      .eventfd { fill: #fff0f0; stroke: #c96b6b; stroke-width: 2; rx: 18; }
-      .loop { fill: #edf7ed; stroke: #4f8f55; stroke-width: 2.4; rx: 20; }
-      .note { fill: #fffdf5; stroke: #c6b178; stroke-width: 1.5; rx: 14; }
-      .line { stroke: #4f6f8f; stroke-width: 2.2; fill: none; marker-end: url(#arrow-hollow); }
-      .dash { stroke: #8a98a8; stroke-width: 1.6; stroke-dasharray: 7 7; fill: none; }
-    </style>
   </defs>
+  <title>eventfd 唤醒 EventLoop 的跨线程时序</title>
+  <desc>worker 线程入队任务后写 eventfd，内核计数器变化使 fd 可读，唤醒阻塞在 epoll_wait 的 EventLoop；底部对比 pipe、eventfd 与条件变量三种唤醒手段。</desc>
 
-  <text x="500" y="48" text-anchor="middle" class="title">eventfd：跨线程唤醒 EventLoop</text>
-  <text x="500" y="76" text-anchor="middle" class="subtitle">其他线程只投递任务和写 eventfd，连接状态回到所属 EventLoop 线程处理</text>
+  <rect x="0" y="0" width="1240" height="750" fill="#F5F4ED"/>
 
-  <rect x="55" y="112" width="890" height="188" rx="24" fill="#fffaf0" stroke="#e2c891" stroke-width="1.5"/>
-  <text x="86" y="145" class="lane-title">worker / main 线程</text>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">怎么叫醒一个睡在 epoll_wait() 里的线程</text>
+  <text x="48" y="82" font-size="13" fill="#6B675C">任务入队不等于会被执行 —— 队列变了，但 EventLoop 睡在内核等待队列上，没有任何 fd 事件把它拽出来</text>
 
-  <rect x="92" y="175" width="190" height="76" class="worker"/>
-  <text x="187" y="205" text-anchor="middle" class="box-title">业务处理完成</text>
-  <text x="187" y="229" text-anchor="middle" class="small">生成 functor</text>
+  <text x="56" y="112" font-size="14" font-weight="700" fill="#4A473F">A · 一次跨线程投递的完整时序</text>
 
-  <rect x="380" y="175" width="210" height="76" class="queue"/>
-  <text x="485" y="205" text-anchor="middle" class="box-title">pendingFunctors</text>
-  <text x="485" y="229" text-anchor="middle" class="small">加锁放入任务队列</text>
+  <!-- 泳道 -->
+  <rect x="56" y="124" width="1128" height="126" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="146" font-size="12" font-weight="700" fill="#3D5A80">worker 线程 · 不拥有这条连接</text>
 
-  <rect x="698" y="175" width="190" height="76" class="eventfd"/>
-  <text x="793" y="205" text-anchor="middle" class="box-title">write(eventfd)</text>
-  <text x="793" y="229" text-anchor="middle" class="small">计数器 + 1</text>
+  <rect x="56" y="258" width="1128" height="126" rx="8" fill="#EFE7DA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="280" font-size="12" font-weight="700" fill="#8A6A3A">内核 · eventfd 计数器 + epoll 等待队列</text>
 
-  <path d="M 282 213 L 378 213" class="line"/>
-  <path d="M 590 213 L 696 213" class="line"/>
+  <rect x="56" y="392" width="1128" height="126" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="414" font-size="12" font-weight="700" fill="#2F6B5E">EventLoop 线程 · 连接的归属线程</text>
 
-  <rect x="55" y="342" width="890" height="206" rx="24" fill="#f4fbf4" stroke="#b8d8b9" stroke-width="1.5"/>
-  <text x="86" y="375" class="lane-title">所属 EventLoop 线程</text>
+  <!-- worker 泳道 -->
+  <rect x="80" y="162" width="190" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="175" y="188" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">① 业务算完了</text>
+  <text x="175" y="208" font-size="10.5" fill="#2C4460" text-anchor="middle">生成一个 functor</text>
 
-  <rect x="92" y="412" width="190" height="82" class="loop"/>
-  <text x="187" y="441" text-anchor="middle" class="box-title">epoll_wait()</text>
-  <text x="187" y="466" text-anchor="middle" class="small">阻塞等待 fd 事件</text>
+  <rect x="294" y="162" width="200" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="394" y="188" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 加锁进队列</text>
+  <text x="394" y="208" font-size="10.5" fill="#2C4460" text-anchor="middle">pendingFunctors_</text>
 
-  <rect x="386" y="412" width="200" height="82" class="eventfd"/>
-  <text x="486" y="441" text-anchor="middle" class="box-title">eventfd 可读</text>
-  <text x="486" y="466" text-anchor="middle" class="small">read 后计数清零</text>
+  <rect x="518" y="162" width="212" height="64" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="624" y="188" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">③ write(wakeupFd, 8 字节)</text>
+  <text x="624" y="208" font-size="10.5" fill="#2C4460" text-anchor="middle">少于 8 字节返回 EINVAL</text>
 
-  <rect x="696" y="412" width="200" height="82" class="loop"/>
-  <text x="796" y="441" text-anchor="middle" class="box-title">doPendingFunctors()</text>
-  <text x="796" y="466" text-anchor="middle" class="small">在 loop 线程执行任务</text>
+  <line x1="274" y1="194" x2="290" y2="194" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="498" y1="194" x2="514" y2="194" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
 
-  <path d="M 793 251 C 793 312 486 318 486 410" class="line"/>
-  <path d="M 282 453 L 384 453" class="line"/>
-  <path d="M 586 453 L 694 453" class="line"/>
+  <!-- 内核泳道 -->
+  <rect x="518" y="296" width="212" height="64" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="624" y="322" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">④ 计数器 0 → 1</text>
+  <text x="624" y="342" font-size="10.5" fill="#6B4E28" text-anchor="middle">fd 从此变成可读</text>
 
-  <path d="M 485 251 C 485 294 786 310 796 410" class="dash"/>
-  <text x="648" y="316" text-anchor="middle" class="small">任务数据在队列中，eventfd 只负责唤醒</text>
+  <rect x="754" y="296" width="200" height="64" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="854" y="322" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">⑤ 唤醒等待队列</text>
+  <text x="854" y="342" font-size="10.5" fill="#6B4E28" text-anchor="middle">loop 从内核态返回</text>
 
-  <rect x="255" y="548" width="490" height="44" class="note"/>
-  <text x="500" y="576" text-anchor="middle" class="small">关键边界：跨线程不直接改连接对象，只把操作投递回连接所属 EventLoop</text>
+  <line x1="624" y1="230" x2="624" y2="292" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="734" y1="328" x2="750" y2="328" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="854" y1="364" x2="854" y2="426" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- EventLoop 泳道 -->
+  <rect x="80" y="430" width="190" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="175" y="456" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⓪ epoll_wait(-1)</text>
+  <text x="175" y="476" font-size="10.5" fill="#24473F" text-anchor="middle">无事件就无限期阻塞</text>
+
+  <rect x="294" y="446" width="436" height="32" rx="6" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="512" y="467" font-size="11.5" fill="#4A473F" text-anchor="middle">睡眠中 —— 队列里已经有任务，但它不知道</text>
+
+  <rect x="754" y="430" width="200" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="854" y="456" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑥ wakeupChannel 可读</text>
+  <text x="854" y="476" font-size="10.5" fill="#24473F" text-anchor="middle">read() 取走计数并清零</text>
+
+  <rect x="978" y="430" width="190" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1073" y="456" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">⑦ doPendingFunctors()</text>
+  <text x="1073" y="476" font-size="10.5" fill="#24473F" text-anchor="middle">在归属线程里改状态</text>
+
+  <line x1="274" y1="462" x2="290" y2="462" stroke="#8A8574" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <line x1="958" y1="462" x2="974" y2="462" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- B 区：三种手段对比 -->
+  <text x="56" y="552" font-size="14" font-weight="700" fill="#4A473F">B · 为什么是 eventfd，不是 pipe，也不是条件变量</text>
+
+  <rect x="56" y="564" width="1128" height="30" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="68" y="584" font-size="11.5" font-weight="700" fill="#4A473F">唤醒手段</text>
+  <text x="248" y="584" font-size="11.5" font-weight="700" fill="#4A473F">占用 fd</text>
+  <text x="378" y="584" font-size="11.5" font-weight="700" fill="#4A473F">能进 epoll</text>
+  <text x="518" y="584" font-size="11.5" font-weight="700" fill="#4A473F">关键差别</text>
+
+  <rect x="56" y="594" width="1128" height="34" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="68" y="616" font-size="11.5" font-weight="700" fill="#2C4460">pipe(2)</text>
+  <text x="248" y="616" font-size="11" fill="#4A473F">2 个</text>
+  <text x="378" y="616" font-size="11" fill="#4A473F">能</text>
+  <text x="518" y="616" font-size="11" fill="#4A473F">有真实缓冲区，写满会阻塞；libevent 早期的做法</text>
+
+  <rect x="56" y="628" width="1128" height="34" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="68" y="650" font-size="11.5" font-weight="700" fill="#24473F">eventfd</text>
+  <text x="248" y="650" font-size="11" fill="#24473F">1 个</text>
+  <text x="378" y="650" font-size="11" fill="#24473F">能</text>
+  <text x="518" y="650" font-size="11" font-weight="700" fill="#24473F">只有一个 64 位计数器，累加不占空间，也不会「满」</text>
+
+  <rect x="56" y="662" width="1128" height="34" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="68" y="684" font-size="11.5" font-weight="700" fill="#733428">条件变量</text>
+  <text x="248" y="684" font-size="11" fill="#733428">0</text>
+  <text x="378" y="684" font-size="11" fill="#733428">不能</text>
+  <text x="518" y="684" font-size="11" fill="#733428">loop 睡在 epoll_wait 上，notify_one() 叫不醒它</text>
+
+  <text x="56" y="726" font-size="11.5" fill="#4A473F">不是每次投递都要写 eventfd：任务本来就在 loop 线程产生、且不在 doPendingFunctors() 执行期间时，本轮循环马上会跑到队列。</text>
 </svg>
