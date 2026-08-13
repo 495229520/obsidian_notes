@@ -192,7 +192,7 @@ skill 的好处就是可以把某类操作方法固化下来。比如需求澄�
 
 没有任务资产，也没有跨会话记忆，更没有规范演进机制。这些配置更多是在解决单次对话里 ai 怎么写代码，而不是整个项目我们怎么去用 ai 持续演进。
 
-[![Image 2](https://cdn3.ldstatic.com/optimized/4X/5/f/8/5f85ac49f7b922753481bb2e29d2f7a11b0b6c82_2_690x385.jpeg)](https://cdn3.ldstatic.com/original/4X/5/f/8/5f85ac49f7b922753481bb2e29d2f7a11b0b6c82.jpeg)
+[![Image 2|1021](https://cdn3.ldstatic.com/optimized/4X/5/f/8/5f85ac49f7b922753481bb2e29d2f7a11b0b6c82_2_690x385.jpeg)](https://cdn3.ldstatic.com/original/4X/5/f/8/5f85ac49f7b922753481bb2e29d2f7a11b0b6c82.jpeg)
 
 所以我们需要一个更加完整的方案。
 

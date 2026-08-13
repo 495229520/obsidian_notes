@@ -1,0 +1,250 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 872"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>RPC 最小实现的分层：一次 AddViaRpc(3,4) 的代码路径与线路字节</title>
+  <desc>左侧主图把示例代码拆成七层：业务层 AddViaRpc 与服务端 handler、消息编码层 AppendU32/ReadU32、调用层 RpcClient::Call 与 RpcServer::Dispatch、帧层 SendFrame/ReadFrame、头编解码层 EncodeHeader/DecodeHeader、字节 I/O 层 WriteAll/ReadExactly，最下面是没有消息边界的 TCP 字节流；客户端一侧向下、服务端一侧向上。右上说明 ReadExactly 为什么必须循环以及它的三种结局 Complete/Eof/Truncated；右下区分 RemoteError 与 ProtocolError 两类失败对连接的不同后果。底部把 Add(3,4) 的一次往返画成线路上的 22 字节请求帧和 18 字节响应帧，逐字段给出十六进制取值。</desc>
+  <defs>
+    <marker id="arrDown" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrUp" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="872" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">一次 RPC 调用在代码里怎么走：七层，每层只解决一个问题</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">上两层认「消息」，中两层认「帧」，下两层只认字节 —— 分层的意义是让每一类错误只出现在它该被处理的那一层</text>
+
+  <!-- ============ Panel A：分层调用链 ============ -->
+  <rect x="48" y="100" width="752" height="496" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="62" y="124" font-size="13" font-weight="700" fill="#4A473F">A · AddViaRpc(client, 3, 4) 的调用链：客户端下行，服务端上行</text>
+
+  <text x="292" y="146" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">客户端 · 发送方向 ↓</text>
+  <text x="613" y="146" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">服务端 · 接收方向 ↑</text>
+
+  <!-- 层带背景 -->
+  <rect x="58" y="152" width="734" height="106" rx="7" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="58" y="262" width="734" height="106" rx="7" fill="#F3EFE6" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="58" y="372" width="734" height="54" rx="7" fill="#EFEDF5" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="58" y="430" width="734" height="54" rx="7" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="58" y="488" width="734" height="54" rx="7" fill="#E7EFE9" stroke="#D8D5C8" stroke-width="1"/>
+
+  <!-- 方向主干 -->
+  <line x1="130" y1="157" x2="130" y2="513" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrDown)"/>
+  <line x1="780" y1="513" x2="780" y2="157" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrUp)"/>
+
+  <!-- 行 1 · 业务层 -->
+  <text x="62" y="175" font-size="10.5" font-weight="700" fill="#3D5A80">① 业务</text>
+  <text x="62" y="190" font-size="9.5" fill="#6B675C">调用方</text>
+  <rect x="138" y="157" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="150" y="176" font-size="11.5" font-weight="700" fill="#2C4460">AddViaRpc(client, 3, 4)</text>
+  <text x="150" y="192" font-size="9.8" fill="#2C4460">调用方眼里就是一个普通函数</text>
+  <rect x="458" y="157" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="470" y="176" font-size="11.5" font-weight="700" fill="#24473F">RegisterAdd 注册的 handler</text>
+  <text x="470" y="192" font-size="9.8" fill="#24473F">算 a+b；溢出抛 invalid_argument</text>
+
+  <!-- 行 2 · 消息编码层 -->
+  <text x="62" y="227" font-size="10.5" font-weight="700" fill="#3D5A80">② 消息</text>
+  <text x="62" y="242" font-size="9.5" fill="#6B675C">schema</text>
+  <rect x="138" y="209" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="150" y="228" font-size="11.5" font-weight="700" fill="#2C4460">AppendU32(args, 3) / (args, 4)</text>
+  <text x="150" y="244" font-size="9.8" fill="#2C4460">请求体 = 8 B，两个网络序 uint32</text>
+  <rect x="458" y="209" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="470" y="228" font-size="11.5" font-weight="700" fill="#24473F">ReadU32(first(4) / subspan(4,4))</text>
+  <text x="470" y="244" font-size="9.8" fill="#24473F">长度不是 8 就是 InvalidArgument</text>
+
+  <!-- 行 3 · 调用层 -->
+  <text x="62" y="285" font-size="10.5" font-weight="700" fill="#8A6A3A">③ 调用</text>
+  <text x="62" y="300" font-size="9.5" fill="#6B675C">id 分配</text>
+  <rect x="138" y="267" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="150" y="286" font-size="11.5" font-weight="700" fill="#2C4460">RpcClient::Call(method, args)</text>
+  <text x="150" y="302" font-size="9.8" fill="#2C4460">分配 request_id，发完阻塞等响应</text>
+  <rect x="458" y="267" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="470" y="286" font-size="11.5" font-weight="700" fill="#24473F">ServeConnection → Dispatch</text>
+  <text x="470" y="302" font-size="9.8" fill="#24473F">按方法号查表，异常转成状态码</text>
+
+  <!-- 行 4 · 帧层 -->
+  <text x="62" y="337" font-size="10.5" font-weight="700" fill="#8A6A3A">④ 帧</text>
+  <text x="62" y="352" font-size="9.5" fill="#6B675C">边界</text>
+  <rect x="138" y="319" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="150" y="338" font-size="11.5" font-weight="700" fill="#2C4460">SendFrame(fd, Request, id, ...)</text>
+  <text x="150" y="354" font-size="9.8" fill="#2C4460">头和体拼一个缓冲，少一次系统调用</text>
+  <rect x="458" y="319" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="470" y="338" font-size="11.5" font-weight="700" fill="#24473F">ReadFrame(fd)</text>
+  <text x="470" y="354" font-size="9.8" fill="#24473F">先读满 14 B 头，再按 body_len 读体</text>
+
+  <!-- 行 5 · 头编解码层 -->
+  <text x="62" y="395" font-size="10.5" font-weight="700" fill="#6B5B95">⑤ 头</text>
+  <text x="62" y="410" font-size="9.5" fill="#6B675C">字节序</text>
+  <rect x="138" y="377" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="150" y="396" font-size="11.5" font-weight="700" fill="#2C4460">EncodeHeader — htons / htonl</text>
+  <text x="150" y="412" font-size="9.8" fill="#2C4460">按偏移 0·2·3·4·8·10 逐字段 memcpy</text>
+  <rect x="458" y="377" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="470" y="396" font-size="11.5" font-weight="700" fill="#24473F">DecodeHeader — ntohs / ntohl</text>
+  <text x="470" y="412" font-size="9.8" fill="#24473F">magic·version·id≠0·长度上限 四校验</text>
+
+  <!-- 行 6 · 字节 I/O 层 -->
+  <text x="62" y="453" font-size="10.5" font-weight="700" fill="#4A473F">⑥ 字节</text>
+  <text x="62" y="468" font-size="9.5" fill="#6B675C">循环</text>
+  <rect x="138" y="435" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="150" y="454" font-size="11.5" font-weight="700" fill="#2C4460">WriteAll(fd, wire)</text>
+  <text x="150" y="470" font-size="9.8" fill="#2C4460">短写续发 · EINTR 重试 · MSG_NOSIGNAL</text>
+  <rect x="458" y="435" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="470" y="454" font-size="11.5" font-weight="700" fill="#24473F">ReadExactly(fd, out)</text>
+  <text x="470" y="470" font-size="9.8" fill="#24473F">短读续读 · 三种结局见右侧 B</text>
+
+  <!-- 行 7 · 内核 -->
+  <text x="62" y="511" font-size="10.5" font-weight="700" fill="#2F6B5E">⑦ 内核</text>
+  <text x="62" y="526" font-size="9.5" fill="#6B675C">TCP</text>
+  <rect x="138" y="493" width="630" height="44" rx="7" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.4"/>
+  <text x="150" y="512" font-size="12" font-weight="700" fill="#4A473F">TCP 字节流：按序、可靠，但没有消息边界</text>
+  <text x="150" y="529" font-size="9.8" fill="#4A473F">send / read 的调用次数与帧边界无关 —— 边界只由 body_len 决定</text>
+
+  <text x="62" y="562" font-size="10.5" fill="#6B675C">读法：①② 只认消息，③④ 只认帧，⑤⑥ 只认字节，⑦ 什么都不认。</text>
+  <text x="62" y="580" font-size="10.5" fill="#4A473F">响应沿同一条链反向再走一遍：⑦→⑥→⑤→④→③→②→① 解出 7。</text>
+
+  <!-- ============ Panel B：ReadExactly ============ -->
+  <rect x="816" y="100" width="376" height="306" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="830" y="124" font-size="13" font-weight="700" fill="#4A473F">B · ReadExactly 为什么必须循环</text>
+  <text x="830" y="146" font-size="10.5" fill="#6B675C">read() 尽力而为：返回值可以小于请求长度</text>
+
+  <rect x="830" y="156" width="348" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="842" y="175" font-size="11.5" font-weight="700" fill="#24473F">Complete · 读满 out.size()</text>
+  <text x="842" y="192" font-size="9.8" fill="#24473F">推进 offset 继续读，直到一个不差</text>
+
+  <rect x="830" y="212" width="348" height="48" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="842" y="231" font-size="11.5" font-weight="700" fill="#4A473F">Eof · offset==0 就遇到 EOF</text>
+  <text x="842" y="248" font-size="9.8" fill="#6B675C">帧边界上的干净关闭 → 返回 nullopt</text>
+
+  <rect x="830" y="268" width="348" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="842" y="287" font-size="11.5" font-weight="700" fill="#733428">Truncated · offset&gt;0 才 EOF</text>
+  <text x="842" y="304" font-size="9.8" fill="#733428">帧被截断 → 抛 ProtocolError</text>
+
+  <rect x="830" y="324" width="348" height="48" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="842" y="343" font-size="11.5" font-weight="700" fill="#6B4E28">EINTR 只是被信号打断</text>
+  <text x="842" y="360" font-size="9.8" fill="#6B4E28">continue 重试，不代表连接坏了</text>
+
+  <text x="830" y="390" font-size="10" fill="#6B675C">读消息体时，Eof 同样按截断处理。</text>
+
+  <!-- ============ Panel C：两类失败 ============ -->
+  <rect x="816" y="422" width="376" height="174" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="830" y="446" font-size="13" font-weight="700" fill="#4A473F">C · 两类失败：连接还能不能接着用</text>
+
+  <rect x="830" y="458" width="348" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="842" y="477" font-size="11.5" font-weight="700" fill="#6B4E28">RemoteError · 业务失败</text>
+  <text x="842" y="493" font-size="9.8" fill="#6B4E28">status 1/2/3：无方法 · 参数错 · handler 抛异常</text>
+  <text x="842" y="507" font-size="9.8" fill="#6B4E28">协议没坏，连接继续用</text>
+
+  <rect x="830" y="520" width="348" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="842" y="539" font-size="11.5" font-weight="700" fill="#733428">ProtocolError · 字节流不可信</text>
+  <text x="842" y="555" font-size="9.8" fill="#733428">magic/version/type 错 · body_len 超限</text>
+  <text x="842" y="569" font-size="9.8" fill="#733428">帧内 EOF · request_id 对不上 → 关连接</text>
+
+  <text x="830" y="590" font-size="10" fill="#6B675C">分开的意义：别把已损坏的输入当业务数据往下喂。</text>
+
+  <!-- ============ Band D：线路字节 ============ -->
+  <rect x="48" y="612" width="1144" height="214" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="62" y="636" font-size="13" font-weight="700" fill="#4A473F">D · Add(3, 4) 一次往返在线路上的真实字节（十六进制，网络序）</text>
+
+  <!-- 请求帧 -->
+  <text x="62" y="690" font-size="10.5" font-weight="700" fill="#2C4460">请求帧</text>
+  <text x="62" y="704" font-size="9.5" fill="#6B675C">22 B</text>
+
+  <text x="142" y="662" font-size="9" fill="#9B968A">0</text>
+  <text x="222" y="662" font-size="9" fill="#9B968A">2</text>
+  <text x="262" y="662" font-size="9" fill="#9B968A">3</text>
+  <text x="302" y="662" font-size="9" fill="#9B968A">4</text>
+  <text x="462" y="662" font-size="9" fill="#9B968A">8</text>
+  <text x="542" y="662" font-size="9" fill="#9B968A">10</text>
+  <text x="702" y="662" font-size="9" fill="#9B968A">14</text>
+  <text x="862" y="662" font-size="9" fill="#9B968A">18</text>
+
+  <rect x="140" y="668" width="80" height="36" rx="5" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="180" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4A473F" text-anchor="middle">52 43</text>
+  <text x="180" y="720" font-size="9.8" fill="#6B675C" text-anchor="middle">magic</text>
+
+  <rect x="220" y="668" width="40" height="36" rx="5" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="240" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4A473F" text-anchor="middle">01</text>
+  <text x="240" y="720" font-size="9.8" fill="#6B675C" text-anchor="middle">ver=1</text>
+
+  <rect x="260" y="668" width="40" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="280" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">01</text>
+  <text x="280" y="720" font-size="9.8" fill="#2C4460" text-anchor="middle">请求</text>
+
+  <rect x="300" y="668" width="160" height="36" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="380" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#6B4E28" text-anchor="middle">00 00 00 01</text>
+  <text x="380" y="720" font-size="9.8" font-weight="600" fill="#6B4E28" text-anchor="middle">request_id=1</text>
+
+  <rect x="460" y="668" width="80" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="500" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">00 01</text>
+  <text x="500" y="720" font-size="9.8" fill="#2C4460" text-anchor="middle">方法号=1</text>
+
+  <rect x="540" y="668" width="160" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="620" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#24473F" text-anchor="middle">00 00 00 08</text>
+  <text x="620" y="720" font-size="9.8" font-weight="600" fill="#24473F" text-anchor="middle">body_len=8</text>
+
+  <rect x="700" y="668" width="160" height="36" rx="5" fill="#FBFBF6" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="780" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4A473F" text-anchor="middle">00 00 00 03</text>
+  <text x="780" y="720" font-size="9.8" fill="#6B675C" text-anchor="middle">a = 3</text>
+
+  <rect x="860" y="668" width="160" height="36" rx="5" fill="#FBFBF6" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="940" y="691" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4A473F" text-anchor="middle">00 00 00 04</text>
+  <text x="940" y="720" font-size="9.8" fill="#6B675C" text-anchor="middle">b = 4</text>
+
+  <rect x="1034" y="668" width="144" height="36" rx="5" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="1046" y="684" font-size="9.8" fill="#4A473F">实线 = 固定头 14 B</text>
+  <text x="1046" y="698" font-size="9.8" fill="#6B675C">虚线 = 消息体，变长</text>
+
+  <!-- 响应帧 -->
+  <text x="62" y="772" font-size="10.5" font-weight="700" fill="#24473F">响应帧</text>
+  <text x="62" y="786" font-size="9.5" fill="#6B675C">18 B</text>
+
+  <text x="142" y="744" font-size="9" fill="#9B968A">0</text>
+  <text x="222" y="744" font-size="9" fill="#9B968A">2</text>
+  <text x="262" y="744" font-size="9" fill="#9B968A">3</text>
+  <text x="302" y="744" font-size="9" fill="#9B968A">4</text>
+  <text x="462" y="744" font-size="9" fill="#9B968A">8</text>
+  <text x="542" y="744" font-size="9" fill="#9B968A">10</text>
+  <text x="702" y="744" font-size="9" fill="#9B968A">14</text>
+
+  <rect x="140" y="750" width="80" height="36" rx="5" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="180" y="773" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4A473F" text-anchor="middle">52 43</text>
+  <text x="180" y="802" font-size="9.8" fill="#6B675C" text-anchor="middle">magic</text>
+
+  <rect x="220" y="750" width="40" height="36" rx="5" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="240" y="773" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4A473F" text-anchor="middle">01</text>
+  <text x="240" y="802" font-size="9.8" fill="#6B675C" text-anchor="middle">ver=1</text>
+
+  <rect x="260" y="750" width="40" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="280" y="773" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#24473F" text-anchor="middle">02</text>
+  <text x="280" y="802" font-size="9.8" fill="#24473F" text-anchor="middle">响应</text>
+
+  <rect x="300" y="750" width="160" height="36" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="380" y="773" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#6B4E28" text-anchor="middle">00 00 00 01</text>
+  <text x="380" y="802" font-size="9.8" font-weight="600" fill="#6B4E28" text-anchor="middle">原样回送 id</text>
+
+  <rect x="460" y="750" width="80" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="500" y="773" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2C4460" text-anchor="middle">00 00</text>
+  <text x="500" y="802" font-size="9.8" fill="#2C4460" text-anchor="middle">状态=OK</text>
+
+  <rect x="540" y="750" width="160" height="36" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="620" y="773" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#24473F" text-anchor="middle">00 00 00 04</text>
+  <text x="620" y="802" font-size="9.8" font-weight="600" fill="#24473F" text-anchor="middle">body_len=4</text>
+
+  <rect x="700" y="750" width="160" height="36" rx="5" fill="#FBFBF6" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="780" y="773" font-size="11" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#4A473F" text-anchor="middle">00 00 00 07</text>
+  <text x="780" y="802" font-size="9.8" fill="#6B675C" text-anchor="middle">3 + 4 = 7</text>
+
+  <rect x="880" y="750" width="298" height="36" rx="5" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="892" y="766" font-size="9.8" fill="#4A473F">头长度恒为 14 B，两帧字段偏移完全一致</text>
+  <text x="892" y="780" font-size="9.8" fill="#6B675C">变的只有 type、code 和 body_len 三处取值</text>
+
+  <text x="48" y="850" font-size="12" fill="#6B675C">整条链上分工是死的：body_len 定帧边界，request_id 关联请求与响应，code 表示业务成败 —— 三件事各由一个字段承担，缺哪一件都只能靠猜。</text>
+</svg>

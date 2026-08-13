@@ -18,6 +18,7 @@
 | `7.LLM应用/` | LLM 工程；含 `5.数值分析`、`6.数值分析笔记` | 90 篇 |
 | `8.高性能存储/` | 存储方向主线 | 160 篇 |
 | `12.投资/` | 投资学习 | 102 篇 |
+| `13. 英文/` | 六级 + 雅思备考；主方案 `00.学习方案.md`，词表 JSONL 和 `工具/vocab2anki.py` 在根目录，剑桥真题在 `公开资料/` |  |
 | `图片/` | 图片资产；`图片/SVG/` 存 SVG，`图片/书籍/` 存 PDF |  |
 | `模版/` | 笔记模板 |  |
 
@@ -93,6 +94,7 @@ Skills 位于 **`~/.claude/skills/`**（用户级，全局生效），不在本�
 | `obsidian-markdown` | wikilink、callout、frontmatter | Obsidian 方言语法 |
 | `obsidian-bases` | `.base`、表格视图、公式 | 笔记的数据库视图 |
 | `numerical-analysis` | "数值分析"、"考点"、"考不考"、"出题" | 讲考点/润色笔记/仿期末出题（内嵌 2020–2024 考频表） |
+| `english-drill` | "今日任务"、"批改作文"、"练口语"、"精听"、"复盘" | 六级 + 雅思备考日常驱动（内嵌基线、阶段日期、剑桥音频命名） |
 | `github-note-push` | 推笔记到 GitHub | 处理 remote、worktree、SSH key 等坑 |
 
 完整清单和精简记录见 [[skills参考目录]]。

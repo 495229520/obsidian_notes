@@ -1,159 +1,141 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 790" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
   </defs>
 
-  <title>socket 在协议栈中的位置与一个 fd 背后的内核结构</title>
-  <desc>左侧画出 socket 抽象层夹在用户进程与传输层之间的位置，右侧展开一个文件描述符到 struct file、struct socket、struct sock 与收发缓冲区的链条，底部列出 domain 与 type 的常见组合。</desc>
+  <title>TCP 的 11 个状态与两条关闭路径</title>
+  <desc>把 TCP 状态机按主动关闭方和被动关闭方分成左右两列，标出每次状态迁移由哪个事件触发；右侧对照四种状态堆积各自说明什么问题。</desc>
 
-  <rect x="0" y="0" width="1240" height="790" fill="rgb(245, 244, 237)"/>
+  <rect x="0" y="0" width="1240" height="800" fill="rgb(245, 244, 237)"/>
 
-  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">socket：把四套协议收进同一个文件描述符</text>
-  <text x="48" y="80" font-size="13" fill="#6B675C">它的价值不是「能上网」，而是让 TCP、UDP、本机通信共用同一套 read / write / close</text>
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">TCP 的 11 个状态：分清谁先发 FIN，图就读顺了</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">左右两列不是客户端和服务端，是主动关闭方和被动关闭方；谁先调 close 谁走左边</text>
 
   <!-- ================= Panel A ================= -->
-  <rect x="48" y="104" width="572" height="356" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 它夹在哪两层之间</text>
+  <rect x="48" y="104" width="772" height="642" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="130" font-size="15" font-weight="700" fill="#4A473F">A · 状态迁移全图</text>
 
-  <rect x="72" y="150" width="162" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
-  <text x="153" y="173" font-size="11.5" fill="#2C4460" text-anchor="middle">浏览器</text>
-  <rect x="246" y="150" width="162" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
-  <text x="327" y="173" font-size="11.5" fill="#2C4460" text-anchor="middle">SSH 客户端</text>
-  <rect x="420" y="150" width="162" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
-  <text x="501" y="173" font-size="11.5" fill="#2C4460" text-anchor="middle">数据库服务</text>
+  <text x="230" y="158" font-size="11.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">主动关闭方</text>
+  <text x="640" y="158" font-size="11.5" font-weight="700" fill="#6B5B95" text-anchor="middle">被动关闭方</text>
 
-  <line x1="153" y1="188" x2="153" y2="198" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
-  <line x1="327" y1="188" x2="327" y2="198" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
-  <line x1="501" y1="188" x2="501" y2="198" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <!-- 状态框 -->
+  <rect x="360" y="176" width="150" height="38" rx="7" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+  <text x="435" y="200" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">CLOSED</text>
 
-  <rect x="72" y="202" width="510" height="44" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.8"/>
-  <text x="327" y="222" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">socket 抽象层</text>
-  <text x="327" y="239" font-size="10.5" fill="#6B4E28" text-anchor="middle">对上给一个 fd，对下选具体协议</text>
+  <rect x="155" y="250" width="150" height="38" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="230" y="274" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">SYN_SENT</text>
 
-  <line x1="210" y1="248" x2="210" y2="258" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
-  <line x1="450" y1="248" x2="450" y2="258" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="565" y="250" width="150" height="38" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="640" y="274" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">LISTEN</text>
 
-  <rect x="100" y="262" width="220" height="36" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <text x="210" y="285" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">TCP</text>
-  <rect x="340" y="262" width="220" height="36" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <text x="450" y="285" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">UDP</text>
+  <rect x="565" y="318" width="150" height="38" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="640" y="342" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">SYN_RCVD</text>
 
-  <line x1="300" y1="300" x2="322" y2="314" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
-  <line x1="360" y1="300" x2="338" y2="314" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="360" y="392" width="150" height="38" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="435" y="416" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">ESTABLISHED</text>
 
-  <rect x="88" y="318" width="112" height="36" rx="6" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
-  <text x="144" y="341" font-size="11.5" fill="#4A3F68" text-anchor="middle">ICMP</text>
-  <rect x="220" y="318" width="220" height="36" rx="6" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
-  <text x="330" y="341" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">IP</text>
-  <rect x="460" y="318" width="112" height="36" rx="6" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
-  <text x="516" y="341" font-size="11.5" fill="#4A3F68" text-anchor="middle">IGMP</text>
+  <rect x="155" y="466" width="150" height="38" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="230" y="490" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">FIN_WAIT_1</text>
 
-  <line x1="330" y1="356" x2="330" y2="368" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <rect x="565" y="466" width="150" height="38" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="640" y="490" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">CLOSE_WAIT</text>
 
-  <rect x="88" y="372" width="112" height="36" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="144" y="395" font-size="11.5" fill="#4A473F" text-anchor="middle">ARP</text>
-  <rect x="220" y="372" width="220" height="36" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="330" y="395" font-size="11.5" fill="#4A473F" text-anchor="middle">网卡驱动</text>
+  <rect x="155" y="540" width="150" height="38" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="230" y="564" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">FIN_WAIT_2</text>
 
-  <text x="330" y="432" font-size="11" fill="#6B675C" text-anchor="middle">物理介质</text>
+  <rect x="360" y="540" width="150" height="38" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="435" y="564" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">CLOSING</text>
+
+  <rect x="565" y="540" width="150" height="38" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="640" y="564" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">LAST_ACK</text>
+
+  <rect x="155" y="614" width="150" height="38" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="230" y="638" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">TIME_WAIT</text>
+
+  <rect x="360" y="688" width="150" height="38" rx="7" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+  <text x="435" y="712" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">CLOSED</text>
+
+  <!-- 迁移箭头 -->
+  <line x1="400" y1="214" x2="256" y2="246" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="316" y="226" font-size="10.5" fill="#4A473F" text-anchor="middle">connect</text>
+
+  <line x1="470" y1="214" x2="614" y2="246" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="554" y="226" font-size="10.5" fill="#4A473F" text-anchor="middle">listen</text>
+
+  <line x1="640" y1="288" x2="640" y2="314" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="652" y="306" font-size="10.5" fill="#4A473F">收 SYN，回 SYN+ACK</text>
+
+  <line x1="230" y1="288" x2="378" y2="388" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="243" y="330" font-size="10.5" fill="#4A473F">收 SYN+ACK</text>
+
+  <line x1="640" y1="356" x2="492" y2="388" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="590" y="378" font-size="10.5" fill="#4A473F" text-anchor="middle">收 ACK</text>
+
+  <line x1="400" y1="430" x2="256" y2="462" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="312" y="442" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">close 发 FIN</text>
+
+  <line x1="470" y1="430" x2="614" y2="462" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="560" y="442" font-size="10.5" font-weight="700" fill="#4A3F68" text-anchor="middle">收到 FIN</text>
+
+  <line x1="200" y1="504" x2="200" y2="536" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="188" y="526" font-size="10.5" fill="#4A473F" text-anchor="end">收 ACK</text>
+
+  <line x1="292" y1="504" x2="382" y2="536" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="348" y="518" font-size="10.5" fill="#6B675C" text-anchor="middle">同时关闭</text>
+
+  <line x1="200" y1="578" x2="200" y2="610" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="188" y="600" font-size="10.5" fill="#4A473F" text-anchor="end">收 FIN</text>
+
+  <line x1="400" y1="578" x2="300" y2="612" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="368" y="602" font-size="10.5" fill="#4A473F" text-anchor="middle">收 ACK</text>
+
+  <line x1="640" y1="504" x2="640" y2="536" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="652" y="526" font-size="10.5" font-weight="700" fill="#4A3F68">close 发 FIN</text>
+
+  <path d="M640,578 V660 H524 V690" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="652" y="620" font-size="10.5" fill="#4A473F">收 ACK</text>
+
+  <line x1="256" y1="652" x2="382" y2="684" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="300" y="678" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">2MSL 超时</text>
+
+  <text x="72" y="736" font-size="11" fill="#6B675C">CLOSING 是虚线：只有双方几乎同时调 close 才会经过它，正常流程走不到</text>
 
   <!-- ================= Panel B ================= -->
-  <rect x="636" y="104" width="556" height="356" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="660" y="130" font-size="15" font-weight="700" fill="#4A473F">B · 一个 fd 背后是什么</text>
+  <rect x="836" y="104" width="356" height="642" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="860" y="130" font-size="15" font-weight="700" fill="#4A473F">B · 哪个状态堆积说明什么</text>
 
-  <rect x="660" y="150" width="100" height="38" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
-  <text x="710" y="166" font-size="10.5" fill="#6B675C" text-anchor="middle">fd 0</text>
-  <text x="710" y="181" font-size="10.5" fill="#4A473F" text-anchor="middle">stdin</text>
-  <rect x="762" y="150" width="100" height="38" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
-  <text x="812" y="166" font-size="10.5" fill="#6B675C" text-anchor="middle">fd 1</text>
-  <text x="812" y="181" font-size="10.5" fill="#4A473F" text-anchor="middle">stdout</text>
-  <rect x="864" y="150" width="100" height="38" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
-  <text x="914" y="166" font-size="10.5" fill="#6B675C" text-anchor="middle">fd 2</text>
-  <text x="914" y="181" font-size="10.5" fill="#4A473F" text-anchor="middle">stderr</text>
-  <rect x="966" y="150" width="100" height="38" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
-  <text x="1016" y="166" font-size="10.5" fill="#2C4460" text-anchor="middle">fd 3</text>
-  <text x="1016" y="181" font-size="10.5" fill="#2C4460" text-anchor="middle">listenfd</text>
-  <rect x="1068" y="150" width="100" height="38" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.8"/>
-  <text x="1118" y="166" font-size="10.5" fill="#6B4E28" text-anchor="middle">fd 4</text>
-  <text x="1118" y="181" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">connfd</text>
+  <rect x="860" y="150" width="308" height="120" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="880" y="174" font-size="12.5" font-weight="700" fill="#733428">TIME_WAIT 很多</text>
+  <text x="880" y="198" font-size="11.5" fill="#733428">出现在主动关闭的一方</text>
+  <text x="880" y="220" font-size="11.5" fill="#733428">短连接高频时属于正常</text>
+  <text x="880" y="242" font-size="11.5" fill="#733428">Linux 固定等 60 秒</text>
+  <text x="880" y="262" font-size="11" fill="#733428">根治办法是改用长连接</text>
 
-  <text x="660" y="212" font-size="11" fill="#6B675C">进程的文件描述符表</text>
+  <rect x="860" y="282" width="308" height="120" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="880" y="306" font-size="12.5" font-weight="700" fill="#4A3F68">CLOSE_WAIT 很多</text>
+  <text x="880" y="330" font-size="11.5" fill="#4A3F68">出现在被动关闭的一方</text>
+  <text x="880" y="352" font-size="11.5" font-weight="700" fill="#4A3F68">这一定是代码 bug</text>
+  <text x="880" y="374" font-size="11.5" fill="#4A3F68">read 返回 0 后没调 close</text>
+  <text x="880" y="394" font-size="11" fill="#4A3F68">查异常分支里漏掉的关闭</text>
 
-  <line x1="1118" y1="190" x2="1118" y2="212" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="860" y="414" width="308" height="120" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="880" y="438" font-size="12.5" font-weight="700" fill="#2C4460">SYN_RCVD 很多</text>
+  <text x="880" y="462" font-size="11.5" fill="#2C4460">半连接队列被占满</text>
+  <text x="880" y="484" font-size="11.5" fill="#2C4460">对方发了 SYN 却不回 ACK</text>
+  <text x="880" y="506" font-size="11.5" fill="#2C4460">典型的 SYN flood 特征</text>
+  <text x="880" y="526" font-size="11" fill="#2C4460">开 syncookies 可以顶住</text>
 
-  <rect x="900" y="216" width="268" height="34" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
-  <text x="1034" y="238" font-size="11.5" fill="#2C4460" text-anchor="middle">struct file</text>
-  <line x1="1034" y1="250" x2="1034" y2="264" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="860" y="546" width="308" height="120" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="880" y="570" font-size="12.5" font-weight="700" fill="#6B4E28">FIN_WAIT_2 很多</text>
+  <text x="880" y="594" font-size="11.5" fill="#6B4E28">自己的 FIN 已经被确认</text>
+  <text x="880" y="616" font-size="11.5" fill="#6B4E28">对端迟迟不发它的 FIN</text>
+  <text x="880" y="638" font-size="11.5" fill="#6B4E28">问题在对端应用不在自己</text>
+  <text x="880" y="658" font-size="11" fill="#6B4E28">对端多半也堆着 CLOSE_WAIT</text>
 
-  <rect x="900" y="268" width="268" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <text x="1034" y="290" font-size="11.5" fill="#24473F" text-anchor="middle">struct socket</text>
-  <line x1="1034" y1="302" x2="1034" y2="316" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="860" y="694" font-size="11" fill="#6B675C">按状态计数：</text>
+  <text x="860" y="716" font-size="11" fill="#6B675C">ss -tan | awk '{print $1}' | sort | uniq -c</text>
 
-  <rect x="900" y="320" width="268" height="34" rx="6" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
-  <text x="1034" y="342" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">struct sock：TCP 控制块</text>
-  <line x1="1034" y1="354" x2="1034" y2="368" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-
-  <rect x="900" y="372" width="130" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
-  <text x="965" y="394" font-size="11" fill="#733428" text-anchor="middle">发送缓冲区</text>
-  <rect x="1038" y="372" width="130" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
-  <text x="1103" y="394" font-size="11" fill="#733428" text-anchor="middle">接收缓冲区</text>
-
-  <text x="660" y="244" font-size="11.5" font-weight="700" fill="#4A473F">socket 就是一个文件描述符</text>
-  <text x="660" y="270" font-size="11.5" fill="#4A473F">read / write / close 直接可用</text>
-  <text x="660" y="292" font-size="11.5" fill="#4A473F">select / poll / epoll 也能收它</text>
-  <text x="660" y="314" font-size="11.5" fill="#4A473F">send / recv 只是多了 flags</text>
-  <text x="660" y="336" font-size="11.5" fill="#4A473F">connect / accept 才是它独有的</text>
-  <text x="660" y="362" font-size="11" fill="#6B675C">序号、窗口、重传队列</text>
-  <text x="660" y="382" font-size="11" fill="#6B675C">都挂在 struct sock 上</text>
-  <text x="660" y="402" font-size="11" fill="#6B675C">write 返回只代表进了缓冲区</text>
-  <text x="660" y="422" font-size="11" fill="#6B675C">不代表对方收到了</text>
-
-  <!-- ================= Panel C ================= -->
-  <rect x="48" y="476" width="1144" height="230" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="72" y="502" font-size="15" font-weight="700" fill="#4A473F">C · domain 与 type 的组合决定你拿到哪种协议</text>
-
-  <rect x="76" y="516" width="1088" height="26" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
-  <rect x="76" y="542" width="1088" height="26" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
-  <rect x="76" y="568" width="1088" height="26" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
-  <rect x="76" y="594" width="1088" height="26" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
-  <rect x="76" y="620" width="1088" height="26" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
-  <rect x="76" y="646" width="1088" height="26" fill="#FBFBF6" stroke="#9B968A" stroke-width="1"/>
-  <line x1="256" y1="516" x2="256" y2="672" stroke="#9B968A" stroke-width="1"/>
-  <line x1="456" y1="516" x2="456" y2="672" stroke="#9B968A" stroke-width="1"/>
-  <line x1="656" y1="516" x2="656" y2="672" stroke="#9B968A" stroke-width="1"/>
-
-  <text x="166" y="534" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">domain</text>
-  <text x="356" y="534" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">type</text>
-  <text x="556" y="534" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">protocol</text>
-  <text x="910" y="534" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">实际拿到的东西</text>
-
-  <text x="166" y="560" font-size="11" fill="#4A473F" text-anchor="middle">AF_INET</text>
-  <text x="356" y="560" font-size="11" fill="#4A473F" text-anchor="middle">SOCK_STREAM</text>
-  <text x="556" y="560" font-size="11" fill="#4A473F" text-anchor="middle">0</text>
-  <text x="910" y="560" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">IPv4 上的 TCP：可靠字节流，没有消息边界</text>
-
-  <text x="166" y="586" font-size="11" fill="#4A473F" text-anchor="middle">AF_INET</text>
-  <text x="356" y="586" font-size="11" fill="#4A473F" text-anchor="middle">SOCK_DGRAM</text>
-  <text x="556" y="586" font-size="11" fill="#4A473F" text-anchor="middle">0</text>
-  <text x="910" y="586" font-size="11" fill="#4A473F" text-anchor="middle">IPv4 上的 UDP：保留消息边界，可能丢可能乱序</text>
-
-  <text x="166" y="612" font-size="11" fill="#4A473F" text-anchor="middle">AF_INET6</text>
-  <text x="356" y="612" font-size="11" fill="#4A473F" text-anchor="middle">SOCK_STREAM</text>
-  <text x="556" y="612" font-size="11" fill="#4A473F" text-anchor="middle">0</text>
-  <text x="910" y="612" font-size="11" fill="#4A473F" text-anchor="middle">IPv6 上的 TCP，地址结构换成 sockaddr_in6</text>
-
-  <text x="166" y="638" font-size="11" fill="#4A473F" text-anchor="middle">AF_UNIX</text>
-  <text x="356" y="638" font-size="11" fill="#4A473F" text-anchor="middle">SOCK_STREAM</text>
-  <text x="556" y="638" font-size="11" fill="#4A473F" text-anchor="middle">0</text>
-  <text x="910" y="638" font-size="11" fill="#4A473F" text-anchor="middle">本机进程间通信：走内存不走网卡，还能传 fd</text>
-
-  <text x="166" y="664" font-size="11" fill="#4A473F" text-anchor="middle">AF_INET</text>
-  <text x="356" y="664" font-size="11" fill="#4A473F" text-anchor="middle">SOCK_RAW</text>
-  <text x="556" y="664" font-size="11" fill="#4A473F" text-anchor="middle">IPPROTO_ICMP</text>
-  <text x="910" y="664" font-size="11" fill="#4A473F" text-anchor="middle">自己拼 ICMP 报文，ping 就是这么实现的，需要 root</text>
-
-  <text x="48" y="748" font-size="11.5" fill="#4A473F">protocol 填 0 的含义是「这个 domain 加这个 type 只有一种合理选择，你来定」。只有 SOCK_RAW 这类一个 type 对应多种协议的场合才必须写明。</text>
-  <text x="48" y="770" font-size="11.5" fill="#4A473F">AF_ 与 PF_ 这两组宏在 Linux 上取值完全相同，随便用哪个都行；历史上曾打算区分「地址族」和「协议族」，最后没有实现。</text>
+  <text x="48" y="774" font-size="11.5" fill="#4A473F">TIME_WAIT 和 CLOSE_WAIT 是两种完全不同的信号：前者是协议要求的等待，后者是你的程序忘了收尾。看到 CLOSE_WAIT 堆积不要去调内核参数。</text>
 </svg>

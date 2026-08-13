@@ -1,144 +1,97 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 616" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 856" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
   </defs>
 
-  <title>NDP：IPv6 用组播替掉了 ARP 的广播</title>
-  <desc>左上对照 ARP 广播与 NDP 组播时哪些网卡会收下这个帧；右上列出 NDP 五种报文的类型号、目的地址与用途；下方演示被请求节点组播地址与组播 MAC 的推导链。</desc>
+  <title>IPv4 分片：一个 4000 字节数据报怎么切成三片</title>
+  <desc>上半部分把 4000 字节的数据报按 MTU 1500 切成三片，标出每片的 Total Length、Fragment Offset 和 MF 标志；下半左侧列分片的四项代价，右侧说明 TCP 用 MSS 规避分片的做法。</desc>
 
-  <rect x="0" y="0" width="1240" height="616" fill="rgb(245, 244, 237)"/>
+  <rect x="0" y="0" width="1240" height="856" fill="rgb(245, 244, 237)"/>
 
-  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">NDP：同一件事，ARP 吵醒整个网段，IPv6 只敲一扇门</text>
-  <text x="48" y="80" font-size="13" fill="#6B675C">判断准则：ARP 的目的地址是广播，NDP 的目的地址由被查询地址算出来，不相干的网卡在硬件层就滤掉</text>
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">IPv4 分片：切开容易，丢一片就全废</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">判断准则：每片都要带完整 IP 首部，Offset 以 8 字节为单位，重组只在目的主机做一次</text>
 
   <!-- ================= Panel A ================= -->
-  <rect x="48" y="104" width="560" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">A · 谁会收下这个帧</text>
+  <rect x="48" y="104" width="1144" height="380" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">A · 4000 字节的数据报遇上 MTU 1500 的链路</text>
 
-  <text x="72" y="158" font-size="11.5" font-weight="700" fill="#6B4E28" dominant-baseline="central">ARP 请求 · 目的 MAC ff:ff:ff:ff:ff:ff</text>
+  <rect x="72" y="156" width="110" height="44" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="127" y="178" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">IP 首部 20B</text>
+  <rect x="182" y="156" width="986" height="44" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="675" y="178" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle" dominant-baseline="central">负载 3980 字节（UDP 首部 + 用户数据）</text>
 
-  <rect x="72" y="172" width="80" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
-  <text x="112" y="190" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主机 A</text>
-  <line x1="152" y1="190" x2="216" y2="190" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="127" y1="206" x2="127" y2="232" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="150" y="219" font-size="11.5" fill="#6B675C" dominant-baseline="central">出口 MTU 只有 1500，源主机或路由器动手切</text>
 
-  <rect x="220" y="172" width="82" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
-  <text x="261" y="190" font-size="11" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">网关</text>
-  <rect x="311" y="172" width="82" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
-  <text x="352" y="190" font-size="11" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">主机 B</text>
-  <rect x="402" y="172" width="82" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
-  <text x="443" y="190" font-size="11" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">主机 C</text>
-  <rect x="493" y="172" width="82" height="36" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
-  <text x="534" y="190" font-size="11" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">打印机</text>
+  <!-- 片 1 -->
+  <rect x="72" y="238" width="56" height="44" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="100" y="260" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">首部</text>
+  <rect x="128" y="238" width="380" height="44" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="318" y="260" font-size="11.5" font-weight="700" fill="#6B5B95" text-anchor="middle" dominant-baseline="central">片 1 · 1480 字节</text>
+  <text x="540" y="254" font-size="11" fill="#4A473F" dominant-baseline="central">Total Length 1500 · Offset 0 · MF = 1</text>
+  <text x="540" y="270" font-size="10.5" fill="#6B675C" dominant-baseline="central">携带原负载的第 0–1479 字节</text>
 
-  <text x="72" y="226" font-size="11" fill="#6B675C" dominant-baseline="central">4 张网卡全部收下，3 台交给内核判断后才丢弃</text>
+  <!-- 片 2 -->
+  <rect x="72" y="294" width="56" height="44" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="100" y="316" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">首部</text>
+  <rect x="128" y="294" width="380" height="44" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="318" y="316" font-size="11.5" font-weight="700" fill="#6B5B95" text-anchor="middle" dominant-baseline="central">片 2 · 1480 字节</text>
+  <text x="540" y="310" font-size="11" fill="#4A473F" dominant-baseline="central">Total Length 1500 · Offset 185 · MF = 1</text>
+  <text x="540" y="326" font-size="10.5" fill="#6B675C" dominant-baseline="central">携带原负载的第 1480–2959 字节</text>
 
-  <line x1="72" y1="244" x2="584" y2="244" stroke="#D8D5C8" stroke-width="1"/>
+  <!-- 片 3 -->
+  <rect x="72" y="350" width="56" height="44" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="100" y="372" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">首部</text>
+  <rect x="128" y="350" width="262" height="44" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="259" y="372" font-size="11.5" font-weight="700" fill="#6B5B95" text-anchor="middle" dominant-baseline="central">片 3 · 1020 字节</text>
+  <text x="540" y="366" font-size="11" fill="#4A473F" dominant-baseline="central">Total Length 1040 · Offset 370 · MF = 0</text>
+  <text x="540" y="382" font-size="10.5" fill="#6B675C" dominant-baseline="central">携带原负载的第 2960–3979 字节</text>
 
-  <text x="72" y="266" font-size="11.5" font-weight="700" fill="#2F6B5E" dominant-baseline="central">NDP 的 NS · 目的地址 ff02::1:ffb2:c3d4</text>
-
-  <rect x="72" y="280" width="80" height="36" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
-  <text x="112" y="298" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">主机 A</text>
-  <line x1="152" y1="298" x2="216" y2="298" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-
-  <rect x="220" y="280" width="82" height="36" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
-  <text x="261" y="298" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle" dominant-baseline="central">网关</text>
-  <rect x="311" y="280" width="82" height="36" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
-  <text x="352" y="298" font-size="11" fill="#9B968A" text-anchor="middle" dominant-baseline="central">主机 B</text>
-  <rect x="402" y="280" width="82" height="36" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
-  <text x="443" y="298" font-size="11" fill="#9B968A" text-anchor="middle" dominant-baseline="central">主机 C</text>
-  <rect x="493" y="280" width="82" height="36" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
-  <text x="534" y="298" font-size="11" fill="#9B968A" text-anchor="middle" dominant-baseline="central">打印机</text>
-
-  <text x="72" y="334" font-size="11" fill="#6B675C" dominant-baseline="central">只有网关收下，其余 3 张网卡在硬件层就滤掉了</text>
+  <text x="72" y="418" font-size="11.5" fill="#4A473F" dominant-baseline="central">三片的 Identification 填同一个值，接收方靠它把三片认成一家</text>
+  <text x="72" y="440" font-size="11.5" fill="#6B675C" dominant-baseline="central">校验：185 × 8 = 1480，370 × 8 = 2960，MF = 0 标记最后一片</text>
+  <text x="72" y="462" font-size="11.5" fill="#6B675C" dominant-baseline="central">UDP 首部只在片 1 里，片 2 和片 3 拆开看不出源端口目的端口</text>
 
   <!-- ================= Panel B ================= -->
-  <rect x="632" y="104" width="560" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="656" y="132" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">B · NDP 的五种报文，全部是 ICMPv6</text>
+  <rect x="48" y="504" width="560" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="532" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">B · 分片要付的四笔账</text>
 
-  <rect x="656" y="152" width="114" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="770" y="152" width="60" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="830" y="152" width="170" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="1000" y="152" width="168" height="32" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
-  <text x="670" y="168" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">报文</text>
-  <text x="784" y="168" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">Type</text>
-  <text x="844" y="168" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">发给谁</text>
-  <text x="1014" y="168" font-size="11.5" font-weight="700" fill="#4A473F" dominant-baseline="central">干什么</text>
+  <rect x="72" y="552" width="512" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="88" y="569" font-size="12" font-weight="700" fill="#733428" dominant-baseline="central">丢一片，整个数据报作废</text>
+  <text x="88" y="586" font-size="10.5" fill="#733428" dominant-baseline="central">4000 字节白传，重传也是整报重来</text>
 
-  <rect x="656" y="184" width="114" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="770" y="184" width="60" height="32" fill="#E3EAF4" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="830" y="184" width="170" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="1000" y="184" width="168" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <text x="670" y="200" font-size="11.5" fill="#4A473F" dominant-baseline="central">RS</text>
-  <text x="784" y="200" font-size="11.5" fill="#2C4460" dominant-baseline="central">133</text>
-  <text x="844" y="200" font-size="11.5" fill="#4A473F" dominant-baseline="central">所有路由器组播</text>
-  <text x="1014" y="200" font-size="11.5" fill="#4A473F" dominant-baseline="central">我上线了，请通告</text>
+  <rect x="72" y="608" width="512" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="88" y="625" font-size="12" font-weight="700" fill="#6B4E28" dominant-baseline="central">只有目的主机能重组</text>
+  <text x="88" y="642" font-size="10.5" fill="#6B4E28" dominant-baseline="central">中途路由器不攒片，来一片转一片</text>
 
-  <rect x="656" y="216" width="114" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="770" y="216" width="60" height="32" fill="#E3EAF4" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="830" y="216" width="170" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="1000" y="216" width="168" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <text x="670" y="232" font-size="11.5" fill="#4A473F" dominant-baseline="central">RA</text>
-  <text x="784" y="232" font-size="11.5" fill="#2C4460" dominant-baseline="central">134</text>
-  <text x="844" y="232" font-size="11.5" fill="#4A473F" dominant-baseline="central">所有节点组播</text>
-  <text x="1014" y="232" font-size="11.5" fill="#4A473F" dominant-baseline="central">前缀、网关、MTU</text>
+  <rect x="72" y="664" width="512" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="88" y="681" font-size="12" font-weight="700" fill="#6B4E28" dominant-baseline="central">重组有超时</text>
+  <text x="88" y="698" font-size="10.5" fill="#6B4E28" dominant-baseline="central">Linux 默认 30 秒，超时丢弃并回 ICMP 11/1</text>
 
-  <rect x="656" y="248" width="114" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="770" y="248" width="60" height="32" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="830" y="248" width="170" height="32" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="1000" y="248" width="168" height="32" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
-  <text x="670" y="264" font-size="11.5" font-weight="700" fill="#24473F" dominant-baseline="central">NS</text>
-  <text x="784" y="264" font-size="11.5" fill="#24473F" dominant-baseline="central">135</text>
-  <text x="844" y="264" font-size="11.5" fill="#24473F" dominant-baseline="central">被请求节点组播</text>
-  <text x="1014" y="264" font-size="11.5" fill="#24473F" dominant-baseline="central">谁是这个地址</text>
-
-  <rect x="656" y="280" width="114" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="770" y="280" width="60" height="32" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="830" y="280" width="170" height="32" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="1000" y="280" width="168" height="32" fill="#DCE9E3" stroke="#D8D5C8" stroke-width="1"/>
-  <text x="670" y="296" font-size="11.5" font-weight="700" fill="#24473F" dominant-baseline="central">NA</text>
-  <text x="784" y="296" font-size="11.5" fill="#24473F" dominant-baseline="central">136</text>
-  <text x="844" y="296" font-size="11.5" fill="#24473F" dominant-baseline="central">单播回提问方</text>
-  <text x="1014" y="296" font-size="11.5" fill="#24473F" dominant-baseline="central">是我，MAC 在这</text>
-
-  <rect x="656" y="312" width="114" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="770" y="312" width="60" height="32" fill="#EFE7DA" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="830" y="312" width="170" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <rect x="1000" y="312" width="168" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
-  <text x="670" y="328" font-size="11.5" fill="#4A473F" dominant-baseline="central">Redirect</text>
-  <text x="784" y="328" font-size="11.5" fill="#6B4E28" dominant-baseline="central">137</text>
-  <text x="844" y="328" font-size="11.5" fill="#4A473F" dominant-baseline="central">单播给主机</text>
-  <text x="1014" y="328" font-size="11.5" fill="#4A473F" dominant-baseline="central">换条更近的下一跳</text>
+  <rect x="72" y="720" width="512" height="48" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="88" y="737" font-size="12" font-weight="700" fill="#4A473F" dominant-baseline="central">很多中间设备直接丢分片</text>
+  <text x="88" y="754" font-size="10.5" fill="#4A473F" dominant-baseline="central">防火墙、负载均衡读不到端口就拒收</text>
 
   <!-- ================= Panel C ================= -->
-  <rect x="48" y="374" width="1144" height="190" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="72" y="402" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">C · NS 的目的地址是算出来的，不是猜的</text>
+  <rect x="632" y="504" width="560" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="656" y="532" font-size="15" font-weight="700" fill="#4A473F" dominant-baseline="central">C · TCP 为什么很少走到这一步</text>
 
-  <rect x="72" y="424" width="250" height="62" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="197" y="444" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">要找的 IPv6 地址</text>
-  <text x="197" y="466" font-size="11" fill="#2C4460" text-anchor="middle" dominant-baseline="central">2001:db8::a1b2:c3d4</text>
+  <rect x="656" y="552" width="512" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="672" y="569" font-size="12" font-weight="700" fill="#2C4460" dominant-baseline="central">握手时就协商 MSS</text>
+  <text x="672" y="586" font-size="10.5" fill="#2C4460" dominant-baseline="central">双方各自通告自己一次能收多大的段</text>
 
-  <line x1="322" y1="455" x2="350" y2="455" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="656" y="608" width="512" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="672" y="625" font-size="12" font-weight="700" fill="#2C4460" dominant-baseline="central">以太网上 MSS 常见 1460</text>
+  <text x="672" y="642" font-size="10.5" fill="#2C4460" dominant-baseline="central">1500 − 20 字节 IP 首部 − 20 字节 TCP 首部</text>
 
-  <rect x="354" y="424" width="250" height="62" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
-  <text x="479" y="444" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">取最低 24 位</text>
-  <text x="479" y="466" font-size="11" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">b2:c3d4</text>
+  <rect x="656" y="664" width="512" height="48" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="672" y="681" font-size="12" font-weight="700" fill="#24473F" dominant-baseline="central">超出部分 TCP 自己切段</text>
+  <text x="672" y="698" font-size="10.5" fill="#24473F" dominant-baseline="central">每段是独立数据报，丢了只补这一段</text>
 
-  <line x1="604" y1="455" x2="632" y2="455" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="656" y="720" width="512" height="48" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="672" y="737" font-size="12" font-weight="700" fill="#733428" dominant-baseline="central">分片主要发生在 UDP 上</text>
+  <text x="672" y="754" font-size="10.5" fill="#733428" dominant-baseline="central">一次 sendto 超过 MTU，IP 层就动手切</text>
 
-  <rect x="636" y="424" width="250" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="761" y="444" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle" dominant-baseline="central">拼成被请求节点组播</text>
-  <text x="761" y="466" font-size="11" fill="#24473F" text-anchor="middle" dominant-baseline="central">ff02::1:ffb2:c3d4</text>
-
-  <line x1="886" y1="455" x2="914" y2="455" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-
-  <rect x="918" y="424" width="250" height="62" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
-  <text x="1043" y="444" font-size="12" font-weight="700" fill="#6B5B95" text-anchor="middle" dominant-baseline="central">映射成组播 MAC</text>
-  <text x="1043" y="466" font-size="11" fill="#6B5B95" text-anchor="middle" dominant-baseline="central">33:33:ff:b2:c3:d4</text>
-
-  <text x="72" y="512" font-size="11.5" fill="#6B675C" dominant-baseline="central">前缀 ff02::1:ff00:0/104 是写死的，只有末尾 24 位跟着目标地址走</text>
-  <text x="72" y="534" font-size="11.5" fill="#6B675C" dominant-baseline="central">组播 MAC 前 16 位固定 33:33，后 32 位照抄组播地址的末 32 位</text>
-
-  <text x="48" y="590" font-size="11.5" fill="#6B675C" dominant-baseline="central">口径：报文类型号依 RFC 4861，地址映射规则依 RFC 4291；图中地址为示例。IPv4 的组播 MAC 映射用的是另一套规则 01:00:5e</text>
+  <text x="48" y="830" font-size="11.5" fill="#6B675C" dominant-baseline="central">口径：例中 MTU 取以太网常见的 1500；分片规则依 RFC 791，重组超时依 Linux 的 net.ipv4.ipfrag_time 默认值</text>
 </svg>

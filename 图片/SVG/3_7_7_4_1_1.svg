@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>自定义 RPC 帧格式与请求关联</title>
+  <desc>上半部分定义 14 字节固定头和变长消息体；下半部分展示异步多路复用中使用 request_id 关联响应的方式。</desc>
+  <defs>
+    <marker id="arrReq" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrResp" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1240" height="660" fill="rgb(245, 244, 237)"/>
+
+  <!-- 标题区 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">自定义 RPC 帧 —— 14 字节固定头与请求关联</text>
+  <text x="48" y="70" font-size="14" fill="#6B675C">固定头定义帧边界；method、body、request_id 与 status 分别描述操作、数据、关联和结果</text>
+
+  <!-- Panel A -->
+  <text x="48" y="120" font-size="15" font-weight="700" fill="#4A473F">A · 帧布局 —— 字段定义与读取顺序</text>
+
+  <!-- 字节偏移 -->
+  <text x="48" y="144" font-size="9.5" fill="#9B968A">0</text>
+  <text x="158" y="144" font-size="9.5" fill="#9B968A">2</text>
+  <text x="238" y="144" font-size="9.5" fill="#9B968A">3</text>
+  <text x="318" y="144" font-size="9.5" fill="#9B968A">4</text>
+  <text x="518" y="144" font-size="9.5" fill="#9B968A">8</text>
+  <text x="708" y="144" font-size="9.5" fill="#9B968A">10</text>
+  <text x="878" y="144" font-size="9.5" fill="#9B968A">14</text>
+
+  <!-- 字段块 -->
+  <rect x="48" y="150" width="110" height="58" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="103" y="174" font-size="12.5" font-weight="600" fill="#4A473F" text-anchor="middle">magic</text>
+  <text x="103" y="194" font-size="10.5" fill="#6B675C" text-anchor="middle">2 B</text>
+
+  <rect x="158" y="150" width="80" height="58" rx="7" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="198" y="174" font-size="12.5" font-weight="600" fill="#4A473F" text-anchor="middle">version</text>
+  <text x="198" y="194" font-size="10.5" fill="#6B675C" text-anchor="middle">1 B</text>
+
+  <rect x="238" y="150" width="80" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="278" y="174" font-size="12.5" font-weight="600" fill="#2C4460" text-anchor="middle">type</text>
+  <text x="278" y="194" font-size="10.5" fill="#2C4460" text-anchor="middle">1 B</text>
+
+  <rect x="318" y="150" width="200" height="58" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+  <text x="418" y="174" font-size="12.5" font-weight="600" fill="#6B4E28" text-anchor="middle">request_id</text>
+  <text x="418" y="194" font-size="10.5" fill="#6B4E28" text-anchor="middle">4 B</text>
+
+  <rect x="518" y="150" width="190" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="613" y="174" font-size="12.5" font-weight="600" fill="#2C4460" text-anchor="middle">method / status</text>
+  <text x="613" y="194" font-size="10.5" fill="#2C4460" text-anchor="middle">2 B</text>
+
+  <rect x="708" y="150" width="170" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="793" y="174" font-size="12.5" font-weight="600" fill="#24473F" text-anchor="middle">body_len</text>
+  <text x="793" y="194" font-size="10.5" fill="#24473F" text-anchor="middle">4 B</text>
+
+  <rect x="878" y="150" width="300" height="58" rx="7" fill="#FBFBF6" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="1028" y="174" font-size="12.5" font-weight="600" fill="#4A473F" text-anchor="middle">body（变长）</text>
+  <text x="1028" y="194" font-size="10.5" fill="#6B675C" text-anchor="middle">序列化后的参数 / 结果</text>
+
+  <!-- 用途标签 -->
+  <text x="103" y="228" font-size="10.5" fill="#6B675C" text-anchor="middle">协议识别</text>
+  <text x="198" y="228" font-size="10.5" fill="#6B675C" text-anchor="middle">格式兼容</text>
+  <text x="278" y="228" font-size="10.5" fill="#6B675C" text-anchor="middle">1 请求 · 2 响应</text>
+  <text x="418" y="228" font-size="10.5" font-weight="600" fill="#6B4E28" text-anchor="middle">关联请求与响应</text>
+  <text x="613" y="228" font-size="10.5" fill="#6B675C" text-anchor="middle">请求：方法号</text>
+  <text x="613" y="243" font-size="10.5" fill="#6B675C" text-anchor="middle">响应：状态码</text>
+  <text x="793" y="228" font-size="10.5" fill="#6B675C" text-anchor="middle">消息体长度</text>
+  <text x="1028" y="228" font-size="10.5" fill="#6B675C" text-anchor="middle">方法定义的编码数据</text>
+
+  <!-- 定长头标注线 -->
+  <line x1="48" y1="264" x2="878" y2="264" stroke="#5A564B" stroke-width="1.2"/>
+  <line x1="48" y1="258" x2="48" y2="264" stroke="#5A564B" stroke-width="1.2"/>
+  <line x1="878" y1="258" x2="878" y2="264" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="463" y="282" font-size="11.5" fill="#4A473F" text-anchor="middle">固定头 14 字节 —— 先读取并验证头部，再读取 body</text>
+  <text x="878" y="300" font-size="10.5" fill="#6B675C" text-anchor="start">　状态：0 成功 · 1 无方法 · 2 参数错误 · 3 服务端错误</text>
+
+  <!-- Panel B -->
+  <text x="48" y="346" font-size="15" font-weight="700" fill="#4A473F">B · 并发扩展示意 —— request_id 用于关联乱序响应（非本文串行实现）</text>
+
+  <!-- participants -->
+  <rect x="130" y="364" width="150" height="34" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="205" y="386" font-size="13" font-weight="600" fill="#2C4460" text-anchor="middle">客户端</text>
+  <rect x="700" y="364" width="150" height="34" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="775" y="386" font-size="13" font-weight="600" fill="#24473F" text-anchor="middle">服务端</text>
+
+  <line x1="205" y1="398" x2="205" y2="600" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="775" y1="398" x2="775" y2="600" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 4"/>
+
+  <!-- 请求 -->
+  <text x="490" y="420" font-size="11.5" fill="#2C4460" text-anchor="middle">① Request · id=1 · Add(3, 4)</text>
+  <line x1="205" y1="428" x2="768" y2="428" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrReq)"/>
+  <text x="490" y="454" font-size="11.5" fill="#2C4460" text-anchor="middle">② Request · id=2 · Echo(hi)</text>
+  <line x1="205" y1="462" x2="768" y2="462" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrReq)"/>
+
+  <!-- 服务端处理注记 -->
+  <text x="852" y="486" font-size="10.5" fill="#6B675C" text-anchor="middle">并发执行时</text>
+  <text x="852" y="502" font-size="10.5" fill="#6B675C" text-anchor="middle">响应可能乱序</text>
+
+  <!-- 响应（乱序） -->
+  <text x="490" y="512" font-size="11.5" fill="#6B4E28" text-anchor="middle">③ Response · id=2 · status=0</text>
+  <text x="235" y="512" font-size="10.5" font-weight="600" fill="#A64B3C" text-anchor="start">先完成</text>
+  <line x1="775" y1="520" x2="212" y2="520" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arrResp)"/>
+  <text x="490" y="548" font-size="11.5" fill="#6B4E28" text-anchor="middle">④ Response · id=1 · status=0</text>
+  <text x="235" y="548" font-size="10.5" font-weight="600" fill="#A64B3C" text-anchor="start">后完成</text>
+  <line x1="775" y1="556" x2="212" y2="556" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arrResp)"/>
+
+  <!-- 待配对表 -->
+  <rect x="930" y="400" width="262" height="176" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="946" y="426" font-size="12.5" font-weight="700" fill="#4A473F">待完成表（并发扩展）</text>
+  <text x="946" y="452" font-size="11" fill="#4A473F">id=1 → Add 的等待者</text>
+  <text x="946" y="474" font-size="11" fill="#4A473F">id=2 → Echo 的等待者</text>
+  <line x1="946" y1="488" x2="1176" y2="488" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="946" y="512" font-size="11" fill="#6B675C">响应到达：按 id 查表</text>
+  <text x="946" y="532" font-size="11" fill="#6B675C">完成对应等待者</text>
+  <text x="946" y="558" font-size="11" font-weight="600" fill="#8A6A3A">依 id 关联，不依赖顺序</text>
+
+  <!-- 底部口径条 -->
+  <text x="48" y="640" font-size="12" fill="#6B675C">本文的串行实现一次只有一个在途请求；异步多路复用需要维护待完成表并协调并发写入。</text>
+</svg>

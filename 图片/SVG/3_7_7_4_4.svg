@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 620" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+  </defs>
+
+  <title>SSH 二进制包格式：长度前缀</title>
+  <desc>上方按字节展开 SSH 二进制包的五个部分：四字节包长度、一字节填充长度、有效载荷、随机填充和消息认证码，并标出包长度字段覆盖的范围；左下给出接收方按长度前缀切包的五个步骤，右下解释长度前缀、随机填充和长度上限的设计原因。</desc>
+
+  <rect x="0" y="0" width="1240" height="620" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">SSH：把长度写在最前面</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">先读 4 字节知道还有多少，再精确读那么多；不用扫描，也不怕正文里出现特殊字节</text>
+
+  <!-- ============ Panel A: 包结构 ============ -->
+  <rect x="48" y="104" width="1144" height="206" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · 一个 SSH 二进制包的五个部分（RFC 4253）</text>
+
+  <text x="147" y="162" font-size="9.5" fill="#9B968A" text-anchor="middle">4 字节</text>
+  <text x="267" y="162" font-size="9.5" fill="#9B968A" text-anchor="middle">1 字节</text>
+  <text x="527" y="162" font-size="9.5" fill="#9B968A" text-anchor="middle">变长</text>
+  <text x="842" y="162" font-size="9.5" fill="#9B968A" text-anchor="middle">4–255 字节</text>
+  <text x="1055" y="162" font-size="9.5" fill="#9B968A" text-anchor="middle">摘要长度</text>
+
+  <rect x="72" y="170" width="150" height="52" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.6"/>
+  <text x="147" y="194" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">packet_length</text>
+  <text x="147" y="212" font-size="10" fill="#8A6A3A" text-anchor="middle">uint32 网络序</text>
+
+  <rect x="222" y="170" width="90" height="52" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="267" y="194" font-size="10.5" fill="#4A473F" text-anchor="middle">padding</text>
+  <text x="267" y="210" font-size="10.5" fill="#4A473F" text-anchor="middle">_length</text>
+
+  <rect x="312" y="170" width="430" height="52" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="527" y="194" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">payload</text>
+  <text x="527" y="212" font-size="10" fill="#3D5A80" text-anchor="middle">消息类型 + 消息体</text>
+
+  <rect x="742" y="170" width="200" height="52" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="842" y="194" font-size="11" fill="#6B5B95" text-anchor="middle">random padding</text>
+  <text x="842" y="212" font-size="10" fill="#6B5B95" text-anchor="middle">随机字节</text>
+
+  <rect x="942" y="170" width="226" height="52" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1055" y="194" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">MAC</text>
+  <text x="1055" y="212" font-size="10" fill="#2F6B5E" text-anchor="middle">完整性校验码</text>
+
+  <path d="M222,236 L222,244 L942,244 L942,236" fill="none" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="582" y="262" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">packet_length 数的是这一段</text>
+
+  <path d="M942,236 L942,244 L1168,244 L1168,236" fill="none" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1055" y="262" font-size="11" fill="#24473F" text-anchor="middle">MAC 不算在里面</text>
+
+  <text x="72" y="290" font-size="11.5" fill="#733428">长度字段不含它自己那 4 个字节，实现里最容易差一位的地方就在这</text>
+
+  <!-- ============ Panel B: 收包步骤 ============ -->
+  <rect x="48" y="330" width="620" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="358" font-size="15" font-weight="700" fill="#4A473F">B · 接收方怎么切出一个包</text>
+
+  <rect x="72" y="368" width="572" height="32" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="88" y="389" font-size="11.5" fill="#6B4E28">① 读满 4 字节，ntohl 得到 N</text>
+
+  <rect x="72" y="406" width="572" height="32" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="88" y="427" font-size="11.5" font-weight="700" fill="#733428">② 校验 N 是否超上限，超了直接断连</text>
+
+  <rect x="72" y="444" width="572" height="32" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="88" y="465" font-size="11.5" fill="#2C4460">③ 再读 N 字节，凑齐才算一个完整包</text>
+
+  <rect x="72" y="482" width="572" height="32" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="88" y="503" font-size="11.5" fill="#24473F">④ 再读 MAC，验完整性，不过就丢弃</text>
+
+  <rect x="72" y="520" width="572" height="32" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="88" y="541" font-size="11.5" fill="#4A473F">⑤ 去掉尾部 padding_length 字节，剩下是 payload</text>
+
+  <!-- ============ Panel C: 设计原因 ============ -->
+  <rect x="692" y="330" width="500" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="716" y="358" font-size="15" font-weight="700" fill="#4A473F">C · 三个字段为什么这么定</text>
+
+  <rect x="716" y="372" width="452" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="732" y="393" font-size="11.5" font-weight="700" fill="#2C4460">长度前缀省掉了扫描</text>
+  <text x="732" y="414" font-size="10.5" fill="#3D5A80">正文可以是任意字节，不必转义</text>
+
+  <rect x="716" y="440" width="452" height="56" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="732" y="461" font-size="11.5" font-weight="700" fill="#6B5B95">随机填充遮住明文长度</text>
+  <text x="732" y="482" font-size="10.5" fill="#6B5B95">同时把总长补到分组长度的整数倍</text>
+
+  <rect x="716" y="508" width="452" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="732" y="529" font-size="11.5" font-weight="700" fill="#733428">长度必须设上限</text>
+  <text x="732" y="550" font-size="10.5" fill="#A64B3C">对方声明 4 GB，照着分配就被打垮</text>
+</svg>
