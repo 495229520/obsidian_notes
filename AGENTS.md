@@ -21,6 +21,8 @@
 - When a note contains raw `<svg>...</svg>` markup, export each SVG into `图片/SVG/` and replace the inline block with an Obsidian embed.
 - Every exported SVG must include a solid background rectangle with `fill="rgb(245, 244, 237)"`.
 - Prefer the local Skill at `.codex/skills/obsidian-svg-bg/SKILL.md` and its script for this workflow.
+- **Client Visualization Preference**: Whenever creating or referencing SVG diagrams in conversation, always render the SVG directly in the chat/Artifacts using `![caption](/absolute/path/to/svg)` (copy to artifact dir if needed) or provide a clickable direct link so the user can immediately view and inspect the diagram in the client interface.
+
 
 ## Testing Guidelines
 - No automated test suite; proofread for accuracy, broken links, and consistent cross-references.
@@ -255,4 +257,20 @@ Linux/8.TCP ↔ windows/2.网络编程
 | 12.1.13 malloc与new | 11.2 编译器基本概念 | 涉及名称修饰 |
 | 智能指针/* | 12.1.7 析构函数 | RAII模式关联 |
 | 16.8 移动语义 | 12.1.6 构造函数 | 移动构造函数 |
+
+<!-- TRELLIS:START -->
+# Trellis Instructions
+
+This vault is managed by Trellis. Study planning and execution state live under `.trellis/`:
+
+- `.trellis/workflow.md` — task lifecycle and working phases
+- `.trellis/tasks/` — active and archived learning tasks
+- `.trellis/workspace/` — journals and session traces
+- `9.培养方案/04.Trellis学习任务/` — read-only Obsidian projection of Trellis tasks
+
+Create future study arrangements as Trellis Tasks. Treat `.trellis/tasks/` as the authority and the Obsidian dashboard as a generated read-only view.
+
+Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
+
+<!-- TRELLIS:END -->
 | 6.6 堆与栈的区别 | 1.3 虚拟地址空间 | 内存布局关联 |
