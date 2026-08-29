@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>C++ Coroutine 非阻塞 RPC 调用链</title>
+  <desc>展示 co_await 如何登记 pending、挂起协程，并在响应按 request_id 到达后恢复。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <rect width="1240" height="700" fill="#F5F4ED"/>
+  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Coroutine 非阻塞 RPC：从 co_await 到 request_id 恢复</text>
+  <text x="48" y="82" font-size="13.5" fill="#6B675C">协程只保存“等谁、从哪继续”；事件循环仍负责非阻塞读写、帧解析与调度</text>
+
+  <!-- identity strip -->
+  <rect x="760" y="34" width="190" height="54" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="855" y="55" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">request_id = 42</text>
+  <text x="855" y="75" font-size="10.5" fill="#24473F" text-anchor="middle">线路字段 · 远端回送</text>
+  <rect x="966" y="34" width="218" height="54" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="1075" y="55" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">coroutine_handle</text>
+  <text x="1075" y="75" font-size="10.5" fill="#4A3F68" text-anchor="middle">本地地址 · 不会上网</text>
+
+  <!-- lanes -->
+  <rect x="56" y="112" width="1128" height="102" rx="8" fill="#EDF1F7" stroke="#D8D5C8"/>
+  <text x="72" y="134" font-size="12.5" font-weight="700" fill="#3D5A80">业务 coroutine</text>
+  <rect x="56" y="224" width="1128" height="102" rx="8" fill="#EDEAF3" stroke="#D8D5C8"/>
+  <text x="72" y="246" font-size="12.5" font-weight="700" fill="#6B5B95">Awaiter + pending 表</text>
+  <rect x="56" y="336" width="1128" height="102" rx="8" fill="#E6EFEA" stroke="#D8D5C8"/>
+  <text x="72" y="358" font-size="12.5" font-weight="700" fill="#2F6B5E">EventLoop + 非阻塞 TCP</text>
+  <rect x="56" y="448" width="1128" height="102" rx="8" fill="#F4E9E4" stroke="#D8D5C8"/>
+  <text x="72" y="470" font-size="12.5" font-weight="700" fill="#A64B3C">远端 RPC 服务端</text>
+
+  <!-- top lane -->
+  <rect x="126" y="151" width="176" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="214" y="171" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① co_await CallAsync</text>
+  <text x="214" y="188" font-size="10.5" fill="#2C4460" text-anchor="middle">保留 a、b 与继续点</text>
+
+  <rect x="330" y="158" width="620" height="32" rx="6" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="7 5"/>
+  <text x="640" y="179" font-size="11.5" fill="#4A473F" text-anchor="middle">coroutine 已挂起 · EventLoop 线程没有被占住</text>
+
+  <rect x="980" y="151" width="168" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="1064" y="171" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">⑩ await_resume</text>
+  <text x="1064" y="188" font-size="10.5" fill="#2C4460" text-anchor="middle">返回 body 或抛错</text>
+
+  <!-- awaiter lane -->
+  <rect x="126" y="263" width="160" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="206" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">② 分配 id = 42</text>
+  <text x="206" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">构造 PendingCall</text>
+
+  <rect x="322" y="263" width="220" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="432" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">③ pending[42] = handle</text>
+  <text x="432" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">先登记，再允许发送</text>
+
+  <rect x="744" y="263" width="196" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="842" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑧ extract pending[42]</text>
+  <text x="842" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">先移除，后恢复</text>
+
+  <rect x="978" y="263" width="170" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="1063" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑨ Post(handle)</text>
+  <text x="1063" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">排入可运行队列</text>
+
+  <!-- event loop lane -->
+  <rect x="322" y="375" width="186" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="415" y="395" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">④ enqueue Request</text>
+  <text x="415" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">完整 22 B Frame</text>
+
+  <rect x="542" y="375" width="174" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="629" y="395" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑤ send 直到 EAGAIN</text>
+  <text x="629" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">保存 offset，等待可写</text>
+
+  <rect x="744" y="375" width="196" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="842" y="395" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑦ Decode Response</text>
+  <text x="842" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">读取 request_id = 42</text>
+
+  <!-- server lane -->
+  <rect x="548" y="487" width="190" height="46" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="643" y="507" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">⑥ Dispatch Add(3, 4)</text>
+  <text x="643" y="524" font-size="10.5" fill="#733428" text-anchor="middle">Response(id=42, sum=7)</text>
+
+  <!-- arrows -->
+  <line x1="214" y1="199" x2="206" y2="259" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="290" y1="286" x2="318" y2="286" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="432" y1="311" x2="415" y2="371" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="512" y1="398" x2="538" y2="398" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <path d="M629 423 L629 470 L643 470 L643 483" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+  <path d="M738 510 L780 510 L780 440 L842 440 L842 425" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <line x1="842" y1="371" x2="842" y2="313" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="944" y1="286" x2="974" y2="286" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1063" y1="259" x2="1064" y2="201" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- invariants -->
+  <text x="56" y="590" font-size="14.5" font-weight="700" fill="#2B2A26">三个不能打破的不变量</text>
+  <rect x="56" y="608" width="352" height="62" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="76" y="631" font-size="12" font-weight="700" fill="#2F6B5E">A · pending 先于发送可见</text>
+  <text x="76" y="653" font-size="10.8" fill="#4A473F">避免极快响应到达时找不到等待者</text>
+
+  <rect x="430" y="608" width="352" height="62" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="450" y="631" font-size="12" font-weight="700" fill="#6B5B95">B · pending 先移除再 resume</text>
+  <text x="450" y="653" font-size="10.8" fill="#4A473F">防止重入、重复响应与悬空条目</text>
+
+  <rect x="804" y="608" width="380" height="62" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="824" y="631" font-size="12" font-weight="700" fill="#A64B3C">C · 成功、超时、取消只赢一次</text>
+  <text x="824" y="653" font-size="10.8" fill="#4A473F">终态竞争必须收敛到一次恢复</text>
+</svg>
