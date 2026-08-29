@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>底层 I/O 适配：ReadExactly 状态机与 WriteAll 信号防御</title>
+  <desc>展示 ReadExactly 处理短读、EINTR 与三种 EOF 结局的状态机，以及 WriteAll 循环发送与使用 MSG_NOSIGNAL 阻断 SIGPIPE 杀进程的安全机制。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 全图背景 -->
+  <rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部标题区 -->
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">底层 I/O 适配：ReadExactly 状态机与 WriteAll 信号防御</text>
+  <text x="48" y="74" font-size="13.5" fill="#6B675C">抹平 TCP 字节流无边界导致的短读短写；区分正常关闭与半帧截断；拦截 SIGPIPE 防止服务猝死</text>
+
+  <!-- ==================== Panel A: ReadExactly 状态机 ==================== -->
+  <rect x="48" y="96" width="560" height="490" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="64" y="122" font-size="13" font-weight="700" fill="#4A473F">A · ReadExactly 状态机：分流 read() 返回值与 EOF 三结局</text>
+
+  <!-- 入口卡片 -->
+  <rect x="198" y="136" width="260" height="38" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="328" y="153" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">ReadExactly(fd, out)</text>
+  <text x="328" y="167" font-size="10" fill="#2C4460" text-anchor="middle">目标长度 out.size() · 初始 offset = 0</text>
+
+  <path d="M328,174 L328,192" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 系统调用卡片 -->
+  <rect x="188" y="194" width="280" height="38" rx="6" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.3"/>
+  <text x="328" y="211" font-size="11.5" font-weight="600" fill="#4A473F" text-anchor="middle">n = ::read(fd, buf + offset, rem)</text>
+  <text x="328" y="225" font-size="9.5" fill="#6B675C" text-anchor="middle">rem = out.size() − offset（尽力而为读取）</text>
+
+  <!-- 三路分支箭头 -->
+  <path d="M228,232 L138,260" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arrBlue)"/>
+  <text x="146" y="246" font-size="10" font-weight="700" fill="#3D5A80">n &gt; 0 (读到数据)</text>
+
+  <path d="M328,232 L328,260" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrGreen)"/>
+  <text x="334" y="248" font-size="10" font-weight="700" fill="#2F6B5E">n == 0 (对端 FIN)</text>
+
+  <path d="M428,232 L518,260" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrRed)"/>
+  <text x="496" y="246" font-size="10" font-weight="700" fill="#A64B3C">n &lt; 0 (出错)</text>
+
+  <!-- 分支 1: n > 0 推进与循环 -->
+  <rect x="58" y="262" width="160" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="138" y="280" font-size="11" font-weight="600" fill="#2C4460" text-anchor="middle">推进 offset += n</text>
+  <text x="138" y="296" font-size="9.5" fill="#2C4460" text-anchor="middle">检查 offset == out.size()</text>
+
+  <path d="M138,306 L138,332" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrGreen)"/>
+  <text x="144" y="322" font-size="9.5" font-weight="700" fill="#2F6B5E">读满</text>
+
+  <!-- 循环回环线 -->
+  <path d="M58,284 L48,284 L48,213 L180,213" fill="none" stroke="#3D5A80" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arrBlue)"/>
+  <text x="52" y="252" font-size="9.5" fill="#3D5A80">未满继续</text>
+
+  <!-- 结局 ① Complete -->
+  <rect x="58" y="334" width="160" height="74" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="138" y="354" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">结局 ① · Complete</text>
+  <text x="138" y="372" font-size="10" fill="#24473F" text-anchor="middle">目标字节全部就绪</text>
+  <text x="138" y="390" font-size="9.5" fill="#24473F" text-anchor="middle">交付 DecodeHeader / 业务</text>
+
+  <!-- 分支 2: n == 0 判别 -->
+  <rect x="236" y="262" width="184" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="328" y="280" font-size="11" font-weight="600" fill="#6B4E28" text-anchor="middle">判定 offset == 0 ?</text>
+  <text x="328" y="296" font-size="9.5" fill="#6B4E28" text-anchor="middle">当前帧是否已有部分字节到达</text>
+
+  <path d="M280,306 L280,332" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arrBlue)"/>
+  <text x="246" y="322" font-size="9.5" font-weight="700" fill="#3D5A80">offset == 0</text>
+
+  <path d="M376,306 L376,418" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrRed)"/>
+  <text x="382" y="360" font-size="9.5" font-weight="700" fill="#A64B3C">offset &gt; 0</text>
+
+  <!-- 结局 ② Eof -->
+  <rect x="236" y="334" width="134" height="74" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="303" y="354" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">结局 ② · Eof</text>
+  <text x="303" y="372" font-size="10" fill="#2C4460" text-anchor="middle">对端在帧边界关闭</text>
+  <text x="303" y="390" font-size="9.5" fill="#2C4460" text-anchor="middle">返回 nullopt (正常退出)</text>
+
+  <!-- 结局 ③ Truncated -->
+  <rect x="236" y="420" width="184" height="74" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="328" y="440" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">结局 ③ · Truncated</text>
+  <text x="328" y="458" font-size="10" fill="#733428" text-anchor="middle">帧头/消息体中途中断</text>
+  <text x="328" y="476" font-size="9.5" fill="#733428" text-anchor="middle">抛 ProtocolError 关连接</text>
+
+  <!-- 分支 3: n < 0 错误分流 -->
+  <rect x="438" y="262" width="160" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="518" y="280" font-size="11" font-weight="600" fill="#6B4E28" text-anchor="middle">检查 errno</text>
+  <text x="518" y="296" font-size="9.5" fill="#6B4E28" text-anchor="middle">判断是否为信号打断</text>
+
+  <path d="M480,306 L480,332" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="444" y="322" font-size="9.5" font-weight="700" fill="#8A6A3A">EINTR</text>
+
+  <path d="M558,306 L558,418" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrRed)"/>
+  <text x="562" y="360" font-size="9.5" font-weight="700" fill="#A64B3C">其他错误</text>
+
+  <!-- EINTR 处理 -->
+  <rect x="438" y="334" width="100" height="74" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="488" y="354" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">EINTR 信号</text>
+  <text x="488" y="372" font-size="10" fill="#6B4E28" text-anchor="middle">连接未损坏</text>
+  <text x="488" y="390" font-size="9.5" fill="#6B4E28" text-anchor="middle">continue 重试</text>
+
+  <!-- 真正 I/O 错误 -->
+  <rect x="438" y="420" width="160" height="74" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="518" y="440" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">物理 I/O 异常</text>
+  <text x="518" y="458" font-size="10" fill="#733428" text-anchor="middle">如 ECONNRESET / EIO</text>
+  <text x="518" y="476" font-size="9.5" fill="#733428" text-anchor="middle">抛 std::system_error</text>
+
+  <!-- 底部说明栏 -->
+  <rect x="58" y="508" width="540" height="66" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="70" y="528" font-size="10.5" font-weight="700" fill="#4A473F">核心定界判据：</text>
+  <text x="70" y="546" font-size="10" fill="#4A473F">① 帧头读取时 offset == 0 遇到 EOF 是正常结束（优雅下线）；</text>
+  <text x="70" y="562" font-size="10" fill="#733428">② 已声明 body_len 后，哪怕消息体第 1 字节遇到 EOF，也是截断错误。</text>
+
+  <!-- ==================== Panel B: WriteAll 与 SIGPIPE 防御 ==================== -->
+  <rect x="632" y="96" width="560" height="490" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="648" y="122" font-size="13" font-weight="700" fill="#4A473F">B · WriteAll 发送控制与 SIGPIPE 救命防御机制</text>
+
+  <!-- B1: 循环发送与短写 -->
+  <rect x="648" y="136" width="528" height="96" rx="6" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="662" y="156" font-size="11.5" font-weight="700" fill="#2C4460">B1 · WriteAll 循环发送短写数据</text>
+
+  <rect x="662" y="168" width="220" height="52" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="772" y="188" font-size="11" font-weight="600" fill="#2C4460" text-anchor="middle">::send(..., MSG_NOSIGNAL)</text>
+  <text x="772" y="206" font-size="9.5" fill="#2C4460" text-anchor="middle">写入发送队列，返回实际字节数 n</text>
+
+  <path d="M882,194 L908,194" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="912" y="168" width="250" height="52" rx="5" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="1037" y="188" font-size="10.5" font-weight="600" fill="#4A473F" text-anchor="middle">短写处理：offset += n</text>
+  <text x="1037" y="206" font-size="9.5" fill="#6B675C" text-anchor="middle">循环推进直到 offset == input.size()</text>
+
+  <!-- B2: 对端关闭后的写操作对照 -->
+  <text x="648" y="256" font-size="12" font-weight="700" fill="#4A473F">B2 · 对端已关闭时写入：致命 SIGPIPE 与 MSG_NOSIGNAL 救命机制</text>
+
+  <!-- 时序步骤条 -->
+  <rect x="648" y="268" width="528" height="58" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="662" y="288" font-size="10.5" font-weight="700" fill="#6B4E28">前置阶段：对端已调用 close()</text>
+  <text x="662" y="306" font-size="9.8" fill="#6B4E28">第 1 次 send() 写进本地缓冲区成功；对端收到后回复 RST 报文</text>
+
+  <!-- 对比容器：左边无标志，右边有标志 -->
+  <!-- 左侧：默认无标志 -->
+  <rect x="648" y="336" width="254" height="164" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="775" y="356" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">默认行为（未设 MSG_NOSIGNAL）</text>
+  <line x1="662" y1="366" x2="888" y2="366" stroke="#D9A8A0" stroke-width="1"/>
+
+  <text x="662" y="386" font-size="10.5" fill="#733428">① 本端第 2 次对已收到 RST 连接写入</text>
+  <text x="662" y="406" font-size="10.5" font-weight="700" fill="#A64B3C">② 内核向当前进程投递 SIGPIPE 信号</text>
+  <text x="662" y="426" font-size="10.5" fill="#733428">③ 默认信号处理动作：Terminate</text>
+
+  <rect x="662" y="440" width="226" height="48" rx="5" fill="#E8BCB5" stroke="#A64B3C" stroke-width="1"/>
+  <text x="775" y="460" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">致命后果：服务进程直接猝死！</text>
+  <text x="775" y="476" font-size="9.5" fill="#733428" text-anchor="middle">不抛 C++ 异常，不走析构清理</text>
+
+  <!-- 右侧：MSG_NOSIGNAL 防护 -->
+  <rect x="922" y="336" width="254" height="164" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1049" y="356" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">工程实践（传 MSG_NOSIGNAL）</text>
+  <line x1="936" y1="366" x2="1162" y2="366" stroke="#9FBDB2" stroke-width="1"/>
+
+  <text x="936" y="386" font-size="10.5" fill="#24473F">① 内核拦截并禁止产生 SIGPIPE 信号</text>
+  <text x="936" y="406" font-size="10.5" font-weight="700" fill="#2F6B5E">② send() 返回 −1 且 errno = EPIPE</text>
+  <text x="936" y="426" font-size="10.5" fill="#24473F">③ 包装为 std::system_error 抛出</text>
+
+  <rect x="936" y="440" width="226" height="48" rx="5" fill="#C4DDD2" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="1049" y="460" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">安全优雅：业务层可控捕获</text>
+  <text x="1049" y="476" font-size="9.5" fill="#24473F" text-anchor="middle">记录日志、回收 socket、触发重连</text>
+
+  <!-- 底部非阻塞说明条 -->
+  <rect x="648" y="508" width="528" height="66" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="662" y="528" font-size="10.5" font-weight="700" fill="#4A473F">I/O 模式边界提示：</text>
+  <text x="662" y="546" font-size="10" fill="#4A473F">非阻塞模式下，遇 EAGAIN / EWOULDBLOCK 禁在 while 忙等；</text>
+  <text x="662" y="562" font-size="10" fill="#6B4E28">交由 epoll 监听事件，配合应用层 Buffer 异步调度。</text>
+
+  <!-- ==================== Panel C: 核心机制速查矩阵 ==================== -->
+  <rect x="48" y="600" width="1144" height="144" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="64" y="622" font-size="12.5" font-weight="700" fill="#2C4460">C · 关键 I/O 机制与异常边界速查表</text>
+
+  <!-- 卡片 1: 短读短写 -->
+  <rect x="60" y="632" width="260" height="100" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="74" y="652" font-size="11" font-weight="700" fill="#3D5A80">短读 / 短写 (Partial I/O)</text>
+  <text x="74" y="670" font-size="9.5" fill="#4A473F">现象：0 &lt; n &lt; 请求长度</text>
+  <text x="74" y="688" font-size="9.5" fill="#6B675C">根源：TCP 流式无界，缓冲区容量受限</text>
+  <text x="74" y="708" font-size="9.5" font-weight="600" fill="#2F6B5E">处理：维护 offset 循环推进直至凑满</text>
+
+  <!-- 卡片 2: EINTR -->
+  <rect x="334" y="632" width="260" height="100" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="348" y="652" font-size="11" font-weight="700" fill="#8A6A3A">信号中断 (EINTR)</text>
+  <text x="348" y="670" font-size="9.5" fill="#4A473F">现象：n == −1 且 errno == EINTR</text>
+  <text x="348" y="688" font-size="9.5" fill="#6B675C">根源：阻塞调用被 OS 信号唤醒执行</text>
+  <text x="348" y="708" font-size="9.5" font-weight="600" fill="#2F6B5E">处理：连接未坏，continue 无损重试</text>
+
+  <!-- 卡片 3: Truncated -->
+  <rect x="608" y="632" width="260" height="100" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="622" y="652" font-size="11" font-weight="700" fill="#A64B3C">半帧截断 (Truncated)</text>
+  <text x="622" y="670" font-size="9.5" fill="#4A473F">现象：offset &gt; 0 且 n == 0</text>
+  <text x="622" y="688" font-size="9.5" fill="#6B675C">根源：对端在一帧中途断线，状态损坏</text>
+  <text x="622" y="708" font-size="9.5" font-weight="600" fill="#A64B3C">处理：抛 ProtocolError 强制关闭连接</text>
+
+  <!-- 卡片 4: SIGPIPE / EPIPE -->
+  <rect x="882" y="632" width="298" height="100" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="896" y="652" font-size="11" font-weight="700" fill="#2F6B5E">对端关闭写入 (EPIPE)</text>
+  <text x="896" y="670" font-size="9.5" fill="#4A473F">现象：向收到 RST 的 socket 继续写入</text>
+  <text x="896" y="688" font-size="9.5" fill="#6B675C">根源：未防护时内核 SIGPIPE 杀进程</text>
+  <text x="896" y="708" font-size="9.5" font-weight="600" fill="#2F6B5E">处理：MSG_NOSIGNAL 转 EPIPE 异常捕获</text>
+</svg>

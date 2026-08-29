@@ -24,7 +24,7 @@ cssclasses:
 
 ## 摘要
 
-2026-08-27：复习 13.6.1–13.9、第14–16章与动画合集，并完成图论三题和总复盘。
+2026-08-30：复习 13.6.1–13.9、第14–16章与动画合集，并完成图论三题和总复盘。
 
 ## PRD
 
@@ -40,16 +40,16 @@ cssclasses:
 
 - Linux 第一块：13.6.1–13.9。
 - Linux 第二块：第 14–16 章、`网络编程·动画合集`，并补齐遗漏动画。
-- 力扣：[997. 找到小镇的法官](https://leetcode.cn/problems/find-the-town-judge/)、[841. 钥匙和房间](https://leetcode.cn/problems/keys-and-rooms/)、[133. 克隆图](https://leetcode.cn/problems/clone-graph/)。
-- 绿勾替补：210、684、399。
+- 力扣：[200. 岛屿数量](https://leetcode.cn/problems/number-of-islands/)（CodeTop #12，仅通过 1 次）、[695. 岛屿的最大面积](https://leetcode.cn/problems/max-area-of-island/)（CodeTop #69，未解决）、[207. 课程表](https://leetcode.cn/problems/course-schedule/)（CodeTop #100，未解决）。
+- 替补：210（CodeTop #167）、130（#256）、994（#275），均未解决。
 
 ## Acceptance Criteria
 
 - [ ] 完成 Linux 13.6.1–13.9 复习
 - [ ] 完成第 14–16 章、动画合集并补齐所有遗漏
-- [ ] 独立完成力扣 997
-- [ ] 独立完成力扣 841
-- [ ] 独立完成力扣 133
+- [ ] 独立完成力扣 200
+- [ ] 独立完成力扣 695
+- [ ] 独立完成力扣 207
 - [ ] 画出完整 EventLoop，复述 Make/CMake、连接池、压测、CDN，并完成全周空白纸总复盘
 - [ ] 检查 111 篇 Markdown、30 个动画、21 道力扣均已完成
 
@@ -70,7 +70,7 @@ cssclasses:
   "id": "linux-leetcode-day7",
   "name": "linux-leetcode-day7",
   "title": "Day 7 · EventLoop、构建系统与生产排障 + 力扣",
-  "description": "2026-08-27：复习 13.6.1–13.9、第14–16章与动画合集，并完成图论三题和总复盘。",
+  "description": "2026-08-30：复习 13.6.1–13.9、第14–16章与动画合集，并完成图论三题和总复盘。",
   "status": "planning",
   "dev_type": null,
   "scope": null,
@@ -92,7 +92,7 @@ cssclasses:
   "notes": "",
   "meta": {
     "domain": "study",
-    "scheduled_date": "2026-08-27"
+    "scheduled_date": "2026-08-30"
   }
 }
 ```

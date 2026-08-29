@@ -1,23 +1,23 @@
 ---
 title: MFMS 新中台 · Trellis 工程结构方案
 date: 2026-08-16
-updated: 2026-08-18
+updated: 2026-08-22
 tags:
   - 复合mfms
   - MFMS
   - Trellis
   - 架构规划
-version: v0.3
+version: v0.4
 status: 当前项目落位方案
 ---
 
 # MFMS 新中台 · Trellis 工程结构方案
 
 > [!abstract] 本文定位
-> 本文说明 v0.3 怎样进入 <code>/Users/melene/project/mfms_Framework/.trellis/</code>。vault 负责讨论、状态和图源；Trellis 只存可约束实现的红线、合同、质量规则与任务资料。当前架构入口见 [[MFMS新中台-架构构造思路]]。
+> 本文说明 v0.4 怎样进入 <code>/Users/melene/project/mfms_Framework/.trellis/</code>。vault 负责讨论、状态和图源；Trellis 只存可约束实现的红线、合同、质量规则与任务资料。当前架构入口见 [[MFMS新中台-架构构造思路]]。
 
-> [!important] v0.3 已解除的旧阻塞
-> Q-33 已在中台范围关闭，Q-34 的 Adapter 内部设计已移出范围，Q-02-rev 已确定基线不需要调度 gRPC 直连。项目不再等待“中台如何协调夺权”，而应把下位机控制接口、Stream 消息和订单单写者合同分别冻结。
+> [!important] v0.4 当前落位
+> 控制权与 Stream 合同沿用 v0.3；持久化合同更新为中台单写需求、调度单写订单与运单。订单逻辑字段已确认，物理 DDL、拆分规则和运单合同继续走 Q-32/Q-46/Q-47/Q-48/Q-54 评审。
 
 ## 1. 权威层级
 
@@ -28,9 +28,9 @@ status: 当前项目落位方案
 | 外部事实层 | 下位机 SDK、legacy 源码、真实消息样例、数据库实物 | Downloads / legacy repo / 联调记录，只读引用 |
 | 展示层 | Trellis Task 的 Obsidian 镜像 | <code>14.1 Task/</code>，导出器生成，禁止手改 |
 
-结论冲突时按“较新、明确、权威方负责”的顺序处理：v0.3 已确认边界优先于旧工作台；下位机真实接口优先于中台自拟函数名；数据库联合评审优先于推荐 DDL。
+结论冲突时按“较新、明确、权威方负责”的顺序处理：v0.4 已确认边界优先于旧工作台；下位机真实接口优先于中台自拟函数名；数据库联合评审优先于推荐 DDL。
 
-## 2. v0.3 Trellis 目录
+## 2. v0.4 Trellis 目录
 
 ~~~text
 .trellis/
@@ -70,12 +70,12 @@ status: 当前项目落位方案
 | <code>constraints.md</code> | 不允许违反的架构红线 |
 | <code>control-access-contract.md</code> | 中台怎样查询/申请/强制申请/释放与发送命令 |
 | <code>realtime-stream-contract.md</code> | Stream 信封、消息来源、序号、时间、质量和多源合并 |
-| <code>order-persistence-contract.md</code> | 新订单请求、执行摘要、绑定、变更请求与单写者 |
+| <code>order-persistence-contract.md</code> | 中台需求、调度订单/运单、订单逻辑字段、血缘与只读边界 |
 | <code>bus-contracts.md</code> | Cpp-Proxy-SDK、设备 ID、既有下位机总线适配 |
 | <code>db-event-contracts.md</code> | legacy 双事件表及迁移；禁止承载新订单模型 |
 | backend specs | 模块落位、DB、错误、审计、质量、恢复与线程规则 |
 
-合同必须分开，避免再次把“控制锁”“实时消息”“订单事实”和“legacy 事件表”混成一个状态机。
+合同必须分开，避免再次把“控制锁”“实时消息”“需求/订单/运单事实”和“legacy 事件表”混成一个状态机。
 
 ## 3. vault → Trellis 映射
 
@@ -84,7 +84,7 @@ status: 当前项目落位方案
 | 架构快照 §1～§4 | ARCHMAP + constraints | 已确认边界可直接同步 |
 | 工作台 §2 控制访问 | control-access-contract | 函数名/错误码仍以 Q-35～Q-44 为评审门槛 |
 | 工作台 §3 实时消息 | realtime-stream-contract | 信封是推荐 P0 基线；实际 Payload 样例待收集 |
-| 工作台 §4/§5 订单 | order-persistence-contract + database guidelines | 表结构为推荐基线，需调度/DBA 评审 |
+| 工作台 §4/§5 需求/订单/运单 | order-persistence-contract + database guidelines | 职责与订单逻辑字段已确认；物理表结构需调度/DBA 评审 |
 | 工作台 §6 | directory-structure | 模块化单体边界已可执行 |
 | 工作台 §7～§9 | error/logging/quality/runtime-recovery | 降级与 fail-closed 规则 |
 | 问题清单 | architecture-design task | 只保留真正未决项 |
@@ -94,26 +94,26 @@ status: 当前项目落位方案
 
 | 交付物 | 当前状态 | 下一步 |
 | --- | --- | --- |
-| 控制权职责 | v0.3 已确认 | 进入 constraints；删净本地锁/协调器表述 |
+| 控制权职责 | v0.4 继承确认 | 进入 constraints；删净本地锁/协调器表述 |
 | 下位机控制接口 | 目标调用面已写 | 与下位机关闭 Q-35～Q-44，附真实头文件/响应样例 |
 | Stream 消息目录 | 来源类型已确认 | 收集每种 payload 样例，冻结 schema_version 和质量阈值 |
-| 订单持久化 | 四表单写者为推荐方案 | 产出 DDL、迁移与调度竞争/恢复评审 |
+| 需求/订单/运单持久化 | 中台需求、调度订单/运单职责已确认 | 产出三类记录 DDL、订单字段精确定义、拆分与调度恢复评审 |
 | 模块目录 | 设计已定，业务代码尚未创建 | P1 任务按 endpoint/application/domain/capability/persistence/infrastructure 建骨架 |
-| 运行恢复 | v0.3 行为已成文 | 用断流、重启、超时、MySQL/调度不可用测试固化 |
+| 运行恢复 | v0.4 行为已成文 | 用断流、重启、超时、MySQL/调度不可用测试固化 |
 | 审计 | 字段和 fail-closed 原则已成文 | 确认保留期、身份绑定和查询权限 |
 | 工厂定制 | SiteProtocolAdapter 边界已定 | 等 Q-14/Q-15 后创建 site spec，不提前猜工厂配置 |
 
 ## 5. 任务拆分
 
-当前架构任务 <code>08-16-architecture-design</code> 继续作为 v0.3 规划总任务，不把所有代码塞进同一任务。建议后续建立可独立验收的子任务：
+当前架构任务 <code>08-16-architecture-design</code> 继续作为 v0.4 规划总任务，不把所有代码塞进同一任务。建议后续建立可独立验收的子任务：
 
 1. **P0-A 下位机控制合同**：接口签名、身份、错误码、超时确认与控制域；
 2. **P0-B 实时 Stream 合同**：消息目录、信封、版本、乱序/新鲜度和录制样例；
-3. **P0-C 订单持久化合同**：DDL、单写者、状态、唯一键、多调度实例与变更请求；
+3. **P0-C 需求/订单/运单合同**：DDL、订单字段、血缘、拆分、幂等、多调度实例与变更请求；
 4. **P1 能力骨架**：Ingestor、DecoderRegistry、StateManager、SDK 薄适配；
-5. **P2 订单竖切**：接单、调度接管、执行摘要与绑定查询；
+5. **P2 需求竖切**：中台需求接入、订单/运单只读查询与血缘；
 6. **P3 调试竖切**：控制访问、调试命令、权限、审计和结果未知恢复；
-7. **P4 统一视图与推送**：OrderView、状态质量、全量快照/增量和断流恢复。
+7. **P4 统一视图与推送**：RequirementView、状态质量、全量快照/增量和断流恢复。
 
 父任务只维护跨任务一致性；子任务各自具备 PRD、design、implement、context 和可运行验收。
 
@@ -121,32 +121,32 @@ status: 当前项目落位方案
 
 ### 6.1 可以立即执行
 
-- 用 v0.3 更新 ARCHMAP、红线、合同和 backend 规范；
+- 用 v0.4 更新 ARCHMAP、红线、合同和 backend 规范；
 - 编写契约测试样例与 mock 接口；
 - 建稳定 DTO 和目录骨架；
 - 设计 UNKNOWN/FRESH/STALE/UNSUPPORTED 状态质量；
-- 设计订单 DDL 草案与评审材料。
+- 设计需求/订单/运单 DDL 草案与评审材料，但不把推荐物理字段冒充已确认事实。
 
 ### 6.2 不能越过
 
 - 未拿到真实接口就把建议函数名当 SDK API；
 - 在中台实现任何真实锁状态；
 - 用调度/运单状态代替下位机控制权；
-- 让中台和调度修改同一订单执行事实；
+- 让中台创建或更新调度拥有的订单/运单；
 - 无来源合并 Stream 消息；
 - 将 Adapter 内部恢复或调度故障转移塞进中台；
-- 把 legacy 双事件表改名后冒充新订单模型；
+- 把 legacy 双事件表改名后冒充需求/订单/运单模型；
 - 审计不可用时仍允许强制申请。
 
 ## 7. 评审与验证
 
-每个 v0.3 实现任务至少检查：
+每个 v0.4 实现任务至少检查：
 
 1. 依赖方向是否与 ARCHMAP 一致；
 2. 是否出现 lock/lease/epoch/token/coordinator 等越界概念；
 3. 所有控制动作是否以下位机终态为准；
 4. 所有状态是否保留来源、时间、序号和质量；
-5. 每个数据库事实是否只有一个权威写者；
+5. 中台是否只写需求、订单/运单 Repository 是否只读；
 6. 超时是否区分“失败”和“结果未知”；
 7. 强制申请是否具备权限、reason 和成功/失败审计；
 8. 重启、断流、MySQL/调度不可用测试是否覆盖；
@@ -155,7 +155,7 @@ status: 当前项目落位方案
 
 ## 8. Trellis 工具边界
 
-现有 workflow、task 生命周期、Obsidian dashboard 导出器和 workspace journal 继续沿用。<code>where.py / ctx.py / map_check.py / intake/</code> 等早期工具设想不是 v0.3 架构前置条件；如确有需求另开 tooling 任务，不再和业务合同冻结绑在一起。
+现有 workflow、task 生命周期、Obsidian dashboard 导出器和 workspace journal 继续沿用。<code>where.py / ctx.py / map_check.py / intake/</code> 等早期工具设想不是 v0.4 架构前置条件；如确有需求另开 tooling 任务，不再和业务合同冻结绑在一起。
 
 ## 9. 关联
 

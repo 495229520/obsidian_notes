@@ -1,0 +1,239 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>网卡硬件过滤与广播风暴成因及防御</title>
+  <desc>网卡硬件过滤机制、二层无TTL广播环路指数爆炸与STP/VLAN/Storm-Control三板斧几何图解</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <!-- 全局背景 -->
+  <rect x="0" y="0" width="1240" height="820" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部标题区 -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">网卡硬件过滤与广播风暴成因及防御</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">单播在网卡硬件芯片丢弃（0 CPU 开销）；广播强制触发硬件中断；二层无 TTL 遇环路即指数爆炸，依靠三板斧分层防御</text>
+
+  <!-- ========================================================================= -->
+  <!-- Panel A: 网卡硬件过滤与 CPU 开销对比 (左上) -->
+  <!-- ========================================================================= -->
+  <rect x="48" y="96" width="620" height="364" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="66" y="122" font-size="14" font-weight="700" fill="#4A473F">A · 主机网卡硬件过滤：单播 vs 广播机制</text>
+
+  <!-- 网卡芯片容器 -->
+  <rect x="66" y="138" width="280" height="306" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="80" y="160" font-size="12" font-weight="700" fill="#4A473F">网卡控制器芯片 (ASIC)</text>
+
+  <!-- 单播链路 -->
+  <line x1="16" y1="195" x2="66" y2="195" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arr-green)"/>
+  <text x="36" y="186" font-size="10" fill="#2F6B5E" font-weight="700" text-anchor="middle">单播帧</text>
+  
+  <rect x="80" y="176" width="130" height="38" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="145" y="193" font-size="11" fill="#2C4460" text-anchor="middle">MAC 比对单元</text>
+  <text x="145" y="206" font-size="9.5" fill="#6B675C" text-anchor="middle">目的 MAC ≠ 本机</text>
+
+  <line x1="210" y1="195" x2="236" y2="195" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="238" y="176" width="96" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="286" y="193" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">硬件丢弃</text>
+  <text x="286" y="206" font-size="9.5" fill="#24473F" text-anchor="middle">0 CPU 消耗</text>
+
+  <!-- 广播链路 -->
+  <line x1="16" y1="280" x2="66" y2="280" stroke="#A64B3C" stroke-width="2" marker-end="url(#arr-red)"/>
+  <text x="36" y="271" font-size="10" fill="#A64B3C" font-weight="700" text-anchor="middle">广播帧</text>
+
+  <rect x="80" y="260" width="130" height="40" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="145" y="277" font-size="11" fill="#6B4E28" text-anchor="middle">广播规则命中</text>
+  <text x="145" y="292" font-size="9.5" fill="#6B4E28" text-anchor="middle">ff:ff:ff:ff:ff:ff</text>
+
+  <line x1="145" y1="300" x2="145" y2="324" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr-red)"/>
+
+  <rect x="80" y="326" width="254" height="42" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="207" y="344" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">DMA 引擎直接写入主机内存</text>
+  <text x="207" y="359" font-size="9.5" fill="#733428" text-anchor="middle">写入 Ring Buffer 并触发中断</text>
+
+  <rect x="80" y="380" width="254" height="52" rx="4" fill="#F8F7F2" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="90" y="398" font-size="10.5" font-weight="700" fill="#4A473F">网卡硬件特性：</text>
+  <text x="90" y="414" font-size="10" fill="#6B675C">• 单播在 PHY/MAC 芯片阻断，不上总线</text>
+  <text x="90" y="426" font-size="10" fill="#6B675C">• 广播天然享有硬件放行权，直通主机</text>
+
+  <!-- 主机 CPU / 内核容器 -->
+  <rect x="360" y="138" width="292" height="306" rx="6" fill="#F5F3EB" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="374" y="160" font-size="12" font-weight="700" fill="#4A473F">主机系统 (内存 + CPU)</text>
+
+  <!-- CPU 状态 1：单播时 -->
+  <rect x="374" y="174" width="264" height="68" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="386" y="194" font-size="11.5" font-weight="700" fill="#24473F">状态 A · 单播时的 CPU（无感）</text>
+  <text x="386" y="213" font-size="10.5" fill="#24473F">• 0 次硬件中断，0 次上下文切换</text>
+  <text x="386" y="228" font-size="10.5" fill="#24473F">• CPU 保持正常运行业务或处于休眠</text>
+
+  <!-- 中断信号连线 -->
+  <path d="M 334 347 L 360 347" stroke="#A64B3C" stroke-width="2" marker-end="url(#arr-red)"/>
+
+  <!-- CPU 状态 2：广播风暴时 -->
+  <rect x="374" y="254" width="264" height="178" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+  <text x="386" y="274" font-size="11.5" font-weight="700" fill="#733428">状态 B · 广播风暴时的 CPU（打满）</text>
+  
+  <rect x="386" y="284" width="240" height="28" rx="3" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="506" y="302" font-size="10.5" fill="#733428" text-anchor="middle">① 触发 IRQ 硬件中断引脚</text>
+
+  <rect x="386" y="318" width="240" height="28" rx="3" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="506" y="336" font-size="10.5" fill="#733428" text-anchor="middle">② 强行上下文切换至中断处理程序</text>
+
+  <rect x="386" y="352" width="240" height="28" rx="3" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="506" y="370" font-size="10.5" fill="#733428" text-anchor="middle">③ 内核协议栈逐层解析 IP/ARP</text>
+
+  <text x="386" y="400" font-size="10.5" font-weight="700" fill="#A64B3C">后果：数十万 pps 导致全网主机 CPU 100% 瘫痪</text>
+  <text x="386" y="418" font-size="9.5" fill="#733428">（所有机器均响应，无法单点逃逸）</text>
+
+  <!-- ========================================================================= -->
+  <!-- Panel B: 广播风暴根源（右上） -->
+  <!-- ========================================================================= -->
+  <rect x="684" y="96" width="508" height="364" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="702" y="122" font-size="14" font-weight="700" fill="#4A473F">B · 广播风暴成因：二层无 TTL + 环路泛洪</text>
+
+  <!-- 拓扑成环示意图 -->
+  <rect x="702" y="138" width="472" height="154" rx="6" fill="#F8F7F2" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="716" y="158" font-size="11.5" font-weight="700" fill="#733428">以太网交换机物理环路</text>
+
+  <!-- 交换机 A -->
+  <rect x="720" y="174" width="94" height="42" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="767" y="196" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">交换机 A</text>
+  <text x="767" y="209" font-size="9.5" fill="#2C4460" text-anchor="middle">泛洪除入口外所有口</text>
+
+  <!-- 交换机 B -->
+  <rect x="880" y="174" width="94" height="42" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="927" y="196" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">交换机 B</text>
+  <text x="927" y="209" font-size="9.5" fill="#2C4460" text-anchor="middle">泛洪除入口外所有口</text>
+
+  <!-- 双向链路成环 -->
+  <path d="M 814 186 L 878 186" stroke="#B07D2B" stroke-width="2.2" marker-end="url(#arr-amber)"/>
+  <text x="846" y="180" font-size="9.5" fill="#6B4E28" text-anchor="middle">链路① 泛洪</text>
+
+  <path d="M 880 204 L 816 204" stroke="#A64B3C" stroke-width="2.2" marker-end="url(#arr-red)"/>
+  <text x="846" y="217" font-size="9.5" fill="#733428" text-anchor="middle">链路② 环回</text>
+
+  <!-- 指数爆炸展示条 -->
+  <rect x="990" y="152" width="172" height="126" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1000" y="170" font-size="11" font-weight="700" fill="#733428">帧数量 2^N 爆炸：</text>
+  <text x="1000" y="188" font-size="10" fill="#733428">t0 (输入): 1 帧</text>
+  <text x="1000" y="204" font-size="10" fill="#733428">t1 (第1圈): 2 帧</text>
+  <text x="1000" y="220" font-size="10" fill="#733428">t2 (第2圈): 4 帧</text>
+  <text x="1000" y="236" font-size="10" fill="#733428">t10: 1024 帧 ... 毫秒饱和</text>
+  <text x="1000" y="260" font-size="10" font-weight="700" fill="#A64B3C">▶ 带宽 100% 跑满</text>
+
+  <text x="716" y="244" font-size="10" fill="#4A473F">成环后果：帧在环路上永无止境地复制并旋转</text>
+  <text x="716" y="262" font-size="10" font-weight="700" fill="#A64B3C">每一台接入交换机的主机都收到同等倍数的广播</text>
+
+  <!-- 报头 TTL 对照区 -->
+  <rect x="702" y="302" width="472" height="142" rx="6" fill="#EDEBE3" stroke="#9B968A" stroke-width="1"/>
+  <text x="716" y="322" font-size="11.5" font-weight="700" fill="#4A473F">为什么三层不会死循环，而二层会？</text>
+
+  <!-- 二层头部 -->
+  <rect x="716" y="332" width="444" height="42" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="726" y="350" font-size="10.5" font-weight="700" fill="#733428">以太网帧头 (二层)：</text>
+  <text x="830" y="350" font-size="10" fill="#4A473F">[目的MAC] [源MAC] [类型] [数据] [FCS]</text>
+  <text x="726" y="366" font-size="10" font-weight="700" fill="#A64B3C">▶ 致命缺陷：完全没有 TTL 计数器，无法自然消亡</text>
+
+  <!-- 三层头部 -->
+  <rect x="716" y="382" width="444" height="48" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="726" y="400" font-size="10.5" font-weight="700" fill="#24473F">IPv4 首部 (三层)：</text>
+  <text x="830" y="400" font-size="10" fill="#4A473F">[版本] ... <tspan font-weight="700" fill="#2F6B5E">[TTL 字段: 64]</tspan> ... [IP校验和]</text>
+  <text x="726" y="418" font-size="10" font-weight="700" fill="#24473F">▶ 自愈机制：每经路由器 TTL - 1，减到 0 直接丢弃</text>
+
+  <!-- ========================================================================= -->
+  <!-- Panel C: 防御三板斧协同架构 (下半部分) -->
+  <!-- ========================================================================= -->
+  <rect x="48" y="476" width="1144" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="66" y="502" font-size="14" font-weight="700" fill="#4A473F">C · 广播风暴防御三板斧：几何动作与分工协作</text>
+
+  <!-- 板斧 1: STP -->
+  <rect x="66" y="518" width="360" height="242" rx="6" fill="#F5F3EB" stroke="#2F6B5E" stroke-width="1.3"/>
+  <rect x="66" y="518" width="360" height="28" rx="6" fill="#DCE9E3"/>
+  <text x="80" y="537" font-size="12" font-weight="700" fill="#24473F">① STP / RSTP（生成树协议）· 治本</text>
+
+  <!-- STP 几何破环示意 -->
+  <rect x="80" y="556" width="70" height="30" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="115" y="575" font-size="10.5" fill="#2C4460" text-anchor="middle">交换机 A</text>
+
+  <rect x="220" y="556" width="70" height="30" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="255" y="575" font-size="10.5" fill="#2C4460" text-anchor="middle">交换机 B</text>
+
+  <line x1="150" y1="565" x2="220" y2="565" stroke="#2F6B5E" stroke-width="2"/>
+  <text x="185" y="560" font-size="9" fill="#2F6B5E" text-anchor="middle">主链路</text>
+
+  <line x1="150" y1="578" x2="220" y2="578" stroke="#9B968A" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <rect x="296" y="556" width="116" height="30" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="354" y="575" font-size="10" font-weight="700" fill="#733428" text-anchor="middle">❌ 逻辑阻塞端口</text>
+
+  <rect x="80" y="596" width="332" height="150" rx="4" fill="#FFFFFF" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="92" y="616" font-size="11" font-weight="700" fill="#24473F">机制原理：</text>
+  <text x="92" y="634" font-size="10.5" fill="#4A473F">• 交换机互发 BPDU 探测物理环路</text>
+  <text x="92" y="652" font-size="10.5" fill="#4A473F">• 自动在逻辑上打叉关闭冗余备份端口</text>
+  <text x="92" y="670" font-size="10.5" fill="#4A473F">• 物理有冗余，逻辑无环路（树状拓扑）</text>
+  <text x="92" y="688" font-size="10.5" fill="#4A473F">• 主线断开时，秒级自动重新打开备用端口</text>
+  <text x="92" y="710" font-size="10.5" font-weight="700" fill="#2F6B5E">定位：从根源消除环路，无环则无风暴</text>
+  <text x="92" y="728" font-size="9.5" fill="#6B675C">局限：收敛震荡期间可能短暂成环</text>
+
+  <!-- 板斧 2: VLAN -->
+  <rect x="440" y="518" width="360" height="242" rx="6" fill="#F5F3EB" stroke="#3D5A80" stroke-width="1.3"/>
+  <rect x="440" y="518" width="360" height="28" rx="6" fill="#E3EAF4"/>
+  <text x="454" y="537" font-size="12" font-weight="700" fill="#2C4460">② VLAN（虚拟局域网）· 隔离</text>
+
+  <!-- VLAN 几何隔离示意 -->
+  <rect x="454" y="556" width="130" height="30" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="519" y="575" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">VLAN 10 (财务部)</text>
+
+  <rect x="590" y="556" width="40" height="30" rx="2" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="610" y="575" font-size="9" font-weight="700" fill="#A64B3C" text-anchor="middle">🚫 隔离</text>
+
+  <rect x="636" y="556" width="150" height="30" rx="4" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="711" y="575" font-size="10" font-weight="700" fill="#4A3F68" text-anchor="middle">VLAN 20 (研发部)</text>
+
+  <rect x="454" y="596" width="332" height="150" rx="4" fill="#FFFFFF" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="466" y="616" font-size="11" font-weight="700" fill="#2C4460">机制原理：</text>
+  <text x="466" y="634" font-size="10.5" fill="#4A473F">• 在二层帧插入 802.1Q 标签识别所属分组</text>
+  <text x="466" y="652" font-size="10.5" fill="#4A473F">• 交换机转发广播绝不跨越 VLAN 边界</text>
+  <text x="466" y="670" font-size="10.5" fill="#4A473F">• 财务部发 ARP 广播，仅财务 20 台主机收到</text>
+  <text x="466" y="688" font-size="10.5" fill="#4A473F">• 研发部 500 台电脑 CPU 零中断、零干扰</text>
+  <text x="466" y="710" font-size="10.5" font-weight="700" fill="#3D5A80">定位：缩小爆炸半径，隔绝广播污染</text>
+  <text x="466" y="728" font-size="9.5" fill="#6B675C">局限：组内环路仍需靠 STP / 限速</text>
+
+  <!-- 板斧 3: Storm Control -->
+  <rect x="814" y="518" width="364" height="242" rx="6" fill="#F5F3EB" stroke="#B07D2B" stroke-width="1.3"/>
+  <rect x="814" y="518" width="364" height="28" rx="6" fill="#F3E8D3"/>
+  <text x="828" y="537" font-size="12" font-weight="700" fill="#6B4E28">③ Storm Control（风暴控制）· 兜底</text>
+
+  <!-- 漏斗/限速门示意 -->
+  <rect x="828" y="556" width="100" height="30" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="878" y="575" font-size="9.5" fill="#733428" text-anchor="middle">涌入: 100k pps</text>
+
+  <line x1="928" y1="571" x2="946" y2="571" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="948" y="556" width="106" height="30" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="1001" y="575" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">限速门 1k pps</text>
+
+  <rect x="1060" y="556" width="104" height="30" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1112" y="575" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">超额 99k 丢弃</text>
+
+  <rect x="828" y="596" width="336" height="150" rx="4" fill="#FFFFFF" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="840" y="616" font-size="11" font-weight="700" fill="#6B4E28">机制原理：</text>
+  <text x="840" y="634" font-size="10.5" fill="#4A473F">• 交换机物理端口硬件芯片实施流量监控</text>
+  <text x="840" y="652" font-size="10.5" fill="#4A473F">• 针对广播、组播、未知单播设定 pps 阈值</text>
+  <text x="840" y="670" font-size="10.5" fill="#4A473F">• 超过阈值的多余广播包在端口硬件直接丢弃</text>
+  <text x="840" y="688" font-size="10.5" fill="#4A473F">• 正常单播流量完全不受影响，业务不瘫痪</text>
+  <text x="840" y="710" font-size="10.5" font-weight="700" fill="#B07D2B">定位：最后一道硬件级防线，物理削峰</text>
+  <text x="840" y="728" font-size="9.5" fill="#6B675C">局限：只止血不治本（环路仍在）</text>
+
+  <!-- 底部口径条 -->
+  <text x="48" y="796" font-size="12" fill="#6B675C">设计铁律：单播由网卡芯片物理屏蔽；环路靠 STP 阻断；VLAN 约束爆炸范围；Storm Control 硬件限速最后兜底。</text>
+</svg>

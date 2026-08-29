@@ -44,61 +44,61 @@
   <text x="62" y="175" font-size="10.5" font-weight="700" fill="#3D5A80">① 业务</text>
   <text x="62" y="190" font-size="9.5" fill="#6B675C">调用方</text>
   <rect x="138" y="157" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="150" y="176" font-size="11.5" font-weight="700" fill="#2C4460">AddViaRpc(client, 3, 4)</text>
-  <text x="150" y="192" font-size="9.8" fill="#2C4460">调用方眼里就是一个普通函数</text>
+  <text x="150" y="176" font-size="11.5" font-weight="700" fill="#2C4460">AddViaRpc(client, a, b)</text>
+  <text x="150" y="192" font-size="9.8" fill="#2C4460">业务调用：打包参数并同步等待返回</text>
   <rect x="458" y="157" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
   <text x="470" y="176" font-size="11.5" font-weight="700" fill="#24473F">RegisterAdd 注册的 handler</text>
-  <text x="470" y="192" font-size="9.8" fill="#24473F">算 a+b；溢出抛 invalid_argument</text>
+  <text x="470" y="192" font-size="9.8" fill="#24473F">业务处理：执行 a+b 计算并校验溢出</text>
 
   <!-- 行 2 · 消息编码层 -->
   <text x="62" y="227" font-size="10.5" font-weight="700" fill="#3D5A80">② 消息</text>
   <text x="62" y="242" font-size="9.5" fill="#6B675C">schema</text>
   <rect x="138" y="209" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="150" y="228" font-size="11.5" font-weight="700" fill="#2C4460">AppendU32(args, 3) / (args, 4)</text>
-  <text x="150" y="244" font-size="9.8" fill="#2C4460">请求体 = 8 B，两个网络序 uint32</text>
+  <text x="150" y="228" font-size="11.5" font-weight="700" fill="#2C4460">AppendU32(args, value)</text>
+  <text x="150" y="244" font-size="9.8" fill="#2C4460">向字节容器追加网络序 uint32_t</text>
   <rect x="458" y="209" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="470" y="228" font-size="11.5" font-weight="700" fill="#24473F">ReadU32(first(4) / subspan(4,4))</text>
-  <text x="470" y="244" font-size="9.8" fill="#24473F">长度不是 8 就是 InvalidArgument</text>
+  <text x="470" y="228" font-size="11.5" font-weight="700" fill="#24473F">ReadU32(input_span)</text>
+  <text x="470" y="244" font-size="9.8" fill="#24473F">从只读视图按网络序解出 uint32_t</text>
 
   <!-- 行 3 · 调用层 -->
   <text x="62" y="285" font-size="10.5" font-weight="700" fill="#8A6A3A">③ 调用</text>
   <text x="62" y="300" font-size="9.5" fill="#6B675C">id 分配</text>
   <rect x="138" y="267" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
   <text x="150" y="286" font-size="11.5" font-weight="700" fill="#2C4460">RpcClient::Call(method, args)</text>
-  <text x="150" y="302" font-size="9.8" fill="#2C4460">分配 request_id，发完阻塞等响应</text>
+  <text x="150" y="302" font-size="9.8" fill="#2C4460">分配 request_id，发帧并阻塞等响应</text>
   <rect x="458" y="267" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
   <text x="470" y="286" font-size="11.5" font-weight="700" fill="#24473F">ServeConnection → Dispatch</text>
-  <text x="470" y="302" font-size="9.8" fill="#24473F">按方法号查表，异常转成状态码</text>
+  <text x="470" y="302" font-size="9.8" fill="#24473F">按方法号分发 handler，异常转状态码</text>
 
   <!-- 行 4 · 帧层 -->
   <text x="62" y="337" font-size="10.5" font-weight="700" fill="#8A6A3A">④ 帧</text>
   <text x="62" y="352" font-size="9.5" fill="#6B675C">边界</text>
   <rect x="138" y="319" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="150" y="338" font-size="11.5" font-weight="700" fill="#2C4460">SendFrame(fd, Request, id, ...)</text>
-  <text x="150" y="354" font-size="9.8" fill="#2C4460">头和体拼一个缓冲，少一次系统调用</text>
+  <text x="150" y="338" font-size="11.5" font-weight="700" fill="#2C4460">SendFrame(fd, type, id, code, body)</text>
+  <text x="150" y="354" font-size="9.8" fill="#2C4460">拼装 14B 头与 Body 并单次发送</text>
   <rect x="458" y="319" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
   <text x="470" y="338" font-size="11.5" font-weight="700" fill="#24473F">ReadFrame(fd)</text>
-  <text x="470" y="354" font-size="9.8" fill="#24473F">先读满 14 B 头，再按 body_len 读体</text>
+  <text x="470" y="354" font-size="9.8" fill="#24473F">分步定界：先读 14B 头再读 body_len</text>
 
   <!-- 行 5 · 头编解码层 -->
   <text x="62" y="395" font-size="10.5" font-weight="700" fill="#6B5B95">⑤ 头</text>
   <text x="62" y="410" font-size="9.5" fill="#6B675C">字节序</text>
   <rect x="138" y="377" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="150" y="396" font-size="11.5" font-weight="700" fill="#2C4460">EncodeHeader — htons / htonl</text>
-  <text x="150" y="412" font-size="9.8" fill="#2C4460">按偏移 0·2·3·4·8·10 逐字段 memcpy</text>
+  <text x="150" y="396" font-size="11.5" font-weight="700" fill="#2C4460">EncodeHeader(FrameHeader)</text>
+  <text x="150" y="412" font-size="9.8" fill="#2C4460">转大端网络序并逐字段 memcpy 编码</text>
   <rect x="458" y="377" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="470" y="396" font-size="11.5" font-weight="700" fill="#24473F">DecodeHeader — ntohs / ntohl</text>
-  <text x="470" y="412" font-size="9.8" fill="#24473F">magic·version·id≠0·长度上限 四校验</text>
+  <text x="470" y="396" font-size="11.5" font-weight="700" fill="#24473F">DecodeHeader(raw_header)</text>
+  <text x="470" y="412" font-size="9.8" fill="#24473F">转主机序并校验魔数、版本与长度上限</text>
 
   <!-- 行 6 · 字节 I/O 层 -->
   <text x="62" y="453" font-size="10.5" font-weight="700" fill="#4A473F">⑥ 字节</text>
   <text x="62" y="468" font-size="9.5" fill="#6B675C">循环</text>
   <rect x="138" y="435" width="308" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
   <text x="150" y="454" font-size="11.5" font-weight="700" fill="#2C4460">WriteAll(fd, wire)</text>
-  <text x="150" y="470" font-size="9.8" fill="#2C4460">短写续发 · EINTR 重试 · MSG_NOSIGNAL</text>
+  <text x="150" y="470" font-size="9.8" fill="#2C4460">循环写满指定字节，防短写与 SIGPIPE</text>
   <rect x="458" y="435" width="310" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
   <text x="470" y="454" font-size="11.5" font-weight="700" fill="#24473F">ReadExactly(fd, out)</text>
-  <text x="470" y="470" font-size="9.8" fill="#24473F">短读续读 · 三种结局见右侧 B</text>
+  <text x="470" y="470" font-size="9.8" fill="#24473F">循环读满指定字节，处理短读、EOF与中断</text>
 
   <!-- 行 7 · 内核 -->
   <text x="62" y="511" font-size="10.5" font-weight="700" fill="#2F6B5E">⑦ 内核</text>

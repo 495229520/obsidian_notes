@@ -1,111 +1,213 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 524" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 554" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M1,2 L7.5,5 L1,8 z" fill="#5A564B"/>
     </marker>
-    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M1,2 L7.5,5 L1,8 z" fill="#A64B3C"/>
     </marker>
-    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M1,2 L7.5,5 L1,8 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M1,2 L7.5,5 L1,8 z" fill="#B07D2B"/>
     </marker>
   </defs>
 
-  <title>dup2 文件描述符重定向的前后对比</title>
-  <desc>左图为重定向前 fd 表，右图为 dup2(3,1) 之后 fd 1 改指 file.txt 并与 fd 3 共享同一打开文件。</desc>
+  <title>dup2 文件描述符重定向底层原理</title>
+  <desc>三层内核对象模型对比：左侧为重定向前各 fd 独立指向 struct file；右侧为 dup2(3,1) 原子关闭原 stdout 并复制指针，fd 1 与 fd 3 汇聚到同一 struct file 共享偏移量与标志。</desc>
 
-  <rect x="0" y="0" width="1240" height="524" fill="rgb(245, 244, 237)"/>
+  <!-- 顶层画布背景 -->
+  <rect x="0" y="0" width="1240" height="554" fill="rgb(245, 244, 237)"/>
 
-  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">dup2 重定向：把 fd 表项改指到同一个打开文件</text>
-  <text x="48" y="80" font-size="13" fill="#6B675C">dup2(oldfd, newfd)：先关闭 newfd，再让它复制 oldfd —— 之后两个 fd 指向同一打开文件，共享偏移量与状态标志</text>
+  <!-- 顶部标题区 -->
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">dup2 重定向底层原理：内核对象模型与表项复制</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">dup2(oldfd, newfd)：关闭 newfd 原连接 → 复制 struct file 指针 → 引用计数 f_count+1，两者共享偏移量与标志</text>
 
-  <!-- Panel A -->
-  <rect x="48" y="104" width="520" height="330" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="72" y="132" font-size="14" font-weight="700" fill="#4A473F">A · 重定向前</text>
-  <text x="150" y="164" font-size="12" font-weight="700" fill="#6B675C" text-anchor="middle">进程 fd 表</text>
+  <!-- ==================== Panel A: 重定向前 ==================== -->
+  <rect x="48" y="96" width="540" height="336" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="70" y="122" font-size="14" font-weight="700" fill="#4A473F">A · 重定向前：各 fd 拥有独立的打开文件表项</text>
+  <text x="70" y="140" font-size="11" fill="#6B675C">进程 fd 表与内核 struct file 一对一映射</text>
 
-  <!-- fd table A -->
-  <rect x="72" y="180" width="156" height="200" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <line x1="118" y1="180" x2="118" y2="380" stroke="#9B968A" stroke-width="1"/>
-  <line x1="72" y1="230" x2="228" y2="230" stroke="#9B968A" stroke-width="1"/>
-  <line x1="72" y1="280" x2="228" y2="280" stroke="#9B968A" stroke-width="1"/>
-  <line x1="72" y1="330" x2="228" y2="330" stroke="#9B968A" stroke-width="1"/>
-  <text x="95" y="211" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">0</text>
-  <text x="132" y="210" font-size="10.5" fill="#6B675C">STDIN</text>
-  <text x="95" y="261" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">1</text>
-  <text x="132" y="260" font-size="10.5" fill="#6B675C">STDOUT</text>
-  <text x="95" y="311" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">2</text>
-  <text x="132" y="310" font-size="10.5" fill="#6B675C">STDERR</text>
-  <text x="95" y="361" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">3</text>
-  <text x="132" y="360" font-size="10.5" fill="#6B675C">open</text>
+  <!-- 列标题 A -->
+  <text x="135" y="164" font-size="11" font-weight="700" fill="#6B675C" text-anchor="middle">进程 fd 表</text>
+  <text x="325" y="164" font-size="11" font-weight="700" fill="#6B675C" text-anchor="middle">内核打开文件表 (struct file)</text>
+  <text x="505" y="164" font-size="11" font-weight="700" fill="#6B675C" text-anchor="middle">物理目标 / 设备</text>
 
-  <!-- targets A -->
-  <rect x="340" y="183" width="188" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="434" y="210" font-size="11.5" fill="#4A473F" text-anchor="middle">标准输入设备</text>
-  <rect x="340" y="233" width="188" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="434" y="260" font-size="11.5" fill="#2C4460" text-anchor="middle">终端 tty</text>
-  <rect x="340" y="283" width="188" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="434" y="310" font-size="11.5" fill="#4A473F" text-anchor="middle">标准错误 (终端)</text>
-  <rect x="340" y="333" width="188" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
-  <text x="434" y="360" font-size="12" font-weight="700" fill="#7A5518" text-anchor="middle">file.txt</text>
+  <!-- FD Table A -->
+  <rect x="70" y="176" width="130" height="202" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <line x1="115" y1="176" x2="115" y2="378" stroke="#9B968A" stroke-width="1"/>
+  <line x1="70" y1="226" x2="200" y2="226" stroke="#9B968A" stroke-width="1"/>
+  <line x1="70" y1="277" x2="200" y2="277" stroke="#9B968A" stroke-width="1"/>
+  <line x1="70" y1="327" x2="200" y2="327" stroke="#9B968A" stroke-width="1"/>
 
-  <line x1="230" y1="205" x2="336" y2="205" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="230" y1="255" x2="336" y2="255" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="230" y1="305" x2="336" y2="305" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="230" y1="355" x2="336" y2="355" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="92" y="205" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">0</text>
+  <text x="124" y="204" font-size="10.5" font-weight="700" fill="#4A473F">STDIN</text>
+  <text x="92" y="255" font-size="15" font-weight="700" fill="#2C4460" text-anchor="middle">1</text>
+  <text x="124" y="254" font-size="10.5" font-weight="700" fill="#2C4460">STDOUT</text>
+  <text x="92" y="306" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">2</text>
+  <text x="124" y="305" font-size="10.5" font-weight="700" fill="#4A473F">STDERR</text>
+  <text x="92" y="356" font-size="15" font-weight="700" fill="#7A5518" text-anchor="middle">3</text>
+  <text x="124" y="355" font-size="10.5" font-weight="700" fill="#7A5518">open(fd)</text>
 
-  <text x="300" y="414" font-size="11" fill="#6B675C" text-anchor="middle">初始：每个 fd 指向各自的目标</text>
+  <!-- struct file Boxes A -->
+  <rect x="235" y="176" width="180" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="245" y="194" font-size="11" font-weight="700" fill="#4A473F">struct file (stdin)</text>
+  <text x="245" y="211" font-size="9.5" fill="#6B675C">f_count=1 · f_pos=0</text>
 
-  <!-- center transform -->
-  <text x="620" y="256" font-size="13" font-weight="700" fill="#A64B3C" text-anchor="middle">dup2(3, 1)</text>
-  <line x1="576" y1="272" x2="664" y2="272" stroke="#A64B3C" stroke-width="2.4" marker-end="url(#arrRed)"/>
-  <text x="620" y="296" font-size="9.5" fill="#8A6A3A" text-anchor="middle">复制 fd 3 → fd 1</text>
+  <rect x="235" y="227" width="180" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="245" y="245" font-size="11" font-weight="700" fill="#2C4460">struct file (stdout)</text>
+  <text x="245" y="262" font-size="9.5" fill="#3D5A80">f_count=1 · f_pos=0</text>
 
-  <!-- Panel B -->
-  <rect x="672" y="104" width="520" height="330" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="696" y="132" font-size="14" font-weight="700" fill="#4A473F">B · dup2(3, 1) 之后</text>
-  <text x="774" y="164" font-size="12" font-weight="700" fill="#6B675C" text-anchor="middle">进程 fd 表</text>
+  <rect x="235" y="278" width="180" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="245" y="296" font-size="11" font-weight="700" fill="#4A473F">struct file (stderr)</text>
+  <text x="245" y="313" font-size="9.5" fill="#6B675C">f_count=1 · f_pos=0</text>
 
-  <!-- fd table B -->
-  <rect x="696" y="180" width="156" height="200" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <rect x="697" y="231" width="154" height="48" fill="#F9EFD8"/>
-  <line x1="742" y1="180" x2="742" y2="380" stroke="#9B968A" stroke-width="1"/>
-  <line x1="696" y1="230" x2="852" y2="230" stroke="#9B968A" stroke-width="1"/>
-  <line x1="696" y1="280" x2="852" y2="280" stroke="#9B968A" stroke-width="1"/>
-  <line x1="696" y1="330" x2="852" y2="330" stroke="#9B968A" stroke-width="1"/>
-  <text x="719" y="211" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">0</text>
-  <text x="756" y="210" font-size="10.5" fill="#6B675C">STDIN</text>
-  <text x="719" y="261" font-size="16" font-weight="700" fill="#B07D2B" text-anchor="middle">1</text>
-  <text x="756" y="260" font-size="10.5" font-weight="700" fill="#8A6A3A">STDOUT</text>
-  <text x="719" y="311" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">2</text>
-  <text x="756" y="310" font-size="10.5" fill="#6B675C">STDERR</text>
-  <text x="719" y="361" font-size="16" font-weight="700" fill="#4A473F" text-anchor="middle">3</text>
-  <text x="756" y="360" font-size="10.5" fill="#6B675C">open</text>
+  <rect x="235" y="328" width="180" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="245" y="346" font-size="11" font-weight="700" fill="#7A5518">struct file (test.txt)</text>
+  <text x="245" y="363" font-size="9.5" fill="#8A6A3A">f_count=1 · f_pos=0 · O_RDWR</text>
 
-  <!-- targets B -->
-  <rect x="964" y="183" width="188" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="1058" y="210" font-size="11.5" fill="#4A473F" text-anchor="middle">标准输入设备</text>
+  <!-- Targets A -->
+  <rect x="445" y="176" width="120" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="505" y="202" font-size="11" fill="#4A473F" text-anchor="middle">键盘 /dev/stdin</text>
 
-  <rect x="964" y="233" width="188" height="44" rx="6" fill="#ECEBE6" stroke="#C9C6BC" stroke-width="1.2" stroke-dasharray="5 3"/>
-  <text x="1058" y="252" font-size="11" fill="#9B968A" text-anchor="middle">终端 tty</text>
-  <text x="1058" y="269" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">✕ 引用归零 → 关闭</text>
+  <rect x="445" y="227" width="120" height="44" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="505" y="253" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">终端 /dev/tty</text>
 
-  <rect x="964" y="283" width="188" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="1058" y="310" font-size="11.5" fill="#4A473F" text-anchor="middle">标准错误 (终端)</text>
+  <rect x="445" y="278" width="120" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="505" y="304" font-size="11" fill="#4A473F" text-anchor="middle">终端 (stderr)</text>
 
-  <rect x="964" y="330" width="188" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
-  <text x="1058" y="352" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">file.txt</text>
-  <text x="1058" y="370" font-size="9.5" fill="#2F6B5E" text-anchor="middle">fd 1 与 fd 3 共享此打开文件</text>
+  <rect x="445" y="328" width="120" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="505" y="348" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">inode (test.txt)</text>
+  <text x="505" y="364" font-size="9.5" fill="#8A6A3A" text-anchor="middle">普通磁盘文件</text>
 
-  <line x1="854" y1="205" x2="960" y2="205" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="854" y1="255" x2="957" y2="350" stroke="#A64B3C" stroke-width="2.4" marker-end="url(#arrRed)"/>
-  <line x1="854" y1="305" x2="960" y2="305" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="854" y1="357" x2="957" y2="357" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <!-- Arrows A -->
+  <line x1="200" y1="198" x2="231" y2="198" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+  <line x1="415" y1="198" x2="441" y2="198" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
 
-  <text x="932" y="414" font-size="11" font-weight="700" fill="#8A6A3A" text-anchor="middle">重定向后：fd 1 改指 file.txt，与 fd 3 汇聚</text>
+  <line x1="200" y1="249" x2="231" y2="249" stroke="#3D5A80" stroke-width="1.3" marker-end="url(#arr)"/>
+  <line x1="415" y1="249" x2="441" y2="249" stroke="#3D5A80" stroke-width="1.3" marker-end="url(#arr)"/>
 
-  <!-- bottom takeaway -->
-  <rect x="48" y="452" width="1144" height="56" rx="8" fill="#EFEDE3" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="68" y="478" font-size="12" font-weight="700" fill="#2B2A26">关键：dup2(3, 1) 先关闭 fd 1 原来的 stdout，再把 fd 3 复制给 fd 1。</text>
-  <text x="68" y="498" font-size="11.5" fill="#4A473F">此后 fd 1 与 fd 3 指向同一打开文件（共享偏移量与状态标志）；写往 stdout 的数据（如 printf）全部落入 file.txt。</text>
+  <line x1="200" y1="300" x2="231" y2="300" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+  <line x1="415" y1="300" x2="441" y2="300" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+
+  <line x1="200" y1="351" x2="231" y2="351" stroke="#B07D2B" stroke-width="1.3" marker-end="url(#arrAmber)"/>
+  <line x1="415" y1="351" x2="441" y2="351" stroke="#B07D2B" stroke-width="1.3" marker-end="url(#arrAmber)"/>
+
+  <!-- Panel A Bottom Hint -->
+  <rect x="70" y="390" width="495" height="28" rx="5" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="317" y="408" font-size="10.5" fill="#4A473F" text-anchor="middle">初始状态：每个 fd 指向各自独立的 struct file（f_count 均为 1）</text>
+
+  <!-- ==================== Center Transition Hub ==================== -->
+  <rect x="595" y="218" width="50" height="22" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="620" y="233" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">dup2</text>
+  <line x1="595" y1="250" x2="643" y2="250" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+
+  <text x="620" y="272" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="middle">① close(1)</text>
+  <text x="620" y="289" font-size="9.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">② 拷指针 3→1</text>
+  <text x="620" y="306" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">③ f_count++</text>
+
+  <!-- ==================== Panel B: 重定向后 ==================== -->
+  <rect x="652" y="96" width="540" height="336" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="674" y="122" font-size="14" font-weight="700" fill="#4A473F">B · dup2(3, 1) 之后：fd 1 与 fd 3 汇聚到同一个 struct file</text>
+  <text x="674" y="140" font-size="11" fill="#6B675C">原 stdout 释放 · fd 1 指针更新 · 共享偏移量与标志位</text>
+
+  <!-- 列标题 B -->
+  <text x="739" y="164" font-size="11" font-weight="700" fill="#6B675C" text-anchor="middle">进程 fd 表</text>
+  <text x="929" y="164" font-size="11" font-weight="700" fill="#6B675C" text-anchor="middle">内核打开文件表 (struct file)</text>
+  <text x="1109" y="164" font-size="11" font-weight="700" fill="#6B675C" text-anchor="middle">物理目标 / 设备</text>
+
+  <!-- FD Table B -->
+  <rect x="674" y="176" width="130" height="202" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="675" y="227" width="128" height="49" fill="#F9EFD8"/>
+  <line x1="719" y1="176" x2="719" y2="378" stroke="#9B968A" stroke-width="1"/>
+  <line x1="674" y1="226" x2="804" y2="226" stroke="#9B968A" stroke-width="1"/>
+  <line x1="674" y1="277" x2="804" y2="277" stroke="#9B968A" stroke-width="1"/>
+  <line x1="674" y1="327" x2="804" y2="327" stroke="#9B968A" stroke-width="1"/>
+
+  <text x="696" y="205" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">0</text>
+  <text x="728" y="204" font-size="10.5" font-weight="700" fill="#4A473F">STDIN</text>
+
+  <text x="696" y="255" font-size="15" font-weight="700" fill="#B07D2B" text-anchor="middle">1</text>
+  <text x="728" y="249" font-size="10.5" font-weight="700" fill="#B07D2B">STDOUT</text>
+  <text x="728" y="264" font-size="9.5" font-weight="700" fill="#A64B3C">(重定向)</text>
+
+  <text x="696" y="306" font-size="15" font-weight="700" fill="#4A473F" text-anchor="middle">2</text>
+  <text x="728" y="305" font-size="10.5" font-weight="700" fill="#4A473F">STDERR</text>
+
+  <text x="696" y="356" font-size="15" font-weight="700" fill="#7A5518" text-anchor="middle">3</text>
+  <text x="728" y="355" font-size="10.5" font-weight="700" fill="#7A5518">open(fd)</text>
+
+  <!-- struct file Boxes B -->
+  <rect x="839" y="176" width="180" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="849" y="194" font-size="11" font-weight="700" fill="#4A473F">struct file (stdin)</text>
+  <text x="849" y="211" font-size="9.5" fill="#6B675C">f_count=1 · f_pos=0</text>
+
+  <!-- 原 stdout (释放) -->
+  <rect x="839" y="227" width="180" height="44" rx="6" fill="#ECEBE6" stroke="#C9C6BC" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="849" y="245" font-size="10.5" fill="#9B968A">原 struct file (stdout)</text>
+  <text x="849" y="262" font-size="9.5" font-weight="700" fill="#A64B3C">✕ f_count 归零 → 内核释放</text>
+
+  <rect x="839" y="278" width="180" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="849" y="296" font-size="11" font-weight="700" fill="#4A473F">struct file (stderr)</text>
+  <text x="849" y="313" font-size="9.5" fill="#6B675C">f_count=1 · f_pos=0</text>
+
+  <!-- 共享的目标 struct file -->
+  <rect x="839" y="328" width="180" height="50" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="849" y="344" font-size="11" font-weight="700" fill="#24473F">struct file (test.txt)</text>
+  <text x="849" y="359" font-size="9.5" font-weight="700" fill="#2F6B5E">f_count = 2 (fd 1 与 3 共享)</text>
+  <text x="849" y="372" font-size="9.5" fill="#24473F">共享 f_pos · 共享 O_RDWR</text>
+
+  <!-- Targets B -->
+  <rect x="1049" y="176" width="120" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1109" y="202" font-size="11" fill="#4A473F" text-anchor="middle">键盘 /dev/stdin</text>
+
+  <rect x="1049" y="227" width="120" height="44" rx="6" fill="#ECEBE6" stroke="#C9C6BC" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="1109" y="246" font-size="10.5" fill="#9B968A" text-anchor="middle">终端 /dev/tty</text>
+  <text x="1109" y="262" font-size="9.5" fill="#A64B3C" text-anchor="middle">已无 fd 引用</text>
+
+  <rect x="1049" y="278" width="120" height="44" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1109" y="304" font-size="11" fill="#4A473F" text-anchor="middle">终端 (stderr)</text>
+
+  <rect x="1049" y="328" width="120" height="50" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="1109" y="349" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">inode (test.txt)</text>
+  <text x="1109" y="366" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">printf 写入落于此</text>
+
+  <!-- Arrows B -->
+  <line x1="804" y1="198" x2="835" y2="198" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+  <line x1="1019" y1="198" x2="1045" y2="198" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+
+  <!-- 重定向跨线箭头 fd 1 -> File 3 -->
+  <path d="M804,251 C818,251 822,336 835,344" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <rect x="806" y="280" width="28" height="15" rx="3" fill="#F0E0DB" stroke="#A64B3C" stroke-width="0.8"/>
+  <text x="820" y="291" font-size="8.5" font-weight="700" fill="#A64B3C" text-anchor="middle">重定向</text>
+
+  <line x1="804" y1="300" x2="835" y2="300" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+  <line x1="1019" y1="300" x2="1045" y2="300" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+
+  <line x1="804" y1="351" x2="835" y2="351" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrTeal)"/>
+  <line x1="1019" y1="351" x2="1045" y2="351" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrTeal)"/>
+
+  <!-- Panel B Bottom Hint -->
+  <rect x="674" y="390" width="495" height="28" rx="5" fill="#EFE7DA" stroke="#B07D2B" stroke-width="1"/>
+  <text x="921" y="408" font-size="10.2" fill="#7A5518" text-anchor="middle">重要延伸：随后调用 close(3) 只使 f_count 降为 1，fd 1 依然有效可写！</text>
+
+  <!-- ==================== Bottom Summary Band: 3 Cards ==================== -->
+  <rect x="48" y="444" width="368" height="90" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="62" y="466" font-size="12" font-weight="700" fill="#2B2A26">① 为什么共享文件偏移量 (f_pos)？</text>
+  <text x="62" y="486" font-size="10.2" fill="#4A473F">f_pos 保存在内核 struct file 结构体中，而非进程 fd 表。</text>
+  <text x="62" y="504" font-size="10.2" fill="#4A473F">fd 1 与 fd 3 指向同一结构体，任意一方读写或 lseek</text>
+  <text x="62" y="522" font-size="10.2" fill="#4A473F">都会改变该结构体内的 f_pos，对另一个 fd 立即见效。</text>
+
+  <rect x="436" y="444" width="368" height="90" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="450" y="466" font-size="12" font-weight="700" fill="#2B2A26">② dup() 与 dup2() 的关键区别</text>
+  <text x="450" y="486" font-size="10.2" fill="#4A473F">dup(oldfd)：自动寻找并分配当前未使用的最小可用 fd。</text>
+  <text x="450" y="504" font-size="10.2" fill="#4A473F">dup2(oldfd, newfd)：指定 newfd；若 newfd 原已打开，</text>
+  <text x="450" y="522" font-size="10.2" fill="#4A473F">内核先原子地将其关闭再复制，杜绝多线程竞态条件。</text>
+
+  <rect x="824" y="444" width="368" height="90" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="838" y="466" font-size="12" font-weight="700" fill="#2B2A26">③ 重定向后 printf 如何落盘？</text>
+  <text x="838" y="486" font-size="10.2" fill="#4A473F">printf 写入 stdout(FILE*)，刷新时 glibc 调用 write(1, ...)。</text>
+  <text x="838" y="504" font-size="10.2" fill="#4A473F">此时内核查 fd 1，解析到的正是 test.txt 的 struct file，</text>
+  <text x="838" y="522" font-size="10.2" fill="#4A473F">数据直接进入文件页缓存，屏幕不再显示任何字符。</text>
 </svg>

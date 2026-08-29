@@ -1,12 +1,12 @@
 ---
 title: MFMS 新中台 · 逐层设计工作台
 date: 2026-08-14
-updated: 2026-08-18
+updated: 2026-08-22
 tags:
   - 复合mfms
   - MFMS
   - 架构规划
-version: v0.3
+version: v0.4
 status: 活跃工作台
 ---
 
@@ -15,29 +15,28 @@ status: 活跃工作台
 > [!abstract] 本文定位
 > 本文是 <code>14.复合mfms/</code> 下的**唯一活跃详细设计工作台**。当前架构结论见 [[MFMS新中台-架构构造思路]]，所有未决项见 [[MFMS新中台-待确定问题清单]]，项目落位见 [[MFMS新中台-Trellis工程结构方案]]。
 
-> [!important] v0.3 设计锚点
-> 控制权的真实状态、普通申请、强制申请、释放、旧持有者失效和无权命令拒绝全部由下位机负责。本文只设计中台的访问包装、显示模型、消息消费、订单边界、权限与审计。
+> [!important] v0.4 设计锚点
+> 控制权继续由下位机唯一裁决；业务持久化更新为“中台负责需求，调度拆分并单写订单与运单”。本文只设计中台的需求接入、只读组合视图、控制访问、消息消费、权限与审计。
 
 ## 0. 工作约定
 
 ### 0.1 结论标签
 
 - 【已确认】：用户明确确认，可写入红线。
-- 【推荐基线】：本版首选方案，需要联合评审后冻结字段/接口。
+- 【推荐基线】：本版首选方案，需要联合评审后冻结物理字段/接口。
 - 【待确认】：列入问题清单，不进入实现。
 - 【历史废弃】：保留迁移提醒，不再扩展。
 
-### 0.2 v0.2 → v0.3 变更
+### 0.2 v0.3 → v0.4 变更
 
-| 主题 | v0.2/旧假设 | v0.3 |
+| 主题 | v0.3 | v0.4 |
 | --- | --- | --- |
-| 控制权 | 中台根据业务状态协调调试互斥 | 下位机是唯一管理者和裁决者 |
-| 二次确认 | 可能带 token/epoch 参与一致性 | 只做知情、权限、原因和审计 |
-| 强制夺权 | 中台协调调度暂停、Adapter 释放 | 中台只把请求发给下位机并展示结果 |
-| 实时状态 | 车辆 Redis KV + 多方字段维护 | 下位机/Adapter 通过 Redis Stream 发布规范消息 |
-| 订单写入 | 中台创建、调度继续修改同一订单行 | 推荐请求/执行摘要/绑定/变更请求分表单写 |
-| 调度连接 | gRPC 直连曾是候选基线 | 基线用 MySQL + Stream；管理 API 另评估 |
-| Adapter | 中台需要设计其内部状态机 | 内部 ADK 编排/恢复移出中台范围 |
+| 控制权 | 下位机唯一管理和裁决 | 保持不变 |
+| 实时状态 | 下位机/Adapter 通过 Redis Stream 发布规范消息 | 保持不变；Adapter 消息改以运单关联 ID 关联 |
+| 中台业务对象 | 中台保存 order_request | 中台保存原始需求，不创建订单/运单 |
+| 调度持久化 | 调度写 execution/binding | 调度从需求拆分并单写订单与运单 |
+| 订单字段 | 推荐通用 payload/执行摘要 | 已确认站点别名、上下料 type、ids[]、时间戳、数量、优先级 |
+| 统一视图 | OrderView | RequirementView：需求 → 订单 → 运单 → 实时状态 |
 
 ## 1. 系统边界
 
@@ -45,25 +44,26 @@ status: 活跃工作台
 
 | 组件 | 输入 | 输出 | 不进入中台设计的内部细节 |
 | --- | --- | --- | --- |
-| 数据中台 | 客户端订单、Stream 状态、下位机调用结果、MySQL 执行摘要 | 订单请求、统一视图、控制/调试请求、审计 | 不管理真实控制锁，不执行调度算法 |
-| 调度系统 | 待接管订单、设备/运单消息 | 执行摘要、执行绑定、发往 Adapter 的执行单元 | 选车、交通、重试、故障转移 |
-| Adapter | 调度执行单元、下位机状态 | ADK 调用、AGV 运单实时消息 | 内部状态机、崩溃恢复、控制权申请策略 |
+| 数据中台 | 客户端需求、Stream 状态、下位机调用结果、MySQL 订单/运单只读数据 | 需求、RequirementView、控制/调试请求、审计 | 不拆单、不写订单/运单、不管理真实控制锁 |
+| 调度系统 | 待处理需求、设备/运单消息 | 订单、运单、发往 Adapter 的运单 | 拆分、选车、交通、重试、故障转移 |
+| Adapter | 调度运单、下位机状态 | ADK 调用、AGV 运单实时消息 | 内部状态机、崩溃恢复、控制权申请策略 |
 | 下位机 | 控制请求、调试命令、Adapter ADK 调用 | 物理动作、控制权裁决、设备/控制状态 | 锁实现、安全互锁、设备驱动 |
 
 ### 1.2 两条业务链
 
-**订单链**：
+**需求执行链**：
 
 ~~~text
 MES / Qt / Web
-  → 数据中台写 mfms_order_request
-  → 调度实例竞争创建 mfms_order_execution
-  → 调度拆出执行单元并写 execution_binding
+  → 数据中台写 mfms_requirement
+  → 调度读取并接管需求
+  → 调度拆出并单写 mfms_order
+  → 调度继续拆出并单写 mfms_waybill
   → Adapter 调 ADK
   → 下位机执行
   → Adapter/下位机发 Stream 消息
-  → 调度更新 execution 摘要
-  → 中台组合查询与实时展示
+  → 调度更新订单/运单持久状态
+  → 中台只读组合 RequirementView 与实时展示
 ~~~
 
 **调试链**：
@@ -89,8 +89,8 @@ MES / Qt / Web
 | --- | --- | --- |
 | 当前锁定与持有者 | <code>AgvControl</code> / 显式 QueryControl | 仅下位机当前响应可作为最终依据 |
 | AGV 运单号与实时进度 | Adapter 的 <code>AgvOrderState</code> 或 SeerM4State | 否，只用于风险提示 |
-| MES taskCode | MySQL request + execution binding | 否 |
-| 调度实例和整体执行状态 | <code>mfms_order_execution</code> | 否 |
+| 需求 ID | <code>mfms_requirement</code> | 否 |
+| 订单/运单与调度状态 | <code>mfms_order</code> + <code>mfms_waybill</code> | 否 |
 | AGV 位置、电量、故障 | SeerCtrlState / VirtAgvState | 设备安全仍以下位机判断为准 |
 | 机械臂模式、程序、错误 | FrRobotState / AuboRobotState | 同上 |
 
@@ -172,7 +172,7 @@ sequenceDiagram
     MFMS-->>UI: 返回结果并写审计
 ~~~
 
-中台不推断强制申请对当前运单的后果。后续变化从 Stream 和执行摘要观察。
+中台不推断强制申请对当前运单的后果。后续变化从 Stream 和调度订单/运单表观察。
 
 ### 2.5 调试命令
 
@@ -293,7 +293,7 @@ RedisStreamIngestor
 | AgvRealtimeStateCache | device_id + message_type + source | 新鲜度、位置/电量时间 |
 | RobotRealtimeStateCache | device_id + source | 模式、程序、错误 |
 | ControlStateCache | device_id + source | 过期即 UNKNOWN，不推断已释放 |
-| LiveOrderStateCache | execution_id + source | 多源不能互相覆盖 |
+| LiveWaybillStateCache | waybill/execution correlation ID + source | 多源不能互相覆盖 |
 | SensorStateCache | device_id + sensor_type | 频率、单位、是否支持 |
 
 ### 3.4 状态质量
@@ -319,157 +319,94 @@ quality
 
 解码失败、倒退序号和未知版本必须可观测，不能静默丢弃后继续显示旧值为 FRESH。
 
-## 4. 订单与执行持久化
+## 4. 需求、订单与运单持久化
 
 ![[图片/SVG/14_1_3.svg|900]]
 
-### 4.1 方案比较
-
-**方案 A：中台创建订单，调度继续修改同一行**
-
-- 两个写者；
-- 字段所有权和版本冲突；
-- 多调度实例接管竞态；
-- schema 高耦合；
-- 中台订单变更可能覆盖执行状态。
-
-**方案 B：请求、执行摘要、绑定、变更请求分离【推荐】**
+### 4.1 写者与血缘【已确认边界】
 
 ~~~text
-mfms_order_request              数据中台单写
-mfms_order_execution            调度系统单写
-mfms_order_execution_binding    调度系统单写
-mfms_order_change_request       数据中台创建、调度系统处理
+mfms_requirement   数据中台单写
+  requirement_uid
+      ↓ 调度拆分
+mfms_order         调度系统单写，中台只读
+  order_uid + requirement_uid
+      ↓ 调度拆分
+mfms_waybill       调度系统单写，中台只读
+  waybill_uid + order_uid + requirement_uid
 ~~~
 
-原则不是“所有表都只能一个进程访问”，而是每个可变事实只有一个权威写者；若一张请求表需双方处理，字段所有权和状态迁移必须显式分段。
+表名和 ID 类型是推荐候选；“中台只写需求、调度只写订单和运单”是已确认职责。中台不得用通用 update/save 接口创建、修复、推进、取消或覆盖派生记录。
 
-### 4.2 mfms_order_request【中台拥有】
+### 4.2 需求【中台拥有】
+
+需求保存原始规范化业务意图和接入审计。推荐技术字段：
 
 | 字段 | 作用 |
 | --- | --- |
-| <code>order_uid</code> | 内部 UUID/ULID 主键 |
-| <code>factory_id</code> | 工厂 |
-| <code>source_system</code> | MES / Qt / Web |
-| <code>task_code</code> | 外部复合订单号 |
-| <code>order_type</code> | 订单类型 |
-| <code>schema_version</code> | payload 版本 |
-| <code>template_id/template_version</code> | 可选模板及版本 |
-| <code>payload_json</code> | 规范化订单内容 |
-| <code>required_capabilities_json</code> | 设备/工艺能力要求 |
-| <code>priority/deadline_at</code> | 优先级与业务截止 |
-| <code>intake_status</code> | 仅表示接单侧校验/受理状态 |
-| <code>revision</code> | 订单定义版本 |
+| <code>requirement_uid</code> | 内部需求 ID |
+| <code>factory_id</code> | 工厂边界 |
+| <code>source_system/source_requirement_id</code> | 来源与来源侧幂等身份 |
+| <code>schema_version/payload_json</code> | 版本化需求正文 |
+| <code>intake_status</code> | 仅接入校验/可用状态，不是执行状态 |
+| <code>revision</code> | 需求定义版本 |
 | <code>created_by/created_at</code> | 审计 |
 
-建议唯一键：<code>UNIQUE(factory_id, source_system, task_code)</code>。不得把外部 taskCode 直接当全局物理主键。
+幂等键、revision、取消/变更交接仍待业务确认。任何机制都不能让中台反写已派生的订单或运单。
 
-### 4.3 mfms_order_execution【调度拥有，中台只读】
+### 4.3 订单【调度拥有，中台只读】
 
-| 字段 | 作用 |
+订单最小业务字段已经确认：
+
+| 逻辑字段 | 作用 |
 | --- | --- |
-| <code>order_uid</code> | 对应订单；建议唯一约束支持首次竞争接管 |
-| <code>scheduler_group</code> | 可处理该订单的调度池 |
-| <code>scheduler_instance_id</code> | 当前接管实例 |
-| <code>execution_status</code> | 订单聚合状态 |
-| <code>phase_code</code> | 当前工艺阶段/里程碑 |
-| <code>progress_current/progress_total</code> | 聚合进度 |
-| <code>current_execution_id</code> | 当前 AGV order_id 或执行单元 ID |
-| <code>current_device_id/current_robot_id</code> | 当前资源 |
-| <code>result_code/result_message</code> | 终态摘要 |
-| <code>result_payload_json</code> | 实际条码等结果 |
-| <code>started_at/updated_at/finished_at</code> | 时间 |
-| <code>version</code> | 乐观版本 |
+| 工作站点名称/别名 | 订单关联的业务工作站点 |
+| <code>type</code> | 上料或下料；规范值候选 <code>LOAD/UNLOAD</code> |
+| <code>ids[]</code> | 业务对象 ID 集合 |
+| 时间戳 | 订单业务时间 |
+| 数量 | 本次上下料数量 |
+| 优先级 | 调度排序输入 |
 
-建议核心状态：
+推荐物理列候选：
 
 ~~~text
-UNCLAIMED
-  → CLAIMED
-  → PLANNING
-  → EXECUTING
-       → PAUSED / BLOCKED
-       → SUCCEEDED / PARTIALLY_SUCCEEDED
-       → FAILED / CANCELLED
+order_uid, requirement_uid,
+workstation_alias, operation_type, item_ids,
+business_timestamp, quantity, priority,
+split_sequence, scheduler_instance_id,
+status, created_at, updated_at, finished_at
 ~~~
 
-“AGV 到达 LM78”“机械臂取料完成”“条码校验完成”属于 <code>phase_code</code> 或里程碑，不新增核心枚举。
+其中 <code>item_ids</code> 用 JSON 还是子表、ID 元素含义/顺序、时间戳具体含义、数量与 IDs 的关系、优先级范围与方向、一个订单行是否只能表达一个上下料动作，均需业务/调度/DBA 冻结。
 
-### 4.4 mfms_order_execution_binding【调度拥有，中台只读】
+### 4.4 运单【调度拥有，中台只读】
 
-| 字段 | 作用 |
-| --- | --- |
-| <code>id</code> | 主键 |
-| <code>order_uid</code> | 复合订单 |
-| <code>execution_type</code> | AGV_ORDER / ROBOT_TASK / CAMERA_TASK 等 |
-| <code>execution_id</code> | 外部执行 ID |
-| <code>sequence_no</code> | 在复合订单中的顺序 |
-| <code>resource_id</code> | AGV/机械臂 |
-| <code>scheduler_instance_id</code> | 创建实例 |
-| <code>created_at/finished_at</code> | 生命周期 |
-| <code>terminal_status</code> | 终态摘要 |
-
-建议唯一键：<code>UNIQUE(execution_type, execution_id)</code>。收到 AGV 运单消息后，中台可由 execution_id 找到 order_uid 和 taskCode。
-
-### 4.5 多调度实例接管【已确认规模，推荐机制】
-
-1. 中台只创建 order_request；
-2. 各调度实例扫描自己 scheduler_group 可处理的请求；
-3. 实例尝试插入 order_execution；
-4. order_uid 唯一约束保证只有一个首次接管者；
-5. 其他实例遇唯一键冲突后停止处理；
-6. 中台只展示接管实例与 updated_at，不管理租约或故障转移。
-
-调度实例崩溃后的重新接管属于调度系统内部契约，见 Q-46。
-
-## 5. 自定义订单与统一视图
-
-### 5.1 中台负责定义
-
-规范化订单示例：
-
-~~~json
-{
-  "start_storage_code": "RACK001",
-  "end_storage_code": "EQ-WB001",
-  "container": {
-    "expected_code": "BOX-001",
-    "size": "B"
-  },
-  "checks": {
-    "end_storage_empty": true,
-    "container_code_matched": true
-  },
-  "upload_actual_container_code": true
-}
-~~~
-
-MES 历史拼写或厂商字段只能存在于协议适配器；进入核心模型后转换为稳定字段。
-
-### 5.2 调度负责解释和拆解
+本轮只确认调度系统生成并拥有运单表，未给出完整业务字段。推荐最小技术血缘为：
 
 ~~~text
-订单定义
-  → 按 order_type + template_version 解释
-  → 拆成 AGV / robot / camera 执行单元
-  → 写 execution_binding
-  → 聚合 execution 摘要
+waybill_uid, order_uid, requirement_uid,
+external_waybill_id, device_id,
+status, created_at, updated_at, finished_at
 ~~~
 
-中台当前不实现通用执行 DAG、补偿、重试和设备编排。
+路线/动作 payload、设备分配时机、生命周期、重试替换、终态和 Adapter 交接均待调度/Adapter 确认。Adapter 实时消息必须携带经评审的运单关联 ID。
 
-### 5.3 OrderView
+### 4.5 多调度实例与拆分【待评审】
+
+调度实例怎样认领需求、保证拆分幂等、原子写入订单/运单、处理实例崩溃和重新接管，属于调度/数据库合同。中台只显示调度写入结果和更新时间，不管理 leader、lease 或 failover。
+
+## 5. RequirementView
 
 ~~~text
-OrderView
-├── request                 ← mfms_order_request
-├── persistentExecution     ← mfms_order_execution
-└── liveExecutions
-    ├── bindings            ← mfms_order_execution_binding
-    └── snapshots           ← StateManager / AgvOrderState
+RequirementView
+├── requirement             ← mfms_requirement
+├── orders[]                ← mfms_order
+│   └── waybills[]          ← mfms_waybill
+├── liveWaybillStates       ← StateManager / Adapter
+└── controlDisplay          ← lower-machine ControlSnapshot
 ~~~
 
-中台不自行从实时消息推导持久终态；Stream 提供“现在发生什么”，execution 摘要提供“业务上最终怎样”。
+中台不自行从实时消息推导订单/运单持久终态。Stream 提供“现在发生什么”，调度表提供“业务上怎样记录”，下位机响应提供“当前是否允许控制”。
 
 ## 6. 模块边界
 
@@ -491,7 +428,7 @@ OrderView
 ~~~text
 连接 MySQL
   → 加载设备注册表
-  → 加载未终态 request/execution/binding
+  → 加载需求与只读订单/运单视图
   → 所有实时状态初始化 UNKNOWN
   → 重新消费 Redis Stream
   → 重建 SDK 连接
@@ -523,8 +460,8 @@ OrderView
 
 | 故障 | 可继续 | 必须停止/降级 |
 | --- | --- | --- |
-| MySQL 不可用 | 实时状态查看、普通快照推送 | 新订单、历史查询；推荐禁止强制申请（无法可靠审计） |
-| 调度不可用 | 实时设备状态；按下位机控制权进行调试 | 不接管/恢复订单；执行摘要显示过期 |
+| MySQL 不可用 | 实时状态查看、普通快照推送 | 新需求、历史查询；推荐禁止强制申请（无法可靠审计） |
+| 调度不可用 | 实时设备状态；按下位机控制权进行调试 | 不拆分/恢复订单或运单；派生视图显示过期 |
 
 ## 8. 安全与审计
 
@@ -547,8 +484,9 @@ operator_id
 operator_role
 reason
 displayed_control_owner
-displayed_task_code
-displayed_execution_id
+displayed_requirement_uid
+displayed_order_uid
+displayed_waybill_uid
 lower_machine_result_code
 lower_machine_result_message
 requested_at
@@ -587,11 +525,11 @@ mfms-platform
 | --- | --- | --- |
 | P0-A 控制契约 | 四个控制调用、身份、错误码、超时查询、控制域 | 与下位机团队联合评审；Q-35～Q-44 有结论 |
 | P0-B Stream 契约 | 统一信封、消息目录、schema 版本、质量/乱序规则 | 样例消息可被解码；未知版本可观测 |
-| P0-C 订单契约 | 四表 DDL、写者矩阵、状态和唯一键 | 中台/调度/DBA 评审；无双写 |
+| P0-C 需求/订单/运单契约 | 三类核心记录、订单字段、血缘、写者矩阵和 DDL | 中台/调度/DBA 评审；中台无订单/运单写权限 |
 | P1 能力骨架 | Ingestor、DecoderRegistry、StateManager、下位机薄客户端 | 真实/录制消息生成 UNKNOWN/FRESH/STALE 快照 |
-| P2 订单竖切 | 接单、调度竞争接管、执行摘要和绑定查询 | taskCode 可追到一个或多个 execution_id |
+| P2 需求竖切 | 中台需求接入、订单/运单只读查询与血缘 | requirement_uid 可追到订单、运单与实时关联 ID |
 | P3 调试竖切 | 查询/申请/强制申请/释放、命令、权限、审计 | 下位机拒绝能稳定映射；中台无锁状态 |
-| P4 统一视图 | OrderView + 设备/机器人/控制快照 + WS | 断流、重启、调度不可用均有明确降级 |
+| P4 统一视图 | RequirementView + 设备/机器人/控制快照 + WS | 断流、重启、调度不可用均有明确降级 |
 | P5 工厂协议 | SiteProtocolAdapter、模板和现场配置 | 不修改核心领域与能力边界即可接入 |
 
 ## 11. 与 Trellis 的衔接
@@ -601,8 +539,8 @@ mfms-platform
 | §1/§6 系统与模块边界 | <code>.trellis/ARCHMAP.md</code>、backend directory spec |
 | §2 控制访问 | <code>spec/contracts/control-access-contract.md</code> |
 | §3 实时消息 | <code>spec/contracts/realtime-stream-contract.md</code> |
-| §4/§5 订单与视图 | <code>spec/contracts/order-persistence-contract.md</code> |
-| legacy 双事件表 | <code>spec/contracts/db-event-contracts.md</code>，不得混入新订单表 |
+| §4/§5 需求/订单/运单与视图 | <code>spec/contracts/order-persistence-contract.md</code> |
+| legacy 双事件表 | <code>spec/contracts/db-event-contracts.md</code>，不得混入需求/订单/运单表 |
 | SDK/总线适配 | <code>spec/contracts/bus-contracts.md</code> |
 | §7～§9 | backend error/logging/quality/runtime-recovery specs |
 | 未决项 | <code>.trellis/tasks/08-16-architecture-design/</code> |
@@ -611,8 +549,8 @@ mfms-platform
 
 ## 12. 关联
 
-- [[MFMS新中台-架构构造思路]] —— v0.3 架构摘要
+- [[MFMS新中台-架构构造思路]] —— v0.4 架构摘要
 - [[MFMS新中台-待确定问题清单]] —— 未决项与关闭规则
 - [[MFMS新中台-Trellis工程结构方案]] —— 项目落位与 gap
 - [[MFMS新中台-资料索引与权威源]] —— 历史输入与证据
-- [[MFMS新中台-架构图.drawio]] —— 三页 v0.3 图源
+- [[MFMS新中台-架构图.drawio]] —— v0.4 图源
