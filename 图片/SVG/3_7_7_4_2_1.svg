@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 840"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>从手写 RPC 到 gRPC：真正要掌握的 RPC 不变量</title>
+  <desc>上半部分按消息边界、数据表示、调用关联、失败语义四个不变量，将 7.4.1 的手写 RPC 实现逐项映射到 7.4.2 的 gRPC 标准实现；中部列出 gRPC 仍不能替业务决定的幂等、授权、兼容和资源治理；底部给出三个掌握标准。</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="840" fill="#F5F4ED"/>
+
+  <!-- 标题 -->
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">从 7.4.1 到 7.4.2：真正要掌握的是 RPC 不变量</text>
+  <text x="48" y="79" font-size="13" fill="#6B675C">手写版揭示机制，gRPC 复用实现；框架没有消除网络失败，也不会替业务定义语义</text>
+
+  <!-- A：逐项迁移 -->
+  <text x="48" y="112" font-size="14" font-weight="700" fill="#4A473F">A · 四个问题始终存在：实现方式变化，协议不变量不变</text>
+  <rect x="48" y="128" width="1144" height="314" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <text x="68" y="154" font-size="13" font-weight="700" fill="#6B4E28">7.4.1 · 手写 RPC：让机制显形</text>
+  <text x="620" y="154" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">同一不变量</text>
+  <text x="732" y="154" font-size="13" font-weight="700" fill="#2C4460">7.4.2 · gRPC：把通用机制标准化</text>
+
+  <!-- Row 1 -->
+  <line x1="508" y1="198" x2="732" y2="198" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <rect x="68" y="174" width="440" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="88" y="194" font-size="12.5" font-weight="700" fill="#6B4E28">FrameHeader + body_len</text>
+  <text x="88" y="212" font-size="10.5" fill="#6B4E28">ReadExactly / WriteAll</text>
+  <rect x="544" y="180" width="152" height="36" rx="8" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="620" y="202" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">消息边界</text>
+  <rect x="732" y="174" width="440" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="752" y="194" font-size="12.5" font-weight="700" fill="#2C4460">gRPC message prefix</text>
+  <text x="752" y="212" font-size="10.5" fill="#2C4460">HTTP/2 DATA 重新组装</text>
+
+  <!-- Row 2 -->
+  <line x1="508" y1="260" x2="732" y2="260" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <rect x="68" y="236" width="440" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="88" y="256" font-size="12.5" font-weight="700" fill="#6B4E28">AppendU32 / ReadU32</text>
+  <text x="88" y="274" font-size="10.5" fill="#6B4E28">网络字节序 + 固定偏移</text>
+  <rect x="544" y="242" width="152" height="36" rx="8" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="620" y="264" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">数据表示</text>
+  <rect x="732" y="236" width="440" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="752" y="256" font-size="12.5" font-weight="700" fill="#2C4460">protobuf schema</text>
+  <text x="752" y="274" font-size="10.5" fill="#2C4460">protoc 生成编解码</text>
+
+  <!-- Row 3 -->
+  <line x1="508" y1="322" x2="732" y2="322" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <rect x="68" y="298" width="440" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="88" y="318" font-size="12.5" font-weight="700" fill="#6B4E28">request_id</text>
+  <text x="88" y="336" font-size="10.5" fill="#6B4E28">串行校验 / 并发关联</text>
+  <rect x="544" y="304" width="152" height="36" rx="8" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="620" y="326" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">调用关联</text>
+  <rect x="732" y="298" width="440" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="752" y="318" font-size="12.5" font-weight="700" fill="#2C4460">HTTP/2 stream</text>
+  <text x="752" y="336" font-size="10.5" fill="#2C4460">Stub + runtime 管理关联</text>
+
+  <!-- Row 4 -->
+  <line x1="508" y1="384" x2="732" y2="384" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+  <rect x="68" y="360" width="440" height="48" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="88" y="380" font-size="12.5" font-weight="700" fill="#6B4E28">StatusCode + ProtocolError</text>
+  <text x="88" y="398" font-size="10.5" fill="#6B4E28">业务失败 ≠ 协议失步</text>
+  <rect x="544" y="366" width="152" height="36" rx="8" fill="#F1EFE8" stroke="#5A564B" stroke-width="1.2"/>
+  <text x="620" y="388" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">失败语义</text>
+  <rect x="732" y="360" width="440" height="48" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="752" y="380" font-size="12.5" font-weight="700" fill="#2C4460">grpc::Status</text>
+  <text x="752" y="398" font-size="10.5" fill="#2C4460">deadline + cancellation</text>
+
+  <text x="620" y="430" font-size="11" font-weight="700" fill="#2F6B5E" text-anchor="middle">机制没有消失：从业务代码下沉到生成代码、runtime 与 HTTP/2</text>
+
+  <!-- B：框架边界 -->
+  <text x="48" y="474" font-size="14" font-weight="700" fill="#4A473F">B · gRPC 的边界：框架接管通用机制，业务仍要做四类决定</text>
+  <rect x="48" y="490" width="1144" height="168" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="68" y="514" width="264" height="122" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="88" y="540" font-size="12.5" font-weight="700" fill="#733428">① 幂等与重试</text>
+  <text x="88" y="566" font-size="11" fill="#733428">超时 ≠ 未执行</text>
+  <text x="88" y="590" font-size="11" fill="#733428">业务幂等键</text>
+  <text x="88" y="614" font-size="11" fill="#733428">持久化去重</text>
+
+  <rect x="348" y="514" width="264" height="122" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="368" y="540" font-size="12.5" font-weight="700" fill="#6B4E28">② 认证与授权</text>
+  <text x="368" y="566" font-size="11" fill="#6B4E28">TLS ≠ 授权</text>
+  <text x="368" y="590" font-size="11" fill="#6B4E28">凭据验证</text>
+  <text x="368" y="614" font-size="11" fill="#6B4E28">方法级权限</text>
+
+  <rect x="628" y="514" width="264" height="122" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="648" y="540" font-size="12.5" font-weight="700" fill="#4A3F68">③ 兼容语义</text>
+  <text x="648" y="566" font-size="11" fill="#4A3F68">field number 不复用</text>
+  <text x="648" y="590" font-size="11" fill="#4A3F68">presence / 默认值</text>
+  <text x="648" y="614" font-size="11" fill="#4A3F68">行为语义可兼容</text>
+
+  <rect x="908" y="514" width="264" height="122" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="928" y="540" font-size="12.5" font-weight="700" fill="#24473F">④ 资源与可观测性</text>
+  <text x="928" y="566" font-size="11" fill="#24473F">deadline · 限流 · 背压</text>
+  <text x="928" y="590" font-size="11" fill="#24473F">日志 · 指标 · trace</text>
+  <text x="928" y="614" font-size="11" fill="#24473F">容量与故障预算</text>
+
+  <!-- C：掌握标准 -->
+  <text x="48" y="690" font-size="14" font-weight="700" fill="#4A473F">C · 自测标准：不是会跑示例，而是能解释三层关系</text>
+
+  <line x1="408" y1="748" x2="446" y2="748" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <line x1="790" y1="748" x2="828" y2="748" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+
+  <rect x="68" y="710" width="340" height="76" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="238" y="736" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">① 能还原手写 AddViaRpc</text>
+  <text x="238" y="762" font-size="11" fill="#6B4E28" text-anchor="middle">帧 · 编解码 · 关联 · 错误</text>
+
+  <rect x="450" y="710" width="340" height="76" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="620" y="736" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 能解释 Stub::Add</text>
+  <text x="620" y="762" font-size="11" fill="#2C4460" text-anchor="middle">schema · message · stream · Status</text>
+
+  <rect x="832" y="710" width="340" height="76" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1002" y="736" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">③ 能划清框架边界</text>
+  <text x="1002" y="762" font-size="11" fill="#24473F" text-anchor="middle">框架管机制 · 业务管语义</text>
+
+  <rect x="68" y="804" width="1104" height="24" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="620" y="821" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">结论：7.4.1 提供心智模型，7.4.2 提供标准复用；二者不是互相替代</text>
+</svg>

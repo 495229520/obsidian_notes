@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Day01 · Linux 基础与文件 I/O 闭卷总结</title>
+  <style>
+    /*
+      DESIGN SYSTEM
+      Type scale: 76 / 48 / 30 / 20 / 16 / 13; Avenir Next + PingFang SC, mono for commands/APIs.
+      Surfaces: warm paper + terminal ink; kernel blue, syscall orange, cache green.
+      Rhythm: 8px base grid; editorial rules and ledgers instead of stacked rounded cards.
+      Interaction: persistent DOM; filters and state comparisons mutate classes/text only.
+    */
+    :root {
+      --paper: #f1eee5;
+      --paper-2: #e5e0d3;
+      --surface: #fffdf8;
+      --ink: #17201e;
+      --muted: #6a726f;
+      --rule: #bdb9ae;
+      --blue: #0d6074;
+      --blue-soft: #dce9ea;
+      --orange: #c45220;
+      --orange-soft: #f4ded1;
+      --green: #66774a;
+      --green-soft: #e3e8d7;
+      --red: #9b3f39;
+      --sans: "Avenir Next", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --mono: "SFMono-Regular", "Cascadia Mono", "IBM Plex Mono", monospace;
+      --ease: cubic-bezier(.2,.72,.2,1);
+      --shadow: 0 18px 48px rgb(23 32 30 / .11);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgb(23 32 30 / .032) 1px, transparent 1px),
+        var(--paper);
+      background-size: 100% 32px;
+      font-family: var(--sans);
+      line-height: 1.65;
+    }
+    button, input { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    a { color: inherit; text-underline-offset: 4px; }
+    code { font-family: var(--mono); }
+
+    .topbar {
+      position: sticky;
+      z-index: 20;
+      top: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 58px;
+      padding: 8px clamp(18px, 4vw, 64px);
+      border-bottom: 1px solid rgb(23 32 30 / .16);
+      background: rgb(241 238 229 / .92);
+      backdrop-filter: blur(16px);
+    }
+    .brand { font: 850 14px/1 var(--mono); letter-spacing: -.02em; }
+    .brand span { margin-left: 10px; color: var(--orange); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; }
+    .nav { display: flex; gap: 4px; }
+    .nav a { padding: 9px 12px; color: var(--muted); font-size: 12px; font-weight: 750; text-decoration: none; }
+    .nav a:hover, .nav a:focus-visible { color: var(--ink); outline: none; }
+
+    .hero { color: #eef1eb; background: var(--ink); }
+    .hero-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(360px, .8fr);
+      gap: clamp(48px, 8vw, 120px);
+      align-items: end;
+      width: min(1440px, calc(100% - 40px));
+      min-height: 680px;
+      margin: 0 auto;
+      padding: 100px 0 72px;
+    }
+    .eyebrow { margin: 0 0 24px; color: #e48a5e; font: 850 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    h1 { max-width: 880px; margin: 0; font-size: clamp(52px, 7.2vw, 104px); line-height: .92; letter-spacing: -.07em; text-wrap: balance; }
+    h1 code { color: #7db7c1; font-size: .72em; }
+    .hero-lede { max-width: 760px; margin: 30px 0 0; color: #b9c2be; font-size: clamp(17px, 1.6vw, 22px); text-wrap: pretty; }
+    .terminal { border: 1px solid #65716d; background: #0d1312; box-shadow: 16px 16px 0 #0a5667; }
+    .terminal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #414b48; color: #97a39e; font: 750 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .terminal-body { padding: 26px 24px 30px; font: 650 13px/1.9 var(--mono); }
+    .terminal-body p { margin: 0; color: #c5cec9; }
+    .terminal-body .prompt { color: #75bac4; }
+    .terminal-body .ok { color: #b6d58c; }
+    .terminal-body .dim { color: #75807c; }
+
+    .scope-strip { overflow-x: auto; border-block: 1px solid #3d4744; background: #111816; }
+    .scope-inner { display: grid; grid-template-columns: repeat(7, max-content); justify-content: center; gap: 12px; min-width: max-content; padding: 17px 28px; color: #9ba6a2; font: 750 11px/1 var(--mono); }
+    .scope-inner span { padding: 7px 10px; border: 1px solid #45504d; }
+    .scope-inner b { color: #f1a17b; }
+
+    .section { width: min(1440px, calc(100% - 40px)); margin: 0 auto; padding: 104px 0; }
+    .section-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 440px); gap: 56px; align-items: end; margin-bottom: 46px; }
+    .section-no { margin: 0 0 15px; color: var(--orange); font: 850 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    h2 { margin: 0; font-size: clamp(38px, 4.5vw, 64px); line-height: 1.02; letter-spacing: -.05em; text-wrap: balance; }
+    .section-intro { margin: 0; color: var(--muted); font-size: 16px; text-wrap: pretty; }
+
+    .learning-map { border-top: 2px solid var(--ink); }
+    .map-row { display: grid; grid-template-columns: 72px 220px minmax(0, 1fr) minmax(220px, .55fr); gap: 26px; align-items: start; padding: 27px 0; border-bottom: 1px solid var(--rule); }
+    .map-index { color: var(--blue); font: 850 28px/1 var(--mono); letter-spacing: -.08em; }
+    .map-title { font-size: 19px; font-weight: 800; }
+    .map-body, .map-proof { color: var(--muted); font-size: 14px; }
+    .map-proof code { color: var(--orange); font-size: 12px; }
+
+    .lab { border: 1px solid #9c9990; background: var(--surface); box-shadow: var(--shadow); }
+    .lab-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 22px; border-bottom: 1px solid var(--rule); background: var(--paper-2); }
+    .lab-toolbar strong { font: 850 13px/1 var(--mono); letter-spacing: .04em; }
+    .segmented { display: flex; gap: 6px; }
+    .seg-btn, .filter-btn, .state-btn {
+      min-height: 44px;
+      padding: 9px 14px;
+      border: 1px solid #98958c;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font: 800 12px/1 var(--mono);
+      transition: color 180ms, background 180ms, border-color 180ms, transform 180ms var(--ease);
+    }
+    .seg-btn:hover, .filter-btn:hover, .state-btn:hover { transform: translateY(-2px); color: var(--ink); }
+    .seg-btn.active, .filter-btn.active, .state-btn.active { color: white; border-color: var(--ink); background: var(--ink); }
+    .seg-btn:focus-visible, .filter-btn:focus-visible, .state-btn:focus-visible { outline: 3px solid rgb(196 82 32 / .28); outline-offset: 2px; }
+    .routes { display: grid; grid-template-columns: 1fr 1fr; }
+    .route { min-width: 0; padding: 30px; opacity: .32; transition: opacity 260ms var(--ease), background 260ms; }
+    .route + .route { border-left: 1px solid var(--rule); }
+    .route.active { opacity: 1; background: #fffaf3; }
+    .route-tag { margin: 0 0 18px; color: var(--blue); font: 850 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    .route-chain { display: grid; gap: 8px; }
+    .chain-node { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 14px; align-items: center; min-height: 62px; padding: 10px 14px; border: 1px solid #b9b5aa; background: white; }
+    .chain-node b { color: var(--orange); font: 850 12px/1 var(--mono); }
+    .chain-node code { font-size: 14px; font-weight: 800; }
+    .chain-node span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .route-explain { min-height: 84px; margin: 0; padding: 18px 22px; border-top: 1px solid var(--rule); color: #4f5754; background: var(--blue-soft); font-size: 15px; text-wrap: pretty; }
+
+    .lifecycle { border-top: 2px solid var(--ink); }
+    .life-row { display: grid; grid-template-columns: 130px 220px minmax(0, 1fr) 220px; gap: 28px; padding: 26px 0; border-bottom: 1px solid var(--rule); }
+    .life-row.header { padding-block: 12px; color: var(--muted); font: 800 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .life-api { color: var(--orange); font: 850 19px/1.3 var(--mono); }
+    .life-action { font-weight: 800; }
+    .life-detail, .life-check { color: var(--muted); font-size: 14px; }
+    .life-check code { color: var(--blue); font-size: 12px; }
+
+    .buffer-board { display: grid; grid-template-columns: 1fr 90px 1fr; align-items: stretch; border: 1px solid #96938a; background: var(--surface); }
+    .buffer-zone { padding: 30px; }
+    .buffer-zone.kernel { background: var(--green-soft); }
+    .buffer-zone h3 { margin: 0 0 18px; font: 850 18px/1.2 var(--mono); }
+    .buffer-zone p { margin: 0; color: var(--muted); font-size: 14px; }
+    .bytes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin: 24px 0; }
+    .bytes i { height: 30px; border: 1px solid #9f9b90; background: var(--paper-2); }
+    .kernel .bytes i:nth-child(-n+5) { border-color: #80915d; background: #c7d3aa; }
+    .handoff { display: grid; place-items: center; border-inline: 1px solid var(--rule); color: var(--orange); background: var(--paper-2); font: 850 11px/1.5 var(--mono); text-align: center; }
+    .durability { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #96938a; border-top: 0; }
+    .durability div { padding: 18px 22px; background: var(--surface); }
+    .durability div + div { border-left: 1px solid var(--rule); }
+    .durability code { color: var(--blue); font-weight: 850; }
+    .durability span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+    .redirect-layout { display: grid; grid-template-columns: minmax(270px, .7fr) minmax(0, 1.3fr); gap: 34px; }
+    .redirect-copy { padding: 28px; color: #e9eee9; background: var(--ink); }
+    .redirect-copy h3 { margin: 0 0 14px; font-size: 26px; line-height: 1.2; }
+    .redirect-copy p { margin: 0; color: #adb7b2; font-size: 14px; }
+    .state-toggle { display: flex; gap: 6px; margin-top: 26px; }
+    .redirect-board { border: 1px solid #96938a; background: var(--surface); }
+    .redir-head { padding: 14px 18px; border-bottom: 1px solid var(--rule); color: var(--muted); font: 800 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .fd-map { display: grid; gap: 10px; padding: 26px; }
+    .fd-line { display: grid; grid-template-columns: 120px 42px minmax(180px, 1fr); gap: 12px; align-items: center; min-height: 58px; }
+    .fd-chip, .ofd-chip { padding: 11px 13px; border: 1px solid #9f9b92; background: white; font: 800 12px/1.3 var(--mono); }
+    .fd-chip { color: var(--blue); }
+    .ofd-chip { transition: background 260ms, border-color 260ms, transform 260ms var(--ease); }
+    .fd-line .arrow { color: var(--orange); font: 850 18px/1 var(--mono); text-align: center; }
+    .redirect-board.after #stdout-target { border-color: var(--orange); background: var(--orange-soft); transform: translateX(4px); }
+    .redirect-board.after #stdout-target code { color: var(--orange); }
+    .redir-caption { min-height: 66px; margin: 0; padding: 16px 26px; border-top: 1px solid var(--rule); color: var(--muted); background: var(--paper-2); font-size: 13px; }
+
+    .dark-section { color: #edf1eb; background: var(--ink); }
+    .dark-section .section { padding-block: 112px; }
+    .dark-section .section-no { color: #ef956a; }
+    .dark-section .section-intro { color: #aeb8b3; }
+    .lock-ledger { border-top: 1px solid #7b8581; }
+    .lock-row { display: grid; grid-template-columns: 150px 210px 150px 130px minmax(260px, 1fr); gap: 28px; padding: 26px 0; border-bottom: 1px solid #3d4844; }
+    .lock-row.header { padding-block: 12px; color: #8f9a95; font: 800 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .lock-api { color: #f3a07a; font: 850 17px/1.3 var(--mono); }
+    .lock-owner { font-weight: 800; }
+    .lock-row p { margin: 0; color: #adb7b2; font-size: 13px; line-height: 1.55; }
+    .lock-badge { display: inline-block; padding: 4px 7px; border: 1px solid #78837e; color: #c2cac6; font: 750 10px/1.2 var(--mono); }
+    .iocp-note { display: grid; grid-template-columns: 180px 1fr; gap: 32px; margin-top: 44px; padding: 26px 0; border-block: 1px solid #53605b; }
+    .iocp-note code { color: #8bc1ca; font-size: 24px; font-weight: 850; }
+    .iocp-note p { margin: 0; color: #b6c0bb; }
+
+    .reference-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .reference-toolbar p { margin: 0; color: var(--muted); font-size: 13px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+    .reference-table { border-top: 2px solid var(--ink); }
+    .ref-row { display: grid; grid-template-columns: 180px 240px minmax(0, 1fr); gap: 28px; padding: 19px 0; border-bottom: 1px solid var(--rule); transition: opacity 180ms; }
+    .ref-row.hidden { display: none; }
+    .ref-row.header { padding-block: 11px; color: var(--muted); font: 800 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .ref-row code { color: var(--blue); font-size: 13px; font-weight: 850; }
+    .ref-row b { font-size: 14px; }
+    .ref-row span { color: var(--muted); font-size: 13px; }
+
+    .traps { border-top: 2px solid var(--ink); }
+    .trap { display: grid; grid-template-columns: 80px minmax(220px, .6fr) minmax(0, 1fr); gap: 28px; padding: 28px 0; border-bottom: 1px solid var(--rule); }
+    .trap-no { color: var(--red); font: 850 28px/1 var(--mono); }
+    .trap h3 { margin: 0; font-size: 20px; }
+    .trap p { margin: 0; color: var(--muted); font-size: 14px; }
+    .trap code { color: var(--orange); }
+
+    .exam { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 48px; align-items: start; }
+    .checklist { border-top: 2px solid var(--ink); }
+    .check-item { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 15px; padding: 20px 0; border-bottom: 1px solid var(--rule); cursor: pointer; }
+    .check-item input { appearance: none; width: 30px; height: 30px; margin: 0; border: 1px solid #87847c; background: var(--surface); cursor: pointer; }
+    .check-item input:checked { border-color: var(--green); background: var(--green); box-shadow: inset 0 0 0 8px var(--surface); }
+    .check-item b { display: block; font-size: 16px; }
+    .check-item span { color: var(--muted); font-size: 13px; }
+    .score-panel { position: sticky; top: 86px; padding: 28px; color: white; background: var(--blue); box-shadow: 12px 12px 0 var(--ink); }
+    .score-panel small { font: 800 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    .score { margin: 18px 0 8px; font: 850 70px/.9 var(--mono); letter-spacing: -.08em; }
+    .score-panel p { margin: 0; color: #c5e0e4; font-size: 13px; }
+    .reset { width: 100%; min-height: 44px; margin-top: 24px; border: 1px solid #b7dade; color: white; background: transparent; cursor: pointer; font: 800 11px/1 var(--mono); }
+
+    .source-footer { padding: 42px max(20px, calc((100vw - 1440px)/2)); border-top: 1px solid var(--rule); background: var(--paper-2); }
+    .source-inner { display: grid; grid-template-columns: 170px 1fr; gap: 36px; width: min(1440px, 100%); margin: 0 auto; }
+    .source-inner h2 { font: 850 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .source-inner p { margin: 0; color: var(--muted); font-size: 13px; }
+    .source-links { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 12px; }
+
+    @media (max-width: 900px) {
+      .nav { display: none; }
+      .hero-inner, .section-head, .exam { grid-template-columns: 1fr; }
+      .hero-inner { min-height: auto; padding-top: 86px; }
+      .terminal { max-width: 640px; }
+      .map-row { grid-template-columns: 50px 1fr; }
+      .map-body, .map-proof { grid-column: 2; }
+      .routes, .redirect-layout { grid-template-columns: 1fr; }
+      .route + .route { border-left: 0; border-top: 1px solid var(--rule); }
+      .life-row, .lock-row { min-width: 920px; }
+      .lifecycle, .lock-ledger { overflow-x: auto; }
+      .buffer-board { grid-template-columns: 1fr; }
+      .handoff { min-height: 64px; border-inline: 0; border-block: 1px solid var(--rule); writing-mode: horizontal-tb; }
+      .durability { grid-template-columns: 1fr; }
+      .durability div + div { border-left: 0; border-top: 1px solid var(--rule); }
+      .trap { grid-template-columns: 54px 1fr; }
+      .trap p { grid-column: 2; }
+      .score-panel { position: static; }
+    }
+    @media (max-width: 580px) {
+      .section { width: min(100% - 24px, 1440px); padding-block: 78px; }
+      .hero-inner { width: min(100% - 28px, 1440px); }
+      .lab-toolbar, .reference-toolbar { display: block; }
+      .segmented, .filters { margin-top: 14px; }
+      .route { padding: 20px; }
+      .ref-row { grid-template-columns: 120px 1fr; gap: 12px; }
+      .ref-row span { grid-column: 2; }
+      .source-inner { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 1ms !important; animation-duration: 1ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">DAY 01 <span>non-leetcode review</span></div>
+    <nav class="nav" aria-label="页面导航">
+      <a href="#map">学习地图</a><a href="#io">I/O 主线</a><a href="#redirect">重定向</a><a href="#locks">文件锁</a><a href="#exam">闭卷验收</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <p class="eyebrow">Trellis learning task · completed 2026-08-25</p>
+          <h1>Linux 基础<br>与文件 <code>I/O</code></h1>
+          <p class="hero-lede">Day01 非力扣部分的收口：从命令与安全输入，到 fd / FILE* 两套接口，再到重定向、持久化语义和文件锁。目标不是“看过”，而是能闭卷画、闭卷讲、闭卷排错。</p>
+        </div>
+        <aside class="terminal" aria-label="任务摘要">
+          <div class="terminal-head"><span>scope.check</span><span>read only</span></div>
+          <div class="terminal-body">
+            <p><span class="prompt">$</span> scope --exclude leetcode</p>
+            <p class="ok">19 notes matched</p>
+            <p><span class="prompt">$</span> acceptance --status</p>
+            <p class="ok">7 / 7 completed</p>
+            <p><span class="prompt">$</span> focus</p>
+            <p class="dim">commands → libc → fd → FILE* → locks</p>
+          </div>
+        </aside>
+      </div>
+      <div class="scope-strip"><div class="scope-inner"><span><b>1.0–1.3</b> 命令</span><span><b>2.1–2.2</b> 环境</span><span><b>3.1–3.5</b> 基础函数</span><span><b>4.1–4.4</b> I/O</span><span><b>6.1–6.4</b> FILE*</span><span><b>3</b> 核心卡点</span><span><b>0</b> 力扣内容</span></div></div>
+    </section>
+
+    <section class="section" id="map">
+      <div class="section-head">
+        <div><p class="section-no">01 · Learning map</p><h2>Day01 真正形成的是一条能力链。</h2></div>
+        <p class="section-intro">命令只是入口，基础函数保证输入可靠；两套 I/O 接口解释数据如何流动；重定向、同步和锁则决定多进程环境下是否正确。</p>
+      </div>
+      <div class="learning-map">
+        <article class="map-row"><div class="map-index">01</div><div class="map-title">定位与操作</div><div class="map-body">用命令找到文件、进程与磁盘问题，并在修改前确认目标。</div><div class="map-proof"><code>grep -rn</code> 找内容；<code>find -name</code> 找文件；先 <code>kill</code>，最后才 <code>kill -9</code>。</div></article>
+        <article class="map-row"><div class="map-index">02</div><div class="map-title">环境与权限</div><div class="map-body">理解 PATH、父子进程环境继承，以及 rwx / UID / GID / umask。</div><div class="map-proof"><code>export</code> 只影响当前会话与后代；创建权限 = 请求权限被 <code>umask</code> 屏蔽后的结果。</div></article>
+        <article class="map-row"><div class="map-index">03</div><div class="map-title">安全输入与转换</div><div class="map-body">格式化 I/O 先看返回值；不可信数字用 strtol 系列，不用 atoi 猜错误。</div><div class="map-proof"><code>end == str</code>：没读到数字；<code>errno == ERANGE</code>：越界；<code>snprintf</code>：检测截断。</div></article>
+        <article class="map-row"><div class="map-index">04</div><div class="map-title">两套文件接口</div><div class="map-body">系统调用用 fd；标准 I/O 用 FILE* 和用户态缓冲。最终都进入内核文件对象链。</div><div class="map-proof"><code>fileno</code> 向下取 fd；<code>fdopen</code> 向上包装成流。</div></article>
+        <article class="map-row"><div class="map-index">05</div><div class="map-title">共享、落盘与互斥</div><div class="map-body">dup/fork 共享打开实例；fflush 不等于落盘；锁行为取决于锁挂在哪个对象上。</div><div class="map-proof"><code>dup2</code> 改 fdtable；<code>fsync</code> 管持久化；<code>F_OFD_SETLK</code> 管区间互斥。</div></article>
+      </div>
+    </section>
+
+    <section class="section" id="io">
+      <div class="section-head">
+        <div><p class="section-no">02 · Two interface routes</p><h2>fd 与 FILE*：两条入口，一条内核主线。</h2></div>
+        <p class="section-intro">点击切换关注路线。最关键的分界不是“哪个函数更高级”，而是用户态缓冲是否存在、资源由谁关闭、数据此刻停在哪一层。</p>
+      </div>
+      <div class="lab" id="route-lab">
+        <div class="lab-toolbar"><strong>INTERFACE ROUTE</strong><div class="segmented"><button class="seg-btn active" data-route="fd" type="button">系统调用 · fd</button><button class="seg-btn" data-route="stdio" type="button">标准 I/O · FILE*</button></div></div>
+        <div class="routes">
+          <article class="route active" data-route-panel="fd"><p class="route-tag">unbuffered user API</p><div class="route-chain">
+            <div class="chain-node"><b>01</b><div><code>open(path, flags)</code><span>返回进程内的小整数 fd</span></div></div>
+            <div class="chain-node"><b>02</b><div><code>read / write</code><span>每次调用直接进入内核</span></div></div>
+            <div class="chain-node"><b>03</b><div><code>struct file</code><span>保存偏移 f_pos 与状态标志</span></div></div>
+            <div class="chain-node"><b>04</b><div><code>inode / page cache</code><span>文件身份、缓存页与底层存储</span></div></div>
+          </div></article>
+          <article class="route" data-route-panel="stdio"><p class="route-tag">buffered C library API</p><div class="route-chain">
+            <div class="chain-node"><b>01</b><div><code>fopen(path, mode)</code><span>返回 FILE* 流对象</span></div></div>
+            <div class="chain-node"><b>02</b><div><code>fread / fwrite / fprintf</code><span>先经过 glibc 用户态缓冲</span></div></div>
+            <div class="chain-node"><b>03</b><div><code>fileno(fp) → fd</code><span>缓冲填充或刷新时进入系统调用</span></div></div>
+            <div class="chain-node"><b>04</b><div><code>inode / page cache</code><span>最终仍落到同一套内核对象</span></div></div>
+          </div></article>
+        </div>
+        <p class="route-explain" id="route-explain">fd 是 fdtable 的索引，没有 stdio 用户态缓冲；read/write 的返回值必须处理短读、短写、EOF 与错误。</p>
+      </div>
+
+      <div style="height:56px"></div>
+      <div class="lifecycle" aria-label="open read write close 生命周期">
+        <div class="life-row header"><div>阶段</div><div>对象变化</div><div>核心机制</div><div>闭卷检查点</div></div>
+        <div class="life-row"><div class="life-api">open()</div><div class="life-action">路径绑定到打开实例</div><div class="life-detail">路径解析找到 inode；创建新的 open file description；在当前 fdtable 分配可用的最小 fd。</div><div class="life-check"><code>open 同一路径两次</code><br>通常得到两个独立偏移。</div></div>
+        <div class="life-row"><div class="life-api">read()</div><div class="life-action">缓存命中或补页</div><div class="life-detail">命中 page cache 就复制给用户；未命中触发文件系统与存储 I/O；成功后推进 f_pos。</div><div class="life-check"><code>return 0</code><br>表示 EOF，不是错误。</div></div>
+        <div class="life-row"><div class="life-api">write()</div><div class="life-action">写入内核缓存</div><div class="life-detail">普通缓存 I/O 先把数据写入 page cache 并形成脏页；持久化到介质是另一件事。</div><div class="life-check"><code>short write</code><br>循环处理未写完的部分。</div></div>
+        <div class="life-row"><div class="life-api">close()</div><div class="life-action">释放 fd 引用</div><div class="life-detail">清空当前 fdtable 表项并减少打开实例引用；最后一个引用消失后才释放 struct file。</div><div class="life-check"><code>close 失败</code><br>也要纳入错误路径。</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div><p class="section-no">03 · Buffer &amp; durability</p><h2>“刷新”有两层，不能混成一个动作。</h2></div><p class="section-intro">stdio 缓冲属于进程；page cache 属于内核。fflush 只完成第一段交接，fsync 才在持久化语义上继续向下推进。</p></div>
+      <div class="buffer-board">
+        <article class="buffer-zone"><h3>FILE* · user buffer</h3><p>printf / fwrite 可能先把小写入聚合在用户空间。</p><div class="bytes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p><code>fflush(fp)</code>：把这些字节交给内核。</p></article>
+        <div class="handoff">fflush<br>→</div>
+        <article class="buffer-zone kernel"><h3>inode · page cache</h3><p>write 成功通常只说明数据已进入内核管理的缓存页。</p><div class="bytes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p><code>fsync(fd)</code>：请求数据与必要元数据持久化。</p></article>
+      </div>
+      <div class="durability"><div><code>fflush()</code><span>用户缓冲 → 内核；不保证掉电后还在。</span></div><div><code>fsync()</code><span>内核缓存 → 稳定存储；用于持久化边界。</span></div><div><code>fclose()</code><span>会刷新 stdio 并关闭 fd；仍应检查返回值。</span></div></div>
+    </section>
+
+    <section class="section" id="redirect">
+      <div class="section-head"><div><p class="section-no">04 · Redirection lab</p><h2>重定向不是搬数据，而是改指针。</h2></div><p class="section-intro"><code>dup2(3, 1)</code> 的本质：关闭 fd 1 的旧引用，再让 fd 1 指向 fd 3 对应的同一个打开文件描述。</p></div>
+      <div class="redirect-layout">
+        <aside class="redirect-copy"><h3>观察 fdtable，而不是 stdout 这个名字。</h3><p>调用之后，fd 1 与 fd 3 可以互换使用，并共享文件偏移与文件状态标志。stdio 仍有独立用户缓冲，因此重定向前后要明确 fflush 边界。</p><div class="state-toggle"><button class="state-btn active" data-redir="before" type="button">执行前</button><button class="state-btn" data-redir="after" type="button">dup2 后</button></div></aside>
+        <div class="redirect-board" id="redirect-board">
+          <div class="redir-head">process fdtable</div>
+          <div class="fd-map">
+            <div class="fd-line"><div class="fd-chip">fd 1 · stdout</div><div class="arrow">→</div><div class="ofd-chip" id="stdout-target"><code id="stdout-object">struct file A</code><span id="stdout-device"> · terminal</span></div></div>
+            <div class="fd-line"><div class="fd-chip">fd 3</div><div class="arrow">→</div><div class="ofd-chip"><code>struct file B</code><span> · test.log</span></div></div>
+          </div>
+          <p class="redir-caption" id="redir-caption">执行前：stdout 指向终端，fd 3 指向文件；两者是不同打开实例。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="dark-section" id="locks">
+      <div class="section">
+        <div class="section-head"><div><p class="section-no">05 · Lock ownership</p><h2>文件锁所有行为，都从“锁挂在哪”推出来。</h2></div><p class="section-intro">冲突需要两个条件同时成立：区间重叠，并且至少一方是写锁。Linux 默认只剩建议性锁，正确性依赖参与者共同遵守。</p></div>
+        <div class="lock-ledger">
+          <div class="lock-row header"><div>接口</div><div>锁主体</div><div>粒度</div><div>fork</div><div>最危险的坑</div></div>
+          <div class="lock-row"><div class="lock-api">flock()</div><div class="lock-owner">open file description</div><div><span class="lock-badge">整个文件</span></div><div><span class="lock-badge">继承</span></div><div><p>同一主体不会和自己冲突；重新 open 才能得到另一个锁主体。适合“整个文件一个写者”。</p></div></div>
+          <div class="lock-row"><div class="lock-api">fcntl()</div><div class="lock-owner">PID + inode</div><div><span class="lock-badge">字节区间</span></div><div><span class="lock-badge">不继承</span></div><div><p>关闭当前进程中指向该 inode 的任意 fd，会清掉本进程在该文件上的全部 POSIX 记录锁。</p></div></div>
+          <div class="lock-row"><div class="lock-api">OFD lock</div><div class="lock-owner">open file description</div><div><span class="lock-badge">字节区间</span></div><div><span class="lock-badge">继承</span></div><div><p>需要区间粒度时优先考虑 <code>F_OFD_SETLK</code>；引用生命周期比 PID 锁更可控。</p></div></div>
+        </div>
+        <aside class="iocp-note"><code>4.4 · IOCP</code><p>这是 Windows 的完成端口模型，不是 Linux API。记住三句：通知的是“某次异步 I/O 已完成”，CompletionKey 找连接，OVERLAPPED* 找请求；取出完成结果后还要补投下一次 Recv / Send / AcceptEx。</p></aside>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div><p class="section-no">06 · Retrieval matrix</p><h2>按场景反查，不按章节背目录。</h2></div><p class="section-intro">切换类别，只保留当前需要回忆的接口。记忆目标是“遇到问题能选工具”，不是复述每个参数。</p></div>
+      <div class="reference-toolbar"><p>筛选 Day01 范围</p><div class="filters"><button class="filter-btn active" data-filter="all" type="button">全部核心</button><button class="filter-btn" data-filter="shell" type="button">命令</button><button class="filter-btn" data-filter="safe" type="button">安全输入</button><button class="filter-btn" data-filter="stdio" type="button">FILE*</button></div></div>
+      <div class="reference-table" id="reference-table">
+        <div class="ref-row header"><div>接口</div><div>解决什么问题</div><div>一句话记忆</div></div>
+        <div class="ref-row" data-group="shell"><code>grep -rn / find</code><b>搜索内容 / 搜索文件</b><span>函数出现在哪个文件用 grep；文件本身在哪用 find。</span></div>
+        <div class="ref-row" data-group="shell"><code>ps / top / kill</code><b>进程定位与退出</b><span>先 SIGTERM 给清理机会，无响应再考虑 SIGKILL。</span></div>
+        <div class="ref-row" data-group="shell"><code>df / du / free</code><b>磁盘与内存排查</b><span>df 定位分区，du 逐层找占用，free 重点看 available。</span></div>
+        <div class="ref-row" data-group="shell"><code>chmod / umask</code><b>权限与默认掩码</b><span>rwx 分所有者、组、其他；umask 屏蔽创建时的权限位。</span></div>
+        <div class="ref-row" data-group="safe"><code>strtol()</code><b>可校验的数字转换</b><span>endptr 判断解析位置，errno 判断范围；不要只看返回值。</span></div>
+        <div class="ref-row" data-group="safe"><code>snprintf()</code><b>安全格式化到缓冲区</b><span>返回“本应写入”的长度；n ≥ 容量表示发生截断。</span></div>
+        <div class="ref-row" data-group="safe"><code>scanf / sscanf</code><b>格式化输入</b><span>限制宽度、检查返回项数；double 在 scanf 中用 %lf。</span></div>
+        <div class="ref-row" data-group="stdio"><code>fopen / fclose</code><b>流的创建与销毁</b><span>写模式下 fclose 也可能报告最后一次刷新失败，必须检查。</span></div>
+        <div class="ref-row" data-group="stdio"><code>fread / fgets / fgetc</code><b>块、行、字符读取</b><span>fread 看完整块数；fgetc 用 int 接 EOF；fgets 会保留换行。</span></div>
+        <div class="ref-row" data-group="stdio"><code>fwrite / fputs / fputc</code><b>块、字符串、字符写入</b><span>fputs 不写 \0 也不自动换行；二进制块优先 fwrite。</span></div>
+        <div class="ref-row" data-group="stdio"><code>fileno / fdopen</code><b>FILE* 与 fd 互转</b><span>fdopen 后由 fclose 一并关闭底层 fd，所有权必须清楚。</span></div>
+        <div class="ref-row" data-group="stdio"><code>freopen / fflush</code><b>流重定向与刷新</b><span>freopen 自带关闭旧流语义；fflush 只交给内核，不等于落盘。</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div><p class="section-no">07 · Three failure modes</p><h2>今日三个卡点，都是“层级混淆”。</h2></div><p class="section-intro">一旦先问“状态位于用户缓冲、打开实例还是 inode”，三个看似诡异的问题都会变成可推导的结果。</p></div>
+      <div class="traps">
+        <article class="trap"><div class="trap-no">01</div><h3>fork 后重复输出</h3><p><code>printf</code> 数据还在 FILE* 用户缓冲时 fork，父子会各自复制一份，退出刷新时可能各写一次。边界：<code>fflush(stdout)</code> 后再 fork。</p></article>
+        <article class="trap"><div class="trap-no">02</div><h3>任意 close 导致 POSIX 锁全丢</h3><p>记录锁挂在 PID + inode，而不是某个 fd。当前进程关闭指向该 inode 的任意 fd，都可能释放本进程在该文件上的所有 POSIX 记录锁。</p></article>
+        <article class="trap"><div class="trap-no">03</div><h3>printf 与 write 顺序颠倒</h3><p><code>write</code> 直接进入内核，<code>printf</code> 可能仍滞留在用户缓冲。两套接口混用时必须显式建立 <code>fflush</code> 同步边界。</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="exam">
+      <div class="section-head"><div><p class="section-no">08 · Closed-book acceptance</p><h2>不看答案，逐项讲到能被追问。</h2></div><p class="section-intro">勾选状态保存在浏览器本地。每项至少要能给出一个反例或错误路径，才算真正通过。</p></div>
+      <div class="exam">
+        <div class="checklist" id="checklist">
+          <label class="check-item"><input type="checkbox" data-check="0"><span><b>命令场景反查</b><span>能说明 grep/find、df/du、kill/kill -9 分别解决什么问题。</span></span></label>
+          <label class="check-item"><input type="checkbox" data-check="1"><span><b>环境与权限</b><span>能解释 PATH、export 继承范围、rwx 与 umask。</span></span></label>
+          <label class="check-item"><input type="checkbox" data-check="2"><span><b>安全转换与格式化</b><span>能说出 strtol 的 endptr/errno，以及 snprintf 如何检查截断。</span></span></label>
+          <label class="check-item"><input type="checkbox" data-check="3"><span><b>画出 open → read/write → close</b><span>必须包含 fdtable、struct file、inode 和 page cache。</span></span></label>
+          <label class="check-item"><input type="checkbox" data-check="4"><span><b>辨析 fd 与 FILE*</b><span>说明用户态缓冲、fileno/fdopen 和关闭所有权。</span></span></label>
+          <label class="check-item"><input type="checkbox" data-check="5"><span><b>推导 dup2 与持久化</b><span>从 fdtable 指针变化讲重定向，并区分 fflush 与 fsync。</span></span></label>
+          <label class="check-item"><input type="checkbox" data-check="6"><span><b>从所有者推导三类锁</b><span>讲清 fork、dup、任意 close 与字节区间冲突。</span></span></label>
+        </div>
+        <aside class="score-panel"><small>acceptance score</small><div class="score"><span id="score">0</span>/7</div><p id="score-copy">先从“画出对象链”开始，不要急着背 API。</p><button class="reset" id="reset" type="button">RESET CHECKLIST</button></aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="source-footer">
+    <div class="source-inner"><h2>Source scope</h2><div><p>整理自 Obsidian 的 Day01 Trellis 只读任务镜像，以及其指向的 Linux 1.0–3.5、4.1–4.4、6.1–6.4 笔记；明确排除力扣 88、128、49。</p><div class="source-links"><a href="obsidian://open?vault=obsidian_notes-main&amp;file=9.%E5%9F%B9%E5%85%BB%E6%96%B9%E6%A1%88%2F04.Trellis%E5%AD%A6%E4%B9%A0%E4%BB%BB%E5%8A%A1%2FTrellis%E8%AF%A6%E6%83%85%2F08-21-linux-leetcode-day1">打开 Day01 原笔记</a><a href="./Linux%20文件%20I-O%20四层模型讲解.html">打开文件 I/O 四层模型</a></div></div></div>
+  </footer>
+
+  <script>
+    const routeButtons = [...document.querySelectorAll("[data-route]")];
+    const routePanels = [...document.querySelectorAll("[data-route-panel]")];
+    const routeExplain = document.getElementById("route-explain");
+    const routeCopy = {
+      fd: "fd 是 fdtable 的索引，没有 stdio 用户态缓冲；read/write 的返回值必须处理短读、短写、EOF 与错误。",
+      stdio: "FILE* 在用户空间聚合小 I/O；fflush 只把缓冲交给内核。通过 fileno 可取得底层 fd，通过 fdopen 可把 fd 包装成流。"
+    };
+    function setRoute(route) {
+      routeButtons.forEach(button => button.classList.toggle("active", button.dataset.route === route));
+      routePanels.forEach(panel => panel.classList.toggle("active", panel.dataset.routePanel === route));
+      routeExplain.textContent = routeCopy[route];
+    }
+    routeButtons.forEach(button => button.addEventListener("click", () => setRoute(button.dataset.route)));
+
+    const redirButtons = [...document.querySelectorAll("[data-redir]")];
+    const redirBoard = document.getElementById("redirect-board");
+    const stdoutObject = document.getElementById("stdout-object");
+    const stdoutDevice = document.getElementById("stdout-device");
+    const redirCaption = document.getElementById("redir-caption");
+    function setRedirect(state) {
+      const after = state === "after";
+      redirButtons.forEach(button => button.classList.toggle("active", button.dataset.redir === state));
+      redirBoard.classList.toggle("after", after);
+      stdoutObject.textContent = after ? "struct file B" : "struct file A";
+      stdoutDevice.textContent = after ? " · test.log" : " · terminal";
+      redirCaption.textContent = after
+        ? "dup2 后：fd 1 与 fd 3 指向同一打开实例，因而共享文件偏移与文件状态标志。"
+        : "执行前：stdout 指向终端，fd 3 指向文件；两者是不同打开实例。";
+    }
+    redirButtons.forEach(button => button.addEventListener("click", () => setRedirect(button.dataset.redir)));
+
+    const filterButtons = [...document.querySelectorAll("[data-filter]")];
+    const refRows = [...document.querySelectorAll(".ref-row[data-group]")];
+    function setFilter(filter) {
+      filterButtons.forEach(button => button.classList.toggle("active", button.dataset.filter === filter));
+      refRows.forEach(row => row.classList.toggle("hidden", filter !== "all" && row.dataset.group !== filter));
+    }
+    filterButtons.forEach(button => button.addEventListener("click", () => setFilter(button.dataset.filter)));
+
+    const checks = [...document.querySelectorAll("[data-check]")];
+    const score = document.getElementById("score");
+    const scoreCopy = document.getElementById("score-copy");
+    const scoreMessages = [
+      "先从“画出对象链”开始，不要急着背 API。",
+      "已经启动；下一项请口头给出一个失败案例。",
+      "基础入口正在成形，继续把返回值说完整。",
+      "接近一半；现在重点检查缓冲与持久化边界。",
+      "主线已建立，开始追问 fork、dup 与 close。",
+      "还差两个薄弱点，别用模糊词带过。",
+      "最后一项请完整讲出锁的所有者。",
+      "Day01 非力扣部分闭卷验收完成。"
+    ];
+    function readChecks() {
+      try { return JSON.parse(localStorage.getItem("day01-linux-checks") || "[]"); }
+      catch { return []; }
+    }
+    function storeChecks(values) {
+      try { localStorage.setItem("day01-linux-checks", JSON.stringify(values)); }
+      catch { /* Local-file privacy settings may disable persistence. */ }
+    }
+    function updateScore() {
+      const count = checks.filter(check => check.checked).length;
+      score.textContent = String(count);
+      scoreCopy.textContent = scoreMessages[count];
+      storeChecks(checks.map(check => check.checked));
+    }
+    const saved = readChecks();
+    checks.forEach((check, index) => {
+      check.checked = Boolean(saved[index]);
+      check.addEventListener("change", updateScore);
+    });
+    document.getElementById("reset").addEventListener("click", () => { checks.forEach(check => { check.checked = false; }); updateScore(); });
+    updateScore();
+  </script>
+</body>
+</html>

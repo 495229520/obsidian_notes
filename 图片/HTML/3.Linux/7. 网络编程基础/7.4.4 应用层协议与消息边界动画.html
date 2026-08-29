@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>消息在哪里结束？· 应用层协议解剖台</title>
+<!--
+  Visual system
+  Type: 58 / 30 / 24 / 18 / 15, editorial serif headings + readable humanist sans + mono bytes.
+  Surfaces: warm paper (#f2efe6) and ink (#20231f), with one semantic color per boundary mechanism.
+  Rhythm: 8px base; framed laboratory panels; square corners softened only to 6–14px.
+  Motion: 640ms material movement, 220ms state feedback, cubic-bezier(.22,.78,.24,1).
+-->
+<style>
+:root {
+  --paper:#f2efe6; --paper-2:#e9e3d6; --panel:#fbfaf5; --ink:#20231f;
+  --muted:#696b63; --faint:#98998f; --rule:#cec8ba; --rule-dark:#aaa394;
+  --rust:#b94f37; --rust-soft:#f0d8cf; --blue:#2f6d84; --blue-soft:#dceaf0;
+  --moss:#3f7456; --moss-soft:#dce9df; --gold:#a66b20; --gold-soft:#f1e3c9;
+  --violet:#665b88; --violet-soft:#e6e1ef;
+  --serif:"Songti SC","STSong","Noto Serif CJK SC",Georgia,serif;
+  --sans:"Avenir Next","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+  --ease:cubic-bezier(.22,.78,.24,1); --move:640ms; --quick:220ms;
+}
+* { box-sizing:border-box; }
+html { color-scheme:light; background:var(--paper); }
+body {
+  margin:0; min-height:100vh; color:var(--ink); font-family:var(--sans); font-size:17px;
+  background-color:var(--paper);
+  background-image:radial-gradient(circle at 1px 1px, rgba(32,35,31,.055) 1px, transparent 0);
+  background-size:22px 22px;
+}
+button { font:inherit; }
+button:focus-visible { outline:3px solid color-mix(in srgb, var(--blue) 70%, white); outline-offset:3px; }
+.shell { width:min(1500px, calc(100% - 48px)); margin:0 auto; padding:34px 0 42px; }
+
+.masthead { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:28px; align-items:end; }
+.eyebrow { font:700 13px/1.2 var(--mono); letter-spacing:.16em; color:var(--rust); text-transform:uppercase; }
+h1 { margin:10px 0 0; font:700 clamp(34px,4.1vw,58px)/1.02 var(--serif); letter-spacing:-.045em; text-wrap:balance; }
+.lead { max-width:860px; margin:13px 0 0; color:var(--muted); font-size:17px; line-height:1.7; text-wrap:pretty; }
+.legend { display:flex; gap:16px; align-items:center; padding-bottom:6px; color:var(--muted); font:650 13px/1.2 var(--mono); }
+.legend span { display:flex; gap:6px; align-items:center; white-space:nowrap; }
+.legend i { width:9px; height:9px; border-radius:50%; background:var(--c); }
+
+.scene-nav {
+  display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); margin-top:28px;
+  border-block:1px solid var(--rule); background:rgba(242,239,230,.86); backdrop-filter:blur(8px);
+}
+.scene-tab {
+  position:relative; min-height:82px; border:0; border-right:1px solid var(--rule); padding:15px 16px;
+  color:var(--muted); background:transparent; cursor:pointer; text-align:left; transition:color var(--quick),background var(--quick);
+}
+.scene-tab:last-child { border-right:0; }
+.scene-tab:hover { color:var(--ink); background:rgba(255,255,255,.38); }
+.scene-tab[aria-pressed="true"] { color:var(--ink); background:var(--panel); }
+.scene-tab[aria-pressed="true"]::after { content:""; position:absolute; inset:auto 12px -1px; height:3px; background:var(--accent,var(--rust)); }
+.scene-no { display:block; color:var(--faint); font:700 12px/1 var(--mono); }
+.scene-name { display:block; margin-top:8px; font-size:15px; font-weight:750; line-height:1.25; }
+
+.lab { margin-top:24px; border:1px solid var(--rule-dark); background:var(--panel); box-shadow:0 18px 50px rgba(50,44,30,.08); }
+.lab-head { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:16px 20px; border-bottom:1px solid var(--rule); background:var(--ink); color:var(--paper); }
+.lab-title { display:flex; align-items:baseline; gap:12px; min-width:0; }
+.lab-kicker { color:#b7b9b0; font:700 13px/1 var(--mono); letter-spacing:.08em; }
+#sceneTitle { font-size:16px; font-weight:750; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.step-counter { color:#d6d7d1; font:700 14px/1 var(--mono); white-space:nowrap; }
+
+.workbench { display:grid; grid-template-columns:minmax(0,2.08fr) minmax(320px,.92fr); min-height:600px; }
+.stage-wrap { position:relative; min-width:0; padding:22px; border-right:1px solid var(--rule); background:var(--paper); overflow:hidden; }
+.stage-wrap::before { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,transparent 31px,rgba(32,35,31,.04) 32px,transparent 33px); background-size:64px 100%; }
+#stage { position:relative; min-height:554px; }
+
+.brief { display:flex; min-width:0; flex-direction:column; background:var(--panel); }
+.brief-main { flex:1; padding:34px 30px 28px; }
+.step-label { font:700 13px/1 var(--mono); letter-spacing:.12em; color:var(--rust); }
+#action { margin:15px 0 0; font:700 28px/1.32 var(--serif); text-wrap:balance; }
+#detail { margin:18px 0 0; color:var(--muted); font-size:17px; line-height:1.8; text-wrap:pretty; }
+.takeaway { margin-top:24px; padding-top:18px; border-top:1px solid var(--rule); }
+.takeaway-label { color:var(--faint); font:700 12px/1 var(--mono); letter-spacing:.12em; }
+#takeaway { margin-top:10px; font-size:15px; font-weight:700; line-height:1.65; }
+.brief-foot { display:grid; grid-template-columns:1fr auto; gap:14px; align-items:center; padding:16px 18px; border-top:1px solid var(--rule); background:var(--paper-2); }
+.dots { display:flex; flex-wrap:wrap; gap:8px; }
+.dot { width:28px; height:5px; border:0; padding:0; background:var(--rule-dark); cursor:pointer; transition:width var(--quick),background var(--quick),transform var(--quick); }
+.dot:hover { transform:translateY(-2px); }
+.dot.done { background:color-mix(in srgb,var(--accent,var(--rust)) 45%,var(--rule)); }
+.dot.now { width:46px; background:var(--accent,var(--rust)); }
+.kbd-hint { color:var(--faint); font:650 12px/1 var(--mono); white-space:nowrap; }
+
+.controls { display:flex; align-items:center; gap:10px; padding:14px 18px; border-top:1px solid var(--rule-dark); background:var(--panel); }
+.control {
+  min-height:44px; border:1px solid var(--rule-dark); border-radius:3px; padding:0 17px; color:var(--ink); background:transparent;
+  cursor:pointer; font-size:15px; font-weight:750; transition:transform var(--quick),background var(--quick),color var(--quick);
+}
+.control:hover:not(:disabled) { transform:translateY(-1px); background:var(--paper-2); }
+.control:disabled { opacity:.32; cursor:not-allowed; }
+.control.play { min-width:112px; color:var(--paper); border-color:var(--ink); background:var(--ink); }
+.control.play:hover { color:white; background:#343832; }
+.progress-track { position:relative; flex:1; height:2px; margin-left:8px; background:var(--rule); }
+#progressBar { position:absolute; inset:0 auto 0 0; width:0; background:var(--accent,var(--rust)); transition:width var(--move) var(--ease); }
+
+/* Shared stage primitives */
+.plate { position:relative; border:1px solid var(--rule); background:rgba(251,250,245,.88); }
+.plate-title { display:flex; justify-content:space-between; gap:14px; padding:12px 14px; border-bottom:1px solid var(--rule); color:var(--muted); font:700 13px/1.35 var(--mono); }
+.tag { display:inline-flex; align-items:center; min-height:28px; padding:0 10px; border:1px solid currentColor; border-radius:999px; font:700 12px/1 var(--mono); }
+.byte { display:inline-flex; align-items:center; justify-content:center; min-width:46px; height:38px; padding:0 9px; border:1px solid var(--rule); background:var(--panel); font:700 13px/1 var(--mono); transition:all var(--move) var(--ease); }
+.byte + .byte { margin-left:-1px; }
+.dim { opacity:.3; }
+
+/* 01 boundaries */
+.boundary-stage { display:grid; gap:16px; min-width:0; }
+.stream-plate,.methods,.method { min-width:0; }
+.stream-plate { padding-bottom:18px; }
+.stream { position:relative; display:flex; align-items:center; min-height:102px; padding:34px 20px 18px; overflow-x:auto; }
+.stream .byte { flex:0 0 auto; }
+.stream::before { content:"TCP 字节流"; position:absolute; top:11px; left:20px; color:var(--faint); font:700 12px/1 var(--mono); }
+.scan-head { position:absolute; top:29px; left:18px; width:3px; height:49px; opacity:0; background:var(--rust); box-shadow:0 0 0 3px var(--rust-soft); transition:left var(--move) var(--ease),opacity var(--quick); z-index:4; }
+.stream .byte.marker { color:var(--rust); background:var(--rust-soft); border-color:var(--rust); }
+.methods { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.method { position:relative; min-height:258px; padding:18px; border:1px solid var(--rule); background:rgba(251,250,245,.78); transition:transform var(--move) var(--ease),border-color var(--quick),background var(--quick),opacity var(--quick); overflow:hidden; }
+.method.active { transform:translateY(-7px); border-color:var(--method); background:var(--method-soft); }
+.method h3 { margin:0; font:700 22px/1.25 var(--serif); }
+.method p { margin:9px 0 0; color:var(--muted); font-size:14px; line-height:1.65; }
+.method-sample { margin-top:20px; }
+.delimiter-sample { display:flex; flex-wrap:wrap; gap:0; }
+.delimiter-sample .byte { min-width:34px; height:31px; }
+.prefix-frame { display:grid; grid-template-columns:72px 1fr; border:1px solid var(--blue); }
+.prefix-frame span { padding:11px 9px; font:700 12px/1.4 var(--mono); }
+.prefix-frame span:first-child { color:white; background:var(--blue); }
+.prefix-fill { position:absolute; left:18px; right:18px; bottom:18px; height:5px; background:var(--blue-soft); }
+.prefix-fill i { display:block; width:10%; height:100%; background:var(--blue); transition:width var(--move) var(--ease); }
+.datagrams { display:flex; gap:8px; align-items:flex-end; padding-bottom:22px; }
+.datagram { flex:1; padding:11px 7px; border:1px solid var(--moss); color:var(--moss); background:var(--moss-soft); font:700 11px/1.35 var(--mono); text-align:center; transform:translateY(22px); opacity:.25; transition:transform var(--move) var(--ease),opacity var(--move); }
+.method.active .datagram { transform:translateY(0); opacity:1; }
+
+/* 02 HTTP */
+.http-stage { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr); gap:14px; min-height:548px; }
+.http-raw { position:relative; overflow:hidden; }
+.http-lines { position:relative; padding:16px 18px 18px; font:650 14px/1.55 var(--mono); }
+.http-line { position:relative; min-height:44px; padding:10px 10px 9px 16px; border-bottom:1px solid var(--rule); transition:color var(--quick),background var(--quick),padding-left var(--move) var(--ease); white-space:pre-wrap; }
+.http-line.active { padding-left:24px; color:var(--ink); background:var(--gold-soft); }
+.http-line.parsed { color:var(--blue); }
+.http-line.blank { color:var(--rust); }
+.http-cursor { position:absolute; left:18px; right:18px; top:16px; height:44px; border-left:4px solid var(--gold); pointer-events:none; transition:transform var(--move) var(--ease),opacity var(--quick); }
+.parser { display:flex; flex-direction:column; }
+.parser-stack { display:grid; gap:9px; padding:16px; }
+.parse-node { padding:12px; border:1px solid var(--rule); color:var(--faint); background:var(--paper); transition:all var(--move) var(--ease); }
+.parse-node b { display:block; font:700 13px/1 var(--mono); }
+.parse-node small { display:block; margin-top:7px; font-size:13px; line-height:1.5; }
+.parse-node.active { color:var(--blue); border-color:var(--blue); background:var(--blue-soft); transform:translateX(-7px); }
+.parse-node.done { color:var(--moss); border-color:var(--moss); }
+.body-meter { margin:auto 16px 16px; }
+.body-meter-label { display:flex; justify-content:space-between; color:var(--muted); font:700 12px/1 var(--mono); }
+.meter { height:12px; margin-top:8px; border:1px solid var(--rule-dark); background:var(--paper-2); }
+.meter i { display:block; width:0; height:100%; background:var(--moss); transition:width var(--move) var(--ease); }
+
+/* 03 TLS */
+.tls-stage { display:grid; gap:14px; }
+.tls-wire { position:relative; min-height:380px; padding:20px; overflow:hidden; }
+.actors { display:flex; justify-content:space-between; }
+.actor { width:150px; min-height:76px; padding:15px 12px; border:1px solid currentColor; background:var(--panel); text-align:center; font:700 14px/1.4 var(--mono); }
+.actor.client { color:var(--blue); } .actor.server { color:var(--violet); }
+.wire-line { position:absolute; top:165px; left:96px; right:96px; height:2px; background:var(--rule-dark); }
+.flight { position:absolute; top:146px; left:188px; width:156px; min-height:38px; padding:10px 12px; border:1px solid var(--blue); color:var(--blue); background:var(--blue-soft); font:700 12px/1.35 var(--mono); text-align:center; opacity:0; transition:transform var(--move) var(--ease),opacity var(--quick),color var(--quick),background var(--quick),border-color var(--quick); z-index:3; }
+.handshake-steps { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:105px; }
+.flight-step { min-height:102px; padding:12px 10px; border-top:3px solid var(--rule); color:var(--faint); font-size:13px; line-height:1.5; transition:all var(--move) var(--ease); }
+.flight-step b { display:block; font-family:var(--mono); }
+.flight-step.active { color:var(--ink); border-color:var(--violet); background:var(--violet-soft); transform:translateY(-6px); }
+.flight-step.done { color:var(--moss); border-color:var(--moss); }
+.tls-lower { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.key-rack,.record { min-height:242px; padding:18px; }
+.key-list { display:grid; gap:8px; margin-top:12px; }
+.key { display:flex; justify-content:space-between; gap:12px; padding:11px 12px; border:1px solid var(--rule); color:var(--faint); font:700 12px/1.4 var(--mono); transition:all var(--move) var(--ease); }
+.key.on { color:var(--moss); border-color:var(--moss); background:var(--moss-soft); }
+.key.dead { color:var(--rust); text-decoration:line-through; opacity:.55; }
+.record-cells { display:grid; grid-template-columns:82px 98px 82px 1fr; margin-top:16px; }
+.record-cell { min-height:92px; padding:11px 8px; border:1px solid var(--rule); margin-left:-1px; color:var(--muted); font:700 11px/1.45 var(--mono); transition:all var(--move) var(--ease); }
+.record-cell b { display:block; margin-top:10px; color:var(--ink); font-size:13px; }
+.record-cell.on { color:var(--violet); border-color:var(--violet); background:var(--violet-soft); transform:translateY(-5px); }
+
+/* 04 SSH */
+.ssh-stage { display:grid; grid-template-rows:auto 1fr; gap:14px; }
+.receive { padding:16px; }
+.segments { display:flex; gap:8px; min-height:52px; align-items:center; }
+.segment { padding:11px 13px; border:1px solid var(--rule); color:var(--faint); background:var(--paper); font:700 12px/1.35 var(--mono); opacity:.25; transform:translateX(-18px); transition:all var(--move) var(--ease); }
+.segment.arrived { color:var(--blue); border-color:var(--blue); background:var(--blue-soft); opacity:1; transform:translateX(0); }
+.buffer { position:relative; height:82px; margin-top:16px; border:1px solid var(--rule-dark); background:var(--paper-2); overflow:hidden; }
+.buffer-fill { position:absolute; inset:0 auto 0 0; width:0; background:var(--blue-soft); transition:width var(--move) var(--ease); }
+.buffer-prefix { position:absolute; inset:0 auto 0 0; width:18%; display:grid; place-items:center; border-right:2px solid var(--blue); color:var(--blue); font:700 13px/1.4 var(--mono); z-index:2; }
+.buffer-body { position:absolute; inset:0 0 0 18%; display:grid; place-items:center; color:var(--muted); font:700 13px/1.4 var(--mono); z-index:2; }
+.buffer-pointer { position:absolute; top:0; bottom:0; left:0; width:3px; background:var(--rust); transition:left var(--move) var(--ease); z-index:4; }
+.ssh-lower { display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:14px; }
+.code-panel { align-self:start; padding:12px 0; overflow:hidden; border-color:#1e211e; background:#282b27; color:#d9d9d1; font:13px/1.55 var(--mono); }
+.code-line { min-height:24px; padding:2px 14px; white-space:pre; transition:background var(--move),box-shadow var(--move),color var(--move); }
+.code-line .cm { color:#92988e; }
+.code-line .kw { color:#e7b36b; } .code-line .ty { color:#91c5db; } .code-line .fn { color:#8fc8a4; }
+.code-line.lit { color:#f7f4ea; background:rgba(47,109,132,.58); box-shadow:inset 4px 0 0 #94d1e9; }
+.code-line.lit .cm { color:#dedbd0; }
+.guard { display:grid; align-content:start; gap:10px; padding:16px; }
+.guard-item { padding:14px 13px; border:1px solid var(--rule); color:var(--faint); font-size:13px; line-height:1.5; transition:all var(--move) var(--ease); }
+.guard-item b { display:block; margin-bottom:4px; font-family:var(--mono); }
+.guard-item.on { color:var(--rust); border-color:var(--rust); background:var(--rust-soft); transform:translateX(-6px); }
+
+/* 05 DNS */
+.dns-stage { display:grid; gap:14px; }
+.dns-road { position:relative; min-height:420px; padding:18px; overflow:hidden; }
+.dns-road .resolver,.dns-road .server { position:absolute; top:157px; width:140px; padding:14px 10px; border:1px solid var(--blue); color:var(--blue); background:var(--panel); font:700 13px/1.4 var(--mono); text-align:center; }
+.dns-road .resolver { left:22px; } .dns-road .server { right:22px; color:var(--violet); border-color:var(--violet); }
+.road { position:absolute; left:162px; right:162px; height:2px; background:var(--rule-dark); }
+.road.udp { top:181px; } .road.tcp { top:276px; }
+.road-label { position:absolute; left:50%; transform:translateX(-50%); padding:5px 10px; border:1px solid var(--rule); background:var(--panel); color:var(--faint); font:700 12px/1 var(--mono); }
+.road-label.udp { top:132px; } .road-label.tcp { top:307px; }
+.dns-packet { position:absolute; top:103px; left:162px; width:150px; min-height:36px; padding:9px 8px; color:var(--moss); border:1px solid var(--moss); background:var(--moss-soft); font:700 12px/1.35 var(--mono); text-align:center; white-space:normal; opacity:0; transition:transform var(--move) var(--ease),top var(--move) var(--ease),opacity var(--quick),background var(--quick),color var(--quick); z-index:3; }
+.dns-head { position:absolute; left:50%; top:52px; width:min(520px,62%); padding-bottom:6px; transform:translateX(-50%); display:grid; grid-template-columns:repeat(6,1fr); }
+.dns-field { min-height:72px; padding:10px 6px; border:1px solid var(--rule); margin-left:-1px; color:var(--faint); font:700 11px/1.4 var(--mono); text-align:center; transition:all var(--move) var(--ease); }
+.dns-field.on { color:var(--rust); border-color:var(--rust); background:var(--rust-soft); transform:translateY(6px); }
+.transport-note { position:absolute; left:50%; bottom:18px; width:min(720px,78%); transform:translateX(-50%); padding:13px; border-block:1px solid var(--rule); color:var(--muted); font-size:14px; line-height:1.65; text-align:center; }
+
+/* 06 matrix */
+.matrix-stage { display:grid; gap:14px; }
+.matrix { display:grid; grid-template-columns:150px repeat(3,1fr); border-top:1px solid var(--rule); border-left:1px solid var(--rule); }
+.matrix-cell { min-height:78px; padding:13px; border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); color:var(--faint); background:rgba(251,250,245,.7); font-size:13px; line-height:1.5; transition:all var(--move) var(--ease); }
+.matrix-cell.head { min-height:52px; color:var(--muted); background:var(--paper-2); font:700 12px/1.4 var(--mono); }
+.matrix-cell.protocol { color:var(--ink); font:700 17px/1.4 var(--serif); }
+.matrix-cell.match { color:var(--blue); font-weight:700; }
+.matrix-row.on .matrix-cell { color:var(--ink); background:var(--soft,var(--blue-soft)); }
+.matrix-row.on .matrix-cell.match { color:var(--accent,var(--blue)); box-shadow:inset 0 -4px 0 var(--accent,var(--blue)); }
+.decision-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.decision { padding:14px; border-top:3px solid var(--c); background:var(--paper-2); }
+.decision b { display:block; font:700 14px/1.25 var(--mono); }
+.decision p { margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
+
+@media (max-width:1120px) {
+  .scene-nav { grid-template-columns:repeat(3,1fr); }
+  .scene-tab:nth-child(3) { border-right:0; }
+  .scene-tab:nth-child(-n+3) { border-bottom:1px solid var(--rule); }
+  .workbench { grid-template-columns:1fr; }
+  .stage-wrap { border-right:0; border-bottom:1px solid var(--rule); }
+  #stage { min-height:540px; }
+  .brief-main { min-height:260px; }
+}
+@media (max-width:760px) {
+  .shell { width:min(100% - 24px,1500px); padding-top:22px; }
+  .masthead { grid-template-columns:1fr; }
+  .legend { display:none; }
+  .scene-nav { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; }
+  .scene-tab { flex:0 0 158px; border-bottom:0!important; scroll-snap-align:start; }
+  .scene-name { font-size:14px; }
+  .stage-wrap { padding:12px; }
+  #stage { min-height:0; }
+  .methods,.tls-lower,.ssh-lower,.decision-strip { grid-template-columns:1fr; }
+  .method { min-height:190px; }
+  .http-stage { grid-template-columns:1fr; }
+  .http-raw { min-height:315px; }
+  .handshake-steps { grid-template-columns:repeat(5,128px); overflow-x:auto; }
+  .tls-wire { min-height:410px; }
+  .actor { width:105px; min-height:62px; padding:9px 5px; font-size:12px; }
+  .wire-line { left:72px; right:72px; }
+  .flight { width:96px; min-height:34px; padding:8px 4px; font-size:10px; }
+  .matrix { grid-template-columns:90px repeat(3,150px); overflow-x:auto; }
+  .dns-road { min-height:470px; }
+  .dns-head { top:50px; width:calc(100% - 20px); grid-template-columns:repeat(3,1fr); }
+  .dns-field { min-height:54px; }
+  .dns-road .resolver,.dns-road .server { top:202px; width:102px; padding-inline:5px; }
+  .dns-road .resolver { left:5px; } .dns-road .server { right:5px; }
+  .road.udp { top:226px; } .road.tcp { top:330px; }
+  .road-label.udp { top:178px; } .road-label.tcp { top:282px; }
+  .road { left:102px; right:102px; }
+  .dns-packet { width:90px; min-height:32px; padding:6px 4px; font-size:10px; }
+  .stream { overflow-x:auto; }
+  .transport-note { bottom:15px; width:calc(100% - 26px); }
+  .controls { position:sticky; bottom:0; z-index:10; display:grid; grid-template-columns:1fr 1.12fr 1fr; gap:7px; padding:12px; }
+  .control { min-width:0; padding:0 7px; }
+  .progress-track { flex-basis:100%; order:5; margin:2px 0 0; }
+  .brief-main { padding:24px 20px; }
+  .kbd-hint { display:none; }
+}
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { scroll-behavior:auto!important; animation-duration:1ms!important; transition-duration:1ms!important; }
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="masthead">
+    <div>
+      <div class="eyebrow">Network Protocol Lab · 07.4</div>
+      <h1>消息，到底在哪里结束？</h1>
+      <p class="lead">HTTP、TLS、SSH、DNS、FTP、SMTP 看起来各不相同，真正的分水岭只有一个：接收方如何从连续字节中认出一条完整消息。</p>
+    </div>
+    <div class="legend" aria-label="边界机制图例">
+      <span><i style="--c:var(--rust)"></i>分隔符</span>
+      <span><i style="--c:var(--blue)"></i>长度前缀</span>
+      <span><i style="--c:var(--moss)"></i>数据报</span>
+    </div>
+  </header>
+
+  <nav class="scene-nav" aria-label="动画场景">
+    <button class="scene-tab" data-scene="paradigms" style="--accent:var(--rust)" aria-pressed="true"><span class="scene-no">01</span><span class="scene-name">边界三问</span></button>
+    <button class="scene-tab" data-scene="http" style="--accent:var(--gold)" aria-pressed="false"><span class="scene-no">02</span><span class="scene-name">HTTP 双轨解析</span></button>
+    <button class="scene-tab" data-scene="https" style="--accent:var(--violet)" aria-pressed="false"><span class="scene-no">03</span><span class="scene-name">TLS 混合加密</span></button>
+    <button class="scene-tab" data-scene="ssh" style="--accent:var(--blue)" aria-pressed="false"><span class="scene-no">04</span><span class="scene-name">SSH 精确读帧</span></button>
+    <button class="scene-tab" data-scene="dns" style="--accent:var(--moss)" aria-pressed="false"><span class="scene-no">05</span><span class="scene-name">DNS 传输分叉</span></button>
+    <button class="scene-tab" data-scene="matrix" style="--accent:var(--rust)" aria-pressed="false"><span class="scene-no">06</span><span class="scene-name">六协议全景</span></button>
+  </nav>
+
+  <section class="lab" aria-label="应用层协议交互动画">
+    <div class="lab-head">
+      <div class="lab-title"><span class="lab-kicker" id="sceneNumber">SCENE 01</span><span id="sceneTitle">边界三问</span></div>
+      <div class="step-counter" id="stepCounter">01 / 05</div>
+    </div>
+    <div class="workbench">
+      <div class="stage-wrap"><div id="stage"></div></div>
+      <aside class="brief">
+        <div class="brief-main">
+          <div class="step-label">▸ 本步动作</div>
+          <h2 id="action" aria-live="polite"></h2>
+          <p id="detail"></p>
+          <div class="takeaway"><div class="takeaway-label">KEEP THIS</div><div id="takeaway"></div></div>
+        </div>
+        <div class="brief-foot"><div class="dots" id="dots"></div><div class="kbd-hint">← → 单步 · SPACE 播放</div></div>
+      </aside>
+    </div>
+    <div class="controls">
+      <button class="control" id="prev">← 上一步</button>
+      <button class="control play" id="play">播放</button>
+      <button class="control" id="next">下一步 →</button>
+      <div class="progress-track" aria-hidden="true"><i id="progressBar"></i></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+  const stage = document.querySelector('#stage');
+  const tabs = [...document.querySelectorAll('.scene-tab')];
+  const ui = {
+    action:document.querySelector('#action'), detail:document.querySelector('#detail'), takeaway:document.querySelector('#takeaway'),
+    title:document.querySelector('#sceneTitle'), number:document.querySelector('#sceneNumber'), counter:document.querySelector('#stepCounter'),
+    dots:document.querySelector('#dots'), prev:document.querySelector('#prev'), play:document.querySelector('#play'), next:document.querySelector('#next'),
+    bar:document.querySelector('#progressBar')
+  };
+
+  const copy = {
+    paradigms:{title:'边界三问',accent:'var(--rust)',steps:[
+      ['TCP 只交付连续字节','先抹掉“发送了几次”的记忆：接收端看到的只是连续字节，一次 read 可能拿到半条、恰好一条或多条消息。','TCP 可靠，但不保存应用层消息边界。'],
+      ['扫描到分隔符才停','HTTP 头部、FTP 命令、SMTP 命令逐字节寻找 CRLF；正文若撞上分隔符，就必须定义转义规则。','分隔符可读、好调试；解析要扫描，正文还要转义。'],
+      ['先读长度，再精确取正文','SSH、TLS 记录、DNS over TCP 先读一个固定宽度的长度，再按这个数字收满正文。','长度来自对端：读之前必须先做上限校验。'],
+      ['一次数据报就是一条消息','UDP 保留 sendto / recvfrom 的数据报边界。DNS 查询放进一个数据报，接收方不必另找结束位置。','天然边界是 UDP 的性质，不是 DNS 报文本身的魔法。'],
+      ['先问传输层，再选边界','连续字节优先在分隔符与长度前缀之间权衡；数据报可直接借用天然边界，但仍要处理丢包与大小限制。','设计协议的第一问不是字段，而是“一条消息从哪里结束”。']
+    ]},
+    http:{title:'HTTP 双轨解析',accent:'var(--gold)',steps:[
+      ['请求行先按 CRLF 切开','第一行拆成方法、目标和版本。文本协议的好处是抓包即可读，代价是接收方必须扫描行尾。','起始行和头字段都属于“未知行数”的文本区。'],
+      ['逐行收集头字段','每个“名字: 值”按 CRLF 结束；Host 决定虚拟主机，Connection 决定连接是否复用。','HTTP/1.1 的 Host 是必需请求头。'],
+      ['空行宣告头部结束','连续两个 CRLF 中，前一个结束最后一行，后一个表示空行；解析器由“读头”切到“读正文”。','\\r\\n\\r\\n 只结束头部，不代表整条 HTTP 消息结束。'],
+      ['Content-Length 给出正文边界','解析器把 17 转成整数并恰好再读 17 字节。少一字节要继续等，多读的属于下一条消息。','keep-alive 让“等连接关闭”不再能充当常规边界。'],
+      ['流式响应改用 chunked','不知道最终长度时，每个块自带十六进制长度，0 长度块收尾；若两种长度信号冲突，就形成请求走私风险。','边界信号必须唯一，否则不同组件会切出不同的消息。']
+    ]},
+    https:{title:'TLS 混合加密',accent:'var(--violet)',steps:[
+      ['先完成 TCP 三次握手','TLS 仍站在 TCP 字节流上。建立可靠连接要先付 1 RTT，然后才能开始身份认证与密钥协商。','HTTPS = HTTP over TLS over TCP，而不是另一套 HTTP 语法。'],
+      ['ClientHello 携带临时公钥','客户端发送算法清单与 ECDHE key_share；临时私钥从不离开本机。','线路上传的是临时公钥，不是共享秘密。'],
+      ['证书签名绑定服务器身份','服务器返回 key_share、证书和 CertificateVerify；客户端验证证书链、域名和握手签名。','证书公钥负责验签，不负责逐字节加密网页。'],
+      ['双方派生同一组对称密钥','ECDHE 共享秘密进入 HKDF，派生握手密钥与双向应用数据密钥；临时私钥随后销毁。','前向保密来自临时密钥，而不是“私钥加密、公钥解密”的口号。'],
+      ['HTTP 被封装成 TLS 记录','记录头固定 5 字节：类型 1B、兼容版本 2B、密文长度 2B；接收方按长度精确切记录。','加密不会消灭边界问题；TLS 自己又做了一层长度前缀。'],
+      ['会话恢复可压缩等待','TLS 1.3 完整握手通常增加 1 RTT；0-RTT 可把早期数据并入 ClientHello，但存在重放风险。','0-RTT 只适合可重放的幂等请求。']
+    ]},
+    ssh:{title:'SSH 精确读帧',accent:'var(--blue)',steps:[
+      ['TCP 分段先后到达','发送端一次送出 3004 字节，接收端可能先拿 1460，再拿 1544；分段位置与 SSH 帧边界无关。','一次 send 不对应一次 read。'],
+      ['ReadExactly 先凑满 4 字节','循环 read 直到长度头完整；遇 EINTR 继续，读到 0 才表示对端关闭。','固定宽度的头也可能被拆成多次 read。'],
+      ['ntohl 解出网络序长度','4 字节大端长度转成本机整数。SSH 的 packet_length 不包含自己的 4 字节，也不包含尾部 MAC。','协议里的长度必须明确“算谁、不算谁”。'],
+      ['先过上限闸门','若 len 为 0 或超过 256 KiB，立即拒绝，绝不能先 resize。','长度前缀必须和资源上限成对出现。'],
+      ['再次循环，恰好收满正文','正文可能横跨多个 TCP 段；got 逐次累加，直到等于 len 才交给上层解析。','ReadExactly 解决拆包；循环调用 ReadFrame 处理粘包。'],
+      ['完整帧才进入业务逻辑','随机填充隐藏明文长度，MAC 校验完整性；边界、资源限制和认证共同构成可用的二进制协议。','“能切开”只是第一步，之后还要验证长度与完整性。']
+    ]},
+    dns:{title:'DNS 传输分叉',accent:'var(--moss)',steps:[
+      ['查询头固定 12 字节','事务 ID、标志位和四个计数字段先建立解析框架；问题与资源记录再按数量逐条读取。','DNS 用“条目数”描述内部结构。'],
+      ['默认借用 UDP 数据报边界','一个 UDP 数据报承载一条查询或响应；接收方一次 recvfrom 就获得完整报文边界。','这里不需要额外的总长度前缀。'],
+      ['TC=1 表示响应被截断','响应过大装不下时，服务器置 TC 位；客户端不能把截断内容当完整答案。','TC 位是从 UDP 切换到 TCP 的信号。'],
+      ['重试切到 TCP 轨道','同一 DNS 报文换到 TCP 后，前面必须补 2 字节长度，因为 TCP 不再保留数据报边界。','报文没变，传输层变了，边界机制就必须跟着变。'],
+      ['DoT / DoH 再套一层边界','DNS over TLS 借 TLS 记录传输；DNS over HTTPS 再交给 HTTP。每一层都必须知道自己的消息从哪里结束。','边界不会消失，只会由不同层分别承担。']
+    ]},
+    matrix:{title:'六协议全景',accent:'var(--rust)',steps:[
+      ['HTTP：头部扫描，正文计数','HTTP 把未知行数的头部交给 CRLF，把已知或可分块的正文交给长度信号。','同一协议可以为不同区域选不同边界。'],
+      ['HTTPS：TLS 记录再加长度','HTTP 报文不改；TLS 把密文切成记录，并用 2 字节 Length 字段给 TCP 字节流重新分帧。','加密层也必须自带边界机制。'],
+      ['SSH：长度前缀必须有限额','4 字节 packet_length 易解析，但对端控制这个数字，所以 ReadExactly 前必须拒绝异常长度。','性能友好不等于安全，长度必须受信任边界约束。'],
+      ['DNS：传输层决定外层边界','UDP 直接借数据报；TCP 版在相同 DNS 报文前补 2 字节长度。','DNS 是理解“边界属于哪一层”的最佳样本。'],
+      ['FTP：用第二条连接补语义','控制连接按 CRLF，数据连接靠关闭结束；再等控制连接上的 226，确认究竟是传完还是断线。','拿关闭当边界，就要另找成功确认。'],
+      ['SMTP：同一连接中途换规则','命令按 CRLF；DATA 正文改用单独一行的点结束，并通过 dot-stuffing 转义正文里的点。','分隔符进入正文，就必须设计对称转义。'],
+      ['把六种写法收束成三问','是否保留数据报？长度是否事先可知？正文能否安全扫描？回答完，边界机制通常已经确定。','先定边界，再定字段；先设上限，再相信长度。']
+    ]}
+  };
+
+  function buildParadigms(){
+    stage.innerHTML=`<div class="boundary-stage">
+      <section class="plate stream-plate"><div class="plate-title"><span>INPUT · one continuous stream</span><span>read(?)</span></div><div class="stream" id="bStream"><i class="scan-head" id="bScan"></i>
+        ${['47','45','54','20','2F','20','48','54','54','50','0D','0A','48','6F','73','74'].map((x,i)=>`<span class="byte${i===10||i===11?' marker':''}" data-byte="${i}">${x}</span>`).join('')}
+      </div></section>
+      <div class="methods">
+        <article class="method" id="mDelimiter" style="--method:var(--rust);--method-soft:var(--rust-soft)"><span class="tag" style="color:var(--rust)">DELIMITER</span><h3>扫到标记为止</h3><p>人能读，机器逐字节寻找；正文撞上标记时需要转义。</p><div class="method-sample delimiter-sample">${['DATA','\\r\\n','.','\\r\\n'].map(x=>`<span class="byte">${x}</span>`).join('')}</div></article>
+        <article class="method" id="mPrefix" style="--method:var(--blue);--method-soft:var(--blue-soft)"><span class="tag" style="color:var(--blue)">LENGTH PREFIX</span><h3>先计数，再取正文</h3><p>无需扫描任意正文，但长度必须先校验再分配内存。</p><div class="method-sample prefix-frame"><span>LEN<br>3000</span><span>PAYLOAD · 3000 bytes</span></div><div class="prefix-fill"><i id="bPrefixFill"></i></div></article>
+        <article class="method" id="mDatagram" style="--method:var(--moss);--method-soft:var(--moss-soft)"><span class="tag" style="color:var(--moss)">DATAGRAM</span><h3>一个数据报一条消息</h3><p>边界由 UDP 保留；协议仍需面对丢包、乱序与大小限制。</p><div class="method-sample datagrams"><span class="datagram">DNS<br>#1</span><span class="datagram">DNS<br>#2</span><span class="datagram">DNS<br>#3</span></div></article>
+      </div></div>`;
+  }
+  function renderParadigms(i){
+    const rows=['mDelimiter','mPrefix','mDatagram'].map(id=>document.getElementById(id)); rows.forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('#bStream .byte').forEach(x=>x.classList.toggle('dim',i>0));
+    const scan=document.getElementById('bScan'); scan.style.opacity=i===1?'1':'0';
+    if(i===1){ const target=document.querySelector('[data-byte="11"]'); scan.style.left=`${target.offsetLeft+target.offsetWidth-2}px`; rows[0].classList.add('active'); }
+    if(i===2) rows[1].classList.add('active');
+    if(i===3) rows[2].classList.add('active');
+    if(i===4) rows.forEach(x=>x.classList.add('active'));
+    document.getElementById('bPrefixFill').style.width=i>=2?'100%':'10%';
+  }
+
+  function buildHttp(){
+    const lines=['GET /search?q=socket HTTP/1.1','Host: example.com','Connection: keep-alive','Content-Length: 17','', 'name=alice&age=30'];
+    stage.innerHTML=`<div class="http-stage"><section class="plate http-raw"><div class="plate-title"><span>RAW HTTP/1.1</span><span>CRLF scanner</span></div><div class="http-lines"><i class="http-cursor" id="hCursor"></i>${lines.map((x,i)=>`<div class="http-line${i===4?' blank':''}" data-http-line="${i}">${x||'␍␊  ← 空行'}</div>`).join('')}</div></section>
+      <section class="plate parser"><div class="plate-title"><span>PARSER STATE</span><span id="hState">START_LINE</span></div><div class="parser-stack">
+        <div class="parse-node" data-node="0"><b>01 · START LINE</b><small>method · target · version</small></div>
+        <div class="parse-node" data-node="1"><b>02 · HEADERS</b><small>name : value</small></div>
+        <div class="parse-node" data-node="2"><b>03 · EMPTY LINE</b><small>header / body boundary</small></div>
+        <div class="parse-node" data-node="3"><b>04 · BODY</b><small>Content-Length or chunks</small></div>
+      </div><div class="body-meter"><div class="body-meter-label"><span>BODY BUFFER</span><span id="hCount">0 / 17 B</span></div><div class="meter"><i id="hFill"></i></div></div></section></div>`;
+  }
+  function renderHttp(i){
+    const lineIndex=[0,2,4,5,5][i], line=document.querySelector(`[data-http-line="${lineIndex}"]`), cursor=document.getElementById('hCursor');
+    document.querySelectorAll('.http-line').forEach((x,n)=>{x.classList.toggle('active',n===lineIndex);x.classList.toggle('parsed',n<lineIndex);});
+    cursor.style.transform=`translateY(${line.offsetTop-16}px)`;
+    const nodeIndex=Math.min(i,3); document.querySelectorAll('.parse-node').forEach((x,n)=>{x.classList.toggle('active',n===nodeIndex);x.classList.toggle('done',n<nodeIndex);});
+    document.getElementById('hState').textContent=['START_LINE','HEADERS','HEADER_END','BODY_FIXED','BODY_CHUNKED'][i];
+    const body=i<3?0:i===3?100:68; document.getElementById('hFill').style.width=`${body}%`; document.getElementById('hCount').textContent=i<3?'0 / 17 B':i===3?'17 / 17 B':'chunk 4 / …';
+  }
+
+  function buildTls(){
+    stage.innerHTML=`<div class="tls-stage"><section class="plate tls-wire"><div class="plate-title"><span>HANDSHAKE FLIGHTS</span><span>TCP + TLS 1.3</span></div><div class="actors"><div class="actor client">CLIENT<br>ephemeral key</div><div class="actor server">SERVER<br>certificate key</div></div><i class="wire-line"></i><div class="flight" id="tFlight">SYN</div>
+      <div class="handshake-steps">${['TCP\n1 RTT','ClientHello\nkey_share','ServerHello\ncert + verify','HKDF\ntraffic keys','Application\nTLS record'].map((x,i)=>`<div class="flight-step" data-flight="${i}"><b>0${i+1}</b>${x.replace('\n','<br>')}</div>`).join('')}</div></section>
+      <div class="tls-lower"><section class="plate key-rack"><div class="plate-title"><span>KEY MATERIAL</span><span>never confuse these</span></div><div class="key-list">
+        <div class="key" data-key="0"><span>证书公钥</span><span>验签</span></div><div class="key" data-key="1"><span>ECDHE 临时私钥</span><span>本机</span></div><div class="key" data-key="2"><span>共享秘密 → HKDF</span><span>派生</span></div><div class="key" data-key="3"><span>对称 traffic keys</span><span>AEAD</span></div>
+      </div></section><section class="plate record"><div class="plate-title"><span>TLS RECORD</span><span>5-byte header + ciphertext</span></div><div class="record-cells">
+        <div class="record-cell" data-rec="0">TYPE<b>1 B</b></div><div class="record-cell" data-rec="1">LEGACY VER<b>2 B</b></div><div class="record-cell" data-rec="2">LENGTH<b>2 B</b></div><div class="record-cell" data-rec="3">AEAD CIPHERTEXT<b>N B</b></div>
+      </div></section></div></div>`;
+  }
+  function renderTls(i){
+    document.querySelectorAll('.flight-step').forEach((x,n)=>{x.classList.toggle('active',n===Math.min(i,4));x.classList.toggle('done',n<Math.min(i,4));});
+    const packet=document.getElementById('tFlight'), client=document.querySelector('.actor.client'), server=document.querySelector('.actor.server'), wire=document.querySelector('.wire-line');
+    const railTop=Math.max(client.offsetTop+client.offsetHeight,server.offsetTop+server.offsetHeight)+18; packet.style.top=`${railTop}px`; wire.style.top=`${railTop+packet.offsetHeight/2}px`;
+    const start=client.offsetLeft+client.offsetWidth/2-packet.offsetWidth/2, end=server.offsetLeft+server.offsetWidth/2-packet.offsetWidth/2;
+    const pos=[end,end,start,(start+end)/2,end,end][i]; packet.style.left=`${start}px`; packet.style.opacity='1'; packet.style.transform=`translateX(${pos-start}px)`; packet.textContent=['SYN →','ClientHello →','← ServerHello + Cert','HKDF = same keys','HTTP in TLS record →','PSK / 0-RTT →'][i];
+    const serverward=[0,1,4,5].includes(i); packet.style.color=serverward?'var(--blue)':'var(--violet)'; packet.style.borderColor=serverward?'var(--blue)':'var(--violet)'; packet.style.background=serverward?'var(--blue-soft)':'var(--violet-soft)';
+    document.querySelectorAll('.key').forEach((x,n)=>{x.classList.toggle('on',(i===1&&n===1)||(i===2&&n===0)||(i>=3&&n>=2));x.classList.toggle('dead',i>=4&&n===1);});
+    document.querySelectorAll('.record-cell').forEach((x,n)=>x.classList.toggle('on',i===4&&(n===2||n===3)));
+  }
+
+  function buildSsh(){
+    const code=[
+      '<span class="ty">bool</span> <span class="fn">ReadExactly</span>(fd, buf) {',
+      '  size_t got = 0;',
+      '  <span class="kw">while</span> (got &lt; buf.size()) {',
+      '    n = read(fd, buf + got, size - got);',
+      '    <span class="kw">if</span> (n == 0) <span class="kw">return</span> false;',
+      '    <span class="kw">if</span> (n &lt; 0 &amp;&amp; errno == EINTR) continue;',
+      '    got += n;',
+      '  }',
+      '  <span class="kw">return</span> true;',
+      '}',
+      '<span class="cm">// then: ntohl → limit → body</span>'
+    ];
+    stage.innerHTML=`<div class="ssh-stage"><section class="plate receive"><div class="plate-title"><span>RECEIVE BUFFER</span><span>frame = 4 B length + 3000 B payload</span></div><div class="segments"><span class="segment" data-seg="0">TCP SEG #1 · 1460 B</span><span class="segment" data-seg="1">TCP SEG #2 · 1544 B</span><span class="segment" data-seg="2">next frame bytes…</span></div><div class="buffer"><i class="buffer-fill" id="sFill"></i><div class="buffer-prefix">4 B<br>LEN</div><div class="buffer-body">PAYLOAD · read until got == len</div><i class="buffer-pointer" id="sPointer"></i></div></section>
+      <div class="ssh-lower"><section class="plate code-panel" id="sCode">${code.map((x,i)=>`<div class="code-line" data-code="${i}">${x}</div>`).join('')}</section><section class="plate guard"><div class="plate-title"><span>TRUST GATES</span></div><div class="guard-item" data-guard="0"><b>BYTE ORDER</b>ntohl(len_be)</div><div class="guard-item" data-guard="1"><b>SIZE LIMIT</b>0 &lt; len ≤ 256 KiB</div><div class="guard-item" data-guard="2"><b>INTEGRITY</b>padding + MAC</div></section></div></div>`;
+  }
+  function renderSsh(i){
+    document.querySelectorAll('.segment').forEach((x,n)=>x.classList.toggle('arrived',n<=(i===0?0:i>=4?1:0)));
+    const widths=[22,25,25,25,100,100]; document.getElementById('sFill').style.width=`${widths[i]}%`; document.getElementById('sPointer').style.left=`calc(${widths[i]}% - 3px)`;
+    const activeLines=[[3],[2,3,4,5,6],[10],[10],[2,3,6],[10]][i]; document.querySelectorAll('.code-line').forEach((x,n)=>x.classList.toggle('lit',activeLines.includes(n)));
+    document.querySelectorAll('.guard-item').forEach((x,n)=>x.classList.toggle('on',(i===2&&n===0)||(i===3&&n===1)||(i===5&&n===2)));
+  }
+
+  function buildDns(){
+    stage.innerHTML=`<div class="dns-stage"><section class="plate dns-road"><div class="plate-title"><span>SAME DNS MESSAGE · TWO TRANSPORTS</span><span>UDP ↔ TCP</span></div><div class="dns-head">${['ID','FLAGS','QDCOUNT','ANCOUNT','NSCOUNT','ARCOUNT'].map((x,i)=>`<div class="dns-field" data-dns-field="${i}">${x}<br>${i<2?'16 bit':'count'}</div>`).join('')}</div><div class="resolver">RESOLVER<br>client</div><div class="server">AUTHORITATIVE<br>server</div><i class="road udp"></i><span class="road-label udp">UDP · datagram boundary</span><i class="road tcp"></i><span class="road-label tcp">TCP · 2-byte length prefix</span><div class="dns-packet" id="dPacket">DNS QUERY</div><div class="transport-note" id="dNote">固定 12 字节头部建立内部结构；外层消息边界由传输方式决定。</div></section></div>`;
+  }
+  function renderDns(i){
+    const dnsTitle=document.querySelector('.dns-road .plate-title'), dnsHead=document.querySelector('.dns-head'); dnsHead.style.top=`${dnsTitle.offsetHeight+20}px`;
+    document.querySelectorAll('.dns-field').forEach((x,n)=>x.classList.toggle('on',i===0||(i===2&&n===1)));
+    const p=document.getElementById('dPacket'), from=document.querySelector('.resolver'), to=document.querySelector('.server');
+    const start=from.offsetLeft+from.offsetWidth, end=to.offsetLeft-p.offsetWidth, travel=Math.max(0,end-start);
+    const lane=document.querySelector(i>=3?'.road.tcp':'.road.udp'); p.style.left=`${start}px`; p.style.opacity=i===0?'0':'1'; p.style.top=`${lane.offsetTop-p.offsetHeight/2}px`; p.style.transform=`translateX(${i===1||i===3||i===4?travel:0}px)`; p.textContent=['DNS HEADER','DNS QUERY →','← TC = 1','LEN + DNS →','DNS / TLS / HTTP →'][i];
+    p.style.color=i===2?'var(--rust)':i>=3?'var(--blue)':'var(--moss)'; p.style.borderColor='currentColor'; p.style.background=i===2?'var(--rust-soft)':i>=3?'var(--blue-soft)':'var(--moss-soft)';
+    document.getElementById('dNote').textContent=['12 B 固定头 + 计数字段：条目数量决定后续解析。','UDP 直接保留数据报边界，不必再加总长度。','TC = 1：当前 UDP 响应被截断，客户端必须换路重试。','换成 TCP 后，同一报文前补 2 B 长度前缀。','DoT / DoH 继续套层：每一层各自负责自己的边界。'][i];
+  }
+
+  function buildMatrix(){
+    const rows=[
+      ['HTTP','CRLF + 空行','Content-Length / chunk','—'],['HTTPS','—','TLS 记录 2 B 长度','—'],['SSH','—','4 B packet_length','—'],['DNS','—','TCP 前置 2 B 长度','UDP 数据报'],['FTP','控制连接 CRLF','数据连接关闭','—'],['SMTP','CRLF / 单独一行 .','—','—']
+    ];
+    stage.innerHTML=`<div class="matrix-stage"><div class="matrix"><div class="matrix-cell head">PROTOCOL</div><div class="matrix-cell head">DELIMITER</div><div class="matrix-cell head">LENGTH / CLOSE</div><div class="matrix-cell head">DATAGRAM</div>${rows.map((r,i)=>`<div class="matrix-row" data-row="${i}" style="display:contents;--accent:${['var(--gold)','var(--violet)','var(--blue)','var(--moss)','var(--rust)','var(--rust)'][i]};--soft:${['var(--gold-soft)','var(--violet-soft)','var(--blue-soft)','var(--moss-soft)','var(--rust-soft)','var(--rust-soft)'][i]}"><div class="matrix-cell protocol">${r[0]}</div>${r.slice(1).map(v=>`<div class="matrix-cell${v!=='—'?' match':''}">${v}</div>`).join('')}</div>`).join('')}</div>
+      <div class="decision-strip"><div class="decision" style="--c:var(--rust)"><b>能安全扫描吗？</b><p>能：分隔符；不能：长度前缀。正文撞标记时必须转义。</p></div><div class="decision" style="--c:var(--blue)"><b>长度可信了吗？</b><p>先做字节序转换和上限校验，再分配缓冲区。</p></div><div class="decision" style="--c:var(--moss)"><b>传输层保边界吗？</b><p>UDP 保留数据报；TCP 只交付连续字节。</p></div></div></div>`;
+  }
+  function renderMatrix(i){ document.querySelectorAll('.matrix-row').forEach((x,n)=>x.classList.toggle('on',i<6&&n===i)); document.querySelector('.decision-strip').style.opacity=i===6?'1':'.42'; }
+
+  const builders={paradigms:buildParadigms,http:buildHttp,https:buildTls,ssh:buildSsh,dns:buildDns,matrix:buildMatrix};
+  const renderers={paradigms:renderParadigms,http:renderHttp,https:renderTls,ssh:renderSsh,dns:renderDns,matrix:renderMatrix};
+  const order=Object.keys(copy); let sceneId='paradigms', step=0, timer=null, dotButtons=[];
+
+  function setScene(id,requestedStep=0){
+    stop(); sceneId=copy[id]?id:'paradigms'; step=Math.max(0,Math.min(requestedStep,copy[sceneId].steps.length-1));
+    document.documentElement.style.setProperty('--accent',copy[sceneId].accent);
+    tabs.forEach(t=>t.setAttribute('aria-pressed',String(t.dataset.scene===sceneId)));
+    ui.title.textContent=copy[sceneId].title; ui.number.textContent=`SCENE ${String(order.indexOf(sceneId)+1).padStart(2,'0')}`;
+    builders[sceneId](); buildDots(); requestAnimationFrame(render); updateHash();
+  }
+  function buildDots(){
+    ui.dots.replaceChildren(); dotButtons=copy[sceneId].steps.map((_,i)=>{const b=document.createElement('button');b.className='dot';b.setAttribute('aria-label',`第 ${i+1} 步`);b.addEventListener('click',()=>{stop();step=i;render();updateHash();});ui.dots.appendChild(b);return b;});
+  }
+  function render(){
+    renderers[sceneId](step); const item=copy[sceneId].steps[step], total=copy[sceneId].steps.length;
+    ui.action.textContent=item[0]; ui.detail.textContent=item[1]; ui.takeaway.textContent=item[2];
+    ui.counter.textContent=`${String(step+1).padStart(2,'0')} / ${String(total).padStart(2,'0')}`;
+    ui.prev.disabled=step===0; ui.next.disabled=step===total-1; ui.bar.style.width=`${total===1?100:(step/(total-1))*100}%`;
+    dotButtons.forEach((b,i)=>{b.classList.toggle('done',i<step);b.classList.toggle('now',i===step);});
+  }
+  function go(delta){ const total=copy[sceneId].steps.length, next=step+delta; if(next<0||next>=total){if(delta>0)stop();return;} step=next;render();updateHash(); }
+  function play(){
+    if(timer){stop();return;} if(step===copy[sceneId].steps.length-1){step=0;render();}
+    ui.play.textContent='暂停'; timer=setInterval(()=>{if(step===copy[sceneId].steps.length-1){stop();return;}go(1);},2400);
+  }
+  function stop(){ if(timer){clearInterval(timer);timer=null;} ui.play.textContent='播放'; }
+  function updateHash(){ history.replaceState(null,'',`#scene=${sceneId}&step=${step+1}`); }
+  function fromHash(){ const p=new URLSearchParams(location.hash.slice(1)); return {scene:p.get('scene')||'paradigms',step:Math.max(0,(Number(p.get('step'))||1)-1)}; }
+
+  tabs.forEach(t=>t.addEventListener('click',()=>setScene(t.dataset.scene)));
+  ui.prev.addEventListener('click',()=>{stop();go(-1);}); ui.next.addEventListener('click',()=>{stop();go(1);}); ui.play.addEventListener('click',play);
+  addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){e.preventDefault();stop();go(-1);}if(e.key==='ArrowRight'){e.preventDefault();stop();go(1);}if(e.code==='Space'&&!/BUTTON/.test(document.activeElement.tagName)){e.preventDefault();play();}});
+  addEventListener('hashchange',()=>{const h=fromHash();if(h.scene!==sceneId)setScene(h.scene,h.step);});
+  addEventListener('resize',()=>renderers[sceneId](step));
+  const initial=fromHash(); setScene(initial.scene,initial.step);
+})();
+</script>
+</body>
+</html>
