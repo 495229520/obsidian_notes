@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>一次 Add RPC 的非阻塞完整往返</title>
+  <desc>request_id 为 42 的 Add 请求由客户端输出队列经 EPOLLOUT 发出，服务端解析处理后响应，再由客户端 pending_calls 完成回调。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    </marker>
+  </defs>
+  <rect width="1400" height="900" fill="#f7f6f2"/>
+  <text x="52" y="58" font-size="22" font-weight="700" fill="#1f2937">一次非阻塞 Add RPC 往返：事件、缓冲区与 request_id 如何配合</text>
+  <text x="52" y="94" font-size="13.5" fill="#4b5563">以客户端 request_id=42 为例，展示 EPOLLOUT、EPOLLIN 与状态机的完整协作链。</text>
+
+  <text x="170" y="150" font-size="22" font-weight="700" fill="#274472" text-anchor="middle">客户端</text>
+  <text x="520" y="150" font-size="22" font-weight="700" fill="#6a5017" text-anchor="middle">客户端 EventLoop</text>
+  <text x="860" y="150" font-size="22" font-weight="700" fill="#2d5a27" text-anchor="middle">服务端 EventLoop</text>
+  <text x="1200" y="150" font-size="22" font-weight="700" fill="#5c3b86" text-anchor="middle">服务端业务</text>
+
+  <line x1="170" y1="180" x2="170" y2="790" stroke="#9ca3af" stroke-width="2"/>
+  <line x1="520" y1="180" x2="520" y2="790" stroke="#9ca3af" stroke-width="2"/>
+  <line x1="860" y1="180" x2="860" y2="790" stroke="#9ca3af" stroke-width="2"/>
+  <line x1="1200" y1="180" x2="1200" y2="790" stroke="#9ca3af" stroke-width="2"/>
+
+  <rect x="70" y="210" width="200" height="62" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
+  <text x="170" y="248" text-anchor="middle" font-size="17" font-weight="700" fill="#274472">CallAsync(Add, 3, 4)</text>
+
+  <line x1="270" y1="241" x2="420" y2="241" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="420" y="210" width="200" height="62" rx="12" fill="#f8efd8" stroke="#a07d2b" stroke-width="1.8"/>
+  <text x="520" y="236" text-anchor="middle" font-size="16" font-weight="700" fill="#6a5017">登记 pending_calls[42]</text>
+  <text x="520" y="258" text-anchor="middle" font-size="14" fill="#6a5017">请求帧进入 output_buffer</text>
+
+  <rect x="420" y="320" width="200" height="62" rx="12" fill="#f8efd8" stroke="#a07d2b" stroke-width="1.8"/>
+  <text x="520" y="346" text-anchor="middle" font-size="16" font-weight="700" fill="#6a5017">EPOLLOUT</text>
+  <text x="520" y="368" text-anchor="middle" font-size="14" fill="#6a5017">send() 尽可能写出请求帧</text>
+
+  <line x1="620" y1="351" x2="760" y2="351" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="690" y="336" text-anchor="middle" font-size="14" fill="#374151">22 字节请求帧</text>
+
+  <rect x="760" y="320" width="200" height="62" rx="12" fill="#e7f1e4" stroke="#5d8a56" stroke-width="1.8"/>
+  <text x="860" y="346" text-anchor="middle" font-size="16" font-weight="700" fill="#2d5a27">EPOLLIN</text>
+  <text x="860" y="368" text-anchor="middle" font-size="14" fill="#2d5a27">read() → input_buffer</text>
+
+  <rect x="760" y="425" width="200" height="62" rx="12" fill="#e7f1e4" stroke="#5d8a56" stroke-width="1.8"/>
+  <text x="860" y="451" text-anchor="middle" font-size="16" font-weight="700" fill="#2d5a27">TryParseFrames()</text>
+  <text x="860" y="473" text-anchor="middle" font-size="14" fill="#2d5a27">恢复 method=Add, id=42</text>
+
+  <line x1="960" y1="456" x2="1100" y2="456" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="1100" y="425" width="200" height="62" rx="12" fill="#f0e8fb" stroke="#7a58a3" stroke-width="1.8"/>
+  <text x="1200" y="451" text-anchor="middle" font-size="16" font-weight="700" fill="#5c3b86">Dispatch → Add handler</text>
+  <text x="1200" y="473" text-anchor="middle" font-size="14" fill="#5c3b86">解码 3、4，计算 sum=7</text>
+
+  <line x1="1100" y1="575" x2="960" y2="575" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="1100" y="544" width="200" height="62" rx="12" fill="#f0e8fb" stroke="#7a58a3" stroke-width="1.8"/>
+  <text x="1200" y="570" text-anchor="middle" font-size="16" font-weight="700" fill="#5c3b86">生成响应帧</text>
+  <text x="1200" y="592" text-anchor="middle" font-size="14" fill="#5c3b86">id=42, status=OK, body=7</text>
+
+  <rect x="760" y="544" width="200" height="62" rx="12" fill="#e7f1e4" stroke="#5d8a56" stroke-width="1.8"/>
+  <text x="860" y="570" text-anchor="middle" font-size="16" font-weight="700" fill="#2d5a27">EPOLLOUT</text>
+  <text x="860" y="592" text-anchor="middle" font-size="14" fill="#2d5a27">写出 18 字节响应帧</text>
+
+  <line x1="760" y1="665" x2="620" y2="665" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="690" y="650" text-anchor="middle" font-size="14" fill="#374151">18 字节响应帧</text>
+
+  <rect x="420" y="634" width="200" height="62" rx="12" fill="#f8efd8" stroke="#a07d2b" stroke-width="1.8"/>
+  <text x="520" y="660" text-anchor="middle" font-size="16" font-weight="700" fill="#6a5017">EPOLLIN + 解析</text>
+  <text x="520" y="682" text-anchor="middle" font-size="14" fill="#6a5017">得到 response(id=42, sum=7)</text>
+
+  <line x1="420" y1="735" x2="270" y2="735" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="70" y="704" width="200" height="62" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
+  <text x="170" y="730" text-anchor="middle" font-size="16" font-weight="700" fill="#274472">根据 request_id=42</text>
+  <text x="170" y="752" text-anchor="middle" font-size="14" fill="#274472">唤醒回调 / Promise，返回 7</text>
+
+  <text x="52" y="840" font-size="17" fill="#374151">要点：请求与响应之间没有任何阻塞式“等待函数”。等待被展开成 pending_calls + output_buffer + input_buffer + epoll 事件。</text>
+</svg>

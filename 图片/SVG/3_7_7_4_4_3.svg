@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Completion Queue 的 tag 生命周期与优雅关闭</title>
+  <desc>异步操作完成后 tag 返回 CompletionQueue；关闭时先停止 server，再 shutdown CQ，并持续 drain 到 Next 返回 false。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    </marker>
+  </defs>
+  <rect width="1320" height="860" fill="#f7f6f2"/>
+  <text x="52" y="58" font-size="22" font-weight="700" fill="#1f2937">Completion Queue 的事件流与优雅关闭</text>
+  <text x="52" y="94" font-size="13.5" fill="#4b5563">gRPC 异步程序最容易出错的地方通常不是业务逻辑，而是 tag 的生命周期与 CQ shutdown 顺序。</text>
+
+  <text x="180" y="150" font-size="22" font-weight="700" fill="#274472" text-anchor="middle">应用线程</text>
+  <text x="520" y="150" font-size="22" font-weight="700" fill="#2d5a27" text-anchor="middle">gRPC Runtime</text>
+  <text x="860" y="150" font-size="22" font-weight="700" fill="#6a5017" text-anchor="middle">Completion Queue</text>
+  <text x="1140" y="150" font-size="22" font-weight="700" fill="#5c3b86" text-anchor="middle">对象生命周期</text>
+
+  <line x1="180" y1="180" x2="180" y2="760" stroke="#9ca3af" stroke-width="2"/>
+  <line x1="520" y1="180" x2="520" y2="760" stroke="#9ca3af" stroke-width="2"/>
+  <line x1="860" y1="180" x2="860" y2="760" stroke="#9ca3af" stroke-width="2"/>
+  <line x1="1140" y1="180" x2="1140" y2="760" stroke="#9ca3af" stroke-width="2"/>
+
+  <rect x="70" y="220" width="220" height="62" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
+  <text x="180" y="258" text-anchor="middle" font-size="17" font-weight="700" fill="#274472">发起异步操作</text>
+
+  <line x1="290" y1="251" x2="420" y2="251" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="420" y="220" width="200" height="62" rx="12" fill="#e7f1e4" stroke="#5d8a56" stroke-width="1.8"/>
+  <text x="520" y="246" text-anchor="middle" font-size="16" font-weight="700" fill="#2d5a27">内部推进 I/O</text>
+  <text x="520" y="268" text-anchor="middle" font-size="14" fill="#2d5a27">HTTP/2 / stream / 编解码</text>
+
+  <line x1="620" y1="251" x2="760" y2="251" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="760" y="220" width="200" height="62" rx="12" fill="#f8efd8" stroke="#a07d2b" stroke-width="1.8"/>
+  <text x="860" y="246" text-anchor="middle" font-size="16" font-weight="700" fill="#6a5017">完成时投递 tag</text>
+  <text x="860" y="268" text-anchor="middle" font-size="14" fill="#6a5017">tag + ok</text>
+
+  <line x1="960" y1="251" x2="1040" y2="251" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="1040" y="220" width="200" height="62" rx="12" fill="#f0e8fb" stroke="#7a58a3" stroke-width="1.8"/>
+  <text x="1140" y="246" text-anchor="middle" font-size="16" font-weight="700" fill="#5c3b86">对象必须仍然活着</text>
+  <text x="1140" y="268" text-anchor="middle" font-size="14" fill="#5c3b86">否则悬空 tag</text>
+
+  <rect x="80" y="390" width="1160" height="300" rx="18" fill="#fbfbf8" stroke="#d2cec1" stroke-width="2"/>
+  <text x="120" y="435" font-size="24" font-weight="700" fill="#1f2937">优雅关闭推荐顺序</text>
+
+  <rect x="120" y="490" width="180" height="86" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
+  <text x="210" y="524" text-anchor="middle" font-size="18" font-weight="700" fill="#274472">1. 停止接收新任务</text>
+  <text x="210" y="550" text-anchor="middle" font-size="14" fill="#274472">不再投递新的 RPC</text>
+
+  <rect x="340" y="490" width="180" height="86" rx="12" fill="#e7f1e4" stroke="#5d8a56" stroke-width="1.8"/>
+  <text x="430" y="524" text-anchor="middle" font-size="18" font-weight="700" fill="#2d5a27">2. server-&gt;Shutdown()</text>
+  <text x="430" y="550" text-anchor="middle" font-size="14" fill="#2d5a27">阻止新 RPC 进入</text>
+
+  <rect x="560" y="490" width="180" height="86" rx="12" fill="#f8efd8" stroke="#a07d2b" stroke-width="1.8"/>
+  <text x="650" y="524" text-anchor="middle" font-size="18" font-weight="700" fill="#6a5017">3. cq-&gt;Shutdown()</text>
+  <text x="650" y="550" text-anchor="middle" font-size="14" fill="#6a5017">通知 CQ 进入关闭流程</text>
+
+  <rect x="780" y="490" width="180" height="86" rx="12" fill="#f0e8fb" stroke="#7a58a3" stroke-width="1.8"/>
+  <text x="870" y="524" text-anchor="middle" font-size="18" font-weight="700" fill="#5c3b86">4. 继续 Next()</text>
+  <text x="870" y="550" text-anchor="middle" font-size="14" fill="#5c3b86">drain 剩余完成事件</text>
+
+  <rect x="1000" y="490" width="180" height="86" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
+  <text x="1090" y="524" text-anchor="middle" font-size="18" font-weight="700" fill="#274472">5. Next 返回 false</text>
+  <text x="1090" y="550" text-anchor="middle" font-size="14" fill="#274472">线程退出，安全销毁对象</text>
+
+  <line x1="300" y1="533" x2="340" y2="533" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="520" y1="533" x2="560" y2="533" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="740" y1="533" x2="780" y2="533" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="960" y1="533" x2="1000" y2="533" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <text x="120" y="635" font-size="16" fill="#374151">• 错误关闭方式：还没 drain CQ 就销毁 CallData / AsyncClientCall，会导致 tag 返回时对象已无效。</text>
+  <text x="120" y="665" font-size="16" fill="#374151">• 正确关闭方式：先阻止新工作，再关闭 server 和 CQ，最后把已有完成事件消费干净。</text>
+</svg>

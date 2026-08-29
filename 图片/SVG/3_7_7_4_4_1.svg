@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>gRPC Completion Queue 的分层与完成事件</title>
+  <desc>应用用 Call 对象和 tag 登记异步操作，gRPC Runtime 推进 HTTP/2 与消息处理，CompletionQueue 将完成事件交给 CQ 线程。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    </marker>
+  </defs>
+  <rect width="1400" height="860" fill="#f7f6f2"/>
+  <text x="56" y="58" font-size="22" font-weight="700" fill="#1f2937">gRPC Completion Queue 总体结构：库推进 I/O，应用消费完成事件</text>
+  <text x="56" y="94" font-size="13.5" fill="#4b5563">与手写 epoll 不同，应用层不再直接面对 socket 读写，而是围绕“操作完成”组织 CallData / AsyncClientCall 对象。</text>
+
+  <rect x="80" y="160" width="250" height="140" rx="16" fill="#e8eef9" stroke="#4f6fad" stroke-width="2"/>
+  <text x="205" y="200" text-anchor="middle" font-size="25" font-weight="700" fill="#274472">应用层对象</text>
+  <text x="205" y="232" text-anchor="middle" font-size="16" fill="#274472">CallData</text>
+  <text x="205" y="258" text-anchor="middle" font-size="16" fill="#274472">AsyncClientCall</text>
+  <text x="205" y="284" text-anchor="middle" font-size="16" fill="#274472">业务处理逻辑</text>
+
+  <rect x="430" y="140" width="360" height="180" rx="16" fill="#eef5ec" stroke="#5d8a56" stroke-width="2"/>
+  <text x="610" y="186" text-anchor="middle" font-size="27" font-weight="700" fill="#2d5a27">gRPC Runtime</text>
+  <text x="610" y="220" text-anchor="middle" font-size="16" fill="#2d5a27">HTTP/2 连接 / stream / 流控</text>
+  <text x="610" y="246" text-anchor="middle" font-size="16" fill="#2d5a27">消息编解码 / 生命周期状态机</text>
+  <text x="610" y="272" text-anchor="middle" font-size="16" fill="#2d5a27">异步操作：Request / Read / Write / Finish</text>
+
+  <rect x="900" y="160" width="250" height="140" rx="16" fill="#f8efd8" stroke="#a07d2b" stroke-width="2"/>
+  <text x="1025" y="200" text-anchor="middle" font-size="25" font-weight="700" fill="#6a5017">CompletionQueue</text>
+  <text x="1025" y="232" text-anchor="middle" font-size="16" fill="#6a5017">保存完成事件</text>
+  <text x="1025" y="258" text-anchor="middle" font-size="16" fill="#6a5017">返回 tag + ok</text>
+  <text x="1025" y="284" text-anchor="middle" font-size="16" fill="#6a5017">cq-&gt;Next()</text>
+
+  <rect x="1180" y="160" width="160" height="140" rx="16" fill="#f0e8fb" stroke="#7a58a3" stroke-width="2"/>
+  <text x="1260" y="206" text-anchor="middle" font-size="22" font-weight="700" fill="#5c3b86">CQ 线程</text>
+  <text x="1260" y="236" text-anchor="middle" font-size="15" fill="#5c3b86">while</text>
+  <text x="1260" y="258" text-anchor="middle" font-size="15" fill="#5c3b86">(cq-&gt;Next)</text>
+  <text x="1260" y="280" text-anchor="middle" font-size="15" fill="#5c3b86">dispatch(tag)</text>
+
+  <line x1="330" y1="230" x2="430" y2="230" stroke="#4b5563" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="380" y="212" text-anchor="middle" font-size="14" fill="#374151">发起异步操作</text>
+  <line x1="790" y1="230" x2="900" y2="230" stroke="#4b5563" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="845" y="212" text-anchor="middle" font-size="14" fill="#374151">操作完成时投递 tag</text>
+  <line x1="1150" y1="230" x2="1180" y2="230" stroke="#4b5563" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="1165" y="212" text-anchor="middle" font-size="14" fill="#374151">取事件</text>
+
+  <rect x="90" y="410" width="1230" height="315" rx="18" fill="#fbfbf8" stroke="#d2cec1" stroke-width="2"/>
+  <text x="120" y="455" font-size="24" font-weight="700" fill="#1f2937">一次异步操作的基本流程</text>
+
+  <rect x="125" y="500" width="190" height="90" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
+  <text x="220" y="535" text-anchor="middle" font-size="18" font-weight="700" fill="#274472">1. 发起操作</text>
+  <text x="220" y="560" text-anchor="middle" font-size="14" fill="#274472">例如 Request / Finish</text>
+
+  <rect x="360" y="500" width="210" height="90" rx="12" fill="#e7f1e4" stroke="#5d8a56" stroke-width="1.8"/>
+  <text x="465" y="535" text-anchor="middle" font-size="18" font-weight="700" fill="#2d5a27">2. Runtime 推进</text>
+  <text x="465" y="560" text-anchor="middle" font-size="14" fill="#2d5a27">内部网络 / 编解码 / HTTP/2</text>
+
+  <rect x="615" y="500" width="200" height="90" rx="12" fill="#f8efd8" stroke="#a07d2b" stroke-width="1.8"/>
+  <text x="715" y="535" text-anchor="middle" font-size="18" font-weight="700" fill="#6a5017">3. 投递完成事件</text>
+  <text x="715" y="560" text-anchor="middle" font-size="14" fill="#6a5017">tag 回到 CQ</text>
+
+  <rect x="860" y="500" width="200" height="90" rx="12" fill="#f0e8fb" stroke="#7a58a3" stroke-width="1.8"/>
+  <text x="960" y="535" text-anchor="middle" font-size="18" font-weight="700" fill="#5c3b86">4. cq-&gt;Next()</text>
+  <text x="960" y="560" text-anchor="middle" font-size="14" fill="#5c3b86">取出 tag + ok</text>
+
+  <rect x="1105" y="500" width="180" height="90" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
+  <text x="1195" y="535" text-anchor="middle" font-size="18" font-weight="700" fill="#274472">5. 推进状态机</text>
+  <text x="1195" y="560" text-anchor="middle" font-size="14" fill="#274472">Proceed / 回调结果</text>
+
+  <line x1="315" y1="545" x2="360" y2="545" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="570" y1="545" x2="615" y2="545" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="815" y1="545" x2="860" y2="545" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="1060" y1="545" x2="1105" y2="545" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <text x="120" y="655" font-size="16" fill="#374151">• CQ 不是“业务消息队列”，而是“异步操作完成通知队列”。</text>
+  <text x="120" y="685" font-size="16" fill="#374151">• 你不直接处理 socket 读写；你处理的是 tag 对应对象在某个生命周期阶段的继续动作。</text>
+</svg>
