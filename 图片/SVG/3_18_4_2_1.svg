@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>C++ Coroutine 非阻塞 RPC：跨层标识映射与恢复状态机</title>
+  <desc>展示协议层 request_id 与本地 coroutine_handle 的映射隔离、PendingCall 生命周期状态机与现场保存位置对比。</desc>
+
+  <defs>
+    <marker id="arr-gray" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arr-purple" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
+  </defs>
+
+  <!-- 全局浅米色底 -->
+  <rect width="1240" height="760" fill="#F5F4ED"/>
+
+  <!-- 顶部主副标题区 -->
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">
+    C++ Coroutine 非阻塞 RPC：跨层标识映射与状态机
+  </text>
+  <text x="48" y="74" font-size="13.5" fill="#6B675C">
+    网络协议只传 request_id，本地 pending 表桥接 coroutine_handle；二者绝不混用
+  </text>
+
+  <!-- ======================== Panel A: 跨层标识映射 ======================== -->
+  <rect x="48" y="98" width="1144" height="204" rx="10"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="70" y="126" font-size="14.5" font-weight="700" fill="#4A473F">
+    A · 协议 ID 与本地句柄映射 (Wire Protocol vs Local Coroutine)
+  </text>
+
+  <!-- 左侧：协议层 (跨进程可见) -->
+  <rect x="70" y="146" width="310" height="136" rx="8"
+        fill="#E3EAF4" stroke="#B7C6DA" stroke-width="1.2"/>
+  <text x="86" y="172" font-size="13" font-weight="700" fill="#2C4460">协议层 (跨网络可见)</text>
+  <text x="86" y="193" font-size="11" fill="#53677E">• Request Frame: id = 42</text>
+  <text x="86" y="213" font-size="11" fill="#53677E">• Response Frame: id = 42 (回显)</text>
+  <rect x="86" y="228" width="278" height="38" rx="5" fill="#D5E2F1"/>
+  <text x="225" y="252" text-anchor="middle" font-size="10.5" font-weight="700" fill="#185FA5">
+    上网标识：仅 32 位 request_id
+  </text>
+
+  <!-- 中间：Pending 映射桥梁 -->
+  <rect x="424" y="146" width="370" height="136" rx="8"
+        fill="#F3E8D3" stroke="#D8BE90" stroke-width="1.2"/>
+  <text x="440" y="172" font-size="13" font-weight="700" fill="#6B4E28">本地映射：pending_[42]</text>
+  <text x="440" y="193" font-size="11" fill="#806541">• Key: request_id = 42</text>
+  <text x="440" y="213" font-size="11" fill="#806541">• Value: PendingCall { continuation }</text>
+  <rect x="440" y="228" width="338" height="38" rx="5" fill="#EAD9B8"/>
+  <text x="609" y="252" text-anchor="middle" font-size="10.5" font-weight="700" fill="#854F0B">
+    出队前登记，响应到达查表
+  </text>
+
+  <!-- 右侧：本地调度层 (进程内独占) -->
+  <rect x="838" y="146" width="334" height="136" rx="8"
+        fill="#EDEAF3" stroke="#C9C0D8" stroke-width="1.2"/>
+  <text x="854" y="172" font-size="13" font-weight="700" fill="#4A3F68">本地调度层 (进程内独占)</text>
+  <text x="854" y="193" font-size="11" fill="#665B78">• co_await 挂起当前协程</text>
+  <text x="854" y="213" font-size="11" fill="#665B78">• continuation: coroutine_handle</text>
+  <rect x="854" y="228" width="302" height="38" rx="5" fill="#DDD7E8"/>
+  <text x="1005" y="252" text-anchor="middle" font-size="10.5" font-weight="700" fill="#534AB7">
+    不上网：句柄指针绝不进帧头
+  </text>
+
+  <!-- 连接箭头 -->
+  <path d="M380 196 H416" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <path d="M416 226 H380" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <path d="M794 196 H830" stroke="#6B5B95" stroke-width="1.8" marker-end="url(#arr-purple)"/>
+  <path d="M830 226 H794" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+
+
+  <!-- ======================== Panel B: PendingCall 状态机 ======================== -->
+  <rect x="48" y="318" width="560" height="348" rx="10"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="70" y="346" font-size="14" font-weight="700" fill="#4A473F">
+    B · PendingCall 状态机 (竞争与单次完成)
+  </text>
+  <text x="70" y="366" font-size="11" fill="#6B675C">
+    核心规则：原子 extract(id)，仅首次状态转移生效
+  </text>
+
+  <!-- 状态 1: Pending -->
+  <rect x="70" y="386" width="220" height="66" rx="8"
+        fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="180" y="409" text-anchor="middle" font-size="12.5" font-weight="700" fill="#6B4E28">Pending (在途)</text>
+  <text x="180" y="427" text-anchor="middle" font-size="10.5" fill="#806541">持有 continuation 句柄</text>
+  <text x="180" y="443" text-anchor="middle" font-size="9.5" fill="#806541">等待响应或超时</text>
+
+  <!-- 状态 2: Completed (成功) -->
+  <rect x="356" y="386" width="232" height="66" rx="8"
+        fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="472" y="409" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">Completed (成功)</text>
+  <text x="472" y="427" text-anchor="middle" font-size="10.5" fill="#4A655F">写入 reply_ 响应体</text>
+  <text x="472" y="443" text-anchor="middle" font-size="9.5" fill="#4A655F">Post(resume) 唤醒</text>
+
+  <!-- 状态 3: Cancelled (失败) -->
+  <rect x="356" y="478" width="232" height="66" rx="8"
+        fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="472" y="501" text-anchor="middle" font-size="12.5" font-weight="700" fill="#733428">Cancelled (异常)</text>
+  <text x="472" y="519" text-anchor="middle" font-size="10.5" fill="#8A5148">写入 error (超时/断链)</text>
+  <text x="472" y="535" text-anchor="middle" font-size="9.5" fill="#8A5148">Post(resume) 抛异常</text>
+
+  <!-- 转移箭头 1: Pending -> Completed -->
+  <path d="M290 412 H348" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arr-green)"/>
+  <text x="323" y="406" text-anchor="middle" font-size="9.5" font-weight="700" fill="#2F6B5E">收到响应</text>
+
+  <!-- 转移箭头 2: Pending -> Cancelled -->
+  <path d="M290 436 H318 V511 H348" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arr-red)"/>
+  <text x="323" y="482" text-anchor="middle" font-size="9.5" font-weight="700" fill="#A64B3C">超时/断链</text>
+
+  <!-- 不变量底条 -->
+  <rect x="70" y="566" width="518" height="82" rx="6"
+        fill="#F5F4ED" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="84" y="587" font-size="11" font-weight="700" fill="#4A473F">状态机核心不变量 (Invariants)</text>
+  <text x="84" y="607" font-size="10" fill="#5A564B">1. 竞态中仅首次状态转移生效。</text>
+  <text x="84" y="625" font-size="10" fill="#5A564B">2. 清空句柄后通过 Post() 异步唤醒。</text>
+  <text x="84" y="641" font-size="10" fill="#5A564B">3. 严禁持锁调用 resume() 防死锁。</text>
+
+
+  <!-- ======================== Panel C: 现场保存位置划分 ======================== -->
+  <rect x="632" y="318" width="560" height="348" rx="10"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="654" y="346" font-size="14" font-weight="700" fill="#4A473F">
+    C · 现场保存位置划分 (两套解耦的恢复点)
+  </text>
+  <text x="654" y="366" font-size="11" fill="#6B675C">
+    协程保存业务逻辑，状态机保存网络字节流
+  </text>
+
+  <!-- 卡片 1: 业务层 -->
+  <rect x="654" y="386" width="518" height="66" rx="8"
+        fill="#EDEAF3" stroke="#C9C0D8" stroke-width="1.2"/>
+  <text x="670" y="409" font-size="12.5" font-weight="700" fill="#4A3F68">1. 业务局部状态 → 堆上 Coroutine Frame</text>
+  <text x="670" y="428" font-size="10.5" fill="#665B78">• 局部变量、执行进度与 awaiter 槽位</text>
+  <text x="670" y="443" font-size="10" fill="#665B78">• 挂起释放线程，不占 OS 线程栈</text>
+
+  <!-- 卡片 2: 传输层 -->
+  <rect x="654" y="466" width="518" height="66" rx="8"
+        fill="#DCE9E3" stroke="#B9D0C5" stroke-width="1.2"/>
+  <text x="670" y="489" font-size="12.5" font-weight="700" fill="#24473F">2. TCP 传输现场 → 用户态连接状态机</text>
+  <text x="670" y="508" font-size="10.5" fill="#4A655F">• 保存 output_queue 偏移与短写</text>
+  <text x="670" y="523" font-size="10" fill="#4A655F">• 保存 input_buffer 流式拼包状态</text>
+
+  <!-- 卡片 3: 调度层 -->
+  <rect x="654" y="546" width="518" height="66" rx="8"
+        fill="#F3E8D3" stroke="#D8BE90" stroke-width="1.2"/>
+  <text x="670" y="569" font-size="12.5" font-weight="700" fill="#6B4E28">3. 统一调度等待 → EventLoop epoll_wait</text>
+  <text x="670" y="588" font-size="10.5" fill="#806541">• 统一监听连接与就绪队列</text>
+  <text x="670" y="603" font-size="10" fill="#806541">• 无专职等待线程，支撑高并发</text>
+
+
+  <!-- ======================== 底部总结条 ======================== -->
+  <rect x="48" y="680" width="1144" height="62" rx="8"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="70" y="705" font-size="12.5" font-weight="700" fill="#2B2A26">
+    核心结论：C++ Coroutine 消除回调嵌套，连接状态机接管底层短读短写与分包；
+  </text>
+  <text x="70" y="725" font-size="11" fill="#6B675C">
+    二者通过 pending_calls_[id] 以 32 位 request_id 完成精确跨层衔接。
+  </text>
+</svg>

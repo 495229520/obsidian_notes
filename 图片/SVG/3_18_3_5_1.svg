@@ -1,0 +1,225 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>非阻塞 RPC 连接与数据流状态机</title>
+  <desc>展示连接生命周期（Connecting/Open/Closing/Closed）以及 Open 内部并行的读解析状态机和写出状态机推演过程与不变量。</desc>
+
+  <defs>
+    <marker id="arr-gray" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 全局浅米色底 -->
+  <rect width="1240" height="760" fill="#F5F4ED"/>
+
+  <!-- 顶部主副标题区 -->
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">
+    非阻塞 RPC 连接与数据流状态机
+  </text>
+  <text x="48" y="74" font-size="13.5" fill="#6B675C">
+    三维状态解耦：生命周期管理连接存亡，读状态机按帧拆解流，写状态机按需挂载 EPOLLOUT
+  </text>
+
+  <!-- ======================== Panel A: 连接生命周期 ======================== -->
+  <rect x="48" y="98" width="1144" height="152" rx="10"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="70" y="126" font-size="14.5" font-weight="700" fill="#4A473F">
+    A · 连接生命周期状态 (Connection Lifecycle)
+  </text>
+
+  <!-- 状态 1: Connecting -->
+  <rect x="70" y="146" width="200" height="84" rx="8"
+        fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="170" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#2C4460">Connecting</text>
+  <text x="170" y="193" text-anchor="middle" font-size="11" fill="#53677E">非阻塞 connect(2)</text>
+  <text x="170" y="211" text-anchor="middle" font-size="10" fill="#53677E">挂载 epoll 等待握手完成</text>
+
+  <!-- 状态 2: Open -->
+  <rect x="364" y="146" width="232" height="84" rx="8"
+        fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="480" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#24473F">Open (双工活跃态)</text>
+  <text x="480" y="193" text-anchor="middle" font-size="11" fill="#4A655F">正常处理多路并发 RPC</text>
+  <text x="480" y="211" text-anchor="middle" font-size="10" fill="#4A655F">内部并行推演读/写状态机</text>
+
+  <!-- 状态 3: Closing -->
+  <rect x="688" y="146" width="210" height="84" rx="8"
+        fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="793" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#6B4E28">Closing (排空态)</text>
+  <text x="793" y="193" text-anchor="middle" font-size="11" fill="#806541">停止接收新 RPC 请求</text>
+  <text x="793" y="211" text-anchor="middle" font-size="10" fill="#806541">尝试写出 output_queue 剩余帧</text>
+
+  <!-- 状态 4: Closed -->
+  <rect x="990" y="146" width="182" height="84" rx="8"
+        fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1081" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="#733428">Closed (终止态)</text>
+  <text x="1081" y="193" text-anchor="middle" font-size="11" fill="#8A5148">从 epoll 移除并 close(fd)</text>
+  <text x="1081" y="211" text-anchor="middle" font-size="10" fill="#8A5148">FailAll 失败全部在途调用</text>
+
+  <!-- 迁移箭头 A1: Connecting -> Open -->
+  <path d="M270 188 H356" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arr-green)"/>
+  <rect x="278" y="168" width="70" height="18" rx="4" fill="#FBFBF6"/>
+  <text x="313" y="181" text-anchor="middle" font-size="10" font-weight="700" fill="#2F6B5E">握手建立</text>
+
+  <!-- 迁移箭头 A2: Open -> Closing -->
+  <path d="M596 188 H680" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arr-amber)"/>
+  <rect x="602" y="162" width="74" height="28" rx="4" fill="#FBFBF6"/>
+  <text x="639" y="175" text-anchor="middle" font-size="9.5" font-weight="700" fill="#8A6A3A">收到有序 EOF</text>
+  <text x="639" y="187" text-anchor="middle" font-size="9.5" fill="#806541">或协议/传输错误</text>
+
+  <!-- 迁移箭头 A3: Closing -> Closed -->
+  <path d="M898 188 H982" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arr-red)"/>
+  <rect x="904" y="168" width="72" height="18" rx="4" fill="#FBFBF6"/>
+  <text x="940" y="181" text-anchor="middle" font-size="10" font-weight="700" fill="#A64B3C">排空或失败</text>
+
+
+  <!-- ======================== Panel B: 读解析状态机 ======================== -->
+  <rect x="48" y="266" width="560" height="402" rx="10"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="70" y="294" font-size="14" font-weight="700" fill="#4A473F">
+    B · 读解析状态机 (输入字节流 → 完整 Frame)
+  </text>
+  <text x="70" y="314" font-size="11" fill="#6B675C">
+    关键字段：input_buffer / input_pos / parse_state
+  </text>
+
+  <!-- ReadingHeader -->
+  <rect x="70" y="332" width="220" height="66" rx="8"
+        fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="180" y="355" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4A3F68">ReadingHeader</text>
+  <text x="180" y="373" text-anchor="middle" font-size="10.5" fill="#665B78">等待固定 14 B 帧头</text>
+  <text x="180" y="389" text-anchor="middle" font-size="9.5" fill="#665B78">校验 magic / version / type</text>
+
+  <!-- ReadingBody -->
+  <rect x="70" y="472" width="220" height="66" rx="8"
+        fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="180" y="495" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">ReadingBody</text>
+  <text x="180" y="513" text-anchor="middle" font-size="10.5" fill="#4A655F">已持有合法 FrameHeader</text>
+  <text x="180" y="529" text-anchor="middle" font-size="9.5" fill="#4A655F">等待承诺的 body_len 字节</text>
+
+  <!-- Header -> Body 成功 -->
+  <path d="M180 398 V464" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arr-green)"/>
+  <rect x="110" y="420" width="140" height="20" rx="4" fill="#FBFBF6" stroke="#DCE9E3" stroke-width="1"/>
+  <text x="180" y="434" text-anchor="middle" font-size="9.5" font-weight="700" fill="#2F6B5E">头齐且校验成功 (pos+=14)</text>
+
+  <!-- Body -> Header 成功完成一帧 (左侧回环) -->
+  <path d="M70 505 H56 V365 H62" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+  <rect x="42" y="420" width="100" height="20" rx="4" fill="#FBFBF6" stroke="#E3EAF4" stroke-width="1"/>
+  <text x="92" y="434" text-anchor="middle" font-size="9.5" font-weight="700" fill="#3D5A80">产出 Frame 交付</text>
+
+  <!-- 右侧挂起节点 1: Header 字节不足 -->
+  <rect x="366" y="332" width="222" height="66" rx="8"
+        fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="477" y="355" text-anchor="middle" font-size="12" font-weight="700" fill="#4A473F">返回 EventLoop (挂起)</text>
+  <text x="477" y="373" text-anchor="middle" font-size="10" fill="#6B675C">可用字节 &lt; 14 B：保持 pos</text>
+  <text x="477" y="389" text-anchor="middle" font-size="9.5" fill="#6B675C">等待下一次 EPOLLIN 唤醒</text>
+
+  <path d="M290 352 H358" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arr-amber)"/>
+  <text x="328" y="346" text-anchor="middle" font-size="9.5" fill="#8A6A3A">字节不足</text>
+
+  <path d="M366 378 H298" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arr-green)"/>
+  <text x="328" y="392" text-anchor="middle" font-size="9.5" fill="#2F6B5E">EPOLLIN</text>
+
+  <!-- 右侧挂起节点 2: Body 字节不足 -->
+  <rect x="366" y="472" width="222" height="66" rx="8"
+        fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="477" y="495" text-anchor="middle" font-size="12" font-weight="700" fill="#4A473F">返回 EventLoop (挂起)</text>
+  <text x="477" y="513" text-anchor="middle" font-size="10" fill="#6B675C">已读 &lt; body_len：保持 header</text>
+  <text x="477" y="529" text-anchor="middle" font-size="9.5" fill="#6B675C">等待下一次 EPOLLIN 唤醒</text>
+
+  <path d="M290 492 H358" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arr-amber)"/>
+  <text x="328" y="486" text-anchor="middle" font-size="9.5" fill="#8A6A3A">body不足</text>
+
+  <path d="M366 518 H298" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arr-green)"/>
+  <text x="328" y="532" text-anchor="middle" font-size="9.5" fill="#2F6B5E">EPOLLIN</text>
+
+  <!-- 读状态机底部不变量提示 -->
+  <rect x="70" y="556" width="518" height="94" rx="6"
+        fill="#F5F4ED" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="84" y="577" font-size="11" font-weight="700" fill="#4A473F">读状态机核心不变量 (Invariants)</text>
+  <text x="84" y="597" font-size="10" fill="#5A564B">1. 只要 input_buffer 有多帧，while 连续产出上交，不提前返回。</text>
+  <text x="84" y="615" font-size="10" fill="#5A564B">2. 字节不足时返回 EventLoop 等待，绝不修改 pos，绝不丢弃半包。</text>
+  <text x="84" y="633" font-size="10" fill="#5A564B">3. 消费后按阈值 CompactInput()，回收前缀空间防止内存膨胀。</text>
+
+
+  <!-- ======================== Panel C: 写出状态机 ======================== -->
+  <rect x="632" y="266" width="560" height="402" rx="10"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="654" y="294" font-size="14" font-weight="700" fill="#4A473F">
+    C · 写出状态机 (output_queue → TCP 发送)
+  </text>
+  <text x="654" y="314" font-size="11" fill="#6B675C">
+    关键字段：output_queue / front.sent
+  </text>
+
+  <!-- 队列为空 (Idle) -->
+  <rect x="654" y="332" width="220" height="66" rx="8"
+        fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="764" y="355" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4A473F">队列为空 (Idle)</text>
+  <text x="764" y="373" text-anchor="middle" font-size="10.5" fill="#5A564B">output_queue_.empty()</text>
+  <text x="764" y="389" text-anchor="middle" font-size="9.5" font-weight="700" fill="#A64B3C">撤销 EPOLLOUT (防 CPU 空转)</text>
+
+  <!-- 队列非空 (Sending) -->
+  <rect x="654" y="472" width="220" height="66" rx="8"
+        fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="764" y="495" text-anchor="middle" font-size="12.5" font-weight="700" fill="#6B4E28">队列非空 (Sending)</text>
+  <text x="764" y="513" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8A6A3A">追加监听 EPOLLOUT 兴趣</text>
+  <text x="764" y="529" text-anchor="middle" font-size="9.5" fill="#806541">非阻塞 send(front + sent) 推进</text>
+
+  <!-- QueueFrame 入队 -->
+  <path d="M764 398 V464" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+  <rect x="686" y="420" width="156" height="20" rx="4" fill="#FBFBF6" stroke="#E3EAF4" stroke-width="1"/>
+  <text x="764" y="434" text-anchor="middle" font-size="9.5" font-weight="700" fill="#3D5A80">QueueFrame() 入队新帧</text>
+
+  <!-- 一帧写完 弹出并判断 (右侧回环) -->
+  <path d="M874 505 H892 V365 H882" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arr-green)"/>
+  <rect x="888" y="420" width="128" height="20" rx="4" fill="#FBFBF6" stroke="#DCE9E3" stroke-width="1"/>
+  <text x="952" y="434" text-anchor="middle" font-size="9.5" font-weight="700" fill="#2F6B5E">sent==size 弹出队首</text>
+
+  <!-- 右侧挂起节点: 短写 / EAGAIN -->
+  <rect x="970" y="472" width="202" height="66" rx="8"
+        fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="1071" y="495" text-anchor="middle" font-size="12" font-weight="700" fill="#4A473F">返回 EventLoop (短写)</text>
+  <text x="1071" y="513" text-anchor="middle" font-size="10" fill="#6B675C">更新 front().sent 偏移</text>
+  <text x="1071" y="529" text-anchor="middle" font-size="9.5" fill="#6B675C">EAGAIN 挂起，等待 EPOLLOUT</text>
+
+  <path d="M874 488 H962" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arr-amber)"/>
+  <text x="918" y="482" text-anchor="middle" font-size="9.5" fill="#8A6A3A">短写/EAGAIN</text>
+
+  <path d="M970 520 H882" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arr-green)"/>
+  <text x="926" y="534" text-anchor="middle" font-size="9.5" fill="#2F6B5E">EPOLLOUT</text>
+
+  <!-- 写状态机底部不变量提示 -->
+  <rect x="654" y="556" width="518" height="94" rx="6"
+        fill="#F5F4ED" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="668" y="577" font-size="11" font-weight="700" fill="#4A473F">写状态机核心不变量 (Invariants)</text>
+  <text x="668" y="597" font-size="10" fill="#5A564B">1. 严禁交叉写：前一帧未全部送入内核前，绝不开始发送下一帧。</text>
+  <text x="668" y="615" font-size="10" fill="#5A564B">2. 队列清空瞬间 MOD 撤销 EPOLLOUT，彻底杜绝 CPU 空转。</text>
+  <text x="668" y="633" font-size="10" fill="#5A564B">3. 遇到短写只累加 front.sent，下次就绪从 sent 偏移处无缝续写。</text>
+
+  <!-- ======================== 底部总结条 ======================== -->
+  <rect x="48" y="682" width="1144" height="60" rx="8"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="70" y="707" font-size="12.5" font-weight="700" fill="#2B2A26">
+    核心机制总结：EventLoop 统一在 epoll_wait 睡眠；EAGAIN 是正常暂停恢复点；状态机各司其职解耦复杂度。
+  </text>
+  <text x="70" y="727" font-size="11" fill="#6B675C">
+    生命周期掌控 fd 存亡与在途撤销；读状态机隔离 TCP 流分包；写状态机实现零拷贝排队与按需就绪监听。
+  </text>
+</svg>
