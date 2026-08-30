@@ -1,78 +1,179 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
-  <title>epoll 驱动的非阻塞 RPC 总体结构</title>
-  <desc>业务线程投递请求，Connection 保存输入输出与待完成状态，EventLoop 通过 epoll 就绪事件推进非阻塞 TCP 收发。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>epoll 非阻塞 RPC 的分层数据路径与恢复状态</title>
+  <desc>从业务 AddAsync 到 TCP 字节流，展示请求向下封装、响应向上恢复，以及 pending_calls、发送偏移、输入解析状态与 epoll 兴趣集的职责。</desc>
+
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6.5" markerHeight="6.5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8.5" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#777164"/>
     </marker>
   </defs>
-  <rect width="1400" height="860" fill="#f7f6f2"/>
-  <text x="60" y="60" font-size="22" font-weight="700" fill="#1f2937">非阻塞 RPC 总体结构：epoll 驱动，状态机推进</text>
-  <text x="60" y="98" font-size="13.5" fill="#4b5563">核心思路：业务线程只投递请求，真正的网络推进发生在 EventLoop 中，由输入/输出缓冲区和连接状态机恢复半途现场。</text>
 
-  <rect x="70" y="160" width="240" height="120" rx="16" fill="#e8eef9" stroke="#4f6fad" stroke-width="2"/>
-  <text x="190" y="205" text-anchor="middle" font-size="24" font-weight="700" fill="#274472">业务线程</text>
-  <text x="190" y="238" text-anchor="middle" font-size="16" fill="#274472">CallAsync(method, args)</text>
-  <text x="190" y="264" text-anchor="middle" font-size="16" fill="#274472">创建 request_id / 回调</text>
+  <rect width="1240" height="820" fill="#F5F4ED"/>
 
-  <rect x="400" y="135" width="300" height="170" rx="16" fill="#eef5ec" stroke="#5d8a56" stroke-width="2"/>
-  <text x="550" y="180" text-anchor="middle" font-size="26" font-weight="700" fill="#2d5a27">Connection</text>
-  <text x="550" y="212" text-anchor="middle" font-size="16" fill="#2d5a27">pending_calls: id -&gt; callback/promise</text>
-  <text x="550" y="238" text-anchor="middle" font-size="16" fill="#2d5a27">input_buffer + parse_state</text>
-  <text x="550" y="264" text-anchor="middle" font-size="16" fill="#2d5a27">output_buffer + write_pos</text>
+  <text x="48" y="50" font-size="22" font-weight="700" fill="#2B2A26">
+    非阻塞 RPC 总体结构：请求向下封装，响应按 request_id 向上恢复
+  </text>
+  <text x="48" y="78" font-size="13.5" fill="#6B675C">
+    epoll 只报告 fd 就绪；长期状态保存半包、短写、deadline 与调用关联
+  </text>
 
-  <rect x="790" y="130" width="260" height="180" rx="16" fill="#f6f0df" stroke="#a07d2b" stroke-width="2"/>
-  <text x="920" y="177" text-anchor="middle" font-size="26" font-weight="700" fill="#6a5017">EventLoop</text>
-  <text x="920" y="210" text-anchor="middle" font-size="16" fill="#6a5017">epoll_wait()</text>
-  <text x="920" y="236" text-anchor="middle" font-size="16" fill="#6a5017">OnReadable / OnWritable</text>
-  <text x="920" y="262" text-anchor="middle" font-size="16" fill="#6a5017">HandleTimeouts()</text>
+  <rect x="48" y="104" width="1144" height="506" rx="11"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="134" font-size="14" font-weight="700" fill="#4A473F">
+    A · 同一个 Add(3, 4) 穿过七层
+  </text>
 
-  <rect x="1130" y="160" width="210" height="120" rx="16" fill="#efe8f9" stroke="#7a58a3" stroke-width="2"/>
-  <text x="1235" y="205" text-anchor="middle" font-size="24" font-weight="700" fill="#5c3b86">TCP Socket</text>
-  <text x="1235" y="238" text-anchor="middle" font-size="16" fill="#5c3b86">非阻塞 fd</text>
-  <text x="1235" y="264" text-anchor="middle" font-size="16" fill="#5c3b86">EPOLLIN / EPOLLOUT</text>
+  <rect x="68" y="150" width="126" height="28" rx="5" fill="#ECEAE0"/>
+  <text x="131" y="169" text-anchor="middle" font-size="11.5" font-weight="700" fill="#5A564B">层次</text>
 
-  <line x1="310" y1="220" x2="400" y2="220" stroke="#4b5563" stroke-width="3" marker-end="url(#arrow)"/>
-  <text x="355" y="205" text-anchor="middle" font-size="14" fill="#374151">投递请求</text>
+  <rect x="214" y="150" width="226" height="28" rx="5" fill="#E3EAF4"/>
+  <text x="327" y="169" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2C4460">请求路径 ↓</text>
 
-  <line x1="700" y1="220" x2="790" y2="220" stroke="#4b5563" stroke-width="3" marker-end="url(#arrow)"/>
-  <text x="745" y="205" text-anchor="middle" font-size="14" fill="#374151">事件推进</text>
+  <rect x="460" y="150" width="400" height="28" rx="5" fill="#EDEAF3"/>
+  <text x="660" y="169" text-anchor="middle" font-size="11.5" font-weight="700" fill="#4A3F68">本层长期状态 / 责任</text>
 
-  <line x1="1050" y1="220" x2="1130" y2="220" stroke="#4b5563" stroke-width="3" marker-end="url(#arrow)"/>
-  <text x="1090" y="205" text-anchor="middle" font-size="14" fill="#374151">read / send</text>
+  <rect x="880" y="150" width="292" height="28" rx="5" fill="#DCE9E3"/>
+  <text x="1026" y="169" text-anchor="middle" font-size="11.5" font-weight="700" fill="#24473F">响应路径 ↑</text>
 
-  <line x1="1130" y1="260" x2="1050" y2="260" stroke="#4b5563" stroke-width="3" marker-end="url(#arrow)"/>
-  <text x="1090" y="285" text-anchor="middle" font-size="14" fill="#374151">就绪事件</text>
+  <!-- Row 1 -->
+  <rect x="68" y="190" width="126" height="52" rx="7" fill="#3D5A80"/>
+  <text x="131" y="221" text-anchor="middle" font-size="12.5" font-weight="700" fill="#FFFFFF">① 业务层</text>
+  <rect x="214" y="190" width="226" height="52" rx="7" fill="#E3EAF4" stroke="#B7C6DA"/>
+  <text x="327" y="213" text-anchor="middle" font-size="12.5" font-weight="700" fill="#2C4460">AddAsync(3, 4)</text>
+  <text x="327" y="231" text-anchor="middle" font-size="10.5" fill="#53677E">调用立即返回</text>
+  <rect x="460" y="190" width="400" height="52" rx="7" fill="#F1EEF6" stroke="#D3CBE1"/>
+  <text x="660" y="213" text-anchor="middle" font-size="12" font-weight="700" fill="#4A3F68">callback + deadline</text>
+  <text x="660" y="231" text-anchor="middle" font-size="10.5" fill="#665B78">业务线程不等待单个响应</text>
+  <rect x="880" y="190" width="292" height="52" rx="7" fill="#DCE9E3" stroke="#B9D0C5"/>
+  <text x="1026" y="221" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">completion(7)</text>
 
-  <rect x="90" y="400" width="1220" height="340" rx="18" fill="#fbfbf8" stroke="#d2cec1" stroke-width="2"/>
-  <text x="120" y="445" font-size="24" font-weight="700" fill="#1f2937">一次请求的推进链</text>
+  <!-- Row 2 -->
+  <rect x="68" y="250" width="126" height="52" rx="7" fill="#6B5B95"/>
+  <text x="131" y="281" text-anchor="middle" font-size="12.5" font-weight="700" fill="#FFFFFF">② 消息层</text>
+  <rect x="214" y="250" width="226" height="52" rx="7" fill="#EDEAF3" stroke="#C9C0D8"/>
+  <text x="327" y="273" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4A3F68">8 B request body</text>
+  <text x="327" y="291" text-anchor="middle" font-size="10.5" fill="#665B78">a、b 各 4 B</text>
+  <rect x="460" y="250" width="400" height="52" rx="7" fill="#F1EEF6" stroke="#D3CBE1"/>
+  <text x="660" y="273" text-anchor="middle" font-size="12" font-weight="700" fill="#4A3F68">AppendU32 / ReadU32</text>
+  <text x="660" y="291" text-anchor="middle" font-size="10.5" fill="#665B78">只理解 Add schema</text>
+  <rect x="880" y="250" width="292" height="52" rx="7" fill="#DCE9E3" stroke="#B9D0C5"/>
+  <text x="1026" y="273" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">4 B response body</text>
+  <text x="1026" y="291" text-anchor="middle" font-size="10.5" fill="#4A655F">sum = 7</text>
 
-  <rect x="120" y="490" width="180" height="92" rx="12" fill="#dde7f7" stroke="#4f6fad" stroke-width="1.8"/>
-  <text x="210" y="527" text-anchor="middle" font-size="19" font-weight="700" fill="#274472">1. 业务发起</text>
-  <text x="210" y="554" text-anchor="middle" font-size="14" fill="#274472">组装帧、登记 pending_calls</text>
+  <!-- Row 3 -->
+  <rect x="68" y="310" width="126" height="52" rx="7" fill="#9A6C1F"/>
+  <text x="131" y="341" text-anchor="middle" font-size="12.5" font-weight="700" fill="#FFFFFF">③ 调用层</text>
+  <rect x="214" y="310" width="226" height="52" rx="7" fill="#F3E8D3" stroke="#D8BE90"/>
+  <text x="327" y="333" text-anchor="middle" font-size="12.5" font-weight="700" fill="#6B4E28">request_id = 42</text>
+  <text x="327" y="351" text-anchor="middle" font-size="10.5" fill="#806541">先登记，再排队</text>
+  <rect x="460" y="310" width="400" height="52" rx="7" fill="#F6EEDC" stroke="#E1CEA8"/>
+  <text x="660" y="333" text-anchor="middle" font-size="12" font-weight="700" fill="#6B4E28">pending_calls[42]</text>
+  <text x="660" y="351" text-anchor="middle" font-size="10.5" fill="#806541">deadline + completion</text>
+  <rect x="880" y="310" width="292" height="52" rx="7" fill="#E9F1ED" stroke="#B9D0C5"/>
+  <text x="1026" y="333" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">extract(42)</text>
+  <text x="1026" y="351" text-anchor="middle" font-size="10.5" fill="#4A655F">一次完成</text>
 
-  <rect x="345" y="490" width="180" height="92" rx="12" fill="#e7f1e4" stroke="#5d8a56" stroke-width="1.8"/>
-  <text x="435" y="527" text-anchor="middle" font-size="19" font-weight="700" fill="#2d5a27">2. 排队待发</text>
-  <text x="435" y="554" text-anchor="middle" font-size="14" fill="#2d5a27">追加 output_buffer</text>
+  <!-- Row 4 -->
+  <rect x="68" y="370" width="126" height="52" rx="7" fill="#A64B3C"/>
+  <text x="131" y="401" text-anchor="middle" font-size="12.5" font-weight="700" fill="#FFFFFF">④ 帧层</text>
+  <rect x="214" y="370" width="226" height="52" rx="7" fill="#F0E0DB" stroke="#D5B2A9"/>
+  <text x="327" y="393" text-anchor="middle" font-size="12.5" font-weight="700" fill="#733428">Request · 22 B</text>
+  <text x="327" y="411" text-anchor="middle" font-size="10.5" fill="#8A5148">14 B 头 + 8 B body</text>
+  <rect x="460" y="370" width="400" height="52" rx="7" fill="#F5E8E4" stroke="#DFC6BF"/>
+  <text x="660" y="393" text-anchor="middle" font-size="12" font-weight="700" fill="#733428">magic / type / id / code / body_len</text>
+  <text x="660" y="411" text-anchor="middle" font-size="10.5" fill="#8A5148">完整校验后才上交</text>
+  <rect x="880" y="370" width="292" height="52" rx="7" fill="#E9F1ED" stroke="#B9D0C5"/>
+  <text x="1026" y="393" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">Response · 18 B</text>
+  <text x="1026" y="411" text-anchor="middle" font-size="10.5" fill="#4A655F">14 B 头 + 4 B body</text>
 
-  <rect x="570" y="490" width="180" height="92" rx="12" fill="#f8efd8" stroke="#a07d2b" stroke-width="1.8"/>
-  <text x="660" y="527" text-anchor="middle" font-size="19" font-weight="700" fill="#6a5017">3. EPOLLOUT</text>
-  <text x="660" y="554" text-anchor="middle" font-size="14" fill="#6a5017">尽可能写出，保留 write_pos</text>
+  <!-- Row 5 -->
+  <rect x="68" y="430" width="126" height="52" rx="7" fill="#2F6B5E"/>
+  <text x="131" y="461" text-anchor="middle" font-size="12.5" font-weight="700" fill="#FFFFFF">⑤ 连接层</text>
+  <rect x="214" y="430" width="226" height="52" rx="7" fill="#DCE9E3" stroke="#B9D0C5"/>
+  <text x="327" y="453" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">output_queue</text>
+  <text x="327" y="471" text-anchor="middle" font-size="10.5" fill="#4A655F">front.sent 保存短写</text>
+  <rect x="460" y="430" width="400" height="52" rx="7" fill="#E9F1ED" stroke="#C6D9D0"/>
+  <text x="660" y="453" text-anchor="middle" font-size="12" font-weight="700" fill="#24473F">sent / input_pos / parse_state</text>
+  <text x="660" y="471" text-anchor="middle" font-size="10.5" fill="#4A655F">保存“做到一半”的现场</text>
+  <rect x="880" y="430" width="292" height="52" rx="7" fill="#DCE9E3" stroke="#B9D0C5"/>
+  <text x="1026" y="453" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">input_buffer</text>
+  <text x="1026" y="471" text-anchor="middle" font-size="10.5" fill="#4A655F">半头 / 半体 / 多帧</text>
 
-  <rect x="795" y="490" width="180" height="92" rx="12" fill="#f0e8fb" stroke="#7a58a3" stroke-width="1.8"/>
-  <text x="885" y="527" text-anchor="middle" font-size="19" font-weight="700" fill="#5c3b86">4. EPOLLIN</text>
-  <text x="885" y="554" text-anchor="middle" font-size="14" fill="#5c3b86">尽可能读入 input_buffer</text>
+  <!-- Row 6 -->
+  <rect x="68" y="490" width="126" height="52" rx="7" fill="#9A6C1F"/>
+  <text x="131" y="521" text-anchor="middle" font-size="12.5" font-weight="700" fill="#FFFFFF">⑥ EventLoop</text>
+  <rect x="214" y="490" width="226" height="52" rx="7" fill="#F3E8D3" stroke="#D8BE90"/>
+  <text x="327" y="513" text-anchor="middle" font-size="12.5" font-weight="700" fill="#6B4E28">EPOLLOUT</text>
+  <text x="327" y="531" text-anchor="middle" font-size="10.5" fill="#806541">队列非空才监听</text>
+  <rect x="460" y="490" width="400" height="52" rx="7" fill="#F6EEDC" stroke="#E1CEA8"/>
+  <text x="660" y="513" text-anchor="middle" font-size="12" font-weight="700" fill="#6B4E28">epoll_wait + I/O budget</text>
+  <text x="660" y="531" text-anchor="middle" font-size="10.5" fill="#806541">统一等待全部 fd</text>
+  <rect x="880" y="490" width="292" height="52" rx="7" fill="#E9F1ED" stroke="#B9D0C5"/>
+  <text x="1026" y="513" text-anchor="middle" font-size="12.5" font-weight="700" fill="#24473F">EPOLLIN</text>
+  <text x="1026" y="531" text-anchor="middle" font-size="10.5" fill="#4A655F">read 后循环解析</text>
 
-  <rect x="1020" y="490" width="240" height="92" rx="12" fill="#e8eef9" stroke="#4f6fad" stroke-width="1.8"/>
-  <text x="1140" y="527" text-anchor="middle" font-size="19" font-weight="700" fill="#274472">5. 解析与回调</text>
-  <text x="1140" y="554" text-anchor="middle" font-size="14" fill="#274472">TryParseFrames → request_id 唤醒等待者</text>
+  <!-- Row 7 -->
+  <rect x="68" y="550" width="126" height="44" rx="7" fill="#5A564B"/>
+  <text x="131" y="577" text-anchor="middle" font-size="12.5" font-weight="700" fill="#FFFFFF">⑦ TCP</text>
+  <rect x="214" y="550" width="226" height="44" rx="7" fill="#ECEAE0" stroke="#D3CFC2"/>
+  <text x="327" y="577" text-anchor="middle" font-size="12" font-weight="700" fill="#4A473F">有序字节流</text>
+  <rect x="460" y="550" width="400" height="44" rx="7" fill="#F1EFE8" stroke="#D8D5C8"/>
+  <text x="660" y="570" text-anchor="middle" font-size="11.5" font-weight="700" fill="#4A473F">无 RPC 消息边界</text>
+  <text x="660" y="586" text-anchor="middle" font-size="10" fill="#6B675C">短读、短写都是正常现象</text>
+  <rect x="880" y="550" width="292" height="44" rx="7" fill="#ECEAE0" stroke="#D3CFC2"/>
+  <text x="1026" y="577" text-anchor="middle" font-size="12" font-weight="700" fill="#4A473F">可靠交付字节</text>
 
-  <line x1="300" y1="536" x2="345" y2="536" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
-  <line x1="525" y1="536" x2="570" y2="536" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
-  <line x1="750" y1="536" x2="795" y2="536" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
-  <line x1="975" y1="536" x2="1020" y2="536" stroke="#4b5563" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <!-- Request and response arrows between rows -->
+  <path d="M327 242 V248" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <path d="M327 302 V308" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <path d="M327 362 V368" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <path d="M327 422 V428" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <path d="M327 482 V488" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <path d="M327 542 V548" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrow-blue)"/>
 
-  <text x="120" y="652" font-size="18" font-weight="700" fill="#1f2937">关键结论</text>
-  <text x="140" y="690" font-size="16" fill="#374151">• epoll 只回答“哪个 fd 现在能继续推进”；状态机回答“下一步应该读头、读体，还是继续写剩余字节”。</text>
-  <text x="140" y="720" font-size="16" fill="#374151">• 输入缓冲区解决半包/粘包；输出缓冲区解决短写/背压；pending_calls 解决并发响应关联。</text>
+  <path d="M1026 550 V544" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <path d="M1026 490 V484" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <path d="M1026 430 V424" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <path d="M1026 370 V364" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <path d="M1026 310 V304" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <path d="M1026 250 V244" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <rect x="48" y="630" width="1144" height="132" rx="11"
+        fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="660" font-size="14" font-weight="700" fill="#4A473F">
+    B · 阻塞调用栈中的局部变量，被提升为四类长期状态
+  </text>
+
+  <rect x="68" y="678" width="254" height="58" rx="8" fill="#F3E8D3" stroke="#D8BE90"/>
+  <text x="195" y="701" text-anchor="middle" font-size="12" font-weight="700" fill="#6B4E28">调用关联</text>
+  <text x="195" y="722" text-anchor="middle" font-size="10.5" fill="#806541">pending_calls[id] + deadline</text>
+
+  <rect x="340" y="678" width="254" height="58" rx="8" fill="#DCE9E3" stroke="#B9D0C5"/>
+  <text x="467" y="701" text-anchor="middle" font-size="12" font-weight="700" fill="#24473F">发送恢复点</text>
+  <text x="467" y="722" text-anchor="middle" font-size="10.5" fill="#4A655F">output_queue.front().sent</text>
+
+  <rect x="612" y="678" width="286" height="58" rx="8" fill="#EDEAF3" stroke="#C9C0D8"/>
+  <text x="755" y="701" text-anchor="middle" font-size="12" font-weight="700" fill="#4A3F68">接收恢复点</text>
+  <text x="755" y="722" text-anchor="middle" font-size="10.5" fill="#665B78">input_pos + current_header</text>
+
+  <rect x="916" y="678" width="256" height="58" rx="8" fill="#E3EAF4" stroke="#B7C6DA"/>
+  <text x="1044" y="701" text-anchor="middle" font-size="12" font-weight="700" fill="#2C4460">调度兴趣</text>
+  <text x="1044" y="722" text-anchor="middle" font-size="10.5" fill="#53677E">EPOLLIN / 按需 EPOLLOUT</text>
+
+  <text x="48" y="790" font-size="12.5" font-weight="700" fill="#2B2A26">
+    结论：没有线程专门等待 id=42；EventLoop 在 epoll_wait 中统一等待。
+  </text>
+  <text x="48" y="808" font-size="11.5" fill="#5A564B">
+    事件到来后，由状态机从保存的恢复点继续推进。
+  </text>
 </svg>
