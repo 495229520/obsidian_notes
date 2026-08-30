@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
-  <title>RDMA Verbs 与 CQ 非阻塞 RPC</title>
-  <desc>展示 RC SEND/RECV 方案中预贴接收、注册内存、工作请求、完成队列和 request_id 的关系。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>RDMA Verbs 与 CQ 非阻塞 RPC 双向推进与内存管理</title>
+  <desc>展示 RC SEND/RECV 机制下预贴接收池、注册内存、工作请求、完成队列与 request_id 的分层解耦与三大工程边界。</desc>
+
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
@@ -8,141 +9,179 @@
     <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
     </marker>
-    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
-    </marker>
     <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
     </marker>
+    <marker id="arrPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
   </defs>
 
-  <rect width="1240" height="700" fill="#F5F4ED"/>
-  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">RDMA Verbs/CQ 非阻塞 RPC：先预贴缓冲，再由 WC 推进</text>
-  <text x="48" y="82" font-size="13.5" fill="#6B675C">基线采用 RC SEND/RECV：消息边界由一对 WR 保留，业务关联仍由 14 B 帧头的 request_id 完成</text>
+  <!-- Canvas Background -->
+  <rect width="1240" height="760" fill="#F5F4ED"/>
 
-  <!-- identity cards -->
-  <rect x="760" y="34" width="192" height="54" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
-  <text x="856" y="55" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">wr_id = local token</text>
-  <text x="856" y="75" font-size="10.5" fill="#4A3F68" text-anchor="middle">WR ↔ WC · 不上网</text>
-  <rect x="968" y="34" width="216" height="54" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <text x="1076" y="55" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">request_id = 42</text>
-  <text x="1076" y="75" font-size="10.5" fill="#24473F" text-anchor="middle">Request ↔ Response · 上网</text>
+  <!-- Title & Subtitle -->
+  <text x="48" y="50" font-size="22" font-weight="700" fill="#2B2A26">RDMA Verbs/CQ 非阻塞 RPC：先预贴缓冲，再由 WC 推进</text>
+  <text x="48" y="78" font-size="13.5" fill="#6B675C">RC SEND/RECV 保留消息边界 · wr_id 关联本地注册槽 · request_id 完成端到端 RPC</text>
 
-  <!-- side panels -->
-  <rect x="56" y="112" width="482" height="428" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="76" y="138" font-size="15" font-weight="700" fill="#3D5A80">客户端</text>
-  <rect x="702" y="112" width="482" height="428" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="722" y="138" font-size="15" font-weight="700" fill="#A64B3C">服务端</text>
+  <!-- Top Right Identity Badges -->
+  <rect x="705" y="32" width="235" height="54" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="822" y="54" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">wr_id = local token (本地层)</text>
+  <text x="822" y="73" font-size="10.5" fill="#4A3F68" text-anchor="middle">关联本地 Send/RecvSlot · 不上网</text>
 
-  <!-- fabric -->
-  <rect x="566" y="156" width="108" height="334" rx="12" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.3"/>
-  <text x="620" y="181" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">RNIC</text>
-  <text x="620" y="199" font-size="10.5" fill="#6B675C" text-anchor="middle">RC QP</text>
-  <line x1="620" y1="222" x2="620" y2="456" stroke="#C7C3B8" stroke-width="2" stroke-dasharray="6 6"/>
-  <text x="620" y="338" font-size="11" fill="#6B675C" text-anchor="middle" transform="rotate(-90 620 338)">可靠有序传输</text>
+  <rect x="955" y="32" width="235" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1072" y="54" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">request_id = 42 (协议层)</text>
+  <text x="1072" y="73" font-size="10.5" fill="#24473F" text-anchor="middle">14 B 帧头字段 · 跨网络回显关联</text>
 
-  <!-- client blocks -->
-  <rect x="76" y="156" width="210" height="64" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="181" y="178" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">pending[42]</text>
-  <text x="181" y="198" font-size="10.5" fill="#2C4460" text-anchor="middle">continuation + deadline</text>
-  <text x="181" y="214" font-size="10.2" fill="#2C4460" text-anchor="middle">等待 Response，不等 Send WC</text>
+  <!-- Main Three-Column Area -->
+  <!-- Left Panel: Client -->
+  <rect x="48" y="106" width="480" height="462" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="62" y="118" width="130" height="24" rx="4" fill="#3D5A80"/>
+  <text x="127" y="134" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">客户端 (Client)</text>
 
-  <rect x="308" y="156" width="210" height="64" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="413" y="178" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① Encode Request</text>
-  <text x="413" y="198" font-size="10.5" fill="#2C4460" text-anchor="middle">22 B · id=42 · Add(3,4)</text>
-  <text x="413" y="214" font-size="10.2" fill="#2C4460" text-anchor="middle">写入注册 SendSlot</text>
+  <!-- Center Column: RNIC & Fabric -->
+  <rect x="548" y="106" width="144" height="462" rx="10" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.3"/>
+  <rect x="560" y="118" width="120" height="24" rx="4" fill="#6B675C"/>
+  <text x="620" y="134" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">RNIC · RC QP</text>
 
-  <rect x="76" y="244" width="210" height="66" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
-  <text x="181" y="266" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">注册 RecvSlot 池</text>
-  <text x="181" y="286" font-size="10.5" fill="#4A3F68" text-anchor="middle">MR + lkey · 固定地址</text>
-  <text x="181" y="303" font-size="10.2" fill="#4A3F68" text-anchor="middle">持续 ibv_post_recv</text>
+  <!-- Right Panel: Server -->
+  <rect x="712" y="106" width="480" height="462" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <rect x="726" y="118" width="130" height="24" rx="4" fill="#A64B3C"/>
+  <text x="791" y="134" font-size="12" font-weight="700" fill="#FFFFFF" text-anchor="middle">服务端 (Server)</text>
 
-  <rect x="308" y="244" width="210" height="66" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
-  <text x="413" y="266" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">② ibv_post_send</text>
-  <text x="413" y="286" font-size="10.5" fill="#4A3F68" text-anchor="middle">wr_id = SendReq token</text>
-  <text x="413" y="303" font-size="10.2" fill="#4A3F68" text-anchor="middle">SGE → SendSlot</text>
+  <!-- Stage 1: Request Flow (Top Row) -->
+  <!-- Client: ① pending + Encode -->
+  <rect x="62" y="154" width="220" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="172" y="176" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① pending[42] + 编码</text>
+  <text x="172" y="196" font-size="10.5" fill="#2C4460" text-anchor="middle">22 B Request(id=42)</text>
+  <text x="172" y="214" font-size="10.5" fill="#2C4460" text-anchor="middle">写入注册 SendSlot</text>
 
-  <rect x="76" y="334" width="210" height="70" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="181" y="356" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">客户端 CQ</text>
-  <text x="181" y="376" font-size="10.5" fill="#24473F" text-anchor="middle">Send WC：槽位可复用</text>
-  <text x="181" y="393" font-size="10.2" fill="#24473F" text-anchor="middle">Receive WC：响应已到达</text>
+  <!-- Client: ② ibv_post_send -->
+  <rect x="298" y="154" width="216" height="72" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="406" y="176" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">② ibv_post_send</text>
+  <text x="406" y="196" font-size="10.5" fill="#2C4460" text-anchor="middle">wr_id = send_token</text>
+  <text x="406" y="214" font-size="10.5" fill="#2C4460" text-anchor="middle">SGE: SendSlot(lkey)</text>
 
-  <rect x="308" y="334" width="210" height="70" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="413" y="356" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑦ Parse Response</text>
-  <text x="413" y="376" font-size="10.5" fill="#24473F" text-anchor="middle">WC.byte_len → Frame</text>
-  <text x="413" y="393" font-size="10.2" fill="#24473F" text-anchor="middle">id=42 → resume pending</text>
+  <line x1="282" y1="190" x2="298" y2="190" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
 
-  <rect x="76" y="428" width="442" height="82" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
-  <text x="96" y="451" font-size="11.5" font-weight="700" fill="#4A473F">客户端接收补给</text>
-  <text x="96" y="472" font-size="10.5" fill="#4A473F">每消费一个 Receive WC：校验 → 解析 → 清空 → 重新 post</text>
-  <text x="96" y="492" font-size="10.5" fill="#A64B3C">远端 credit 为 0 时停止发新请求，避免 RNR 与资源挤爆</text>
+  <!-- Fabric Request Arrow (Left to Right) -->
+  <line x1="514" y1="190" x2="726" y2="190" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrBlue)"/>
+  <rect x="556" y="179" width="128" height="22" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="620" y="194" font-size="10.2" font-weight="700" fill="#2C4460" text-anchor="middle">Request SEND 22B</text>
 
-  <!-- server blocks -->
-  <rect x="722" y="156" width="210" height="64" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
-  <text x="827" y="178" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">③ Receive WC</text>
-  <text x="827" y="198" font-size="10.5" fill="#733428" text-anchor="middle">opcode=RECV · 22 B</text>
-  <text x="827" y="214" font-size="10.2" fill="#733428" text-anchor="middle">对应已预贴 RecvSlot</text>
+  <!-- Server: ③ RECV WC 到达 -->
+  <rect x="726" y="154" width="220" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="836" y="176" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">③ RECV WC 到达</text>
+  <text x="836" y="196" font-size="10.5" fill="#733428" text-anchor="middle">byte_len = 22 B</text>
+  <text x="836" y="214" font-size="10.5" fill="#733428" text-anchor="middle">命中已预贴 RecvSlot</text>
 
-  <rect x="954" y="156" width="210" height="64" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
-  <text x="1059" y="178" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">④ Dispatch Add</text>
-  <text x="1059" y="198" font-size="10.5" fill="#733428" text-anchor="middle">Decode a=3, b=4</text>
-  <text x="1059" y="214" font-size="10.2" fill="#733428" text-anchor="middle">结果 sum=7</text>
+  <!-- Server: ④ Dispatch Add(3, 4) -->
+  <rect x="962" y="154" width="216" height="72" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="1070" y="176" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">④ Dispatch Add(3, 4)</text>
+  <text x="1070" y="196" font-size="10.5" fill="#733428" text-anchor="middle">解出参数，计算 sum=7</text>
+  <text x="1070" y="214" font-size="10.5" fill="#733428" text-anchor="middle">组装 18 B Response</text>
 
-  <rect x="722" y="244" width="210" height="66" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
-  <text x="827" y="266" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">服务端 RecvSlot 池</text>
-  <text x="827" y="286" font-size="10.5" fill="#4A3F68" text-anchor="middle">启动时预贴 N 个 WR</text>
-  <text x="827" y="303" font-size="10.2" fill="#4A3F68" text-anchor="middle">消费后立即补回</text>
+  <line x1="946" y1="190" x2="962" y2="190" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
 
-  <rect x="954" y="244" width="210" height="66" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
-  <text x="1059" y="266" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑤ Encode + post_send</text>
-  <text x="1059" y="286" font-size="10.5" fill="#4A3F68" text-anchor="middle">18 B Response · id=42</text>
-  <text x="1059" y="303" font-size="10.2" fill="#4A3F68" text-anchor="middle">wr_id = SendResp token</text>
+  <!-- Stage 2: Memory & Foundation Layer (Middle Row) -->
+  <!-- Client Memory Pool -->
+  <rect x="62" y="248" width="452" height="82" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="78" y="271" font-size="11.8" font-weight="700" fill="#4A3F68">客户端注册内存池与预贴 RQ</text>
+  <text x="78" y="293" font-size="10.5" fill="#4A3F68">• 启动预贴 N 个 RecvSlot(MR+lkey) · 保证地址稳定不释放</text>
+  <text x="78" y="313" font-size="10.5" fill="#6B5B95">• remote_credit 耗尽时暂停发新 RPC，避免远端 RNR 异常</text>
 
-  <rect x="722" y="334" width="210" height="70" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="827" y="356" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">服务端 CQ</text>
-  <text x="827" y="376" font-size="10.5" fill="#24473F" text-anchor="middle">poll 或 notify + poll</text>
-  <text x="827" y="393" font-size="10.2" fill="#24473F" text-anchor="middle">批量 drain WC</text>
+  <!-- Fabric Hardware Box -->
+  <rect x="556" y="248" width="128" height="82" rx="7" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="620" y="272" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">硬件特性</text>
+  <text x="620" y="293" font-size="10" fill="#6B675C" text-anchor="middle">零拷贝 · 硬件 ACK</text>
+  <text x="620" y="313" font-size="10" fill="#6B675C" text-anchor="middle">严格保序 / 保边界</text>
 
-  <rect x="954" y="334" width="210" height="70" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="1059" y="356" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑥ Send WC</text>
-  <text x="1059" y="376" font-size="10.5" fill="#24473F" text-anchor="middle">响应 SendSlot 可回收</text>
-  <text x="1059" y="393" font-size="10.2" fill="#24473F" text-anchor="middle">不是客户端 RPC 成功</text>
+  <!-- Server Memory Pool -->
+  <rect x="726" y="248" width="452" height="82" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="742" y="271" font-size="11.8" font-weight="700" fill="#4A3F68">服务端预贴补充与 Credit 闭环</text>
+  <text x="742" y="293" font-size="10.5" fill="#4A3F68">• 消费 RecvSlot 后立即清空并 repost · 保持 RQ 接收池充盈</text>
+  <text x="742" y="313" font-size="10.5" fill="#6B5B95">• 回送响应时携带 credit 许可，确保客户端安全发新请求</text>
 
-  <rect x="722" y="428" width="442" height="82" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
-  <text x="742" y="451" font-size="11.5" font-weight="700" fill="#4A473F">服务端接收不变量</text>
-  <text x="742" y="472" font-size="10.5" fill="#4A473F">RQ 必须先有 Receive WR，发送端才能安全投递消息</text>
-  <text x="742" y="492" font-size="10.5" fill="#A64B3C">CQ overrun / QP error：连接级失败，唤醒全部 pending</text>
+  <!-- Stage 3: Response Flow (Bottom Row) -->
+  <!-- Server: ⑤ 响应 post_send -->
+  <rect x="962" y="352" width="216" height="72" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="1070" y="374" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑤ 响应 post_send</text>
+  <text x="1070" y="394" font-size="10.5" fill="#4A3F68" text-anchor="middle">18 B Response(id=42)</text>
+  <text x="1070" y="412" font-size="10.5" fill="#4A3F68" text-anchor="middle">wr_id = resp_token</text>
 
-  <!-- cross-fabric request and response arrows -->
-  <path d="M518 278 L566 278 L674 278 L718 188" fill="none" stroke="#3D5A80" stroke-width="2.2" marker-end="url(#arrBlue)"/>
-  <text x="620" y="264" font-size="10.8" font-weight="700" fill="#3D5A80" text-anchor="middle">Request SEND · 22 B</text>
-  <path d="M954 278 L674 420 L566 420 L518 369" fill="none" stroke="#A64B3C" stroke-width="2.2" marker-end="url(#arrRed)"/>
-  <text x="620" y="438" font-size="10.8" font-weight="700" fill="#A64B3C" text-anchor="middle">Response SEND · 18 B</text>
+  <!-- Server: ⑥ 服务端 SEND WC -->
+  <rect x="726" y="352" width="220" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="836" y="374" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑥ 服务端 SEND WC</text>
+  <text x="836" y="394" font-size="10.5" fill="#24473F" text-anchor="middle">回收响应 SendSlot</text>
+  <text x="836" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">不代表客户端收到</text>
 
-  <!-- local arrows -->
-  <line x1="286" y1="188" x2="304" y2="188" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="413" y1="224" x2="413" y2="240" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <path d="M286 369 L304 369" fill="none" stroke="#2F6B5E" stroke-width="1.7" marker-end="url(#arrGreen)"/>
-  <path d="M413 330 L413 314" fill="none" stroke="#5A564B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arr)"/>
-  <line x1="932" y1="188" x2="950" y2="188" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="1059" y1="224" x2="1059" y2="240" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="932" y1="369" x2="950" y2="369" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
-  <path d="M827 330 L827 314" fill="none" stroke="#5A564B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <line x1="1070" y1="226" x2="1070" y2="352" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="962" y1="388" x2="946" y2="388" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
 
-  <!-- bottom summary -->
-  <text x="56" y="576" font-size="14.5" font-weight="700" fill="#2B2A26">三层完成语义不能混用</text>
-  <rect x="56" y="594" width="352" height="70" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="76" y="618" font-size="12" font-weight="700" fill="#6B5B95">Send WC</text>
-  <text x="76" y="640" font-size="10.8" fill="#4A473F">本地 NIC 已消费发送描述符</text>
-  <text x="76" y="657" font-size="10.8" fill="#4A473F">只允许回收本地 SendSlot</text>
+  <!-- Fabric Response Arrow (Right to Left) -->
+  <line x1="726" y1="388" x2="514" y2="388" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrGreen)"/>
+  <rect x="556" y="377" width="128" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="620" y="392" font-size="10.2" font-weight="700" fill="#24473F" text-anchor="middle">Response SEND 18B</text>
 
-  <rect x="430" y="594" width="352" height="70" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="450" y="618" font-size="12" font-weight="700" fill="#2F6B5E">Receive WC + 完整 Frame</text>
-  <text x="450" y="640" font-size="10.8" fill="#4A473F">一条远端消息已经到达并可解析</text>
-  <text x="450" y="657" font-size="10.8" fill="#4A473F">仍需检查 type、id、status</text>
+  <!-- Client: ⑦ 客户端 RECV WC -->
+  <rect x="298" y="352" width="216" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="406" y="374" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑦ 客户端 RECV WC</text>
+  <text x="406" y="394" font-size="10.5" fill="#24473F" text-anchor="middle">byte_len = 18 B</text>
+  <text x="406" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">解出 id=42, sum=7</text>
 
-  <rect x="804" y="594" width="380" height="70" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="824" y="618" font-size="12" font-weight="700" fill="#A64B3C">Response(status=OK)</text>
-  <text x="824" y="640" font-size="10.8" fill="#4A473F">客户端才可完成本次 RPC</text>
-  <text x="824" y="657" font-size="10.8" fill="#4A473F">超时仍不等于服务端未执行</text>
+  <!-- Client: ⑧ 完成 pending[42] -->
+  <rect x="62" y="352" width="220" height="72" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="172" y="374" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑧ 完成 pending[42]</text>
+  <text x="172" y="394" font-size="10.5" fill="#24473F" text-anchor="middle">extract 节点并移除</text>
+  <text x="172" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">恢复协程/返回 sum=7</text>
+
+  <line x1="298" y1="388" x2="282" y2="388" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Stage 4: CQ Polling & Local Notification (Bottom Panels) -->
+  <!-- Client CQ -->
+  <rect x="62" y="444" width="452" height="104" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="78" y="467" font-size="11.8" font-weight="700" fill="#4A473F">客户端 CQ 轮询与收割</text>
+  <text x="78" y="489" font-size="10.5" fill="#4A473F">• Send WC 到达：仅回收本地 SendSlot，RPC 仍等待 Response</text>
+  <text x="78" y="509" font-size="10.5" fill="#4A473F">• Recv WC 到达：清空 RecvSlot 并立即 repost，再按 id 唤醒业务</text>
+  <text x="78" y="529" font-size="10.5" fill="#A64B3C">• 持续批量 drain CQ，避免 CQ overrun 导致严重传输故障</text>
+
+  <!-- Fabric CQ Model Box -->
+  <rect x="556" y="444" width="128" height="104" rx="7" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="620" y="475" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">CQ 模型</text>
+  <text x="620" y="500" font-size="10.2" fill="#6B675C" text-anchor="middle">ibv_poll_cq</text>
+  <text x="620" y="520" font-size="10.2" fill="#6B675C" text-anchor="middle">极低延迟 (~μs)</text>
+
+  <!-- Server CQ -->
+  <rect x="726" y="444" width="452" height="104" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="742" y="467" font-size="11.8" font-weight="700" fill="#4A473F">服务端 CQ 处理与异常防护</text>
+  <text x="742" y="489" font-size="10.5" fill="#4A473F">• Recv WC 触发业务处理，Send WC 安全释放响应缓冲</text>
+  <text x="742" y="509" font-size="10.5" fill="#4A473F">• 批量轮询设置 budget 上限，防止热点 QP 饿死其他事件</text>
+  <text x="742" y="529" font-size="10.5" fill="#A64B3C">• 任意非成功 WC 记录错误并关闭 QP，原子失败对应连接</text>
+
+  <!-- Bottom Section: Engineering Boundaries -->
+  <text x="48" y="596" font-size="14.5" font-weight="700" fill="#2B2A26">三大核心工程边界与设计准则</text>
+
+  <!-- Boundary Card 1 -->
+  <rect x="48" y="612" width="364" height="124" rx="8" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="62" y="624" width="148" height="22" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="136" y="639" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">1 · 先预贴 RECV 与 Credit</text>
+  <text x="62" y="666" font-size="10.8" fill="#2B2A26">• 必须先预贴足够 RecvSlot，远端才可发送</text>
+  <text x="62" y="688" font-size="10.5" fill="#6B675C">• 消费后立即 repost，保持接收队列充盈</text>
+  <text x="62" y="710" font-size="10.5" fill="#6B675C">• 基于 credit 流控，杜绝远端 RNR 重试耗尽</text>
+
+  <!-- Boundary Card 2 -->
+  <rect x="438" y="612" width="364" height="124" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.2"/>
+  <rect x="452" y="624" width="148" height="22" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="526" y="639" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">2 · 注册内存生命期边界</text>
+  <text x="452" y="666" font-size="10.8" fill="#2B2A26">• 数据缓冲必须完成 ibv_reg_mr 锁定物理页</text>
+  <text x="452" y="688" font-size="10.5" fill="#6B675C">• 直到对应 WC 产生前，内存严禁移动或释放</text>
+  <text x="452" y="710" font-size="10.5" fill="#6B675C">• 热路径复用注册 slot 池，避免频繁 dereg</text>
+
+  <!-- Boundary Card 3 -->
+  <rect x="828" y="612" width="364" height="124" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="842" y="624" width="148" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="916" y="639" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">3 · 三层完成语义严格分层</text>
+  <text x="842" y="666" font-size="10.8" fill="#2B2A26">• Send WC：本地 NIC 发送完成，仅可回收 slot</text>
+  <text x="842" y="688" font-size="10.5" fill="#6B675C">• Recv WC：远端消息已到，仍需解码 14 B 帧头</text>
+  <text x="842" y="710" font-size="10.5" fill="#6B675C">• Response 匹配：按 request_id 真正完成 RPC</text>
 </svg>

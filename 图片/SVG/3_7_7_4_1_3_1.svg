@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
-  <title>C++ Coroutine 非阻塞 RPC 调用链</title>
-  <desc>展示 co_await 如何登记 pending、挂起协程，并在响应按 request_id 到达后恢复。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>C++ Coroutine 非阻塞 RPC 调用链与双重标识解耦</title>
+  <desc>展示本地 coroutine_handle 与网络 request_id 的映射机制、全链路推进状态机及三项核心工程不变量。</desc>
+
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
@@ -13,97 +14,132 @@
     </marker>
   </defs>
 
-  <rect width="1240" height="700" fill="#F5F4ED"/>
-  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">Coroutine 非阻塞 RPC：从 co_await 到 request_id 恢复</text>
-  <text x="48" y="82" font-size="13.5" fill="#6B675C">协程只保存“等谁、从哪继续”；事件循环仍负责非阻塞读写、帧解析与调度</text>
+  <!-- Canvas Background -->
+  <rect width="1240" height="760" fill="#F5F4ED"/>
 
-  <!-- identity strip -->
-  <rect x="760" y="34" width="190" height="54" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <text x="855" y="55" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">request_id = 42</text>
-  <text x="855" y="75" font-size="10.5" fill="#24473F" text-anchor="middle">线路字段 · 远端回送</text>
-  <rect x="966" y="34" width="218" height="54" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
-  <text x="1075" y="55" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">coroutine_handle</text>
-  <text x="1075" y="75" font-size="10.5" fill="#4A3F68" text-anchor="middle">本地地址 · 不会上网</text>
+  <!-- Title & Subtitle -->
+  <text x="48" y="50" font-size="22" font-weight="700" fill="#2B2A26">C++ Coroutine 非阻塞 RPC：从 co_await 到 request_id 恢复</text>
+  <text x="48" y="78" font-size="13.5" fill="#6B675C">本地协程句柄与网络 request_id 精确映射 · 事件循环推进状态机与三大工程不变量</text>
 
-  <!-- lanes -->
-  <rect x="56" y="112" width="1128" height="102" rx="8" fill="#EDF1F7" stroke="#D8D5C8"/>
-  <text x="72" y="134" font-size="12.5" font-weight="700" fill="#3D5A80">业务 coroutine</text>
-  <rect x="56" y="224" width="1128" height="102" rx="8" fill="#EDEAF3" stroke="#D8D5C8"/>
-  <text x="72" y="246" font-size="12.5" font-weight="700" fill="#6B5B95">Awaiter + pending 表</text>
-  <rect x="56" y="336" width="1128" height="102" rx="8" fill="#E6EFEA" stroke="#D8D5C8"/>
-  <text x="72" y="358" font-size="12.5" font-weight="700" fill="#2F6B5E">EventLoop + 非阻塞 TCP</text>
-  <rect x="56" y="448" width="1128" height="102" rx="8" fill="#F4E9E4" stroke="#D8D5C8"/>
-  <text x="72" y="470" font-size="12.5" font-weight="700" fill="#A64B3C">远端 RPC 服务端</text>
+  <!-- Top Right Identity Badges -->
+  <rect x="705" y="32" width="235" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="822" y="54" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">request_id = 42 (协议层)</text>
+  <text x="822" y="73" font-size="10.5" fill="#24473F" text-anchor="middle">14 B 帧头字段 · 跨网络回显关联</text>
 
-  <!-- top lane -->
-  <rect x="126" y="151" width="176" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
-  <text x="214" y="171" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① co_await CallAsync</text>
-  <text x="214" y="188" font-size="10.5" fill="#2C4460" text-anchor="middle">保留 a、b 与继续点</text>
+  <rect x="955" y="32" width="235" height="54" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="1072" y="54" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">coroutine_handle&lt;&gt; (本地层)</text>
+  <text x="1072" y="73" font-size="10.5" fill="#4A3F68" text-anchor="middle">指向协程帧内存 · 绝不写入网络帧</text>
 
-  <rect x="330" y="158" width="620" height="32" rx="6" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="7 5"/>
-  <text x="640" y="179" font-size="11.5" fill="#4A473F" text-anchor="middle">coroutine 已挂起 · EventLoop 线程没有被占住</text>
+  <!-- Swinlane 1: User / Coroutine -->
+  <rect x="48" y="106" width="1144" height="106" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="62" y="116" width="120" height="22" rx="4" fill="#3D5A80"/>
+  <text x="122" y="131" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">用户态 · 业务协程</text>
 
-  <rect x="980" y="151" width="168" height="46" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
-  <text x="1064" y="171" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">⑩ await_resume</text>
-  <text x="1064" y="188" font-size="10.5" fill="#2C4460" text-anchor="middle">返回 body 或抛错</text>
+  <!-- Swinlane 2: Middleware / Awaiter & Pending -->
+  <rect x="48" y="222" width="1144" height="106" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="62" y="232" width="120" height="22" rx="4" fill="#6B5B95"/>
+  <text x="122" y="247" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">中间件 · Awaiter/表</text>
 
-  <!-- awaiter lane -->
-  <rect x="126" y="263" width="160" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
-  <text x="206" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">② 分配 id = 42</text>
-  <text x="206" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">构造 PendingCall</text>
+  <!-- Swinlane 3: Transport / EventLoop & TCP -->
+  <rect x="48" y="338" width="1144" height="106" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="62" y="348" width="120" height="22" rx="4" fill="#2F6B5E"/>
+  <text x="122" y="363" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">传输层 · EventLoop</text>
 
-  <rect x="322" y="263" width="220" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
-  <text x="432" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">③ pending[42] = handle</text>
-  <text x="432" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">先登记，再允许发送</text>
+  <!-- Swinlane 4: Remote Server -->
+  <rect x="48" y="454" width="1144" height="106" rx="8" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="62" y="464" width="120" height="22" rx="4" fill="#A64B3C"/>
+  <text x="122" y="479" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">远端 · RPC 服务端</text>
 
-  <rect x="744" y="263" width="196" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
-  <text x="842" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑧ extract pending[42]</text>
-  <text x="842" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">先移除，后恢复</text>
+  <!-- Lane 1 Step Cards & Suspension Box -->
+  <rect x="195" y="132" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="280" y="153" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① co_await CallAsync</text>
+  <text x="280" y="172" font-size="10.5" fill="#2C4460" text-anchor="middle">准备 Add(3, 4) 业务入参</text>
 
-  <rect x="978" y="263" width="170" height="46" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
-  <text x="1063" y="283" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑨ Post(handle)</text>
-  <text x="1063" y="300" font-size="10.5" fill="#4A3F68" text-anchor="middle">排入可运行队列</text>
+  <rect x="385" y="138" width="550" height="42" rx="6" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="660" y="164" font-size="11.5" fill="#4A473F" text-anchor="middle">coroutine 挂起 · 栈帧保留现场 · EventLoop 线程继续调度</text>
 
-  <!-- event loop lane -->
-  <rect x="322" y="375" width="186" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
-  <text x="415" y="395" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">④ enqueue Request</text>
-  <text x="415" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">完整 22 B Frame</text>
+  <rect x="955" y="132" width="170" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="1040" y="153" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">⑩ await_resume()</text>
+  <text x="1040" y="172" font-size="10.5" fill="#2C4460" text-anchor="middle">取 reply 解码 sum=7 返回</text>
 
-  <rect x="542" y="375" width="174" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
-  <text x="629" y="395" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑤ send 直到 EAGAIN</text>
-  <text x="629" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">保存 offset，等待可写</text>
+  <!-- Lane 2 Step Cards -->
+  <rect x="195" y="248" width="170" height="54" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="280" y="269" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">② await_suspend(h)</text>
+  <text x="280" y="288" font-size="10.5" fill="#4A3F68" text-anchor="middle">保存 h，分配 id = 42</text>
 
-  <rect x="744" y="375" width="196" height="46" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
-  <text x="842" y="395" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑦ Decode Response</text>
-  <text x="842" y="412" font-size="10.5" fill="#24473F" text-anchor="middle">读取 request_id = 42</text>
+  <rect x="385" y="248" width="170" height="54" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="470" y="269" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">③ pending_[42] = call</text>
+  <text x="470" y="288" font-size="10.5" fill="#4A3F68" text-anchor="middle">先登记映射，后允许发送</text>
 
-  <!-- server lane -->
-  <rect x="548" y="487" width="190" height="46" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
-  <text x="643" y="507" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">⑥ Dispatch Add(3, 4)</text>
-  <text x="643" y="524" font-size="10.5" fill="#733428" text-anchor="middle">Response(id=42, sum=7)</text>
+  <rect x="765" y="248" width="170" height="54" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="850" y="269" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑧ extract pending_[42]</text>
+  <text x="850" y="288" font-size="10.5" fill="#4A3F68" text-anchor="middle">先弹出条目，清空句柄</text>
 
-  <!-- arrows -->
-  <line x1="214" y1="199" x2="206" y2="259" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="290" y1="286" x2="318" y2="286" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="432" y1="311" x2="415" y2="371" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="512" y1="398" x2="538" y2="398" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <path d="M629 423 L629 470 L643 470 L643 483" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrBlue)"/>
-  <path d="M738 510 L780 510 L780 440 L842 440 L842 425" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
-  <line x1="842" y1="371" x2="842" y2="313" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="944" y1="286" x2="974" y2="286" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="1063" y1="259" x2="1064" y2="201" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <rect x="955" y="248" width="170" height="54" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="1040" y="269" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">⑨ loop.Post([h] { resume })</text>
+  <text x="1040" y="288" font-size="10.5" fill="#4A3F68" text-anchor="middle">写入 reply，排入就绪队列</text>
 
-  <!-- invariants -->
-  <text x="56" y="590" font-size="14.5" font-weight="700" fill="#2B2A26">三个不能打破的不变量</text>
-  <rect x="56" y="608" width="352" height="62" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="76" y="631" font-size="12" font-weight="700" fill="#2F6B5E">A · pending 先于发送可见</text>
-  <text x="76" y="653" font-size="10.8" fill="#4A473F">避免极快响应到达时找不到等待者</text>
+  <!-- Lane 3 Step Cards -->
+  <rect x="385" y="364" width="170" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="470" y="385" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">④ EnqueueFrame()</text>
+  <text x="470" y="404" font-size="10.5" fill="#24473F" text-anchor="middle">22 B 完整 Request 帧入队</text>
 
-  <rect x="430" y="608" width="352" height="62" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="450" y="631" font-size="12" font-weight="700" fill="#6B5B95">B · pending 先移除再 resume</text>
-  <text x="450" y="653" font-size="10.8" fill="#4A473F">防止重入、重复响应与悬空条目</text>
+  <rect x="575" y="364" width="170" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="660" y="385" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑤ 非阻塞 send(fd)</text>
+  <text x="660" y="404" font-size="10.5" fill="#24473F" text-anchor="middle">EAGAIN 存 offset 等可写</text>
 
-  <rect x="804" y="608" width="380" height="62" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="824" y="631" font-size="12" font-weight="700" fill="#A64B3C">C · 成功、超时、取消只赢一次</text>
-  <text x="824" y="653" font-size="10.8" fill="#4A473F">终态竞争必须收敛到一次恢复</text>
+  <rect x="765" y="364" width="170" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="850" y="385" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑦ FrameDecoder</text>
+  <text x="850" y="404" font-size="10.5" fill="#24473F" text-anchor="middle">recv 到 EAGAIN · 解析 id=42</text>
+
+  <!-- Lane 4 Step Cards (Server) -->
+  <rect x="575" y="480" width="360" height="54" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="755" y="501" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">⑥ Server 处理与回显 (Add 3 + 4)</text>
+  <text x="755" y="520" font-size="10.5" fill="#733428" text-anchor="middle">计算 3+4=7 · 组装 18 B Response(id=42, OK)</text>
+
+  <!-- Control & Data Flow Arrows (All Orthogonal & Centered) -->
+  <line x1="280" y1="186" x2="280" y2="248" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="365" y1="275" x2="385" y2="275" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="470" y1="302" x2="470" y2="364" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="555" y1="391" x2="575" y2="391" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Network Wire Transmission Paths & Badges -->
+  <line x1="660" y1="418" x2="660" y2="480" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+  <rect x="585" y="438" width="150" height="22" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="660" y="453" font-size="10.2" font-weight="700" fill="#2C4460" text-anchor="middle">Request Frame (22 B)</text>
+
+  <line x1="850" y1="480" x2="850" y2="418" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <rect x="775" y="438" width="150" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="850" y="453" font-size="10.2" font-weight="700" fill="#24473F" text-anchor="middle">Response Frame (18 B)</text>
+
+  <line x1="850" y1="364" x2="850" y2="302" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="935" y1="275" x2="955" y2="275" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="1040" y1="248" x2="1040" y2="186" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Invariant Section Header -->
+  <text x="48" y="596" font-size="14.5" font-weight="700" fill="#2B2A26">三大核心工程不变量（防竞态 · 防死锁 · 防泄漏）</text>
+
+  <!-- Invariant Card A -->
+  <rect x="48" y="612" width="364" height="124" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="62" y="624" width="140" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="132" y="639" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">A · 先登记，后允许发送</text>
+  <text x="62" y="666" font-size="10.8" fill="#2B2A26">• 请求入队前必须已写入 pending_[id] 映射</text>
+  <text x="62" y="688" font-size="10.5" fill="#6B675C">• 规避极快本地回环响应先于登记到达的未知 ID 误判</text>
+  <text x="62" y="710" font-size="10.5" fill="#6B675C">• 入队异常时必须 catch 并回滚清除 map 条目</text>
+
+  <!-- Invariant Card B -->
+  <rect x="438" y="612" width="364" height="124" rx="8" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="452" y="624" width="140" height="22" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="522" y="639" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">B · 先移除，再排队恢复</text>
+  <text x="452" y="666" font-size="10.8" fill="#2B2A26">• 解码完整帧后，先从 pending_ extract 节点</text>
+  <text x="452" y="688" font-size="10.5" fill="#6B675C">• std::exchange 清空句柄后再 loop.Post(resume)</text>
+  <text x="452" y="710" font-size="10.5" fill="#6B675C">• 消除业务恢复后立即发起新 RPC 或析构客户端的重入死锁</text>
+
+  <!-- Invariant Card C -->
+  <rect x="828" y="612" width="364" height="124" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.2"/>
+  <rect x="842" y="624" width="144" height="22" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="914" y="639" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">C · 终态竞争单次有效</text>
+  <text x="842" y="666" font-size="10.8" fill="#2B2A26">• 正常响应、超时、主动取消与断线仅首次转换生效</text>
+  <text x="842" y="688" font-size="10.5" fill="#6B675C">• 晚到响应命中 tombstone 丢弃，真正未知 ID 报错</text>
+  <text x="842" y="710" font-size="10.5" fill="#6B675C">• 断线时原子批量 extract 全部 pending_ 注入传输异常</text>
 </svg>

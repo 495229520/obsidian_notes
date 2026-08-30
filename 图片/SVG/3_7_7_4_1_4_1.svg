@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
-  <title>io_uring 非阻塞 RPC 的双重关联</title>
-  <desc>展示 SQE user_data 关联本地 I/O，request_id 关联线路 RPC，以及发送与接收完成如何推进状态机。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>io_uring 非阻塞 RPC 的双重关联与状态机推进</title>
+  <desc>展示 SQE user_data 关联本地 I/O，request_id 关联线路 RPC，以及发送与接收完成如何推进状态机与四大工程边界。</desc>
+
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
@@ -11,123 +12,159 @@
     <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
     </marker>
+    <marker id="arrPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
   </defs>
 
-  <rect width="1240" height="700" fill="#F5F4ED"/>
-  <text x="48" y="54" font-size="22" font-weight="700" fill="#2B2A26">io_uring 非阻塞 RPC：SQE/CQE 推进两条状态机</text>
-  <text x="48" y="82" font-size="13.5" fill="#6B675C">user_data 只关联本机 I/O；响应仍必须解码 request_id 才能完成远程调用</text>
+  <!-- Canvas Background -->
+  <rect width="1240" height="760" fill="#F5F4ED"/>
 
-  <rect x="742" y="34" width="202" height="54" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
-  <text x="843" y="55" font-size="11.5" font-weight="700" fill="#4A3F68" text-anchor="middle">user_data = token</text>
-  <text x="843" y="75" font-size="10.5" fill="#4A3F68" text-anchor="middle">SQE ↔ CQE · 本地关联</text>
-  <rect x="962" y="34" width="222" height="54" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <text x="1073" y="55" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">request_id = 42</text>
-  <text x="1073" y="75" font-size="10.5" fill="#24473F" text-anchor="middle">Request ↔ Response · 线路关联</text>
+  <!-- Title & Subtitle -->
+  <text x="48" y="50" font-size="22" font-weight="700" fill="#2B2A26">io_uring 非阻塞 RPC：SQE/CQE 推进两条状态机</text>
+  <text x="48" y="78" font-size="13.5" fill="#6B675C">user_data 关联本地 I/O 算子 · request_id 关联线路 RPC · 双向状态机与四大工程边界</text>
 
-  <!-- main panel -->
-  <rect x="56" y="112" width="1128" height="414" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <!-- Top Right Dual-Token Badges -->
+  <rect x="705" y="32" width="235" height="54" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="822" y="54" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">user_data = token (本地层)</text>
+  <text x="822" y="73" font-size="10.5" fill="#4A3F68" text-anchor="middle">绑定 UringOp 内存 · SQE ↔ CQE 闭环</text>
 
-  <!-- column headers -->
-  <rect x="76" y="132" width="186" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80"/>
-  <text x="169" y="158" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">RPC 状态</text>
-  <rect x="286" y="132" width="206" height="42" rx="7" fill="#EDEAF3" stroke="#6B5B95"/>
-  <text x="389" y="158" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">UringOp 生命周期</text>
-  <rect x="516" y="132" width="190" height="42" rx="7" fill="#EFE7DA" stroke="#8A6A3A"/>
-  <text x="611" y="158" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Submission Queue</text>
-  <rect x="730" y="132" width="194" height="42" rx="7" fill="#F0E0DB" stroke="#A64B3C"/>
-  <text x="827" y="158" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">内核 TCP 路径</text>
-  <rect x="948" y="132" width="216" height="42" rx="7" fill="#DCE9E3" stroke="#2F6B5E"/>
-  <text x="1056" y="158" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Completion Queue</text>
+  <rect x="955" y="32" width="235" height="54" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1072" y="54" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">request_id = 42 (协议层)</text>
+  <text x="1072" y="73" font-size="10.5" fill="#24473F" text-anchor="middle">14 B 帧头字段 · 跨网络回显关联 RPC</text>
 
-  <!-- send row label -->
-  <text x="76" y="210" font-size="14" font-weight="700" fill="#3D5A80">A · 发送方向</text>
-  <rect x="76" y="226" width="186" height="72" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
-  <text x="169" y="249" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">FrameQueue</text>
-  <text x="169" y="269" font-size="10.5" fill="#2C4460" text-anchor="middle">Request(id=42) · 22 B</text>
-  <text x="169" y="286" font-size="10.5" fill="#2C4460" text-anchor="middle">按整帧顺序排队</text>
+  <!-- Main Grid Panel -->
+  <rect x="48" y="106" width="1144" height="462" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
 
-  <rect x="286" y="226" width="206" height="72" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
-  <text x="389" y="247" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">SendOp</text>
-  <text x="389" y="267" font-size="10.5" fill="#4A3F68" text-anchor="middle">buffer + offset + token</text>
-  <text x="389" y="284" font-size="10.5" fill="#4A3F68" text-anchor="middle">buffer 活到最终 CQE</text>
+  <!-- Column Headers -->
+  <rect x="64" y="122" width="205" height="38" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="166" y="146" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">1. RPC 状态 / 帧处理</text>
 
-  <rect x="516" y="226" width="190" height="72" rx="8" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.4"/>
-  <text x="611" y="247" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">SQE · IORING_OP_SEND</text>
-  <text x="611" y="267" font-size="10.5" fill="#6B4E28" text-anchor="middle">addr = remaining.data()</text>
-  <text x="611" y="284" font-size="10.5" fill="#6B4E28" text-anchor="middle">user_data = token</text>
+  <rect x="285" y="122" width="210" height="38" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="390" y="146" font-size="12.5" font-weight="700" fill="#4A3F68" text-anchor="middle">2. UringOp 本地管理</text>
 
-  <rect x="730" y="226" width="194" height="72" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
-  <text x="827" y="247" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">sendmsg / TCP sendbuf</text>
-  <text x="827" y="267" font-size="10.5" fill="#733428" text-anchor="middle">可能只接受部分字节</text>
-  <text x="827" y="284" font-size="10.5" fill="#733428" text-anchor="middle">不代表远端业务成功</text>
+  <rect x="511" y="122" width="205" height="38" rx="6" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="613" y="146" font-size="12.5" font-weight="700" fill="#6B4E28" text-anchor="middle">3. Submission Queue</text>
 
-  <rect x="948" y="226" width="216" height="72" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="1056" y="247" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">CQE { token, res }</text>
-  <text x="1056" y="267" font-size="10.5" fill="#24473F" text-anchor="middle">res &gt; 0：offset += res</text>
-  <text x="1056" y="284" font-size="10.5" fill="#24473F" text-anchor="middle">未完成则重新提交</text>
+  <rect x="732" y="122" width="210" height="38" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="837" y="146" font-size="12.5" font-weight="700" fill="#733428" text-anchor="middle">4. 内核 TCP 协议栈</text>
 
-  <!-- send arrows -->
-  <line x1="266" y1="262" x2="282" y2="262" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="496" y1="262" x2="512" y2="262" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="710" y1="262" x2="726" y2="262" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="928" y1="262" x2="944" y2="262" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <path d="M1056 302 L1056 318 L389 318 L389 302" fill="none" stroke="#6B5B95" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr)"/>
-  <text x="722" y="313" font-size="9.8" fill="#6B5B95" text-anchor="middle">短发送：保留 op，再发 remaining</text>
+  <rect x="958" y="122" width="218" height="38" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1067" y="146" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">5. Completion Queue</text>
 
-  <!-- receive row -->
-  <text x="76" y="352" font-size="14" font-weight="700" fill="#2F6B5E">B · 接收方向</text>
-  <rect x="286" y="368" width="206" height="76" rx="8" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.4"/>
-  <text x="389" y="390" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">RecvOp</text>
-  <text x="389" y="410" font-size="10.5" fill="#4A3F68" text-anchor="middle">scratch buffer + token</text>
-  <text x="389" y="428" font-size="10.5" fill="#4A3F68" text-anchor="middle">同方向只保留一个 recv</text>
+  <!-- Row A: Send Direction -->
+  <rect x="64" y="174" width="135" height="22" rx="4" fill="#3D5A80"/>
+  <text x="131" y="189" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">A · 发送方向 (SEND)</text>
 
-  <rect x="516" y="368" width="190" height="76" rx="8" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.4"/>
-  <text x="611" y="390" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">SQE · IORING_OP_RECV</text>
-  <text x="611" y="410" font-size="10.5" fill="#6B4E28" text-anchor="middle">等待任意 TCP 字节</text>
-  <text x="611" y="428" font-size="10.5" fill="#6B4E28" text-anchor="middle">user_data = recv token</text>
+  <rect x="64" y="204" width="205" height="74" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="166" y="226" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">① FrameQueue</text>
+  <text x="166" y="246" font-size="10.5" fill="#2C4460" text-anchor="middle">Request(id=42, 22 B)</text>
+  <text x="166" y="264" font-size="10.5" fill="#2C4460" text-anchor="middle">按完整帧串行排队</text>
 
-  <rect x="730" y="368" width="194" height="76" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
-  <text x="827" y="390" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">TCP 字节到达</text>
-  <text x="827" y="410" font-size="10.5" fill="#733428" text-anchor="middle">头、体可任意分节</text>
-  <text x="827" y="428" font-size="10.5" fill="#733428" text-anchor="middle">内核完成一次 recv</text>
+  <rect x="285" y="204" width="210" height="74" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="390" y="226" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">② SendOp(token=1001)</text>
+  <text x="390" y="246" font-size="10.5" fill="#4A3F68" text-anchor="middle">frame + offset + token</text>
+  <text x="390" y="264" font-size="10.5" fill="#4A3F68" text-anchor="middle">buffer 活到最终 CQE</text>
 
-  <rect x="948" y="368" width="216" height="76" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="1056" y="390" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">CQE { recv token, res }</text>
-  <text x="1056" y="410" font-size="10.5" fill="#24473F" text-anchor="middle">res = 0：EOF</text>
-  <text x="1056" y="428" font-size="10.5" fill="#24473F" text-anchor="middle">res &lt; 0：-errno</text>
+  <rect x="511" y="204" width="205" height="74" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="613" y="226" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">③ SQE · IORING_OP_SEND</text>
+  <text x="613" y="246" font-size="10.5" fill="#6B4E28" text-anchor="middle">addr = remaining.data()</text>
+  <text x="613" y="264" font-size="10.5" fill="#6B4E28" text-anchor="middle">user_data = token(1001)</text>
 
-  <rect x="76" y="368" width="186" height="76" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="169" y="388" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">FrameDecoder</text>
-  <text x="169" y="407" font-size="10.5" fill="#24473F" text-anchor="middle">Feed(res bytes)</text>
-  <text x="169" y="424" font-size="10.5" fill="#24473F" text-anchor="middle">Response id=42 → pending</text>
-  <text x="169" y="439" font-size="10" fill="#24473F" text-anchor="middle">这里才完成 RPC</text>
+  <rect x="732" y="204" width="210" height="74" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="837" y="226" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">④ 内核 sendmsg</text>
+  <text x="837" y="246" font-size="10.5" fill="#733428" text-anchor="middle">写入 TCP 发送缓冲区</text>
+  <text x="837" y="264" font-size="10.5" fill="#733428" text-anchor="middle">可能短发送 (部分字节)</text>
 
-  <!-- receive arrows right-to-left then decoder -->
-  <line x1="496" y1="406" x2="512" y2="406" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="710" y1="406" x2="726" y2="406" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <line x1="928" y1="406" x2="944" y2="406" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
-  <path d="M1056 448 L1056 470 L169 470 L169 448" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
-  <text x="620" y="486" font-size="10.3" fill="#2F6B5E" text-anchor="middle">CQE 只给本次 recv 结果；帧解析后再按 request_id 唤醒调用者</text>
+  <rect x="958" y="204" width="218" height="74" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1067" y="226" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑤ CQE { token, res }</text>
+  <text x="1067" y="246" font-size="10.5" fill="#24473F" text-anchor="middle">res &gt; 0: offset += res</text>
+  <text x="1067" y="264" font-size="10.5" fill="#24473F" text-anchor="middle">已完成弹出，未完重提</text>
 
-  <!-- bottom cards -->
-  <text x="56" y="560" font-size="14.5" font-weight="700" fill="#2B2A26">工程边界</text>
-  <rect x="56" y="578" width="266" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="76" y="602" font-size="12" font-weight="700" fill="#A64B3C">SQ 没位置</text>
-  <text x="76" y="623" font-size="10.7" fill="#4A473F">暂缓提交，不丢 op</text>
-  <text x="76" y="641" font-size="10.7" fill="#4A473F">把压力传回发送队列</text>
+  <!-- Row A Flow Arrows -->
+  <line x1="269" y1="241" x2="285" y2="241" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="495" y1="241" x2="511" y2="241" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="716" y1="241" x2="732" y2="241" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="942" y1="241" x2="958" y2="241" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
 
-  <rect x="338" y="578" width="266" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="358" y="602" font-size="12" font-weight="700" fill="#6B5B95">buffer 生命周期</text>
-  <text x="358" y="623" font-size="10.7" fill="#4A473F">内核仍引用 addr 时不可移动</text>
-  <text x="358" y="641" font-size="10.7" fill="#4A473F">最终 CQE 后才能释放</text>
+  <!-- Row A Short-Send Loop -->
+  <path d="M1067 278 L1067 302 L390 302 L390 278" fill="none" stroke="#6B5B95" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrPurple)"/>
+  <text x="728" y="297" font-size="10.2" font-weight="700" fill="#6B5B95" text-anchor="middle">⑥ 短发送重提：保留 SendOp 算子，更新 offset 并重新提交剩余字节</text>
 
-  <rect x="620" y="578" width="266" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="640" y="602" font-size="12" font-weight="700" fill="#3D5A80">方向内串行</text>
-  <text x="640" y="623" font-size="10.7" fill="#4A473F">一个 active send</text>
-  <text x="640" y="641" font-size="10.7" fill="#4A473F">一个 active recv</text>
+  <!-- Row B: Receive Direction -->
+  <rect x="64" y="324" width="135" height="22" rx="4" fill="#2F6B5E"/>
+  <text x="131" y="339" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">B · 接收方向 (RECV)</text>
 
-  <rect x="902" y="578" width="282" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="922" y="602" font-size="12" font-weight="700" fill="#2F6B5E">完成层次</text>
-  <text x="922" y="623" font-size="10.7" fill="#4A473F">CQE：本地 I/O 结束</text>
-  <text x="922" y="641" font-size="10.7" fill="#4A473F">Response OK：远端调用成功</text>
+  <rect x="64" y="354" width="205" height="74" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="166" y="376" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">⑤ FrameDecoder</text>
+  <text x="166" y="396" font-size="10.5" fill="#24473F" text-anchor="middle">Feed(res) → 拼出完整帧</text>
+  <text x="166" y="414" font-size="10.5" fill="#24473F" text-anchor="middle">按 request_id 完成 RPC</text>
+
+  <rect x="285" y="354" width="210" height="74" rx="7" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="390" y="376" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">① RecvOp(token=2001)</text>
+  <text x="390" y="396" font-size="10.5" fill="#4A3F68" text-anchor="middle">scratch buffer + token</text>
+  <text x="390" y="414" font-size="10.5" fill="#4A3F68" text-anchor="middle">同方向单活跃 recv</text>
+
+  <rect x="511" y="354" width="205" height="74" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="613" y="376" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">② SQE · IORING_OP_RECV</text>
+  <text x="613" y="396" font-size="10.5" fill="#6B4E28" text-anchor="middle">等待任意 TCP 字节到达</text>
+  <text x="613" y="414" font-size="10.5" fill="#6B4E28" text-anchor="middle">user_data = token(2001)</text>
+
+  <rect x="732" y="354" width="210" height="74" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="837" y="376" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">③ TCP 字节到达</text>
+  <text x="837" y="396" font-size="10.5" fill="#733428" text-anchor="middle">字节流无消息边界</text>
+  <text x="837" y="414" font-size="10.5" fill="#733428" text-anchor="middle">内核完成一次 recv</text>
+
+  <rect x="958" y="354" width="218" height="74" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1067" y="376" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">④ CQE { token, res }</text>
+  <text x="1067" y="396" font-size="10.5" fill="#24473F" text-anchor="middle">res &gt; 0: 交付字节片段</text>
+  <text x="1067" y="414" font-size="10.5" fill="#24473F" text-anchor="middle">res = 0: EOF / res &lt; 0: 错</text>
+
+  <!-- Row B Flow Arrows -->
+  <line x1="495" y1="391" x2="511" y2="391" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="716" y1="391" x2="732" y2="391" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="942" y1="391" x2="958" y2="391" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Row B Return Loop to FrameDecoder -->
+  <path d="M1067 428 L1067 456 L166 456 L166 428" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <text x="613" y="473" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">⑥ CQE 只给本次 I/O 结果；帧解析后再按 request_id 唤醒调用者</text>
+
+  <!-- Resubmit next recv dashed line -->
+  <path d="M166 354 L166 335 L285 335" fill="none" stroke="#6B5B95" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arrPurple)"/>
+  <text x="225" y="331" font-size="9.8" font-weight="700" fill="#6B5B95" text-anchor="middle">续提 Recv</text>
+
+  <!-- Bottom Section: Engineering Boundaries -->
+  <text x="48" y="596" font-size="14.5" font-weight="700" fill="#2B2A26">四大核心工程边界与设计准则</text>
+
+  <!-- Boundary Card 1 -->
+  <rect x="48" y="612" width="272" height="124" rx="8" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.2"/>
+  <rect x="62" y="624" width="118" height="22" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="121" y="639" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">1 · SQ 容量背压</text>
+  <text x="62" y="666" font-size="10.8" fill="#2B2A26">• get_sqe() 返回空不是错误</text>
+  <text x="62" y="688" font-size="10.5" fill="#6B675C">• 视为背压信号：暂缓提交、不丢 op</text>
+  <text x="62" y="710" font-size="10.5" fill="#6B675C">• 压力传导至发送队列阻断新调用</text>
+
+  <!-- Boundary Card 2 -->
+  <rect x="336" y="612" width="272" height="124" rx="8" fill="#FBFBF6" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="350" y="624" width="134" height="22" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="417" y="639" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">2 · Buffer 生命周期</text>
+  <text x="350" y="666" font-size="10.8" fill="#2B2A26">• 提交前先登记进本地所有权表</text>
+  <text x="350" y="688" font-size="10.5" fill="#6B675C">• 内核引用 buffer 期间禁止移动/扩容</text>
+  <text x="350" y="710" font-size="10.5" fill="#6B675C">• 必须等最终 CQE 消费后才安全释放</text>
+
+  <!-- Boundary Card 3 -->
+  <rect x="624" y="612" width="272" height="124" rx="8" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="638" y="624" width="130" height="22" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="703" y="639" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">3 · 方向内串行推进</text>
+  <text x="638" y="666" font-size="10.8" fill="#2B2A26">• 每连接最多一个活跃 SEND op</text>
+  <text x="638" y="688" font-size="10.5" fill="#6B675C">• 保证 TCP 字节流严格按整帧发出</text>
+  <text x="638" y="710" font-size="10.5" fill="#6B675C">• 同一接收方向只保留一个活跃 RECV</text>
+
+  <!-- Boundary Card 4 -->
+  <rect x="912" y="612" width="280" height="124" rx="8" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="926" y="624" width="140" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="996" y="639" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">4 · 两层完成严格解耦</text>
+  <text x="926" y="666" font-size="10.8" fill="#2B2A26">• CQE 仅表示本地 I/O 片段完成</text>
+  <text x="926" y="688" font-size="10.5" fill="#6B675C">• 单 RPC 超时不取消共享 RecvOp</text>
+  <text x="926" y="710" font-size="10.5" fill="#6B675C">• 解码出 Response 帧才算远端 RPC 成功</text>
 </svg>
