@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 690" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>bthread 调度主循环：四级任务获取与 Work Stealing 流程</title>
+  <desc>展示 TaskGroup::sched() 中的四级调度逻辑：本地 run queue、RemoteTaskQueue、TaskControl 工作窃取与 ParkingLot 休眠唤醒流程。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 顶层背景 -->
+  <rect x="0" y="0" width="1240" height="690" fill="rgb(245, 244, 237)"/>
+
+  <!-- 标题与副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">bthread 调度主循环：四级任务获取与 Work Stealing 机制</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">TaskGroup::sched() 决策路径：本地 LIFO 优先 → 远程队列降级 → 跨 worker 随机窃取 → ParkingLot 休眠</text>
+
+  <!-- ============ Panel A: 调度决策流 ============ -->
+  <text x="48" y="102" font-size="13.5" font-weight="700" fill="#4A473F">A · TaskGroup::sched() 决策状态机与切换流</text>
+  <rect x="48" y="114" width="716" height="548" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 步骤 0: 起点 -->
+  <rect x="72" y="134" width="336" height="52" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="240" y="155" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">当前 bthread 主动 yield() / 原语阻塞</text>
+  <text x="240" y="173" font-size="10.5" fill="#2C4460" text-anchor="middle">bthread_usleep() · butex 等待 · 调度出让</text>
+
+  <!-- 箭头 0 -> 1 -->
+  <path d="M240 186 V208" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 步骤 1: 本地队列 -->
+  <rect x="72" y="210" width="336" height="60" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="240" y="233" font-size="12" font-weight="700" fill="#4A3F6B" text-anchor="middle">① 本地 run queue 能否 pop？</text>
+  <text x="240" y="253" font-size="10.5" fill="#4A3F6B" text-anchor="middle">TaskGroup::_rq.pop()（LIFO 快路径）</text>
+
+  <!-- 分支 1 成功 -> sched_to -->
+  <path d="M408 240 H494" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <text x="445" y="232" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">是 (命中)</text>
+
+  <!-- 分支 1 失败 -> 步骤 2 -->
+  <path d="M240 270 V294" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="256" y="287" font-size="10" fill="#6B675C">否</text>
+
+  <!-- 步骤 2: 远程队列 -->
+  <rect x="72" y="296" width="336" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="240" y="319" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">② RemoteTaskQueue 能否 pop？</text>
+  <text x="240" y="339" font-size="10.5" fill="#6B4E28" text-anchor="middle">TaskGroup::_remote_rq.pop()</text>
+
+  <!-- 分支 2 成功 -> sched_to -->
+  <path d="M408 326 C454 326 454 260 494 260" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <text x="452" y="318" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">是 (命中)</text>
+
+  <!-- 分支 2 失败 -> 步骤 3 -->
+  <path d="M240 356 V380" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="256" y="373" font-size="10" fill="#6B675C">否</text>
+
+  <!-- 步骤 3: 随机工作窃取 -->
+  <rect x="72" y="382" width="336" height="60" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="240" y="405" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">③ 随机工作窃取能否成功？</text>
+  <text x="240" y="425" font-size="10.5" fill="#6B4E28" text-anchor="middle">TaskControl::steal_task()</text>
+
+  <!-- 分支 3 成功 -> sched_to -->
+  <path d="M408 412 C466 412 466 280 494 280" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <text x="462" y="404" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">成功 (窃取)</text>
+
+  <!-- 分支 3 失败 -> 步骤 4 -->
+  <path d="M240 442 V466" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="256" y="459" font-size="10" fill="#6B675C">失败</text>
+
+  <!-- 步骤 4: ParkingLot 休眠 -->
+  <rect x="72" y="468" width="336" height="60" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="240" y="491" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">④ 进入 ParkingLot::park() 休眠</text>
+  <text x="240" y="511" font-size="10.5" fill="#733428" text-anchor="middle">无任务可运行，挂起避免空转</text>
+
+  <!-- 唤醒流 -->
+  <rect x="72" y="556" width="336" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="240" y="577" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">新任务到达 · signal_task() 唤醒</text>
+  <text x="240" y="595" font-size="10" fill="#24473F" text-anchor="middle">唤醒 idle worker 重新进入调度</text>
+
+  <!-- 步骤 4 -> 唤醒 -->
+  <path d="M240 528 V552" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrGreen)"/>
+
+  <!-- 唤醒 -> 回流到步骤 1 -->
+  <path d="M72 582 C44 582 44 240 68 240" fill="none" stroke="#2F6B5E" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrGreen)"/>
+  <text x="56" y="410" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">唤醒后</text>
+  <text x="56" y="425" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="middle">重入调度</text>
+
+  <!-- 右侧：执行切换区块 -->
+  <rect x="498" y="196" width="242" height="268" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.6"/>
+  <text x="619" y="222" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">TaskGroup::sched_to()</text>
+  <text x="619" y="242" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">运行下一个 bthread</text>
+
+  <line x1="514" y1="254" x2="724" y2="254" stroke="#9FBDB2" stroke-width="1"/>
+
+  <rect x="514" y="266" width="210" height="34" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="619" y="287" font-size="10.5" fill="#4A473F" text-anchor="middle">1. 保存当前 TaskMeta 栈帧</text>
+
+  <rect x="514" y="308" width="210" height="34" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="619" y="329" font-size="10.5" fill="#4A473F" text-anchor="middle">2. 切换 bthread TLS 存储</text>
+
+  <rect x="514" y="350" width="210" height="34" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="619" y="371" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">3. jump_stack() 切换栈上下文</text>
+
+  <rect x="514" y="392" width="210" height="56" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="619" y="414" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">4. 执行用户 bthread 逻辑</text>
+  <text x="619" y="434" font-size="10" fill="#2C4460" text-anchor="middle">用户态切换，无内核参与</text>
+
+  <!-- 执行完回流到起点 -->
+  <path d="M619 196 V160 H412" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+  <text x="514" y="152" font-size="10.5" font-weight="700" fill="#3D5A80" text-anchor="middle">出让 / 再次阻塞</text>
+
+  <!-- 底部说明条 -->
+  <rect x="72" y="620" width="668" height="28" rx="5" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="406" y="638" font-size="10.2" fill="#4A473F" text-anchor="middle">调度核心：无任务时休眠，有任务时 LIFO 用户态切栈，实现纳秒级任务调度</text>
+
+  <!-- ============ Panel B: 四级策略解析与关键边界 ============ -->
+  <text x="784" y="102" font-size="13.5" font-weight="700" fill="#4A473F">B · 四级获取策略机制解析与工程边界</text>
+  <rect x="784" y="114" width="408" height="548" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 卡片 1: 本地 _rq -->
+  <rect x="800" y="130" width="376" height="74" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="814" y="152" font-size="11.5" font-weight="700" fill="#4A3F6B">① 本地 _rq（WorkStealingQueue）</text>
+  <text x="814" y="172" font-size="10.5" fill="#4A3F6B">· 本 worker 从 bottom 弹出（LIFO）</text>
+  <text x="814" y="190" font-size="10.5" fill="#6B675C">· CPU Cache 局部性高，单 owner 无锁</text>
+
+  <!-- 卡片 2: RemoteTaskQueue -->
+  <rect x="800" y="214" width="376" height="74" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="814" y="236" font-size="11.5" font-weight="700" fill="#6B4E28">② RemoteTaskQueue（远程提交队列）</text>
+  <text x="814" y="256" font-size="10.5" fill="#6B4E28">· 接收外部线程派发的新任务</text>
+  <text x="814" y="274" font-size="10.5" fill="#6B675C">· MPSC 队列，隔离跨线程本地争用</text>
+
+  <!-- 卡片 3: 工作窃取 -->
+  <rect x="800" y="298" width="376" height="84" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="814" y="320" font-size="11.5" font-weight="700" fill="#6B4E28">③ 跨 TaskGroup 随机工作窃取</text>
+  <text x="814" y="340" font-size="10.5" fill="#6B4E28">· 从其他 worker _rq top 端窃取（FIFO）</text>
+  <text x="814" y="358" font-size="10.5" fill="#6B4E28">· 随机 seed 遍历，平摊全核负载</text>
+  <text x="814" y="374" font-size="10" fill="#6B675C">· 窃取与本地弹出分别操作头尾两端</text>
+
+  <!-- 卡片 4: ParkingLot -->
+  <rect x="800" y="392" width="376" height="74" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="814" y="414" font-size="11.5" font-weight="700" fill="#4A473F">④ ParkingLot 休眠与唤醒</text>
+  <text x="814" y="434" font-size="10.5" fill="#4A473F">· 全局无任务时进入 futex 休眠</text>
+  <text x="814" y="452" font-size="10.5" fill="#6B675C">· signal_task() 定向唤醒，避免空转</text>
+
+  <!-- 重点警示卡片 -->
+  <rect x="800" y="478" width="376" height="170" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="814" y="502" font-size="12" font-weight="700" fill="#733428">⚠ 阻塞语义核心红线（面试必考）</text>
+
+  <rect x="812" y="512" width="352" height="56" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="822" y="530" font-size="10.5" font-weight="700" fill="#24473F">✓ bthread 原语阻塞：</text>
+  <text x="822" y="546" font-size="10" fill="#24473F">· bthread_usleep/butex 主动让出 worker</text>
+  <text x="822" y="560" font-size="10" fill="#24473F">· worker 继续调度其他任务，不消耗系统线程</text>
+
+  <rect x="812" y="576" width="352" height="60" rx="5" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="822" y="594" font-size="10.5" font-weight="700" fill="#733428">✗ 系统级阻塞调用：</text>
+  <text x="822" y="610" font-size="10" fill="#733428">· ::usleep/磁盘 I/O/pthread_mutex 卡死底层 worker</text>
+  <text x="822" y="626" font-size="10" fill="#733428">· worker 耗尽后回调无法触发，导致饥饿死锁</text>
+</svg>

@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>bthread_id 内部状态机：单 RPC 终态门闩流转与 ABA 防护</title>
+  <desc>展示 bthread_id 内部五个状态（Unlocked、Locked、Contended、AboutToDestroy、Invalid）的转移路径、Pending Error 接管机制以及 64 位句柄 ABA 防护原理。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 顶层背景 -->
+  <rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+  <!-- 标题与副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">bthread_id 内部状态机：单 RPC 终态门闩流转与 ABA 防护</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">64 位句柄 (slot + version) 与每 ID butex 状态流转，杜绝 ABA 并串行化 Response、Timeout、Cancel 竞争</text>
+
+  <!-- ============ Panel A: 状态流转图 ============ -->
+  <text x="48" y="102" font-size="13.5" font-weight="700" fill="#4A473F">A · bthread_id 内部状态转移与 Pending Error 机制</text>
+  <rect x="48" y="114" width="716" height="618" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 起点 -->
+  <circle cx="360" cy="138" r="7" fill="#5A564B"/>
+  <text x="360" y="152" font-size="10" fill="#6B675C" text-anchor="middle">create 创建</text>
+
+  <path d="M360 148 V170" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 状态 1: Unlocked -->
+  <rect x="260" y="172" width="200" height="52" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="360" y="194" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">Unlocked</text>
+  <text x="360" y="212" font-size="10" fill="#24473F" text-anchor="middle">*butex == first_ver（空闲）</text>
+
+  <!-- Unlocked -> Locked -->
+  <path d="M320 224 C280 248 260 262 250 286" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="256" y="254" font-size="10.5" font-weight="700" fill="#3D5A80" text-anchor="middle">lock() 成功</text>
+
+  <!-- 状态 2: Locked -->
+  <rect x="150" y="290" width="180" height="54" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="240" y="312" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">Locked</text>
+  <text x="240" y="331" font-size="10" fill="#2C4460" text-anchor="middle">*butex == locked_ver</text>
+
+  <!-- Locked -> Unlocked (retry) -->
+  <path d="M210 290 C180 250 210 210 256 200" fill="none" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <text x="165" y="240" font-size="9.5" fill="#6B675C" text-anchor="middle">retry 路径 unlock</text>
+
+  <!-- Locked -> Contended -->
+  <path d="M330 317 H426" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arrAmber)"/>
+  <text x="378" y="309" font-size="10" font-weight="700" fill="#8A6A3A" text-anchor="middle">另一个 lock 到达</text>
+
+  <!-- 状态 3: Contended -->
+  <rect x="430" y="290" width="190" height="54" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.5"/>
+  <text x="525" y="312" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">Contended</text>
+  <text x="525" y="331" font-size="10" fill="#6B4E28" text-anchor="middle">*butex == contended_ver</text>
+
+  <!-- Contended -> Unlocked -->
+  <path d="M525 290 C525 224 490 200 464 200" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrGreen)"/>
+  <text x="535" y="240" font-size="9.5" fill="#24473F" text-anchor="middle">unlock 并唤醒等待者</text>
+
+  <!-- Locked -> AboutToDestroy -->
+  <path d="M240 344 C240 390 290 415 320 442" fill="none" stroke="#6B5B95" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="250" y="405" font-size="10" fill="#4A3F6B" text-anchor="middle">最终成功/失败</text>
+
+  <!-- Contended -> AboutToDestroy -->
+  <path d="M525 344 C525 390 440 415 410 442" fill="none" stroke="#6B5B95" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="510" y="405" font-size="10" fill="#4A3F6B" text-anchor="middle">最终成功/失败</text>
+
+  <!-- 状态 4: AboutToDestroy -->
+  <rect x="270" y="446" width="210" height="54" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.5"/>
+  <text x="375" y="468" font-size="13" font-weight="700" fill="#4A3F6B" text-anchor="middle">AboutToDestroy</text>
+  <text x="375" y="487" font-size="10" fill="#4A3F6B" text-anchor="middle">*butex == unlockable_ver</text>
+
+  <!-- AboutToDestroy -> Invalid -->
+  <path d="M375 500 V546" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="385" y="522" font-size="9.5" fill="#6B675C">unlock_and_destroy</text>
+  <text x="385" y="535" font-size="9.5" fill="#6B675C">推进 generation</text>
+
+  <!-- 状态 5: Invalid -->
+  <rect x="270" y="550" width="210" height="54" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+  <text x="375" y="572" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">Invalid / Next Gen</text>
+  <text x="375" y="591" font-size="10" fill="#6B675C" text-anchor="middle">first_ver 前移至 end_ver</text>
+
+  <!-- Invalid -> 终点 -->
+  <path d="M375 604 V630" fill="none" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+  <circle cx="375" cy="642" r="7" fill="none" stroke="#5A564B" stroke-width="1.5"/>
+  <circle cx="375" cy="642" r="4" fill="#5A564B"/>
+  <text x="375" y="666" font-size="10" fill="#6B675C" text-anchor="middle">槽位归还 ResourcePool</text>
+
+  <!-- 左侧 Pending Error Callout 提示框 -->
+  <rect x="64" y="468" width="190" height="136" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="76" y="490" font-size="11" font-weight="700" fill="#6B4E28">📌 Pending Error 机制</text>
+  <text x="76" y="512" font-size="10" fill="#6B4E28">· 已加锁期间到达的 error</text>
+  <text x="76" y="528" font-size="10" fill="#6B4E28">  （如 Timeout / Cancel）</text>
+  <text x="76" y="546" font-size="10" fill="#6B4E28">· 写入 pending queue</text>
+  <text x="76" y="564" font-size="10" fill="#6B4E28">· 当前 owner unlock 时</text>
+  <text x="76" y="582" font-size="10" fill="#6B4E28">  接管处理，不丢事件</text>
+
+  <!-- 虚线连接 callout 和 Locked 状态 -->
+  <path d="M159 468 C159 380 160 360 180 344" fill="none" stroke="#B07D2B" stroke-width="1.4" stroke-dasharray="4 3"/>
+
+  <!-- ============ Panel B: 状态表与 ABA 防护 ============ -->
+  <text x="784" y="102" font-size="13.5" font-weight="700" fill="#4A473F">B · 状态取值定义、64 位句柄与 ABA 防护</text>
+  <rect x="784" y="114" width="408" height="618" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 1. 状态定义表格 -->
+  <rect x="798" y="128" width="380" height="196" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="810" y="148" font-size="11.5" font-weight="700" fill="#4A473F">内部状态与 Butex 取值对照表</text>
+
+  <!-- 表头 -->
+  <rect x="806" y="156" width="364" height="24" rx="4" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="0.8"/>
+  <text x="816" y="172" font-size="10" font-weight="700" fill="#4A473F">状态</text>
+  <text x="888" y="172" font-size="10" font-weight="700" fill="#4A473F">Butex 内部取值</text>
+  <text x="996" y="172" font-size="10" font-weight="700" fill="#4A473F">并发处理者规则</text>
+
+  <line x1="806" y1="180" x2="1170" y2="180" stroke="#D8D5C8" stroke-width="1"/>
+
+  <!-- 行 1 -->
+  <text x="816" y="196" font-size="9.8" font-weight="700" fill="#24473F">Unlocked</text>
+  <text x="888" y="196" font-size="9.5" fill="#4A473F">first_ver</text>
+  <text x="996" y="196" font-size="9.5" fill="#4A473F">空闲，无终态处理者</text>
+
+  <line x1="806" y1="204" x2="1170" y2="204" stroke="#EDEBE3" stroke-width="0.8"/>
+
+  <!-- 行 2 -->
+  <text x="816" y="220" font-size="9.8" font-weight="700" fill="#2C4460">Locked</text>
+  <text x="888" y="220" font-size="9.5" fill="#4A473F">locked_ver</text>
+  <text x="996" y="220" font-size="9.5" fill="#4A473F">某一路径独占处理中</text>
+
+  <line x1="806" y1="228" x2="1170" y2="228" stroke="#EDEBE3" stroke-width="0.8"/>
+
+  <!-- 行 3 -->
+  <text x="816" y="244" font-size="9.8" font-weight="700" fill="#6B4E28">Contended</text>
+  <text x="888" y="244" font-size="9.5" fill="#4A473F">contended_ver</text>
+  <text x="996" y="244" font-size="9.5" fill="#4A473F">有其他 locker 等待唤醒</text>
+
+  <line x1="806" y1="252" x2="1170" y2="252" stroke="#EDEBE3" stroke-width="0.8"/>
+
+  <!-- 行 4 -->
+  <text x="816" y="268" font-size="9.8" font-weight="700" fill="#4A3F6B">AboutDestroy</text>
+  <text x="888" y="268" font-size="9.5" fill="#4A473F">unlockable_ver</text>
+  <text x="996" y="268" font-size="9.5" fill="#4A473F">终态确立，禁止新 locker</text>
+
+  <line x1="806" y1="276" x2="1170" y2="276" stroke="#EDEBE3" stroke-width="0.8"/>
+
+  <!-- 行 5 -->
+  <text x="816" y="292" font-size="9.8" font-weight="700" fill="#4A473F">Invalid</text>
+  <text x="888" y="292" font-size="9.5" fill="#4A473F">end_ver</text>
+  <text x="996" y="292" font-size="9.5" fill="#4A473F">旧 ID 失效，槽位可复用</text>
+
+  <line x1="806" y1="300" x2="1170" y2="300" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="812" y="316" font-size="9.5" fill="#6B675C">单原子变量维护，CAS + butex 实现低争用协调</text>
+
+  <!-- 2. 64 位句柄与 ABA 防护 -->
+  <rect x="798" y="336" width="380" height="236" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="810" y="356" font-size="11.5" font-weight="700" fill="#4A473F">64 位句柄结构与 ABA 防护机制</text>
+
+  <!-- 64 位图解 -->
+  <rect x="810" y="368" width="176" height="32" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="898" y="388" font-size="10.5" font-weight="700" fill="#4A3F6B" text-anchor="middle">high 32: slot 槽位索引</text>
+
+  <rect x="992" y="368" width="176" height="32" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="1080" y="388" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">low 32: version 版本号</text>
+
+  <!-- ABA 对比盒 -->
+  <rect x="810" y="410" width="358" height="150" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="820" y="428" font-size="10" font-weight="700" fill="#4A473F">ABA 防护全流程模拟：</text>
+
+  <text x="820" y="446" font-size="9.8" fill="#4A473F">1. 旧 RPC A: 分配 call_id = (slot=42, ver=7)</text>
+  <text x="820" y="462" font-size="9.8" fill="#4A473F">2. RPC A 完成归还 slot 42，version 推进到 11</text>
+  <text x="820" y="478" font-size="9.8" fill="#4A473F">3. 新 RPC B 复用 slot 42，新 ID = (42, 11)</text>
+  <text x="820" y="496" font-size="9.8" fill="#A64B3C">4. 迟到的 RPC A 超时事件携带 (42, 7) 到达：</text>
+  <text x="832" y="512" font-size="9.5" fill="#A64B3C">· 定位 slot 42 发现当前代数 11 ≠ 7</text>
+  <text x="832" y="528" font-size="9.5" fill="#A64B3C">· 立即拒绝过期事件，绝不误杀 RPC B！</text>
+  <text x="820" y="548" font-size="9.5" fill="#2F6B5E">✓ 内存复用 ≠ 身份复用，实现 O(1) 安全定位</text>
+
+  <!-- 3. 架构结论卡片 -->
+  <rect x="798" y="582" width="380" height="70" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="810" y="604" font-size="11" font-weight="700" fill="#24473F">💡 为什么说 bthread_id 性能极高？</text>
+  <text x="810" y="622" font-size="10" fill="#24473F">· 无全局哈希互斥锁：slot 数组下标 O(1) 直接寻址</text>
+  <text x="810" y="638" font-size="10" fill="#24473F">· 细粒度局部串行：多事件在 per-ID 门闩内竞争</text>
+</svg>

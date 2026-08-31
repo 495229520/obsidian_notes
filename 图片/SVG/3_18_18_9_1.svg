@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>RPC 治理闭环：预算、准入、尝试与实例选择</title>
+  <desc>从 deadline 与 TraceContext 进入，经 Name Resolver 和 Picker 选择实例，再由自适应并发限制与重试对冲预算决定是否发起 attempt。后端结果、延迟、错误与健康事件回流，持续更新 limit、picker 和异常实例驱逐状态。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5F5E5A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#444441" dominant-baseline="central">RPC 治理闭环：让一次逻辑调用在长尾、故障与扩缩容下仍然有界</text>
+  <text x="48" y="74" font-size="13" fill="#5F5E5A" dominant-baseline="central">主路径决定“能否发、发给谁、还能发几次”；反馈路径把延迟、错误和健康状态变成下一轮策略</text>
+
+  <text x="48" y="112" font-size="12.5" font-weight="700" fill="#0C447C" dominant-baseline="central">四个不变量</text>
+  <text x="164" y="112" font-size="11" fill="#0C447C" dominant-baseline="central">deadline 只减不增</text>
+  <text x="356" y="112" font-size="11" fill="#3C3489" dominant-baseline="central">logical call ≠ attempt</text>
+  <text x="590" y="112" font-size="11" fill="#085041" dominant-baseline="central">inflight 不超过动态 limit</text>
+  <text x="858" y="112" font-size="11" fill="#633806" dominant-baseline="central">额外 attempt 受预算约束</text>
+
+  <!-- 主调用路径 -->
+  <text x="48" y="142" font-size="13" font-weight="700" fill="#444441" dominant-baseline="central">A · 单次调用的治理主路径</text>
+
+  <rect x="48" y="166" width="220" height="190" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="158" y="194" font-size="13" font-weight="700" fill="#0C447C" text-anchor="middle" dominant-baseline="central">① 上下文预算</text>
+  <text x="158" y="226" font-size="11" fill="#0C447C" text-anchor="middle" dominant-baseline="central">absolute deadline</text>
+  <text x="158" y="250" font-size="11" fill="#0C447C" text-anchor="middle" dominant-baseline="central">wire: grpc-timeout</text>
+  <text x="158" y="274" font-size="11" fill="#0C447C" text-anchor="middle" dominant-baseline="central">traceparent</text>
+  <text x="158" y="298" font-size="11" fill="#0C447C" text-anchor="middle" dominant-baseline="central">tracestate / baggage</text>
+  <text x="158" y="330" font-size="11.5" font-weight="700" fill="#0C447C" text-anchor="middle" dominant-baseline="central">剩余预算不足 → 快速失败</text>
+
+  <path d="M268,261 L330,261" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="299" y="244" font-size="9.5" fill="#5F5E5A" text-anchor="middle" dominant-baseline="central">上下文</text>
+
+  <rect x="332" y="166" width="240" height="190" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="452" y="194" font-size="13" font-weight="700" fill="#3C3489" text-anchor="middle" dominant-baseline="central">② 候选实例选择</text>
+  <text x="452" y="226" font-size="11" fill="#3C3489" text-anchor="middle" dominant-baseline="central">Name Resolver 快照</text>
+  <text x="452" y="250" font-size="11" fill="#3C3489" text-anchor="middle" dominant-baseline="central">READY ∩ SERVING</text>
+  <text x="452" y="274" font-size="11" fill="#3C3489" text-anchor="middle" dominant-baseline="central">排除 ejected 实例</text>
+  <text x="452" y="298" font-size="11" fill="#3C3489" text-anchor="middle" dominant-baseline="central">RR / P2C / hash</text>
+  <text x="452" y="330" font-size="11.5" font-weight="700" fill="#3C3489" text-anchor="middle" dominant-baseline="central">Picker 必须走热路径</text>
+
+  <path d="M572,261 L634,261" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="603" y="244" font-size="9.5" fill="#5F5E5A" text-anchor="middle" dominant-baseline="central">endpoint</text>
+
+  <rect x="636" y="166" width="240" height="190" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="756" y="194" font-size="13" font-weight="700" fill="#085041" text-anchor="middle" dominant-baseline="central">③ 准入与尝试预算</text>
+  <text x="756" y="226" font-size="11" fill="#085041" text-anchor="middle" dominant-baseline="central">adaptive concurrency</text>
+  <text x="756" y="250" font-size="11" fill="#085041" text-anchor="middle" dominant-baseline="central">inflight &lt; limit</text>
+  <text x="756" y="274" font-size="11" fill="#085041" text-anchor="middle" dominant-baseline="central">retry / hedge budget</text>
+  <text x="756" y="298" font-size="11" fill="#085041" text-anchor="middle" dominant-baseline="central">deadline 覆盖全部 attempts</text>
+  <text x="756" y="330" font-size="11.5" font-weight="700" fill="#085041" text-anchor="middle" dominant-baseline="central">超限 → 拒绝，不排长队</text>
+
+  <path d="M876,261 L938,261" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="907" y="244" font-size="9.5" fill="#5F5E5A" text-anchor="middle" dominant-baseline="central">attempt</text>
+
+  <rect x="940" y="166" width="252" height="190" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="1066" y="194" font-size="13" font-weight="700" fill="#633806" text-anchor="middle" dominant-baseline="central">④ 后端实例池</text>
+  <text x="1066" y="224" font-size="11" fill="#633806" text-anchor="middle" dominant-baseline="central">Subchannel 状态机</text>
+
+  <circle cx="990" cy="270" r="24" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
+  <text x="990" y="267" font-size="10.5" font-weight="700" fill="#085041" text-anchor="middle" dominant-baseline="central">A</text>
+  <text x="990" y="282" font-size="9.5" fill="#085041" text-anchor="middle" dominant-baseline="central">READY</text>
+
+  <circle cx="1066" cy="270" r="24" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+  <text x="1066" y="267" font-size="10.5" font-weight="700" fill="#633806" text-anchor="middle" dominant-baseline="central">B</text>
+  <text x="1066" y="282" font-size="9.5" fill="#633806" text-anchor="middle" dominant-baseline="central">SLOW</text>
+
+  <circle cx="1142" cy="270" r="24" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <text x="1142" y="267" font-size="10.5" font-weight="700" fill="#444441" text-anchor="middle" dominant-baseline="central">C</text>
+  <text x="1142" y="282" font-size="9.5" fill="#444441" text-anchor="middle" dominant-baseline="central">EJECT</text>
+
+  <text x="1066" y="330" font-size="11.5" font-weight="700" fill="#633806" text-anchor="middle" dominant-baseline="central">先返回的有效结果提交</text>
+
+  <!-- 中间判据条，无卡片 -->
+  <text x="48" y="410" font-size="12.5" font-weight="700" fill="#444441" dominant-baseline="central">提交判据</text>
+  <text x="164" y="410" font-size="11" fill="#0C447C" dominant-baseline="central">deadline 未耗尽</text>
+  <text x="358" y="410" font-size="11" fill="#3C3489" dominant-baseline="central">实例仍在 eligible 集合</text>
+  <text x="590" y="410" font-size="11" fill="#085041" dominant-baseline="central">permit 与 attempt token 均已取得</text>
+  <text x="906" y="410" font-size="11" fill="#633806" dominant-baseline="central">失败分类决定重试、对冲或终止</text>
+
+  <!-- 反馈路径 -->
+  <text x="48" y="484" font-size="13" font-weight="700" fill="#444441" dominant-baseline="central">B · 观测与反馈：区分 logical call、attempt、实例和控制器四个层次</text>
+
+  <rect x="48" y="516" width="220" height="132" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="158" y="542" font-size="12.5" font-weight="700" fill="#0C447C" text-anchor="middle" dominant-baseline="central">延迟与排队</text>
+  <text x="158" y="570" font-size="10.5" fill="#0C447C" text-anchor="middle" dominant-baseline="central">p50 / p95 / p99 / p999</text>
+  <text x="158" y="594" font-size="10.5" fill="#0C447C" text-anchor="middle" dominant-baseline="central">minRTT / sampleRTT</text>
+  <text x="158" y="618" font-size="10.5" fill="#0C447C" text-anchor="middle" dominant-baseline="central">remaining deadline</text>
+
+  <rect x="332" y="516" width="240" height="132" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="452" y="542" font-size="12.5" font-weight="700" fill="#3C3489" text-anchor="middle" dominant-baseline="central">解析与健康事件</text>
+  <text x="452" y="570" font-size="10.5" fill="#3C3489" text-anchor="middle" dominant-baseline="central">resolver version</text>
+  <text x="452" y="594" font-size="10.5" fill="#3C3489" text-anchor="middle" dominant-baseline="central">health Check / Watch</text>
+  <text x="452" y="618" font-size="10.5" fill="#3C3489" text-anchor="middle" dominant-baseline="central">connect / reset / timeout</text>
+
+  <rect x="636" y="516" width="240" height="132" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="756" y="542" font-size="12.5" font-weight="700" fill="#085041" text-anchor="middle" dominant-baseline="central">尝试与预算</text>
+  <text x="756" y="570" font-size="10.5" fill="#085041" text-anchor="middle" dominant-baseline="central">call duration / final status</text>
+  <text x="756" y="594" font-size="10.5" fill="#085041" text-anchor="middle" dominant-baseline="central">attempt duration / endpoint</text>
+  <text x="756" y="618" font-size="10.5" fill="#085041" text-anchor="middle" dominant-baseline="central">retry / hedge tokens</text>
+
+  <rect x="940" y="516" width="252" height="132" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="1066" y="542" font-size="12.5" font-weight="700" fill="#633806" text-anchor="middle" dominant-baseline="central">控制器输出</text>
+  <text x="1066" y="570" font-size="10.5" fill="#633806" text-anchor="middle" dominant-baseline="central">concurrency limit</text>
+  <text x="1066" y="594" font-size="10.5" fill="#633806" text-anchor="middle" dominant-baseline="central">picker weights</text>
+  <text x="1066" y="618" font-size="10.5" fill="#633806" text-anchor="middle" dominant-baseline="central">ejection / probation</text>
+
+  <!-- 主模块与观测面双向连接：上报样本，回写策略 -->
+  <path d="M158,356 L158,514" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <path d="M452,356 L452,514" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <path d="M756,356 L756,514" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <path d="M1066,356 L1066,514" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+
+  <!-- 聚合总线 -->
+  <line x1="158" y1="648" x2="158" y2="704" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="452" y1="648" x2="452" y2="704" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="756" y1="648" x2="756" y2="704" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="1066" y1="648" x2="1066" y2="704" stroke="#5F5E5A" stroke-width="1"/>
+  <line x1="158" y1="704" x2="1066" y2="704" stroke="#5F5E5A" stroke-width="1.2"/>
+  <circle cx="158" cy="704" r="3" fill="#5F5E5A"/>
+  <circle cx="452" cy="704" r="3" fill="#5F5E5A"/>
+  <circle cx="756" cy="704" r="3" fill="#5F5E5A"/>
+  <circle cx="1066" cy="704" r="3" fill="#5F5E5A"/>
+
+  <text x="48" y="742" font-size="12.5" font-weight="700" fill="#444441" dominant-baseline="central">反馈闭环</text>
+  <text x="158" y="742" font-size="11" fill="#444441" dominant-baseline="central">采样窗口 → 分位数与错误分类 → 更新 limit、picker 与 ejection</text>
+
+  <text x="924" y="742" font-size="10.5" fill="#5F5E5A" dominant-baseline="central">双向箭头：上报样本 / 回写策略</text>
+
+  <text x="48" y="806" font-size="11" fill="#5F5E5A" dominant-baseline="central">读图顺序：先沿 A 从左到右判断一次调用；再沿 B 看反馈怎样改变下一次调用。治理目标不是“永不失败”，而是让失败有界、可归因、可恢复。</text>
+</svg>

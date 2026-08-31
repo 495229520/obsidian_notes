@@ -1,0 +1,296 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>bRPC 1.17.0 核心运行时：调用、I/O、调度与观测</title>
+  <desc>展示 bRPC 从调用层到传输层的主路径、接收与聚合写路径，以及 bthread、bthread_id、bvar 三个核心高性能机制与设计边界。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 顶层背景 -->
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <!-- 页面标题与副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">bRPC 1.17.0 核心运行时：调用、I/O、调度与观测</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">高性能来自“分散热写、局部串行、版本化身份、竞争时批处理”，而不是整条路径都无锁</text>
+
+  <!-- ============ Panel A: 一次 RPC 的主路径 ============ -->
+  <text x="48" y="104" font-size="13.5" font-weight="700" fill="#4A473F">A · 一次 RPC 的五层协作主路径</text>
+  <rect x="48" y="116" width="1144" height="106" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 卡片 1: 业务 / Stub -->
+  <rect x="64" y="129" width="190" height="80" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="159" y="153" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">业务 / Stub</text>
+  <text x="159" y="174" font-size="11" fill="#2C4460" text-anchor="middle">同步调用或异步 done</text>
+  <text x="159" y="193" font-size="10" fill="#6B675C" text-anchor="middle">只表达方法与消息定义</text>
+
+  <!-- 箭头 1-2 -->
+  <path d="M254 169 H292" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 卡片 2: Channel / Controller -->
+  <rect x="298" y="129" width="190" height="80" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="393" y="153" font-size="13" font-weight="700" fill="#4A3F6B" text-anchor="middle">Channel / Controller</text>
+  <text x="393" y="174" font-size="11" fill="#4A3F6B" text-anchor="middle">选址 · timeout · retry</text>
+  <text x="393" y="193" font-size="10" fill="#6B675C" text-anchor="middle">创建 call id 与调用状态</text>
+
+  <!-- 箭头 2-3 -->
+  <path d="M488 169 H526" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 卡片 3: Protocol / Serializer -->
+  <rect x="532" y="129" width="190" height="80" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="627" y="153" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle">Protocol / Serializer</text>
+  <text x="627" y="174" font-size="11" fill="#6B4E28" text-anchor="middle">Protobuf · HTTP/h2</text>
+  <text x="627" y="193" font-size="10" fill="#6B675C" text-anchor="middle">framing 与 correlation 编解码</text>
+
+  <!-- 箭头 3-4 -->
+  <path d="M722 169 H760" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 卡片 4: Socket / SocketId -->
+  <rect x="766" y="129" width="190" height="80" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="861" y="153" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">Socket / SocketId</text>
+  <text x="861" y="174" font-size="11" fill="#24473F" text-anchor="middle">连接生命周期 · 引用计数</text>
+  <text x="861" y="193" font-size="10" fill="#6B675C" text-anchor="middle">MPSC 聚合写与失败传播</text>
+
+  <!-- 箭头 4-5 -->
+  <path d="M956 169 H994" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 卡片 5: Transport / fd -->
+  <rect x="1000" y="129" width="176" height="80" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="1088" y="153" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">Transport / fd</text>
+  <text x="1088" y="174" font-size="11" fill="#733428" text-anchor="middle">TCP · SSL · RDMA</text>
+  <text x="1088" y="193" font-size="10" fill="#6B675C" text-anchor="middle">内核发送队列与远端背压</text>
+
+  <!-- ============ Panel B: 收发解耦 ============ -->
+  <text x="48" y="248" font-size="13.5" font-weight="700" fill="#4A473F">B · 收发解耦：读侧 bthread 快速分发，写侧单写者批量排空</text>
+
+  <!-- 左：接收路径 -->
+  <rect x="48" y="260" width="558" height="186" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="64" y="284" font-size="12.5" font-weight="700" fill="#4A473F">接收路径：EventDispatcher 只管事件入口</text>
+
+  <rect x="64" y="300" width="108" height="52" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="118" y="322" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">epoll 事件</text>
+  <text x="118" y="341" font-size="10" fill="#6B675C" text-anchor="middle">EventDispatcher</text>
+
+  <path d="M172 326 H196" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+
+  <rect x="200" y="300" width="112" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="256" y="322" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">读取 bthread</text>
+  <text x="256" y="341" font-size="10" fill="#2C4460" text-anchor="middle">尽快 drain fd</text>
+
+  <path d="M312 326 H336" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+
+  <rect x="340" y="300" width="116" height="52" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="398" y="322" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">InputMessenger</text>
+  <text x="398" y="341" font-size="10" fill="#6B4E28" text-anchor="middle">切帧 · 识别协议</text>
+
+  <path d="M456 326 H480" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+
+  <rect x="484" y="300" width="108" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="538" y="322" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">服务 bthread</text>
+  <text x="538" y="341" font-size="10" fill="#24473F" text-anchor="middle">Process 回调</text>
+
+  <rect x="64" y="366" width="526" height="66" rx="6" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="388" font-size="10.5" font-weight="700" fill="#4A473F">并发模型提示：</text>
+  <text x="76" y="406" font-size="10.5" fill="#4A473F">· 同一 fd 上的多条完整消息可进入不同 bthread 并发处理</text>
+  <text x="76" y="422" font-size="10.5" fill="#4A473F">· 业务层不可假设同连接天然串行，顺序需协议或队列显式保证</text>
+
+  <!-- 右：发送路径 -->
+  <rect x="634" y="260" width="558" height="186" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="650" y="284" font-size="12.5" font-weight="700" fill="#4A473F">发送路径：MPSC 提交 + Single Writer / KeepWrite</text>
+
+  <!-- 3 个 Producer 栈 -->
+  <rect x="650" y="300" width="80" height="26" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="690" y="317" font-size="10" fill="#4A473F" text-anchor="middle">Producer 1</text>
+
+  <rect x="650" y="331" width="80" height="26" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="690" y="348" font-size="10" fill="#4A473F" text-anchor="middle">Producer 2</text>
+
+  <rect x="650" y="362" width="80" height="26" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="690" y="379" font-size="10" fill="#4A473F" text-anchor="middle">Producer N</text>
+
+  <!-- 连接线到 atomic exchange -->
+  <path d="M730 313 C754 313 754 336 774 336" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arrAmber)"/>
+  <path d="M730 344 H774" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arrAmber)"/>
+  <path d="M730 375 C754 375 754 352 774 352" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arrAmber)"/>
+
+  <!-- atomic exchange 节点 -->
+  <rect x="778" y="308" width="134" height="72" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="845" y="330" font-size="10" fill="#6B4E28" text-anchor="middle">atomic exchange</text>
+  <text x="845" y="349" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">_write_head</text>
+  <text x="845" y="367" font-size="9.5" fill="#6B4E28" text-anchor="middle">wait-free 提交</text>
+
+  <path d="M912 344 H944" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arrAmber)"/>
+
+  <!-- 单写者节点 -->
+  <rect x="948" y="308" width="130" height="72" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.4"/>
+  <text x="1013" y="330" font-size="12" font-weight="700" fill="#4A3F6B" text-anchor="middle">单写者</text>
+  <text x="1013" y="349" font-size="10" fill="#4A3F6B" text-anchor="middle">direct / KeepWrite</text>
+  <text x="1013" y="367" font-size="9.5" fill="#4A3F6B" text-anchor="middle">链表反转 · 收集批次</text>
+
+  <path d="M1078 344 H1108" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arrAmber)"/>
+
+  <!-- fd 节点 -->
+  <rect x="1112" y="308" width="66" height="72" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="1145" y="335" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">fd</text>
+  <text x="1145" y="356" font-size="10" fill="#733428" text-anchor="middle">batch</text>
+
+  <text x="913" y="408" font-size="10.5" fill="#6B675C" text-anchor="middle">生产者提交后立即返回；单写者负责顺序、partial write 与 EPOLLOUT 续写</text>
+  <text x="913" y="425" font-size="10" fill="#733428" text-anchor="middle">批写入上限 DATA_LIST_MAX = 256（源码实现细节）</text>
+
+  <!-- ============ Panel C: 三大核心性能机制 ============ -->
+  <text x="48" y="470" font-size="13.5" font-weight="700" fill="#4A473F">C · 三大核心性能机制：M:N 调度、版本化门闩与 TLS 监控</text>
+
+  <!-- Col 1: bthread -->
+  <rect x="48" y="482" width="364" height="268" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="64" y="506" font-size="12.5" font-weight="700" fill="#2C4460">bthread：M:N + Work Stealing</text>
+  <text x="64" y="524" font-size="10.5" fill="#6B675C">M 个逻辑任务复用 N 个 pthread worker</text>
+
+  <!-- bthread 队列泡泡 -->
+  <rect x="64" y="538" width="58" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="93" y="556" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">bth A</text>
+  <rect x="130" y="538" width="58" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="159" y="556" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">bth B</text>
+  <rect x="196" y="538" width="58" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="225" y="556" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">bth C</text>
+  <rect x="262" y="538" width="58" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="291" y="556" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">bth D</text>
+  <rect x="328" y="538" width="54" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="355" y="556" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">…</text>
+
+  <!-- 下发箭头 -->
+  <path d="M93 566 V590" fill="none" stroke="#3D5A80" stroke-width="1.4" marker-end="url(#arrBlue)"/>
+  <path d="M159 566 C159 580 230 580 230 590" fill="none" stroke="#3D5A80" stroke-width="1.4" marker-end="url(#arrBlue)"/>
+  <path d="M225 566 V590" fill="none" stroke="#3D5A80" stroke-width="1.4" marker-end="url(#arrBlue)"/>
+  <path d="M291 566 C291 580 340 580 340 590" fill="none" stroke="#3D5A80" stroke-width="1.4" marker-end="url(#arrBlue)"/>
+
+  <!-- 3 个 worker -->
+  <rect x="64" y="596" width="102" height="74" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="115" y="618" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">pthread W1</text>
+  <rect x="74" y="630" width="82" height="26" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="115" y="647" font-size="9.5" fill="#4A473F" text-anchor="middle">local _rq</text>
+
+  <rect x="179" y="596" width="102" height="74" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="230" y="618" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">pthread W2</text>
+  <rect x="189" y="630" width="82" height="26" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="230" y="647" font-size="9.5" fill="#4A473F" text-anchor="middle">local _rq</text>
+
+  <rect x="294" y="596" width="102" height="74" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="345" y="618" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">pthread W3</text>
+  <rect x="304" y="630" width="82" height="26" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="345" y="647" font-size="9.5" fill="#4A473F" text-anchor="middle">local _rq</text>
+
+  <!-- 工作窃取虚线弧线 -->
+  <path d="M345 670 C310 706 255 706 235 678" fill="none" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <text x="280" y="705" font-size="9.5" fill="#6B675C" text-anchor="middle">steal_task() 随机工作窃取</text>
+  <text x="230" y="736" font-size="10" fill="#733428" text-anchor="middle">普通阻塞 syscall 会卡住底层 worker！</text>
+
+  <!-- Col 2: bthread_id -->
+  <rect x="438" y="482" width="364" height="268" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="454" y="506" font-size="12.5" font-weight="700" fill="#4A3F6B">bthread_id：slot + version</text>
+  <text x="454" y="524" font-size="10.5" fill="#6B675C">O(1) 定位上下文，版本号杜绝 ABA 误杀</text>
+
+  <!-- 64 位结构示意 -->
+  <rect x="454" y="538" width="162" height="36" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="535" y="560" font-size="10.5" font-weight="700" fill="#4A3F6B" text-anchor="middle">high 32: slot 槽位</text>
+
+  <rect x="622" y="538" width="164" height="36" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="704" y="560" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">low 32: version 代数</text>
+
+  <!-- 三个并发事件 -->
+  <rect x="454" y="594" width="86" height="24" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="497" y="610" font-size="9.5" fill="#2C4460" text-anchor="middle">Response</text>
+
+  <rect x="454" y="624" width="86" height="24" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+  <text x="497" y="640" font-size="9.5" fill="#6B4E28" text-anchor="middle">Timeout</text>
+
+  <rect x="454" y="654" width="86" height="24" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="497" y="670" font-size="9.5" fill="#733428" text-anchor="middle">Cancel</text>
+
+  <path d="M540 606 H572" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <path d="M540 636 H572" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+  <path d="M540 666 H572" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- per-ID 门闩 -->
+  <rect x="576" y="594" width="112" height="84" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="632" y="618" font-size="11" font-weight="700" fill="#4A3F6B" text-anchor="middle">per-ID 门闩</text>
+  <text x="632" y="638" font-size="9.5" fill="#4A3F6B" text-anchor="middle">mutex · butex</text>
+  <text x="632" y="658" font-size="9.5" fill="#733428" text-anchor="middle">pending error</text>
+
+  <path d="M688 636 H714" fill="none" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- 唯一终态 -->
+  <rect x="718" y="594" width="68" height="84" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="752" y="625" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">唯一</text>
+  <text x="752" y="645" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">终态</text>
+  <text x="752" y="665" font-size="9.5" fill="#24473F" text-anchor="middle">Controller</text>
+
+  <text x="620" y="705" font-size="10" fill="#6B675C" text-anchor="middle">非全路径 lock-free：通过细粒度门闩化解全局锁</text>
+  <text x="620" y="726" font-size="10" fill="#6B675C" text-anchor="middle">终态确立前 about_to_destroy 拦截迟到 locker</text>
+
+  <!-- Col 3: bvar -->
+  <rect x="828" y="482" width="364" height="268" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="844" y="506" font-size="12.5" font-weight="700" fill="#24473F">bvar：TLS 分片写，读取时合并</text>
+  <text x="844" y="524" font-size="10.5" fill="#6B675C">把 cache line 争用从高频写搬到低频读</text>
+
+  <!-- 3 个 Thread -->
+  <rect x="844" y="542" width="76" height="28" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="882" y="560" font-size="10" fill="#4A473F" text-anchor="middle">Thread A</text>
+
+  <rect x="844" y="580" width="76" height="28" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="882" y="598" font-size="10" fill="#4A473F" text-anchor="middle">Thread B</text>
+
+  <rect x="844" y="618" width="76" height="28" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+  <text x="882" y="636" font-size="10" fill="#4A473F" text-anchor="middle">Thread C</text>
+
+  <!-- 对应 TLS agent -->
+  <path d="M920 556 H944" fill="none" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrGreen)"/>
+  <path d="M920 594 H944" fill="none" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrGreen)"/>
+  <path d="M920 632 H944" fill="none" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrGreen)"/>
+
+  <rect x="948" y="542" width="96" height="28" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="996" y="560" font-size="9.5" fill="#24473F" text-anchor="middle">TLS agent A</text>
+
+  <rect x="948" y="580" width="96" height="28" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="996" y="598" font-size="9.5" fill="#24473F" text-anchor="middle">TLS agent B</text>
+
+  <rect x="948" y="618" width="96" height="28" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="996" y="636" font-size="9.5" fill="#24473F" text-anchor="middle">TLS agent C</text>
+
+  <!-- 合并箭头到 combine -->
+  <path d="M1044 556 C1062 556 1062 584 1074 584" fill="none" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arrAmber)"/>
+  <path d="M1044 594 H1074" fill="none" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arrAmber)"/>
+  <path d="M1044 632 C1062 632 1062 604 1074 604" fill="none" stroke="#8A6A3A" stroke-width="1.4" marker-end="url(#arrAmber)"/>
+
+  <rect x="1078" y="556" width="98" height="74" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="1127" y="580" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">combine</text>
+  <text x="1127" y="600" font-size="9.5" fill="#6B4E28" text-anchor="middle">/vars · sampler</text>
+  <text x="1127" y="618" font-size="9.5" fill="#6B4E28" text-anchor="middle">低频读合并</text>
+
+  <text x="1010" y="680" font-size="10" fill="#6B675C" text-anchor="middle">适合监控埋点；不适合强一致即时控制逻辑</text>
+  <text x="1010" y="700" font-size="10" fill="#6B675C" text-anchor="middle">常见写路径低竞争，但初次建 agent 与合并仍有开销</text>
+
+  <!-- ============ Band D: 底部三个边界提示 ============ -->
+  <rect x="48" y="766" width="364" height="66" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="230" y="790" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">术语边界：bthread_id ≠ lock-free</text>
+  <text x="230" y="812" font-size="10.2" fill="#6B4E28" text-anchor="middle">用 per-ID 细粒度门闩代替全局互斥哈希表</text>
+
+  <rect x="438" y="766" width="364" height="66" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="620" y="790" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">写路径边界：提交 wait-free ≠ I/O 不等待</text>
+  <text x="620" y="812" font-size="10.2" fill="#2C4460" text-anchor="middle">writer 仍受连接建立、SSL、EPOLLOUT 与内核背压约束</text>
+
+  <rect x="828" y="766" width="364" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1010" y="790" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">性能方法：把争用移出 common case</text>
+  <text x="1010" y="812" font-size="10.2" fill="#24473F" text-anchor="middle">局部化、版本化、批处理，让无竞争热路径极短</text>
+</svg>
