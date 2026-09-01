@@ -1,0 +1,203 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>KV Cache Chunk 生命周期状态机</title>
+  <desc>展示从 Reserved 到 Released 的正常推进链路，以及 Retryable、Recompute、Cancelled 异常分支与自愈环，配合四大架构不变量。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 背景画布 -->
+  <rect x="0" y="0" width="1240" height="820" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">KV Cache Chunk 状态机：从预留到安全释放的生命周期</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">主干链路：目标预留 → 生产就绪 → 传输在途 → 校验提交 → 解码准入；异常分支受 Generation 与重试预算闭环约束</text>
+
+  <!-- ============ Panel A: 正常流转主干 (Happy Path) ============ -->
+  <rect x="48" y="94" width="1144" height="150" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 主干快路径流转：Chunk 逐级推进</text>
+
+  <!-- 初始点 [*] -->
+  <circle cx="78" cy="180" r="8" fill="#4A473F"/>
+  <path d="M86,180 L112,180" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="99" y="166" font-size="9.5" fill="#6B675C" text-anchor="middle">分配</text>
+
+  <!-- 1. Reserved -->
+  <rect x="114" y="148" width="110" height="64" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.2"/>
+  <text x="169" y="168" font-size="12" font-weight="700" fill="#3C3489" text-anchor="middle">Reserved</text>
+  <text x="169" y="186" font-size="9.5" fill="#3C3489" text-anchor="middle">预留 Slot+Credit</text>
+  <text x="169" y="200" font-size="9.5" fill="#6B675C" text-anchor="middle">绑定 Generation</text>
+
+  <path d="M224,180 L256,180" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <text x="240" y="166" font-size="9.5" fill="#3D5A80" text-anchor="middle">开始写</text>
+
+  <!-- 2. Producing -->
+  <rect x="258" y="148" width="110" height="64" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="313" y="168" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">Producing</text>
+  <text x="313" y="186" font-size="9.5" fill="#2C4460" text-anchor="middle">Prefill 写入 HBM</text>
+  <text x="313" y="200" font-size="9.5" fill="#6B675C" text-anchor="middle">计算未决态</text>
+
+  <path d="M368,180 L400,180" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <text x="384" y="166" font-size="9.5" fill="#3D5A80" text-anchor="middle">CUDA Event</text>
+
+  <!-- 3. ReadyLocal -->
+  <rect x="402" y="148" width="110" height="64" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="457" y="168" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">ReadyLocal</text>
+  <text x="457" y="186" font-size="9.5" fill="#24473F" text-anchor="middle">本地写入完成</text>
+  <text x="457" y="200" font-size="9.5" fill="#6B675C" text-anchor="middle">只读不可变</text>
+
+  <path d="M512,180 L544,180" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="528" y="166" font-size="9.5" fill="#2F6B5E" text-anchor="middle">post RDMA</text>
+
+  <!-- 4. InFlight -->
+  <rect x="546" y="148" width="110" height="64" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="601" y="168" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">InFlight</text>
+  <text x="601" y="186" font-size="9.5" fill="#24473F" text-anchor="middle">网络多 Rail 传输</text>
+  <text x="601" y="200" font-size="9.5" fill="#6B675C" text-anchor="middle">占在途 Credit</text>
+
+  <path d="M656,180 L688,180" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="672" y="166" font-size="9.5" fill="#2F6B5E" text-anchor="middle">CQE / 通知</text>
+
+  <!-- 5. Arrived -->
+  <rect x="690" y="148" width="110" height="64" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="745" y="168" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Arrived</text>
+  <text x="745" y="186" font-size="9.5" fill="#24473F" text-anchor="middle">DMA 写入目标</text>
+  <text x="745" y="200" font-size="9.5" fill="#6B675C" text-anchor="middle">待可见性同步</text>
+
+  <path d="M800,180 L832,180" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="816" y="166" font-size="9.5" fill="#2F6B5E" text-anchor="middle">校验发布</text>
+
+  <!-- 6. Committed -->
+  <rect x="834" y="148" width="112" height="64" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="890" y="168" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">Committed</text>
+  <text x="890" y="186" font-size="9.5" fill="#24473F" text-anchor="middle">Ready 位图发布</text>
+  <text x="890" y="200" font-size="9.5" fill="#6B675C" text-anchor="middle">回 Commit ACK</text>
+
+  <path d="M946,180 L978,180" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="962" y="166" font-size="9.5" fill="#2F6B5E" text-anchor="middle">全请求 Barrier</text>
+
+  <!-- 7. DecodeReady -->
+  <rect x="980" y="148" width="112" height="64" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1036" y="168" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">DecodeReady</text>
+  <text x="1036" y="186" font-size="9.5" fill="#24473F" text-anchor="middle">准入 Decode 批</text>
+  <text x="1036" y="200" font-size="9.5" fill="#6B675C" text-anchor="middle">首 Token 就绪</text>
+
+  <path d="M1092,180 L1120,180" fill="none" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="1106" y="166" font-size="9.5" fill="#5A564B" text-anchor="middle">结束</text>
+
+  <!-- 8. Released (Terminal) -->
+  <circle cx="1134" cy="180" r="9" fill="none" stroke="#4A473F" stroke-width="2"/>
+  <circle cx="1134" cy="180" r="5" fill="#4A473F"/>
+
+  <!-- ============ Panel B: 异常处理、重试环与安全清理 ============ -->
+  <rect x="48" y="260" width="1144" height="270" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="284" font-size="13" font-weight="700" fill="#4A473F">B · 异常分支、自愈重投与作废清理流</text>
+
+  <!-- 异常状态 1: Cancelled -->
+  <rect x="160" y="324" width="190" height="66" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="255" y="346" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">Cancelled（作废态）</text>
+  <text x="255" y="364" font-size="9.5" fill="#733428" text-anchor="middle">作废 Generation 编号</text>
+  <text x="255" y="378" font-size="9.5" fill="#6B675C" text-anchor="middle">超时 / 路由变更 / 客户端取消</text>
+
+  <!-- 异常状态 2: Retryable -->
+  <rect x="506" y="324" width="190" height="66" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="601" y="346" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">Retryable（重试待命）</text>
+  <text x="601" y="364" font-size="9.5" fill="#6B4E28" text-anchor="middle">链路中断 / QP Error</text>
+  <text x="601" y="378" font-size="9.5" fill="#6B675C" text-anchor="middle">核算剩余 TTFT 预算</text>
+
+  <!-- 异常状态 3: Recompute -->
+  <rect x="760" y="324" width="190" height="66" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="855" y="346" font-size="12" font-weight="700" fill="#733428" text-anchor="middle">Recompute（重算接管）</text>
+  <text x="855" y="364" font-size="9.5" fill="#733428" text-anchor="middle">重新 Prefill 算力生成</text>
+  <text x="855" y="378" font-size="9.5" fill="#6B675C" text-anchor="middle">无有效副本 / 重试超限</text>
+
+  <!-- 连线：Reserved -> Cancelled (垂直下行) -->
+  <path d="M169,212 L169,296 L205,296 L205,316" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr-red)"/>
+  <text x="135" y="278" font-size="9.5" fill="#A64B3C" text-anchor="middle">deadline 超时</text>
+
+  <!-- 连线：Producing -> Cancelled (垂直下行) -->
+  <path d="M313,212 L313,296 L285,296 L285,316" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr-red)"/>
+  <text x="350" y="278" font-size="9.5" fill="#A64B3C" text-anchor="middle">客户端取消</text>
+
+  <!-- 连线：InFlight -> Retryable (垂直下行) -->
+  <path d="M601,212 L601,316" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arr-amber)"/>
+  <text x="612" y="278" font-size="9.5" fill="#8A6A3A" text-anchor="start">path / QP 故障</text>
+
+  <!-- 连线：Retryable -> InFlight (左侧自愈弧线) -->
+  <path d="M530,324 C480,275 480,240 540,216" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+  <text x="460" y="260" font-size="9.5" fill="#2F6B5E" text-anchor="middle">换 Rail / 重投</text>
+
+  <!-- 连线：Retryable -> Recompute (水平向右) -->
+  <path d="M696,357 L752,357" fill="none" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr-red)"/>
+  <text x="728" y="347" font-size="9.5" fill="#A64B3C" text-anchor="middle">无副本/预算不足</text>
+
+  <!-- 连线：Cancelled -> Released (底部专用走线通道 y=440) -->
+  <path d="M255,390 L255,440 L1134,440 L1134,198" fill="none" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <text x="268" y="432" font-size="9.5" fill="#4A473F" text-anchor="start">作废代次后释放 Slot 与源保留区</text>
+
+  <!-- 连线：Recompute -> Released (下行汇入通道 y=440) -->
+  <path d="M855,390 L855,440" fill="none" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="866" y="425" font-size="9.5" fill="#4A473F" text-anchor="start">原 Chunk 作废清理</text>
+
+  <!-- Panel B 说明文字 (避开走线区) -->
+  <text x="68" y="482" font-size="10.5" fill="#4A473F">· 幂等重试：相同 Generation 仅覆盖未提交区，一致直接 ACK</text>
+  <text x="68" y="504" font-size="10.5" fill="#4A473F">· 源端保留：收到 Commit ACK 前保持只读，严禁提前释放显存</text>
+
+  <!-- ============ Panel C: 关键状态所有权与内存驻留 ============ -->
+  <rect x="48" y="546" width="560" height="190" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="68" y="570" font-size="12.5" font-weight="700" fill="#2C4460">C · 关键状态所有权与内存驻留</text>
+  <line x1="68" y1="580" x2="588" y2="580" stroke="#3D5A80" stroke-width="0.8" stroke-opacity="0.4"/>
+
+  <text x="68" y="602" font-size="10.5" font-weight="700" fill="#2C4460">Reserved</text>
+  <text x="160" y="602" font-size="10" fill="#2C4460">Decode 节点</text>
+  <text x="260" y="602" font-size="10" fill="#2C4460">目标 HBM / DRAM 预留槽位</text>
+
+  <text x="68" y="626" font-size="10.5" font-weight="700" fill="#2C4460">ReadyLocal</text>
+  <text x="160" y="626" font-size="10" fill="#2C4460">Prefill 节点</text>
+  <text x="260" y="626" font-size="10" fill="#2C4460">源 HBM Slab（CUDA 写入完成）</text>
+
+  <text x="68" y="650" font-size="10.5" font-weight="700" fill="#2C4460">InFlight</text>
+  <text x="160" y="650" font-size="10" fill="#2C4460">Transfer Engine</text>
+  <text x="260" y="650" font-size="10" fill="#2C4460">RDMA Fabric 在途（占 Rail Credit）</text>
+
+  <text x="68" y="674" font-size="10.5" font-weight="700" fill="#2C4460">Committed</text>
+  <text x="160" y="674" font-size="10" fill="#2C4460">Decode 节点</text>
+  <text x="260" y="674" font-size="10" fill="#2C4460">已校验发布，对 Kernel 可读</text>
+
+  <text x="68" y="706" font-size="9.5" fill="#6B675C">DecodeReady 等待全请求 Barrier；Released 归还所有槽位</text>
+
+  <!-- ============ Panel D: 四大核心不变量 ============ -->
+  <rect x="632" y="546" width="560" height="190" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="652" y="570" font-size="12.5" font-weight="700" fill="#24473F">D · 系统四大核心不变量</text>
+  <line x1="652" y1="580" x2="1172" y2="580" stroke="#2F6B5E" stroke-width="0.8" stroke-opacity="0.4"/>
+
+  <text x="652" y="602" font-size="10.5" font-weight="700" fill="#24473F">① 无 Reservation 不传</text>
+  <text x="820" y="602" font-size="10" fill="#24473F">下游无容量令牌，严禁盲推流量</text>
+
+  <text x="652" y="626" font-size="10.5" font-weight="700" fill="#24473F">② 无 Generation 不写</text>
+  <text x="820" y="626" font-size="10" fill="#24473F">防止超时旧包污染已复用的新槽位</text>
+
+  <text x="652" y="650" font-size="10.5" font-weight="700" fill="#24473F">③ 无 Commit 不释放源副本</text>
+  <text x="820" y="650" font-size="10" fill="#24473F">CQE ≠ 业务完成，未 ACK 前保持保留</text>
+
+  <text x="652" y="674" font-size="10.5" font-weight="700" fill="#24473F">④ 无 SLO 预算不慢重试</text>
+  <text x="820" y="674" font-size="10" fill="#24473F">预算不足立即快速拒绝，保护集群</text>
+
+  <text x="652" y="706" font-size="9.5" fill="#6B675C">任何降级操作都先核算剩余 TTFT，不做无界慢排队</text>
+
+  <!-- 底部口径 -->
+  <text x="48" y="760" font-size="11" fill="#4A473F">【读图指南】遵循从左至右正常提交主干；故障时沿琥珀/红分支自愈或重算；Generation 与 Commit 构筑正确性底线。</text>
+</svg>

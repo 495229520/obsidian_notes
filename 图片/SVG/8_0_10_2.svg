@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Linux CXL 异构内存分层与页面迁移闭环</title>
+  <desc>展示 Type-3 容量经 HDM Decoder、CXL Region、DAX 转成 Device DAX 或 System RAM；中部展示 DRAM Top-tier 与 CXL Bottom-tier；右侧比较 AutoNUMA 与 DAMON/DAMOS 的观察、决策、迁移和反馈闭环；底部说明迁移收益判据与边界。</desc>
+  <defs>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/></marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/></marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/></marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker>
+  </defs>
+
+  <!-- 全局背景 -->
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部主副标题 -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">Linux CXL 分层内存：接入路径与冷热迁移控制环</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">容量经 DAX 接入页分配器；HMAT/CDAT 确立 Tier 坐标；AutoNUMA 与 DAMON/DAMOS 构成反馈闭环</text>
+
+  <!-- ==================== Panel A ==================== -->
+  <text x="48" y="106" font-size="13" font-weight="700" fill="#4A473F">A · 设备容量如何接入 Linux 内存子系统（硬件 → 区域 → 分配器）</text>
+  <rect x="48" y="118" width="1144" height="154" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Step 1: Type-3 Memdev -->
+  <rect x="68" y="132" width="145" height="126" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="140" y="156" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Type-3 Memdev</text>
+  <text x="140" y="176" font-size="10.5" fill="#2F6B5E" text-anchor="middle">物理 HDM 介质</text>
+  <text x="140" y="194" font-size="10" fill="#4A473F" text-anchor="middle">DRAM / 持久内存</text>
+  <text x="140" y="212" font-size="10" fill="#4A473F" text-anchor="middle">CXL.io + CXL.mem</text>
+  <text x="140" y="236" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">[DPA 设备物理寻址]</text>
+
+  <path d="M213,195 L248,195" fill="none" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrg)"/>
+
+  <!-- Step 2: HDM Decoders -->
+  <rect x="248" y="132" width="150" height="126" rx="8" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="323" y="156" font-size="12.5" font-weight="700" fill="#4A473F" text-anchor="middle">HDM Decoders</text>
+  <text x="323" y="176" font-size="10.5" fill="#6B675C" text-anchor="middle">硬件解码器配置</text>
+  <text x="323" y="194" font-size="10" fill="#4A473F" text-anchor="middle">HPA ➔ Port / DPA</text>
+  <text x="323" y="212" font-size="10" fill="#6B675C" text-anchor="middle">支持 Interleave 条带化</text>
+  <text x="323" y="236" font-size="9.5" font-weight="700" fill="#4A473F" text-anchor="middle">[HPA 主机物理地址]</text>
+
+  <path d="M398,195 L433,195" fill="none" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrg)"/>
+
+  <!-- Step 3: CXL Region -->
+  <rect x="433" y="132" width="145" height="126" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="505" y="156" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">CXL Region</text>
+  <text x="505" y="176" font-size="10.5" fill="#3D5A80" text-anchor="middle">Linux cxl core</text>
+  <text x="505" y="194" font-size="10" fill="#4A473F" text-anchor="middle">逻辑连续内存区域</text>
+  <text x="505" y="212" font-size="10" fill="#4A473F" text-anchor="middle">聚合单/多 memdev</text>
+  <text x="505" y="236" font-size="9.5" font-weight="700" fill="#2C4460" text-anchor="middle">[/sys/bus/cxl]</text>
+
+  <path d="M578,195 L613,195" fill="none" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrb)"/>
+
+  <!-- Step 4: DAX Region -->
+  <rect x="613" y="132" width="140" height="126" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="683" y="156" font-size="12.5" font-weight="700" fill="#2C4460" text-anchor="middle">DAX Region</text>
+  <text x="683" y="176" font-size="10.5" fill="#3D5A80" text-anchor="middle">统一转换层抽象</text>
+  <text x="683" y="194" font-size="10" fill="#4A473F" text-anchor="middle">daxctl / cxl-cli</text>
+  <text x="683" y="212" font-size="10" fill="#4A473F" text-anchor="middle">选择暴露形态</text>
+  <text x="683" y="236" font-size="9.5" font-weight="700" fill="#3D5A80" text-anchor="middle">[模式分流入口]</text>
+
+  <!-- Split Paths -->
+  <path d="M753,176 L795,155" fill="none" stroke="#8A6A3A" stroke-width="1.8" marker-end="url(#arra)"/>
+  <path d="M753,214 L795,232" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <!-- Step 5A: Device DAX -->
+  <rect x="795" y="128" width="375" height="58" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="810" y="149" font-size="11.5" font-weight="700" fill="#6B4E28">Device DAX · /dev/daxN.Y (显式专用)</text>
+  <text x="810" y="169" font-size="9.8" fill="#6B4E28">• 应用 mmap() 直接寻址 ｜ 绕过页分配器 ｜ 专用引擎</text>
+
+  <!-- Step 5B: System RAM -->
+  <rect x="795" y="194" width="375" height="66" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="810" y="215" font-size="11.5" font-weight="700" fill="#24473F">System RAM · dax_kmem (透明分层)</text>
+  <text x="810" y="234" font-size="10" fill="#2F6B5E">• 内存热插拔入伙伴系统 ｜ 注册为 CPU-less 节点</text>
+  <text x="810" y="249" font-size="9.5" fill="#24473F">• Linux 透明分层 (Memory Tiering) 的物理基石</text>
+
+
+  <!-- ==================== Panels B & C ==================== -->
+  <!-- Panel B: Two-Tier Architecture -->
+  <text x="48" y="294" font-size="13" font-weight="700" fill="#4A473F">B · 两层地址空间模型：Top-tier 与 Bottom-tier</text>
+  <rect x="48" y="306" width="560" height="364" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Top-tier DRAM Node -->
+  <rect x="68" y="320" width="520" height="114" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="88" y="344" font-size="13" font-weight="700" fill="#24473F">Top-tier · 本地 DRAM 节点 (Node 0/1)</text>
+  <text x="88" y="364" font-size="10.5" fill="#2F6B5E">延迟 ~80-120 ns ｜ 本地直连高带宽 ｜ 容量稀缺预留余量</text>
+
+  <!-- Hot Chips -->
+  <rect x="88" y="376" width="112" height="42" rx="5" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="144" y="394" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">Hot Code/Stack</text>
+  <text x="144" y="410" font-size="9.5" fill="#2F6B5E" text-anchor="middle">高频指令与栈</text>
+
+  <rect x="208" y="376" width="112" height="42" rx="5" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="264" y="394" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">Hot Anon Pages</text>
+  <text x="264" y="410" font-size="9.5" fill="#2F6B5E" text-anchor="middle">活跃堆变量</text>
+
+  <rect x="328" y="376" width="112" height="42" rx="5" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="384" y="394" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">Tree / Index</text>
+  <text x="384" y="410" font-size="9.5" fill="#2F6B5E" text-anchor="middle">高频索引与指针</text>
+
+  <rect x="448" y="376" width="124" height="42" rx="5" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="510" y="394" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">New Allocation</text>
+  <text x="510" y="410" font-size="9.5" fill="#2F6B5E" text-anchor="middle">首触与临时缓冲</text>
+
+  <!-- Migration Flow in Middle -->
+  <rect x="68" y="442" width="520" height="38" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <path d="M190,470 L190,450" fill="none" stroke="#A64B3C" stroke-width="2" marker-end="url(#arrr)"/>
+  <text x="90" y="465" font-size="10" font-weight="700" fill="#733428">Promote 提升 ↑ (NUMA Fault / migrate_hot)</text>
+
+  <path d="M470,450 L470,470" fill="none" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrb)"/>
+  <text x="330" y="465" font-size="10" font-weight="700" fill="#2C4460">Demote 降级 ↓ (reclaim / migrate_cold)</text>
+
+  <!-- Bottom-tier CXL Node -->
+  <rect x="68" y="488" width="520" height="114" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="88" y="512" font-size="13" font-weight="700" fill="#2C4460">Bottom-tier · CXL 内存节点 (CPU-less)</text>
+  <text x="88" y="532" font-size="10.5" fill="#3D5A80">延迟 ~200-300 ns ｜ 扩展总线大容量 ｜ 冷页沉淀层</text>
+
+  <!-- Cold Chips -->
+  <rect x="88" y="544" width="112" height="42" rx="5" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <text x="144" y="562" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">Cold Anon Pages</text>
+  <text x="144" y="578" font-size="9.5" fill="#3D5A80" text-anchor="middle">低频访问堆数据</text>
+
+  <rect x="208" y="544" width="112" height="42" rx="5" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <text x="264" y="562" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">Clean PageCache</text>
+  <text x="264" y="578" font-size="9.5" fill="#3D5A80" text-anchor="middle">只读文件页缓存</text>
+
+  <rect x="328" y="544" width="112" height="42" rx="5" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <text x="384" y="562" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">Idle KV Objects</text>
+  <text x="384" y="578" font-size="9.5" fill="#3D5A80" text-anchor="middle">长尾非活跃对象</text>
+
+  <rect x="448" y="544" width="124" height="42" rx="5" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1"/>
+  <text x="510" y="562" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">Scan Stream</text>
+  <text x="510" y="578" font-size="9.5" fill="#3D5A80" text-anchor="middle">高 MLP 批量扫描</text>
+
+  <!-- Coordinates Info Box -->
+  <rect x="68" y="610" width="520" height="48" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="80" y="629" font-size="10" fill="#4A473F">• 排序基准：SRAT / HMAT / CDAT 建立访问坐标</text>
+  <text x="80" y="647" font-size="10" fill="#6B675C">• 避坑提示：NUMA distance 仅为相对权重，非真实延迟</text>
+
+  <!-- Panel C: Control Loop -->
+  <text x="632" y="294" font-size="13" font-weight="700" fill="#4A473F">C · 观察—决策—迁移—反馈控制闭环</text>
+  <rect x="632" y="306" width="560" height="364" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Scheme 1: AutoNUMA -->
+  <rect x="650" y="320" width="250" height="106" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="775" y="342" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">AutoNUMA / Tiering</text>
+  <text x="662" y="362" font-size="10" fill="#4A473F">• 机制：周期 unmap 采样映射</text>
+  <text x="662" y="380" font-size="10" fill="#4A473F">• 信号：访问触发 Hinting Fault</text>
+  <text x="662" y="398" font-size="10" fill="#4A473F">• 动作：内核异步提升热页到快层</text>
+  <text x="662" y="415" font-size="9.5" fill="#3D5A80">• 特性：通用启发式、应用透明</text>
+
+  <!-- Scheme 2: DAMON + DAMOS -->
+  <rect x="922" y="320" width="250" height="106" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="1047" y="342" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">DAMON + DAMOS</text>
+  <text x="934" y="362" font-size="10" fill="#4A473F">• 机制：基于 Region 自适应抽样</text>
+  <text x="934" y="380" font-size="10" fill="#4A473F">• 信号：access_frequency + age</text>
+  <text x="934" y="398" font-size="10" fill="#4A473F">• 动作：DAMOS 方案执行迁移</text>
+  <text x="934" y="415" font-size="9.5" fill="#8A6A3A">• 特性：开销有界、支持 Quota 约束</text>
+
+  <!-- Connectors to Policy -->
+  <path d="M775,426 L775,440" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrb)"/>
+  <path d="M1047,426 L1047,440" fill="none" stroke="#8A6A3A" stroke-width="1.8" marker-end="url(#arra)"/>
+
+  <!-- Placement Policy Engine -->
+  <rect x="650" y="440" width="522" height="66" rx="7" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="911" y="460" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">Placement Policy 决策与仲裁中心</text>
+  <text x="911" y="478" font-size="10" fill="#4A473F" text-anchor="middle">热冷阈值判定 ｜ 迟滞设计 (Hysteresis) ｜ 冷却窗口</text>
+  <text x="911" y="494" font-size="9.5" fill="#6B675C" text-anchor="middle">速率配额控制：numa_balancing_promote_rate_limit</text>
+
+  <path d="M911,506 L911,518" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrg)"/>
+
+  <!-- Migration Execution Layer -->
+  <rect x="650" y="518" width="522" height="64" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="911" y="538" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">页面迁移执行动作 (migrate_pages / TPP)</text>
+  <text x="911" y="557" font-size="9.8" fill="#24473F" text-anchor="middle">① 隔离源页 ➔ ② 目标分配 ➔ ③ 拷贝 ➔ ④ 刷TLB ➔ ⑤ 释放</text>
+  <text x="911" y="572" font-size="9.5" fill="#2F6B5E" text-anchor="middle">提升：migrate_hot (热页上浮) ｜ 降级：reclaim demote (冷页下沉)</text>
+
+  <!-- Dynamic Feedback -->
+  <rect x="650" y="592" width="522" height="66" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="665" y="612" font-size="11" font-weight="700" fill="#733428">动态反馈与自适应抑制 (Feedback Control)</text>
+  <text x="665" y="630" font-size="10" fill="#733428">• 实时监控：p99 尾延迟、TLB 刷新频率与总线争用</text>
+  <text x="665" y="647" font-size="9.8" fill="#A64B3C">• 负反馈调优：延迟抖动时自动节流，防迁移风暴</text>
+
+
+  <!-- ==================== Panel D ==================== -->
+  <text x="48" y="686" font-size="13" font-weight="700" fill="#4A473F">D · 页面迁移收益判据与系统工程边界</text>
+  <rect x="48" y="698" width="1144" height="124" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Card 1: Economic Formula -->
+  <rect x="68" y="708" width="360" height="102" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="84" y="728" font-size="11.5" font-weight="700" fill="#2C4460">迁移收益判据（不亏本原则）</text>
+  <text x="84" y="747" font-size="10" font-weight="700" fill="#2C4460">未来访问收益：N_access × (L_CXL − L_DRAM)</text>
+  <text x="84" y="764" font-size="10" fill="#4A473F">必须大于 迁移成本：</text>
+  <text x="84" y="781" font-size="9.8" fill="#733428">页复制时间 + PTE更新 + TLB刷新 + 链路总线争用</text>
+  <text x="84" y="798" font-size="9.5" font-weight="700" fill="#3D5A80">结论：只有持续高频热页才值得发起迁移</text>
+
+  <!-- Card 2: Stability Mechanisms -->
+  <rect x="448" y="708" width="360" height="102" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="464" y="728" font-size="11.5" font-weight="700" fill="#24473F">防 Ping-Pong 抖动与稳态机制</text>
+  <text x="464" y="747" font-size="10" fill="#24473F">• 访问时间窗口 (Age)：过滤瞬态突发访问</text>
+  <text x="464" y="764" font-size="10" fill="#24473F">• 迟滞设计：提升阈值显著高于降级阈值</text>
+  <text x="464" y="781" font-size="10" fill="#24473F">• 速率配额：Rate Limit / Quota 保护总线带宽</text>
+  <text x="464" y="798" font-size="9.5" fill="#2F6B5E">• 预留空间：Top-tier 必须维持最低可用余量</text>
+
+  <!-- Card 3: Boundary Constraints -->
+  <rect x="828" y="708" width="344" height="102" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="844" y="728" font-size="11.5" font-weight="700" fill="#733428">硬件与内核边界约束</text>
+  <text x="844" y="747" font-size="10" fill="#733428">• 不可迁移页：Pinned / mlocked / DMA 映射页</text>
+  <text x="844" y="764" font-size="10" fill="#733428">• 大页放大：THP 2MB 页迁移开销大、易子页伪热</text>
+  <text x="844" y="781" font-size="10" fill="#733428">• 隔离与拓扑：cgroup/cpuset 约束与跨 Switch 拥塞</text>
+  <text x="844" y="798" font-size="9.5" fill="#A64B3C">• 固件依赖：ACPI HMAT 缺失将导致 Tier 识别失效</text>
+
+  <!-- Bottom Summary Line -->
+  <text x="48" y="844" font-size="10.8" fill="#6B675C">记忆：AutoNUMA 用 fault 找热页；reclaim/demotion 释放快层；DAMON 画热度图，DAMOS 执行策略</text>
+</svg>

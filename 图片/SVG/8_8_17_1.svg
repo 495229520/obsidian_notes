@@ -1,0 +1,231 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>万卡集群 Checkpoint 的三级下刷与提交门限</title>
+  <desc>训练安全快照从 GPU HBM 复制到 Host Pinned Memory，再下刷到本地 NVMe 或机架级 NVMe-oF 快速池，最终写入 3FS、Ceph、HDFS 或 S3，并通过 manifest 提交。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect x="0" y="0" width="1240" height="820" fill="rgb(245, 244, 237)"/>
+
+  <!-- 主副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">万卡集群 Checkpoint：三级下刷、四层介质、五道生命周期门</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">目标不是让字节消失，而是把长尾持久化移出训练关键路径，并保留确定可验证的恢复语义</text>
+
+  <!-- ================= PANEL A ================= -->
+  <text x="48" y="112" font-size="14" font-weight="700" fill="#4A473F">A · 快照门限与后台排空时序：仅将不可变 staging 暴露给训练</text>
+  <rect x="48" y="126" width="760" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Training Main Loop Lane -->
+  <text x="64" y="156" font-size="11.5" font-weight="700" fill="#2C4460">训练主循环</text>
+  <line x1="140" y1="152" x2="788" y2="152" stroke="#9B968A" stroke-width="1"/>
+  
+  <rect x="150" y="136" width="90" height="32" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="195" y="156" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">Step k</text>
+  
+  <rect x="252" y="136" width="80" height="32" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="292" y="150" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">快照门</text>
+  <text x="292" y="162" font-size="9.5" fill="#6B4E28" text-anchor="middle">短协调</text>
+
+  <rect x="344" y="136" width="100" height="32" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="394" y="156" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">F/B k+1</text>
+
+  <rect x="456" y="136" width="100" height="32" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="506" y="156" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">F/B k+2</text>
+
+  <rect x="568" y="136" width="90" height="32" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="613" y="156" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">Opt k+1</text>
+
+  <!-- CUDA Staging Lane -->
+  <text x="64" y="222" font-size="11.5" font-weight="700" fill="#4A3F68">CUDA Staging</text>
+  <line x1="140" y1="218" x2="788" y2="218" stroke="#9B968A" stroke-width="1"/>
+  
+  <line x1="292" y1="170" x2="292" y2="198" stroke="#B07D2B" stroke-width="1.5" marker-end="url(#arr-amber)"/>
+
+  <rect x="252" y="202" width="70" height="32" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="287" y="216" font-size="10" font-weight="700" fill="#4A3F68" text-anchor="middle">D2H C0</text>
+  <text x="287" y="228" font-size="9.5" fill="#4A3F68" text-anchor="middle">pinned</text>
+
+  <line x1="324" y1="218" x2="338" y2="218" stroke="#6B5B95" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="344" y="202" width="70" height="32" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="379" y="216" font-size="10" font-weight="700" fill="#4A3F68" text-anchor="middle">D2H C1</text>
+  <text x="379" y="228" font-size="9.5" fill="#4A3F68" text-anchor="middle">pinned</text>
+
+  <line x1="416" y1="218" x2="430" y2="218" stroke="#6B5B95" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="436" y="202" width="70" height="32" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="471" y="216" font-size="10" font-weight="700" fill="#4A3F68" text-anchor="middle">D2H Cn</text>
+  <text x="471" y="228" font-size="9.5" fill="#4A3F68" text-anchor="middle">event</text>
+
+  <line x1="508" y1="218" x2="528" y2="218" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="534" y="202" width="130" height="32" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="599" y="216" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">SNAPSHOT_SAFE</text>
+  <text x="599" y="228" font-size="9.5" fill="#24473F" text-anchor="middle">原张量可继续修改</text>
+
+  <!-- Background Drain Lane -->
+  <text x="64" y="286" font-size="11.5" font-weight="700" fill="#24473F">后台多级排空</text>
+  <line x1="140" y1="282" x2="788" y2="282" stroke="#9B968A" stroke-width="1"/>
+
+  <rect x="150" y="266" width="100" height="34" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="200" y="280" font-size="10" font-weight="700" fill="#4A3F68" text-anchor="middle">不可变 Slot</text>
+  <text x="200" y="294" font-size="9.5" fill="#4A3F68" text-anchor="middle">双缓冲调度</text>
+
+  <line x1="252" y1="283" x2="276" y2="283" stroke="#5A564B" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="280" y="266" width="100" height="34" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="330" y="280" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">压缩 + 校验</text>
+  <text x="330" y="294" font-size="9.5" fill="#6B4E28" text-anchor="middle">硬件流水</text>
+
+  <line x1="382" y1="283" x2="406" y2="283" stroke="#5A564B" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="410" y="266" width="100" height="34" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="460" y="280" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">快速暂存池</text>
+  <text x="460" y="294" font-size="9.5" fill="#2C4460" text-anchor="middle">NVMe / NVMe-oF</text>
+
+  <line x1="512" y1="283" x2="536" y2="283" stroke="#5A564B" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="540" y="266" width="110" height="34" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="595" y="280" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">全局持久层</text>
+  <text x="595" y="294" font-size="9.5" fill="#24473F" text-anchor="middle">3FS / Ceph / S3</text>
+
+  <line x1="652" y1="283" x2="680" y2="283" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="686" y="266" width="102" height="34" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="737" y="280" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">Manifest 发布</text>
+  <text x="737" y="294" font-size="9.5" fill="#24473F" text-anchor="middle">原子推进 LATEST</text>
+
+  <!-- Summary note inside panel -->
+  <rect x="64" y="380" width="728" height="32" rx="4" fill="#F1EFE8"/>
+  <text x="76" y="400" font-size="10.5" fill="#4A473F">重叠成立前提：源张量在 D2H 完成前保持不可变；后台稳定前提：排空速率长期大于产生速率</text>
+
+  <!-- ================= PANEL B ================= -->
+  <text x="828" y="112" font-size="14" font-weight="700" fill="#4A473F">B · 三级下刷 / 四层介质体系</text>
+  <rect x="828" y="126" width="364" height="300" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Tier 0 -->
+  <rect x="844" y="140" width="332" height="50" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="856" y="160" font-size="11.5" font-weight="700" fill="#4A3F68">L0 · GPU HBM</text>
+  <text x="856" y="178" font-size="10" fill="#6B5B95">训练工作区；速度极快；节点掉电即失</text>
+  <rect x="1076" y="148" width="90" height="20" rx="3" fill="#6B5B95"/>
+  <text x="1121" y="162" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">PREPARING</text>
+
+  <line x1="1010" y1="192" x2="1010" y2="204" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Tier 1 -->
+  <rect x="844" y="206" width="332" height="50" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="856" y="226" font-size="11.5" font-weight="700" fill="#6B4E28">L1 · Host Pinned Pool</text>
+  <text x="856" y="244" font-size="10" fill="#B07D2B">训练安全暂存；双 Slot 缓冲；NUMA 亲和</text>
+  <rect x="1060" y="214" width="106" height="20" rx="3" fill="#B07D2B"/>
+  <text x="1113" y="228" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">SNAPSHOT_SAFE</text>
+
+  <line x1="1010" y1="258" x2="1010" y2="270" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Tier 2 -->
+  <rect x="844" y="272" width="332" height="58" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="856" y="292" font-size="11.5" font-weight="700" fill="#2C4460">L2 · 快速缓冲池 (Fast Spool)</text>
+  <text x="856" y="308" font-size="9.5" fill="#3D5A80">本地 NVMe：直连低延时，节点故障会丢</text>
+  <text x="856" y="322" font-size="9.5" fill="#3D5A80">NVMe-oF：机架共享池，SPDK 轮询驱动</text>
+  <rect x="1066" y="280" width="100" height="20" rx="3" fill="#3D5A80"/>
+  <text x="1116" y="294" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">LOCAL_DURABLE</text>
+
+  <line x1="1010" y1="332" x2="1010" y2="344" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Tier 3 -->
+  <rect x="844" y="346" width="332" height="58" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="856" y="366" font-size="11.5" font-weight="700" fill="#24473F">L3 · 全局持久层 (Global Durable)</text>
+  <text x="856" y="382" font-size="9.5" fill="#2F6B5E">3FS / CephFS / RADOS / HDFS / S3</text>
+  <text x="856" y="396" font-size="9.5" fill="#2F6B5E">不可变 Chunk + Checksum + Manifest 索引</text>
+  <rect x="1080" y="354" width="86" height="20" rx="3" fill="#2F6B5E"/>
+  <text x="1123" y="368" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">COMMITTED</text>
+
+  <text x="844" y="416" font-size="10" fill="#6B675C">SPDK 是 I/O 软件栈不是介质；3FS 是分布式文件系统不是对象存储</text>
+
+  <!-- ================= PANEL C ================= -->
+  <text x="48" y="446" font-size="14" font-weight="700" fill="#4A473F">C · 提交状态机：五大生命周期门限与原子发布规则</text>
+  <rect x="48" y="460" width="760" height="154" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 5 States Flow -->
+  <rect x="64" y="476" width="124" height="46" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="126" y="494" font-size="10.5" font-weight="700" fill="#4A3F68" text-anchor="middle">PREPARING</text>
+  <text x="126" y="510" font-size="9.5" fill="#4A3F68" text-anchor="middle">分配 epoch / 租约</text>
+  <line x1="190" y1="499" x2="204" y2="499" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="208" y="476" width="134" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="275" y="494" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">SNAPSHOT_SAFE</text>
+  <text x="275" y="510" font-size="9.5" fill="#6B4E28" text-anchor="middle">源张量脱离依赖</text>
+  <line x1="344" y1="499" x2="358" y2="499" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="362" y="476" width="134" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="429" y="494" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">LOCAL_DURABLE</text>
+  <text x="429" y="510" font-size="9.5" fill="#2C4460" text-anchor="middle">快速层写完并校验</text>
+  <line x1="498" y1="499" x2="512" y2="499" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="516" y="476" width="138" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="585" y="494" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">GLOBAL_DURABLE</text>
+  <text x="585" y="510" font-size="9.5" fill="#24473F" text-anchor="middle">全局分片齐备可读</text>
+  <line x1="656" y1="499" x2="670" y2="499" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="674" y="476" width="118" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="733" y="494" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">COMMITTED</text>
+  <text x="733" y="510" font-size="9.5" fill="#24473F" text-anchor="middle">推进 LATEST 恢复点</text>
+
+  <!-- Rules -->
+  <text x="64" y="546" font-size="10.5" fill="#4A473F">Fencing 机制：单调递增 Generation 防旧进程覆盖</text>
+  <text x="64" y="568" font-size="10.5" fill="#4A473F">增量 Checkpoint：Delta Child 引用 Parent，GC 依赖图保护</text>
+  <text x="64" y="590" font-size="10.5" fill="#A64B3C">校验和防线：端到端 Checksum 校验，拒绝发布损坏分片</text>
+
+  <!-- ================= PANEL D ================= -->
+  <text x="828" y="446" font-size="14" font-weight="700" fill="#4A473F">D · 四大验收维度与稳定性底线</text>
+  <rect x="828" y="460" width="364" height="154" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <rect x="844" y="476" width="160" height="56" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="924" y="496" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">训练可见影响</text>
+  <text x="924" y="516" font-size="9.5" fill="#6B4E28" text-anchor="middle">pause P99 · step P99 · MFU</text>
+
+  <rect x="1016" y="476" width="160" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="1096" y="496" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">后台排空健康</text>
+  <text x="1096" y="516" font-size="9.5" fill="#2C4460" text-anchor="middle">backlog · oldest age · slots</text>
+
+  <rect x="844" y="542" width="160" height="56" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="924" y="562" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">恢复业务目标</text>
+  <text x="924" y="582" font-size="9.5" fill="#24473F" text-anchor="middle">RPO age · RTO · rollback</text>
+
+  <rect x="1016" y="542" width="160" height="56" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1"/>
+  <text x="1096" y="562" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">证据纪律边界</text>
+  <text x="1096" y="582" font-size="9.5" fill="#4A3F68" text-anchor="middle">公开事实 ≠ 综合实现</text>
+
+  <!-- ================= BOTTOM STRIP ================= -->
+  <rect x="48" y="628" width="1144" height="172" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="64" y="652" font-size="13" font-weight="700" fill="#2B2A26">工程落地三道防线：为什么多级 Checkpoint 能支撑万卡稳态训练</text>
+  
+  <rect x="64" y="668" width="360" height="116" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="76" y="690" font-size="11.5" font-weight="700" fill="#2C4460">1. 训练与 I/O 完全解耦</text>
+  <text x="76" y="710" font-size="10" fill="#2C4460">D2H staging 仅占数秒，迅速释放 GPU 执行前向计算</text>
+  <text x="76" y="728" font-size="10" fill="#2C4460">长尾落盘、压缩与跨机房复制全部移至后台排空线程</text>
+  <text x="76" y="746" font-size="10" fill="#2C4460">大幅降低万卡集中写导致的 Incast 训练气泡</text>
+
+  <rect x="440" y="668" width="360" height="116" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="452" y="690" font-size="11.5" font-weight="700" fill="#24473F">2. 故障域与分级持久化</text>
+  <text x="452" y="710" font-size="10" fill="#24473F">本地 NVMe / 机架池接住秒级毛刺，支持进程级瞬时恢复</text>
+  <text x="452" y="728" font-size="10" fill="#24473F">3FS / Ceph 全局层兜底整机柜故障，提供确定性数据安全性</text>
+  <text x="452" y="746" font-size="10" fill="#24473F">分层隔离避免存储单点拥塞反噬计算节点</text>
+
+  <rect x="816" y="668" width="360" height="116" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="828" y="690" font-size="11.5" font-weight="700" fill="#6B4E28">3. 背压与闭环过载保护</text>
+  <text x="828" y="710" font-size="10" fill="#6B4E28">严守产生速率小于保守排空速率：S_out / P &lt; η · B_drain</text>
+  <text x="828" y="728" font-size="10" fill="#6B4E28">高水位触发自动合并旧 Delta，低水位平稳排空</text>
+  <text x="828" y="746" font-size="10" fill="#6B4E28">防止 Pinned 内存与快速盘发生无界堆积引发 OOM</text>
+</svg>

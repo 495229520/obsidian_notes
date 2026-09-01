@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820"
+     font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>TiKV MVCC 三列族物理布局与快照读决策链</title>
+  <desc>展示 TiKV 底层基于 RocksDB 的三列族（CF_WRITE、CF_LOCK、CF_DEFAULT）物理存储结构，以及读事务在 read_ts=35 时的完整判定流程与锁冲突恢复机制。</desc>
+
+  <defs>
+    <!-- 标号/连线箭头 -->
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 全局背景 -->
+  <rect x="0" y="0" width="1240" height="820" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部标题与副标题 -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">TiKV MVCC：三列族物理布局与快照读全路径决策</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">CF_WRITE 决定可见版本，CF_DEFAULT 保存数据实体，CF_LOCK 追踪未决事务 —— 快照读通过时间戳解耦</text>
+
+  <!-- ==================== Panel A: 三列族物理布局 ==================== -->
+  <rect x="48" y="96" width="556" height="610" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="66" y="124" font-size="13.5" font-weight="700" fill="#4A473F">A · Key K 的三列族物理存储</text>
+  <text x="586" y="124" font-size="10" fill="#6B675C" text-anchor="end">新版本 ◄── 排序方向 (~TS 降序) ──► 旧版本</text>
+
+  <!-- 列标题 -->
+  <text x="262" y="152" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">v3 · 未提交</text>
+  <text x="392" y="152" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">v2 · 已提交 (目标快照)</text>
+  <text x="526" y="152" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">v1 · 已提交 (历史版本)</text>
+
+  <!-- Lane 1: CF_WRITE -->
+  <rect x="62" y="162" width="528" height="96" rx="6" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="74" y="184" font-size="12" font-weight="700" fill="#2C4460">CF_WRITE</text>
+  <text x="74" y="202" font-size="9.5" fill="#3D5A80">(K, commit_ts) → info</text>
+  <text x="74" y="220" font-size="9.5" fill="#6B675C">可见性与版本索引</text>
+
+  <!-- v3 CF_WRITE slot -->
+  <rect x="206" y="172" width="112" height="76" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="262" y="202" font-size="10.5" font-weight="700" fill="#6B5B95" text-anchor="middle">无 Write 记录</text>
+  <text x="262" y="222" font-size="9.5" fill="#6B5B95" text-anchor="middle">快照读不可见</text>
+
+  <!-- v2 CF_WRITE card -->
+  <rect x="328" y="172" width="128" height="76" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="392" y="190" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">commit_ts = 30</text>
+  <text x="392" y="210" font-size="10" fill="#2C4460" text-anchor="middle">Put → start_ts = 20</text>
+  <text x="392" y="230" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">★ read_ts=35 命中</text>
+
+  <!-- v1 CF_WRITE card -->
+  <rect x="466" y="172" width="120" height="76" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="526" y="192" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">commit_ts = 12</text>
+  <text x="526" y="212" font-size="10" fill="#2C4460" text-anchor="middle">Put → start_ts = 5</text>
+  <text x="526" y="230" font-size="9.5" fill="#6B675C" text-anchor="middle">更早历史提交</text>
+
+  <!-- Lane 2: CF_LOCK -->
+  <rect x="62" y="268" width="528" height="88" rx="6" fill="#FBF6ED" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="74" y="290" font-size="12" font-weight="700" fill="#6B4E28">CF_LOCK</text>
+  <text x="74" y="308" font-size="9.5" fill="#8A6A3A">K → lock_info</text>
+  <text x="74" y="326" font-size="9.5" fill="#6B675C">单 Key 至多一个锁</text>
+
+  <!-- v3 CF_LOCK card -->
+  <rect x="206" y="276" width="112" height="72" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="262" y="294" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">lock.start_ts = 40</text>
+  <text x="262" y="312" font-size="9.5" fill="#6B4E28" text-anchor="middle">Primary = K · Put</text>
+  <text x="262" y="330" font-size="9.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">40 &gt; 35 → 忽略未来锁</text>
+
+  <!-- v2 & v1 dereference arrow indicators in CF_LOCK lane -->
+  <line x1="392" y1="248" x2="392" y2="372" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+  <rect x="332" y="298" width="120" height="24" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="392" y="314" font-size="9.5" font-weight="700" fill="#2C4460" text-anchor="middle">start_ts=20 解引用</text>
+
+  <line x1="526" y1="248" x2="526" y2="372" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arrBlue)"/>
+  <rect x="472" y="298" width="108" height="24" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="526" y="314" font-size="9.5" fill="#2C4460" text-anchor="middle">start_ts=5 解引用</text>
+
+  <!-- Lane 3: CF_DEFAULT -->
+  <rect x="62" y="366" width="528" height="116" rx="6" fill="#EDF5F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="74" y="390" font-size="12" font-weight="700" fill="#24473F">CF_DEFAULT</text>
+  <text x="74" y="408" font-size="9.5" fill="#2F6B5E">(K, start_ts) → Value</text>
+  <text x="74" y="426" font-size="9.5" fill="#6B675C">保存实际数据实体</text>
+
+  <!-- v3 CF_DEFAULT card -->
+  <rect x="206" y="376" width="112" height="96" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="262" y="398" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">(K, start_ts=40)</text>
+  <text x="262" y="422" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">value = v3</text>
+  <text x="262" y="448" font-size="9.5" fill="#8A6A3A" text-anchor="middle">已持久化但不可见</text>
+
+  <!-- v2 CF_DEFAULT card -->
+  <rect x="328" y="376" width="128" height="96" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="392" y="398" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">(K, start_ts=20)</text>
+  <text x="392" y="422" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">value = v2</text>
+  <text x="392" y="448" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">★ commit_ts=30 所指向</text>
+
+  <!-- v1 CF_DEFAULT card -->
+  <rect x="466" y="376" width="120" height="96" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="526" y="398" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">(K, start_ts=5)</text>
+  <text x="526" y="422" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">value = v1</text>
+  <text x="526" y="448" font-size="9.5" fill="#6B675C" text-anchor="middle">commit_ts=12 所指向</text>
+
+  <!-- v3: 未决关联 -->
+  <line x1="262" y1="348" x2="262" y2="372" stroke="#8A6A3A" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#arrAmber)"/>
+
+  <!-- Panel A 底部门禁与原理说明 -->
+  <rect x="62" y="494" width="528" height="98" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="516" font-size="11.5" font-weight="700" fill="#2B2A26">物理存在 ≠ 逻辑可见（解耦的核心）</text>
+  <text x="76" y="538" font-size="10" fill="#4A473F">• 隔离保证：CF_DEFAULT 有 v3 数据，但无 Commit 记录则不可见</text>
+  <text x="76" y="558" font-size="10" fill="#4A473F">• 短值优化：短值直接内联于 Write 记录中，省去二次查询 Default</text>
+  <text x="76" y="578" font-size="9.5" fill="#6B675C">• 物理编码：时间戳按位取反（~TS），使最新版本物理排在最前快速 Seek</text>
+
+  <!-- ==================== Panel B: 快照读决策链 ==================== -->
+  <rect x="636" y="96" width="556" height="610" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="654" y="124" font-size="13.5" font-weight="700" fill="#4A473F">B · 快照读 Get(K, read_ts=35) 决策链</text>
+  <text x="1174" y="124" font-size="10" fill="#6B675C" text-anchor="end">快照读隔离：全程使用 read_ts=35</text>
+
+  <!-- Step 1 Card -->
+  <rect x="652" y="142" width="524" height="60" rx="6" fill="#FBF6ED" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="666" y="162" font-size="11" font-weight="700" fill="#6B4E28">① 检查 CF_LOCK 锁状态</text>
+  <text x="666" y="186" font-size="10" fill="#6B4E28">发现 lock.start_ts = 40  &gt;  read_ts = 35</text>
+  <text x="1160" y="186" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="end">属于未来事务 → 安全忽略，不阻塞</text>
+
+  <!-- Step 1 -> 2 Arrow -->
+  <line x1="914" y1="202" x2="914" y2="214" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 2 Card -->
+  <rect x="652" y="214" width="524" height="60" rx="6" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="666" y="234" font-size="11" font-weight="700" fill="#2C4460">② Seek CF_WRITE 寻找最新有效提交</text>
+  <text x="666" y="258" font-size="10" fill="#2C4460">定位到最大 commit_ts ≤ 35 的记录</text>
+  <text x="1160" y="258" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="end">✓ 命中 commit_ts = 30（跳过 12）</text>
+
+  <!-- Step 2 -> 3 Arrow -->
+  <line x1="914" y1="274" x2="914" y2="286" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 3 Card -->
+  <rect x="652" y="286" width="524" height="60" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="666" y="306" font-size="11" font-weight="700" fill="#4A3F6B">③ 解析 Write Record 记录类型</text>
+  <text x="666" y="330" font-size="10" fill="#4A3F6B">记录为 Put 类型，指向 start_ts = 20</text>
+  <text x="1160" y="330" font-size="10" font-weight="700" fill="#4A3F6B" text-anchor="end">获得数据版本指针 start_ts = 20</text>
+
+  <!-- Step 3 -> 4 Arrow -->
+  <line x1="914" y1="346" x2="914" y2="358" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 4 Card -->
+  <rect x="652" y="358" width="524" height="60" rx="6" fill="#EDF5F2" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="666" y="378" font-size="11" font-weight="700" fill="#24473F">④ 读取 CF_DEFAULT 获得数据实体</text>
+  <text x="666" y="402" font-size="10" fill="#24473F">读取 CF_DEFAULT(K, start_ts=20)</text>
+  <text x="1160" y="402" font-size="11" font-weight="700" fill="#2F6B5E" text-anchor="end">★ 返回数据 v2（完成读路径）</text>
+
+  <!-- 分割线 -->
+  <line x1="652" y1="432" x2="1176" y2="432" stroke="#D8D5C8" stroke-width="1"/>
+
+  <!-- 锁冲突异常分支说明 -->
+  <text x="652" y="452" font-size="11.5" font-weight="700" fill="#733428">⚡ 异常分支：若 lock.start_ts ≤ read_ts（可能在快照前已提交）</text>
+  <text x="652" y="472" font-size="9.5" fill="#6B675C">此时不能直接忽略，必须沿 primary_ptr 查询 Primary Key 实际状态来决断：</text>
+
+  <!-- 分支 A: Primary 已提交 -->
+  <rect x="652" y="484" width="256" height="108" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="780" y="506" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">Primary 已提交 (有 Write 记录)</text>
+  <text x="780" y="528" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">roll-forward Secondary</text>
+  <text x="780" y="550" font-size="9.5" fill="#2F6B5E" text-anchor="middle">补齐 Write 记录并继续快照读</text>
+  <text x="780" y="570" font-size="9.5" fill="#24473F" text-anchor="middle">事务全局已成功，不可回滚</text>
+
+  <!-- 分支 B: Primary 锁过期 / 已回滚 -->
+  <rect x="920" y="484" width="256" height="108" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1048" y="506" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">Primary 锁过期 / 已 Rollback</text>
+  <text x="1048" y="528" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">rollback Secondary</text>
+  <text x="1048" y="550" font-size="9.5" fill="#A64B3C" text-anchor="middle">清理锁并写入 Rollback Record</text>
+  <text x="1048" y="570" font-size="9.5" fill="#733428" text-anchor="middle">Rollback 记录防止迟到 Prewrite</text>
+
+  <!-- ==================== 底部总结条 ==================== -->
+  <rect x="48" y="722" width="1144" height="74" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="746" font-size="12" font-weight="700" fill="#2B2A26">架构原则：三列族职责解耦</text>
+  <text x="68" y="770" font-size="10.5" fill="#5F5E5A">CF_LOCK 处理「并发未决与故障恢复」，CF_WRITE 处理「可见版本索引与逻辑删除」，CF_DEFAULT 处理「实际数据落地」</text>
+  <text x="680" y="746" font-size="12" font-weight="700" fill="#2B2A26">快照隔离（SI）的核心优势</text>
+  <text x="680" y="770" font-size="10.5" fill="#5F5E5A">读写不互斥：读不加锁直接走快照 Seek，写只追加新版本。借助单调递增 TS 彻底杜绝脏读、不可重复读与读偏斜</text>
+</svg>

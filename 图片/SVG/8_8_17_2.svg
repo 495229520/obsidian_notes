@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>万卡集群 Checkpoint 故障恢复全链路：决策分支与重分片流水线</title>
+  <desc>展示从读取 LATEST 开始，经合法性校验、恢复源选择（快速池 vs 全局后端）、组内广播消减读放大、Load-time 逻辑重分片到恢复训练的完整流程。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect x="0" y="0" width="1240" height="820" fill="rgb(245, 244, 237)"/>
+
+  <!-- 主副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">万卡集群分布式 Checkpoint：故障恢复决策与执行全链路</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">先验合法性与回退边界，再选快速/全局源，经组内广播消减读放大与 Load-time Resharding 恢复训练</text>
+
+  <!-- ================= FLOWCHART AREA (LEFT COLUMN) ================= -->
+  
+  <!-- Step 1: Read Latest & Manifest -->
+  <rect x="48" y="104" width="300" height="48" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="58" y="112" width="72" height="18" rx="3" fill="#3D5A80"/>
+  <text x="94" y="125" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">Step 1</text>
+  <text x="138" y="126" font-size="11.5" font-weight="700" fill="#2C4460">读取 LATEST 与 Manifest</text>
+  <text x="58" y="143" font-size="10" fill="#2C4460">获取最新 Committed Epoch 与分片索引</text>
+
+  <!-- Down arrow to Decision 1 -->
+  <line x1="198" y1="152" x2="198" y2="174" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Decision 1: Manifest Validity -->
+  <rect x="48" y="176" width="300" height="50" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="198" y="196" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Generation / Schema / Checksum 合法?</text>
+  <text x="198" y="214" font-size="10" fill="#6B4E28" text-anchor="middle">检查租约代数与内容哈希</text>
+
+  <!-- Branch No -> Rollback -->
+  <line x1="348" y1="201" x2="410" y2="201" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arr-red)"/>
+  <text x="379" y="193" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">否 (异常)</text>
+
+  <rect x="416" y="176" width="214" height="50" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="523" y="196" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">回退到前一个 COMMITTED Epoch</text>
+  <text x="523" y="214" font-size="10" fill="#733428" text-anchor="middle">丢弃损坏版本，确保状态强一致</text>
+
+  <!-- Branch Yes -> Down to Step 2 -->
+  <line x1="198" y1="226" x2="198" y2="254" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+  <text x="216" y="242" font-size="10.5" font-weight="700" fill="#2F6B5E">是 (合法)</text>
+
+  <!-- Decision 2: Fast Cache Available? -->
+  <rect x="48" y="256" width="300" height="50" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="198" y="276" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">快速缓冲池仍有完整副本?</text>
+  <text x="198" y="294" font-size="10" fill="#6B4E28" text-anchor="middle">本地 NVMe 或机架池故障域可达</text>
+
+  <!-- Left: Yes -> Read Fast Pool -->
+  <path d="M48 281 H24 Q16 281 16 289 V351 Q16 359 24 359 H42" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+  <text x="34" y="273" font-size="10" font-weight="700" fill="#2F6B5E">是</text>
+
+  <rect x="48" y="336" width="265" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="180" y="354" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">从本地 NVMe 或机架池读取</text>
+  <text x="180" y="370" font-size="9.5" fill="#24473F" text-anchor="middle">极速近端恢复，零跨机房流量</text>
+
+  <!-- Right: No -> Read Global Backend -->
+  <path d="M348 281 H372 Q380 281 380 289 V351 Q380 359 372 359 H341" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <text x="366" y="273" font-size="10" font-weight="700" fill="#3D5A80">否</text>
+
+  <rect x="335" y="336" width="295" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="482" y="354" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">从 3FS / Ceph / HDFS / S3 读取</text>
+  <text x="482" y="370" font-size="9.5" fill="#2C4460" text-anchor="middle">全局高可靠持久层兜底全机柜故障</text>
+
+  <!-- Join into Decision 3 -->
+  <path d="M180 382 V404 H335" fill="none" stroke="#5A564B" stroke-width="1.2"/>
+  <path d="M482 382 V404 H335" fill="none" stroke="#5A564B" stroke-width="1.2"/>
+  <line x1="335" y1="404" x2="335" y2="420" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Decision 3: Replicated States? -->
+  <rect x="185" y="422" width="300" height="50" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="335" y="442" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">状态在组内是否复制?</text>
+  <text x="335" y="460" font-size="10" fill="#6B4E28" text-anchor="middle">如 DP 复制权重与优化器分片</text>
+
+  <!-- Left: Yes -> Leader read & Broadcast (MegaScale) -->
+  <path d="M185 447 H120 Q112 447 112 455 V517 Q112 525 120 525 H142" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+  <text x="146" y="439" font-size="10" font-weight="700" fill="#2F6B5E">是 (MegaScale)</text>
+
+  <rect x="48" y="502" width="265" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="180" y="521" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">每组 Leader 读 1 次 + 组内广播</text>
+  <text x="180" y="537" font-size="9.5" fill="#24473F" text-anchor="middle">消减 90%+ 全局存储读取放大</text>
+
+  <!-- Right: No -> Parallel Shard Read -->
+  <path d="M485 447 H548 Q556 447 556 455 V517 Q556 525 548 525 H534" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <text x="522" y="439" font-size="10" font-weight="700" fill="#3D5A80">否 (独立)</text>
+
+  <rect x="335" y="502" width="295" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="482" y="521" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">各 Rank 读取唯一 Shard</text>
+  <text x="482" y="537" font-size="9.5" fill="#2C4460" text-anchor="middle">无重复分片直接并发下载解析</text>
+
+  <!-- Join into Decompress & Verify -->
+  <path d="M180 548 V568 H335" fill="none" stroke="#5A564B" stroke-width="1.2"/>
+  <path d="M482 548 V568 H335" fill="none" stroke="#5A564B" stroke-width="1.2"/>
+  <line x1="335" y1="568" x2="335" y2="584" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 4: Decompress, Checksum, Deserialize -->
+  <rect x="165" y="586" width="340" height="44" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="335" y="604" font-size="11" font-weight="700" fill="#4A3F68" text-anchor="middle">流式解压、端到端校验与反序列化</text>
+  <text x="335" y="620" font-size="9.5" fill="#4A3F68" text-anchor="middle">硬件加速解压 (nvCOMP/QAT) + SHA256</text>
+
+  <!-- Down to Decision 4 -->
+  <line x1="335" y1="630" x2="335" y2="648" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Decision 4: Topology Match? -->
+  <rect x="185" y="650" width="300" height="50" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="335" y="670" font-size="11.5" font-weight="700" fill="#6B4E28" text-anchor="middle">新旧训练拓扑是否一致?</text>
+  <text x="335" y="688" font-size="10" fill="#6B4E28" text-anchor="middle">比较 World Size 及 DP/TP/PP/EP</text>
+
+  <!-- Left: No -> Load-time Reshard -->
+  <path d="M185 675 H120 Q112 675 112 683 V745 Q112 753 120 753 H142" fill="none" stroke="#B07D2B" stroke-width="1.5" marker-end="url(#arr-amber)"/>
+  <text x="146" y="667" font-size="10" font-weight="700" fill="#B07D2B">否 (异构)</text>
+
+  <rect x="48" y="730" width="265" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="180" y="749" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">按 logical owner 执行 Reshard</text>
+  <text x="180" y="765" font-size="9.5" fill="#6B4E28" text-anchor="middle">基于逻辑 Tensor 描述切片动态重组</text>
+
+  <!-- Right: Yes -> Direct Map -->
+  <path d="M485 675 H548 Q556 675 556 683 V745 Q556 753 548 753 H534" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arr-green)"/>
+  <text x="522" y="667" font-size="10" font-weight="700" fill="#2F6B5E">是 (同构)</text>
+
+  <rect x="335" y="730" width="295" height="46" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="482" y="749" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">直接零拷贝映射到目标 Tensor</text>
+  <text x="482" y="765" font-size="9.5" fill="#24473F" text-anchor="middle">原样载入 GPU 对应 rank 显存</text>
+
+  <!-- ================= RIGHT COLUMN: RECOVERY CARDS & RESUME ================= -->
+
+  <!-- Final Recovery Steps -->
+  <rect x="660" y="104" width="532" height="172" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="676" y="128" font-size="13" font-weight="700" fill="#2B2A26">恢复训练收尾：时钟游标同步与全局校验</text>
+  
+  <rect x="676" y="140" width="500" height="54" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="690" y="161" font-size="11.5" font-weight="700" fill="#2C4460">Step 5 · 恢复辅助训练状态</text>
+  <text x="690" y="180" font-size="10" fill="#2C4460">同步 RNG、Dataloader 游标与 LR Scheduler</text>
+
+  <rect x="676" y="204" width="500" height="54" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="690" y="225" font-size="11.5" font-weight="700" fill="#24473F">Step 6 · 全局 Barrier 核验 → 恢复训练</text>
+  <text x="690" y="244" font-size="10" fill="#24473F">单步参数一致性校验与 Rank 握手</text>
+
+  <!-- Three Deep Architectural Principles -->
+  <rect x="660" y="296" width="532" height="480" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="676" y="320" font-size="13" font-weight="700" fill="#2B2A26">万卡 Checkpoint 恢复的核心设计哲学</text>
+
+  <!-- Card 1: Broadcast -->
+  <rect x="676" y="336" width="500" height="126" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="690" y="358" font-size="12" font-weight="700" fill="#24473F">① 组内广播消减读放大 (MegaScale 实践)</text>
+  <text x="690" y="380" font-size="10.5" fill="#24473F">痛点：万卡并发读同一分片导致存储 Incast 拥塞</text>
+  <text x="690" y="400" font-size="10.5" fill="#24473F">解法：每个 DP 组仅由 Leader (Rank 0) 读 1 次</text>
+  <text x="690" y="420" font-size="10.5" font-weight="700" fill="#24473F">效果：NVLink/RoCE 高速广播，读取带宽放大降低 90%+</text>
+
+  <!-- Card 2: Resharding -->
+  <rect x="676" y="478" width="500" height="126" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="690" y="500" font-size="12" font-weight="700" fill="#6B4E28">② Load-Time 逻辑重分片 (解耦物理拓扑)</text>
+  <text x="690" y="522" font-size="10.5" fill="#6B4E28">痛点：扩缩容或节点替换导致 GPU 拓扑改变</text>
+  <text x="690" y="542" font-size="10.5" fill="#6B4E28">解法：Manifest 记录 logical_owner 逻辑寻址</text>
+  <text x="690" y="562" font-size="10.5" font-weight="700" fill="#6B4E28">效果：8192 卡直接恢复到 12288 卡，无需离线转换</text>
+
+  <!-- Card 3: Fencing & Rollback -->
+  <rect x="676" y="620" width="500" height="140" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="690" y="642" font-size="12" font-weight="700" fill="#2C4460">③ 原子回退与 Fencing 防线 (防御脑裂)</text>
+  <text x="690" y="664" font-size="10.5" fill="#2C4460">校验和：任一分片 Checksum 损坏拒绝加载半成品</text>
+  <text x="690" y="684" font-size="10.5" fill="#2C4460">租约隔离：Fencing Token 防止迟到进程覆盖最新状态</text>
+  <text x="690" y="704" font-size="10.5" font-weight="700" fill="#2C4460">确定性回退：校验失败一键原子回滚到上一代 COMMITTED</text>
+</svg>

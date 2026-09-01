@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 750" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',system-ui,sans-serif">
+<title>io_uring passthrough 描述符到原生 NVMe SQE/CQE 的两次转换</title>
+<desc>展示 SQE128 和 CQE32 的槽位尺寸、72 字节 nvme_uring_cmd 如何放入 80 字节 command payload，以及内核如何构造 64 字节原生 NVMe 命令并将 16 字节硬件完成转换为 CQE32。</desc>
+<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+  </marker>
+</defs>
+
+<!-- 全图背景 -->
+<rect x="0" y="0" width="1240" height="750" fill="rgb(245, 244, 237)"/>
+
+<!-- 主标题与副标题 -->
+<text x="48" y="46" font-size="22" fill="#2B2A26" font-weight="700" text-anchor="start" dominant-baseline="central">四种 Entry：io_uring 的槽位不是原生 NVMe 硬件队列</text>
+<text x="48" y="74" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start" dominant-baseline="central">用户态提交 72 B 描述符；内核映射用户页并生成 64 B hardware SQE；完成再翻译为 CQE32</text>
+
+<!-- ==================== Panel A · 用户态共享环 ==================== -->
+<text x="48" y="108" font-size="13.5" fill="#4A473F" font-weight="700" text-anchor="start" dominant-baseline="central">A · 用户态共享环：SQE128 + CQE32</text>
+<rect x="48" y="122" width="1144" height="190" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+<!-- 左半：Submission Slot (128 B) -->
+<text x="68" y="144" font-size="12.5" fill="#3D5A80" font-weight="700" text-anchor="start" dominant-baseline="central">Submission Slot · 128 B (IORING_SETUP_SQE128)</text>
+
+<!-- 基础 SQE (64 B) -->
+<rect x="68" y="158" width="252" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<text x="194" y="177" font-size="11.5" fill="#2C4460" font-weight="700" text-anchor="middle" dominant-baseline="central">基础 io_uring_sqe · 64 B</text>
+<text x="194" y="196" font-size="9.8" fill="#2C4460" font-weight="400" text-anchor="middle" dominant-baseline="central">opcode / fd / user_data (0–47B)</text>
+
+<!-- 扩展区 (64 B) -->
+<rect x="328" y="158" width="252" height="56" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+<text x="454" y="177" font-size="11.5" fill="#4A3F68" font-weight="700" text-anchor="middle" dominant-baseline="central">扩展区 SQE128 · 64 B</text>
+<text x="454" y="196" font-size="9.8" fill="#4A3F68" font-weight="400" text-anchor="middle" dominant-baseline="central">为设备专有命令提供扩展空间</text>
+
+<!-- sqe->cmd 80 B 载荷条 -->
+<rect x="246" y="226" width="334" height="28" rx="5" fill="#FAEEDA" stroke="#8A6A3A" stroke-width="1.1"/>
+<text x="413" y="240" font-size="10.5" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">sqe-&gt;cmd：连续 80 B (基础尾 16 B + 扩展 64 B)</text>
+
+<!-- nvme_uring_cmd 72 B 结构条 -->
+<rect x="268" y="264" width="290" height="28" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+<text x="413" y="278" font-size="10.5" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">nvme_uring_cmd · 72 B (opcode / NSID / CDW)</text>
+
+<line x1="246" y1="254" x2="268" y2="264" stroke="#8A6A3A" stroke-width="1.0" stroke-dasharray="2 2" fill="none"/>
+<line x1="580" y1="254" x2="558" y2="264" stroke="#8A6A3A" stroke-width="1.0" stroke-dasharray="2 2" fill="none"/>
+
+<!-- 右半：Completion Slot (32 B) -->
+<text x="648" y="144" font-size="12.5" fill="#A64B3C" font-weight="700" text-anchor="start" dominant-baseline="central">Completion Slot · 32 B (IORING_SETUP_CQE32)</text>
+
+<!-- 基础 CQE (16 B) -->
+<rect x="648" y="158" width="244" height="56" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+<text x="770" y="177" font-size="11.5" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">基础 io_uring_cqe · 16 B</text>
+<text x="770" y="196" font-size="9.8" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">user_data (8B) | res (4B) | flags (4B)</text>
+
+<!-- CQE32 extra (16 B) -->
+<rect x="900" y="158" width="244" height="56" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+<text x="1022" y="177" font-size="11.5" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">CQE32 extra · 16 B</text>
+<text x="1022" y="196" font-size="9.8" fill="#6B4E28" font-weight="400" text-anchor="middle" dominant-baseline="central">big_cqe[0] = 64-bit result</text>
+
+<!-- 状态解读条 -->
+<rect x="648" y="234" width="496" height="46" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.0"/>
+<text x="896" y="257" font-size="10.8" fill="#4A473F" font-weight="700" text-anchor="middle" dominant-baseline="central">cqe-&gt;res：0 成功 · 负 errno · 正 NVMe status</text>
+
+<!-- ==================== Panel B · 内核翻译路径 ==================== -->
+<text x="48" y="332" font-size="13.5" fill="#4A473F" font-weight="700" text-anchor="start" dominant-baseline="central">B · 内核翻译：设备描述符 → blk-mq Request → 原生硬件命令</text>
+<rect x="48" y="346" width="1144" height="114" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+<rect x="68" y="360" width="176" height="54" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<text x="156" y="378" font-size="11.8" fill="#2C4460" font-weight="700" text-anchor="middle" dominant-baseline="central">72 B 描述符</text>
+<text x="156" y="396" font-size="9.8" fill="#2C4460" font-weight="400" text-anchor="middle" dominant-baseline="central">opcode · NSID · CDW</text>
+
+<line x1="244" y1="387" x2="292" y2="387" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="300" y="360" width="176" height="54" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+<text x="388" y="378" font-size="11.8" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">权限校验</text>
+<text x="388" y="396" font-size="9.8" fill="#24473F" font-weight="400" text-anchor="middle" dominant-baseline="central">effects · open mode</text>
+
+<line x1="476" y1="387" x2="524" y2="387" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="532" y="360" width="176" height="54" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+<text x="620" y="378" font-size="11.8" fill="#4A3F68" font-weight="700" text-anchor="middle" dominant-baseline="central">blk-mq request</text>
+<text x="620" y="396" font-size="9.8" fill="#4A3F68" font-weight="400" text-anchor="middle" dominant-baseline="central">分配 tag · 管理超时</text>
+
+<line x1="708" y1="387" x2="756" y2="387" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="764" y="360" width="176" height="54" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+<text x="852" y="378" font-size="11.8" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">DMA 映射与 PRP/SGL</text>
+<text x="852" y="396" font-size="9.8" fill="#6B4E28" font-weight="400" text-anchor="middle" dominant-baseline="central">用户 VA pin / map</text>
+
+<line x1="940" y1="387" x2="988" y2="387" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="996" y="360" width="176" height="54" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+<text x="1084" y="378" font-size="11.8" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">64 B 原生 SQE</text>
+<text x="1084" y="396" font-size="9.8" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">驱动填硬件 CID · 下发</text>
+
+<text x="620" y="440" font-size="11" fill="#6B675C" font-weight="700" text-anchor="middle" dominant-baseline="central">关键分界：用户态给虚拟地址；内核负责 DMA 映射与硬件 CID</text>
+
+<!-- ==================== Panel C · NVMe 原生硬件队列 ==================== -->
+<text x="48" y="480" font-size="13.5" fill="#4A473F" font-weight="700" text-anchor="start" dominant-baseline="central">C · NVMe 原生硬件队列：64 B 命令结构与 16 B 完成结构</text>
+<rect x="48" y="494" width="1144" height="154" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+<!-- 左侧：Native SQE 64 B -->
+<text x="68" y="516" font-size="12.5" fill="#3D5A80" font-weight="700" text-anchor="start" dominant-baseline="central">Native SQE · 64 B (Host Memory)</text>
+
+<rect x="68" y="532" width="104" height="50" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+<text x="120" y="548" font-size="10.8" fill="#2C4460" font-weight="700" text-anchor="middle" dominant-baseline="central">DW0</text>
+<text x="120" y="566" font-size="9.8" fill="#2C4460" font-weight="400" text-anchor="middle" dominant-baseline="central">opcode · CID</text>
+
+<rect x="176" y="532" width="96" height="50" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+<text x="224" y="548" font-size="10.8" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">DW1</text>
+<text x="224" y="566" font-size="9.8" fill="#24473F" font-weight="400" text-anchor="middle" dominant-baseline="central">NSID</text>
+
+<rect x="276" y="532" width="104" height="50" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.1"/>
+<text x="328" y="548" font-size="10.8" fill="#4A473F" font-weight="700" text-anchor="middle" dominant-baseline="central">DW4–5</text>
+<text x="328" y="566" font-size="9.8" fill="#4A473F" font-weight="400" text-anchor="middle" dominant-baseline="central">metadata ptr</text>
+
+<rect x="384" y="532" width="168" height="50" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.1"/>
+<text x="468" y="548" font-size="10.8" fill="#4A3F68" font-weight="700" text-anchor="middle" dominant-baseline="central">DW6–9</text>
+<text x="468" y="566" font-size="9.8" fill="#4A3F68" font-weight="400" text-anchor="middle" dominant-baseline="central">PRP1/PRP2 或 SGL1</text>
+
+<rect x="556" y="532" width="176" height="50" rx="5" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.1"/>
+<text x="644" y="548" font-size="10.8" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">DW10–15</text>
+<text x="644" y="566" font-size="9.8" fill="#6B4E28" font-weight="400" text-anchor="middle" dominant-baseline="central">SLBA · NLB · 控制标志</text>
+
+<!-- 中间下发与完成箭头 -->
+<line x1="740" y1="557" x2="784" y2="557" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<!-- 右侧：Native CQE 16 B -->
+<text x="796" y="516" font-size="12.5" fill="#A64B3C" font-weight="700" text-anchor="start" dominant-baseline="central">Native CQE · 16 B (Host Memory)</text>
+
+<rect x="796" y="532" width="108" height="50" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+<text x="850" y="548" font-size="10.5" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">DW0</text>
+<text x="850" y="566" font-size="9.8" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">command result</text>
+
+<rect x="908" y="532" width="80" height="50" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+<text x="948" y="548" font-size="10.5" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">DW1</text>
+<text x="948" y="566" font-size="9.8" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">SQHD (head)</text>
+
+<rect x="992" y="532" width="80" height="50" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+<text x="1032" y="548" font-size="10.5" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">DW2</text>
+<text x="1032" y="566" font-size="9.8" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">SQID (queue)</text>
+
+<rect x="1076" y="532" width="100" height="50" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+<text x="1126" y="548" font-size="10.5" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">DW3</text>
+<text x="1126" y="566" font-size="9.8" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">CID · Status · Phase</text>
+
+<text x="620" y="622" font-size="11" fill="#6B675C" font-weight="700" text-anchor="middle" dominant-baseline="central">硬件 CQE.CID 找回 request；CQE.user_data 找回应用请求</text>
+
+<!-- ==================== 底部警示卡片 ==================== -->
+<rect x="48" y="670" width="560" height="40" rx="6" fill="#FAEEDA" stroke="#8A6A3A" stroke-width="1.0"/>
+<text x="328" y="690" font-size="11" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">sqe-&gt;user_data (应用关联) ≠ NVMe CID (硬件标识)</text>
+
+<rect x="632" y="670" width="560" height="40" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.0"/>
+<text x="912" y="690" font-size="11" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">uring_cmd 的 cqe-&gt;res 是状态码，不是完成字节数</text>
+
+</svg>

@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>WiscKey 与 RocksDB Integrated BlobDB：写路径与架构集成对比</title>
+  <desc>对比 WiscKey 论文模型的前台先写 vLog 与 RocksDB Integrated BlobDB 的后台 Flush/Compaction 提取路径，以及独立 GC 与集成 GC 的核心差异。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+  <!-- 主副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">WiscKey vs RocksDB Integrated BlobDB：写路径与架构集成对比</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">WiscKey 前台先追加写 vLog；RocksDB 则在后台 Flush/Compaction 提取 Blob 并纳管于 VersionSet</text>
+
+  <!-- ================= PANEL A: WiscKey ================= -->
+  <text x="48" y="112" font-size="14" font-weight="700" fill="#4A473F">A · WiscKey 原始模型（论文设计 · 前台写日志 + 独立 GC）</text>
+  <rect x="48" y="126" width="556" height="376" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Step 1: Put -->
+  <rect x="68" y="142" width="516" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="80" y="150" width="88" height="20" rx="3" fill="#3D5A80"/>
+  <text x="124" y="164" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">① 前台 Put</text>
+  <text x="180" y="165" font-size="11.5" font-weight="700" fill="#2C4460">先写 vLog head</text>
+  <text x="82" y="183" font-size="10" fill="#2C4460">写入 {klen, vlen, key, value}</text>
+  <text x="290" y="183" font-size="10" fill="#2C4460">获取物理地址 &lt;offset, size&gt;</text>
+
+  <!-- Arrow down -->
+  <line x1="326" y1="196" x2="326" y2="212" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 2: LSM Put -->
+  <rect x="68" y="214" width="516" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="80" y="222" width="96" height="20" rx="3" fill="#2F6B5E"/>
+  <text x="128" y="236" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">② 写入 LSM</text>
+  <text x="188" y="237" font-size="11.5" font-weight="700" fill="#24473F">Key → &lt;offset, size&gt;</text>
+  <text x="82" y="255" font-size="10" fill="#24473F">仅存紧凑引用；依靠 vLog 中 Key 重建索引 (可裁剪 WAL)</text>
+
+  <!-- Arrow down -->
+  <line x1="326" y1="268" x2="326" y2="284" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 3: Separate GC -->
+  <rect x="68" y="286" width="516" height="66" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <rect x="80" y="294" width="88" height="20" rx="3" fill="#B07D2B"/>
+  <text x="124" y="308" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">③ 独立 GC</text>
+  <text x="180" y="309" font-size="11.5" font-weight="700" fill="#6B4E28">逐条反查 LSM 判活</text>
+  <text x="82" y="327" font-size="10" fill="#6B4E28">读 tail chunk 提取 Key → 逐条点查 LSM 验证当前引用</text>
+  <text x="82" y="343" font-size="10" fill="#6B4E28">活 Value 追加至 head，同步更新 LSM 索引并推进 tail</text>
+
+  <!-- Arrow down -->
+  <line x1="326" y1="354" x2="326" y2="370" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 4: Storage layout -->
+  <rect x="68" y="372" width="516" height="52" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="80" y="380" width="88" height="20" rx="3" fill="#9B968A"/>
+  <text x="124" y="394" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">④ 文件管理</text>
+  <text x="180" y="395" font-size="11.5" font-weight="700" fill="#4A473F">单日志 + 打洞回收</text>
+  <text x="82" y="413" font-size="10" fill="#4A473F">fallocate(PUNCH_HOLE) 释放垃圾区间；依赖稀疏文件</text>
+
+  <rect x="68" y="438" width="516" height="50" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="82" y="458" font-size="10.5" font-weight="700" fill="#733428">局限：前台多一次 I/O 阻塞；GC 额外消耗 LSM 读带宽</text>
+  <text x="82" y="476" font-size="10.5" fill="#733428">难以原生集成快照 (Snapshot)、事务隔离、Checkpoint 与列族</text>
+
+  <!-- ================= PANEL B: RocksDB Integrated BlobDB ================= -->
+  <text x="620" y="112" font-size="14" font-weight="700" fill="#4A473F">B · RocksDB Integrated BlobDB（工业级设计 · 后台提取 + 集成 GC）</text>
+  <rect x="620" y="126" width="572" height="376" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Step 1: Standard Put -->
+  <rect x="640" y="142" width="532" height="52" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <rect x="652" y="150" width="88" height="20" rx="3" fill="#3D5A80"/>
+  <text x="696" y="164" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">① 前台 Put</text>
+  <text x="752" y="165" font-size="11.5" font-weight="700" fill="#2C4460">标准 WAL + MemTable</text>
+  <text x="654" y="183" font-size="10" fill="#2C4460">大 Value 先入内存 MemTable；前台零额外 Blob 旁路 I/O</text>
+
+  <!-- Arrow down -->
+  <line x1="906" y1="196" x2="906" y2="212" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 2: Flush/Compaction Separation -->
+  <rect x="640" y="214" width="532" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="652" y="222" width="88" height="20" rx="3" fill="#2F6B5E"/>
+  <text x="696" y="236" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">② 后台提取</text>
+  <text x="752" y="237" font-size="11.5" font-weight="700" fill="#24473F">Flush / Compaction 下沉</text>
+  <text x="654" y="255" font-size="10" fill="#24473F">Value ≥ min_blob_size 写 Blob 文件；SST 存 BlobIndex</text>
+
+  <!-- Arrow down -->
+  <line x1="906" y1="268" x2="906" y2="284" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 3: Integrated GC -->
+  <rect x="640" y="286" width="532" height="66" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <rect x="652" y="294" width="88" height="20" rx="3" fill="#6B5B95"/>
+  <text x="696" y="308" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">③ 集成 GC</text>
+  <text x="752" y="309" font-size="11.5" font-weight="700" fill="#4A3F68">Compaction 归并直接判活</text>
+  <text x="654" y="327" font-size="10" fill="#4A3F68">遍历 SST 时已知最新版本，零额外 LSM 往返点查！</text>
+  <text x="654" y="343" font-size="10" fill="#4A3F68">边归并边搬迁存活 Blob，输出 SST 写入 new BlobIndex</text>
+
+  <!-- Arrow down -->
+  <line x1="906" y1="354" x2="906" y2="370" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Step 4: Version/Manifest -->
+  <rect x="640" y="372" width="532" height="52" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <rect x="652" y="380" width="88" height="20" rx="3" fill="#9B968A"/>
+  <text x="696" y="394" font-size="10" font-weight="700" fill="#FFFFFF" text-anchor="middle">④ 文件管理</text>
+  <text x="752" y="395" font-size="11.5" font-weight="700" fill="#4A473F">不可变 Blob + VersionSet</text>
+  <text x="654" y="413" font-size="10" fill="#4A473F">分块不可变文件 (默认 256MB)；无引用后整文件 unlink 删除</text>
+
+  <rect x="640" y="438" width="532" height="50" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="654" y="458" font-size="10.5" font-weight="700" fill="#24473F">优势：完全复用 RocksDB WAL、Snapshot 与 Compaction 体系</text>
+  <text x="654" y="476" font-size="10.5" fill="#24473F">标准 DB 接口，支持 min_blob_size 与 starting_level 配置</text>
+
+  <!-- ================= PANEL C: COMPARISON MATRIX ================= -->
+  <text x="48" y="528" font-size="14" font-weight="700" fill="#4A473F">C · 关键机制横向对比：为什么工业界选择 Integrated BlobDB 架构</text>
+  <rect x="48" y="542" width="1144" height="198" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 4 Columns / Cards -->
+  <rect x="66" y="558" width="260" height="166" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="196" y="580" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">写入时机与前台开销</text>
+  <line x1="78" y1="592" x2="314" y2="592" stroke="#3D5A80" stroke-width="0.8"/>
+  <text x="78" y="612" font-size="10.5" font-weight="700" fill="#2C4460">WiscKey：</text>
+  <text x="78" y="630" font-size="10" fill="#2C4460">前台追加 vLog (多 1 次 I/O)</text>
+  <text x="78" y="652" font-size="10.5" font-weight="700" fill="#2C4460">Integrated BlobDB：</text>
+  <text x="78" y="670" font-size="10" fill="#2C4460">前台入 MemTable，后台提取</text>
+  <text x="78" y="692" font-size="9.5" fill="#6B675C">短命大 Value 可在内存直接被覆盖</text>
+
+  <rect x="342" y="558" width="260" height="166" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="472" y="580" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">GC 判活与 LSM 交互</text>
+  <line x1="354" y1="592" x2="590" y2="592" stroke="#2F6B5E" stroke-width="0.8"/>
+  <text x="354" y="612" font-size="10.5" font-weight="700" fill="#24473F">WiscKey：</text>
+  <text x="354" y="630" font-size="10" fill="#24473F">独立 GC 扫描 + 逐条点查 LSM</text>
+  <text x="354" y="652" font-size="10.5" font-weight="700" fill="#24473F">Integrated BlobDB：</text>
+  <text x="354" y="670" font-size="10" fill="#24473F">融入 Compaction 归并直接判活</text>
+  <text x="354" y="692" font-size="9.5" fill="#6B675C">归并迭代器已知可见最新版本</text>
+
+  <rect x="618" y="558" width="260" height="166" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="748" y="580" font-size="12" font-weight="700" fill="#4A3F68" text-anchor="middle">事务、快照与元数据管理</text>
+  <line x1="630" y1="592" x2="866" y2="592" stroke="#6B5B95" stroke-width="0.8"/>
+  <text x="630" y="612" font-size="10.5" font-weight="700" fill="#4A3F68">WiscKey：</text>
+  <text x="630" y="630" font-size="10" fill="#4A3F68">依赖 vLog 重建，快照管理独立</text>
+  <text x="630" y="652" font-size="10.5" font-weight="700" fill="#4A3F68">Integrated BlobDB：</text>
+  <text x="630" y="670" font-size="10" fill="#4A3F68">纳管于 VersionSet / MANIFEST</text>
+  <text x="630" y="692" font-size="9.5" fill="#6B675C">原生支持 Snapshot 与 ColumnFamily</text>
+
+  <rect x="894" y="558" width="280" height="166" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="1034" y="580" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">存储文件格式与空间回收</text>
+  <line x1="906" y1="592" x2="1162" y2="592" stroke="#B07D2B" stroke-width="0.8"/>
+  <text x="906" y="612" font-size="10.5" font-weight="700" fill="#6B4E28">WiscKey：</text>
+  <text x="906" y="630" font-size="10" fill="#6B4E28">单一大文件追加 + hole punch 打洞</text>
+  <text x="906" y="652" font-size="10.5" font-weight="700" fill="#6B4E28">Integrated BlobDB：</text>
+  <text x="906" y="670" font-size="10" fill="#6B4E28">多个 Immutable 分块文件 (256MB)</text>
+  <text x="906" y="692" font-size="9.5" fill="#6B675C">无活引用后整文件 unlink 物理删除</text>
+</svg>

@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',system-ui,sans-serif">
+<title>传统 Block I/O、io_uring NVMe Passthrough 与 SPDK 三条路径</title>
+<desc>并列比较三种本地 NVMe 数据路径，强调 io_uring passthrough 绕过文件系统和通用读写翻译，但仍使用 blk-mq 与内核 NVMe 驱动；SPDK 才完全绕过内核块栈。</desc>
+<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+  </marker>
+</defs>
+
+<!-- 全图背景 -->
+<rect x="0" y="0" width="1240" height="760" fill="rgb(245, 244, 237)"/>
+
+<!-- 主标题与副标题 -->
+<text x="48" y="46" font-size="22" fill="#2B2A26" font-weight="700" text-anchor="start" dominant-baseline="central">三条 NVMe 数据路径：省掉哪些层，由谁承担治理</text>
+<text x="48" y="74" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start" dominant-baseline="central">判断准则：uring_cmd 绕过文件语义与通用 I/O 翻译，但仍进入 blk-mq；SPDK 才解绑内核驱动</text>
+
+<!-- ==================== Panel A · 传统 Block I/O ==================== -->
+<rect x="48" y="100" width="360" height="536" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+<!-- 标题 Badge -->
+<rect x="60" y="112" width="336" height="36" rx="6" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.0"/>
+<text x="76" y="130" font-size="13" fill="#3D5A80" font-weight="700" text-anchor="start" dominant-baseline="central">A · 传统 Block I/O</text>
+
+<rect x="78" y="174" width="300" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="228" y="189" font-size="12" fill="#2C4460" font-weight="700" text-anchor="middle" dominant-baseline="central">应用：file + offset</text>
+<text x="228" y="206" font-size="10" fill="#2C4460" font-weight="400" text-anchor="middle" dominant-baseline="central">read/write 或 IORING_OP_READ</text>
+
+<line x1="228" y1="218" x2="228" y2="236" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="78" y="236" width="300" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="228" y="251" font-size="12" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">VFS + 文件系统</text>
+<text x="228" y="268" font-size="10" fill="#24473F" font-weight="400" text-anchor="middle" dominant-baseline="central">inode / extent / 权限</text>
+
+<line x1="228" y1="280" x2="228" y2="298" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="78" y="298" width="300" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="228" y="313" font-size="12" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">Page Cache / O_DIRECT</text>
+<text x="228" y="330" font-size="10" fill="#24473F" font-weight="400" text-anchor="middle" dominant-baseline="central">缓存路径或 direct path</text>
+
+<line x1="228" y1="342" x2="228" y2="360" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="78" y="360" width="300" height="44" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="228" y="375" font-size="12" fill="#4A3F68" font-weight="700" text-anchor="middle" dominant-baseline="central">bio + blk-mq</text>
+<text x="228" y="392" font-size="10" fill="#4A3F68" font-weight="400" text-anchor="middle" dominant-baseline="central">merge / tag / hardware queue</text>
+
+<line x1="228" y1="404" x2="228" y2="422" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="78" y="422" width="300" height="44" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="228" y="437" font-size="12" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">内核 NVMe driver</text>
+<text x="228" y="454" font-size="10" fill="#6B4E28" font-weight="400" text-anchor="middle" dominant-baseline="central">CID / PRP-SGL / doorbell</text>
+
+<line x1="228" y1="466" x2="228" y2="484" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="78" y="484" width="300" height="44" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<text x="228" y="499" font-size="12" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">NVMe SSD</text>
+<text x="228" y="516" font-size="10" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">64 B SQE · DMA · 16 B CQE</text>
+
+<!-- 底部说明卡片 -->
+<rect x="78" y="582" width="300" height="34" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.0"/>
+<text x="228" y="599" font-size="11" fill="#4A473F" font-weight="700" text-anchor="middle" dominant-baseline="central">全栈经由内核 · 文件语义完备</text>
+
+<!-- ==================== Panel B · NVMe io_uring_cmd ==================== -->
+<rect x="440" y="100" width="360" height="536" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+<!-- 标题 Badge -->
+<rect x="452" y="112" width="336" height="36" rx="6" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.0"/>
+<text x="468" y="130" font-size="13" fill="#2F6B5E" font-weight="700" text-anchor="start" dominant-baseline="central">B · NVMe io_uring_cmd</text>
+
+<rect x="470" y="168" width="300" height="38" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="620" y="180" font-size="11.8" fill="#2C4460" font-weight="700" text-anchor="middle" dominant-baseline="central">应用：SQE128</text>
+<text x="620" y="195" font-size="9.8" fill="#2C4460" font-weight="400" text-anchor="middle" dominant-baseline="central">nvme_uring_cmd 设备描述</text>
+
+<line x1="620" y1="206" x2="620" y2="222" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="470" y="222" width="300" height="38" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="620" y="234" font-size="11.8" fill="#2C4460" font-weight="700" text-anchor="middle" dominant-baseline="central">io_uring</text>
+<text x="620" y="249" font-size="9.8" fill="#2C4460" font-weight="400" text-anchor="middle" dominant-baseline="central">共享 SQ / CQ · 批量提交</text>
+
+<line x1="620" y1="260" x2="620" y2="276" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="470" y="276" width="300" height="38" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="620" y="288" font-size="11.8" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">/dev/ngXnY</text>
+<text x="620" y="303" font-size="9.8" fill="#24473F" font-weight="400" text-anchor="middle" dominant-baseline="central">namespace char device</text>
+
+<line x1="620" y1="314" x2="620" y2="330" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="470" y="330" width="300" height="38" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="620" y="342" font-size="11.8" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">命令与权限校验</text>
+<text x="620" y="357" font-size="9.8" fill="#24473F" font-weight="400" text-anchor="middle" dominant-baseline="central">NSID · effects · open mode</text>
+
+<line x1="620" y1="368" x2="620" y2="384" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="470" y="384" width="300" height="38" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="620" y="396" font-size="11.8" fill="#4A3F68" font-weight="700" text-anchor="middle" dominant-baseline="central">blk-mq request + map</text>
+<text x="620" y="411" font-size="9.8" fill="#4A3F68" font-weight="400" text-anchor="middle" dominant-baseline="central">仍分配 request / 映射用户页</text>
+
+<line x1="620" y1="422" x2="620" y2="438" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="470" y="438" width="300" height="38" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="620" y="450" font-size="11.8" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">内核 NVMe driver</text>
+<text x="620" y="465" font-size="9.8" fill="#6B4E28" font-weight="400" text-anchor="middle" dominant-baseline="central">生成 CID / PRP-SGL</text>
+
+<line x1="620" y1="476" x2="620" y2="492" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="470" y="492" width="300" height="38" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<text x="620" y="504" font-size="11.8" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">NVMe SSD</text>
+<text x="620" y="519" font-size="9.8" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">native SQ/CQ + DMA</text>
+
+<!-- 底部说明卡片 -->
+<rect x="460" y="582" width="320" height="34" rx="6" fill="#FAEEDA" stroke="#8A6A3A" stroke-width="1.0"/>
+<text x="620" y="599" font-size="11" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">绕过 VFS / FS；没有绕过 blk-mq</text>
+
+<!-- ==================== Panel C · SPDK 用户态驱动 ==================== -->
+<rect x="832" y="100" width="360" height="536" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+<!-- 标题 Badge -->
+<rect x="844" y="112" width="336" height="36" rx="6" fill="#F4E9E4" stroke="#A64B3C" stroke-width="1.0"/>
+<text x="860" y="130" font-size="13" fill="#A64B3C" font-weight="700" text-anchor="start" dominant-baseline="central">C · SPDK 用户态驱动</text>
+
+<rect x="862" y="174" width="300" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="1012" y="189" font-size="12" fill="#2C4460" font-weight="700" text-anchor="middle" dominant-baseline="central">应用 / raw storage engine</text>
+<text x="1012" y="206" font-size="10" fill="#2C4460" font-weight="400" text-anchor="middle" dominant-baseline="central">自己管理 LBA 与一致性</text>
+
+<line x1="1012" y1="218" x2="1012" y2="236" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="862" y="236" width="300" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1012" y="251" font-size="12" fill="#24473F" font-weight="700" text-anchor="middle" dominant-baseline="central">SPDK NVMe driver</text>
+<text x="1012" y="268" font-size="10" fill="#24473F" font-weight="400" text-anchor="middle" dominant-baseline="central">用户态 request pool</text>
+
+<line x1="1012" y1="280" x2="1012" y2="298" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="862" y="298" width="300" height="44" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="1012" y="313" font-size="12" fill="#4A3F68" font-weight="700" text-anchor="middle" dominant-baseline="central">VFIO + IOMMU</text>
+<text x="1012" y="330" font-size="10" fill="#4A3F68" font-weight="400" text-anchor="middle" dominant-baseline="central">设备解绑 · DMA 隔离</text>
+
+<line x1="1012" y1="342" x2="1012" y2="360" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="862" y="360" width="300" height="44" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="1012" y="375" font-size="12" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">用户态 qpair</text>
+<text x="1012" y="392" font-size="10" fill="#6B4E28" font-weight="400" text-anchor="middle" dominant-baseline="central">构造 64 B command</text>
+
+<line x1="1012" y1="404" x2="1012" y2="422" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="862" y="422" width="300" height="44" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="1012" y="437" font-size="12" fill="#6B4E28" font-weight="700" text-anchor="middle" dominant-baseline="central">MMIO Doorbell + poll</text>
+<text x="1012" y="454" font-size="10" fill="#6B4E28" font-weight="400" text-anchor="middle" dominant-baseline="central">直接提交 · 轮询 phase bit</text>
+
+<line x1="1012" y1="466" x2="1012" y2="484" stroke="#5A564B" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+
+<rect x="862" y="484" width="300" height="44" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<text x="1012" y="499" font-size="12" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">NVMe SSD</text>
+<text x="1012" y="516" font-size="10" fill="#733428" font-weight="400" text-anchor="middle" dominant-baseline="central">kernel block stack 不参与</text>
+
+<!-- 底部说明卡片 -->
+<rect x="852" y="582" width="320" height="34" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.0"/>
+<text x="1012" y="599" font-size="11" fill="#733428" font-weight="700" text-anchor="middle" dominant-baseline="central">完整绕过内核文件系统与块栈</text>
+
+<!-- ==================== 底部总结收口 ==================== -->
+<text x="48" y="662" font-size="13.5" fill="#2B2A26" font-weight="700" text-anchor="start" dominant-baseline="central">收口：路径更短只是收益的一面，另一面是应用接管了多少责任</text>
+
+<rect x="48" y="682" width="1144" height="48" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+<rect x="60" y="688" width="360" height="36" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="0.8"/>
+<text x="240" y="706" font-size="11.5" fill="#4A473F" font-weight="700" text-anchor="middle" dominant-baseline="central">控制器所有权：内核 → 内核 → 应用 (SPDK)</text>
+
+<rect x="440" y="688" width="360" height="36" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="0.8"/>
+<text x="620" y="706" font-size="11.5" fill="#4A473F" font-weight="700" text-anchor="middle" dominant-baseline="central">文件抽象：可保留 → 无文件语义 → 无文件语义</text>
+
+<rect x="820" y="688" width="360" height="36" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="0.8"/>
+<text x="1000" y="706" font-size="11.5" fill="#4A473F" font-weight="700" text-anchor="middle" dominant-baseline="central">运维与独占成本：低 → 中等 → 极高 (专用核/UIO)</text>
+
+</svg>

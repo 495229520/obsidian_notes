@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 810" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>Masstree 与 Bw-Tree：两条高并发内存索引路线</title>
+  <desc>左侧展示 Bw-Tree 通过 Mapping Table、PID、Delta Chain 与 CAS 发布更新，并以 consolidation 收敛链；右侧展示 Masstree 将变长键切成 8 字节切片，用多层 B+Tree 构成 Trie，并通过版本校验、Permutation 与局部写锁实现并发；底部展示两者共同依赖 Epoch-Based Reclamation 延迟回收旧对象。</desc>
+  <defs>
+    <!-- 中性深灰开式/空心微箭头 (小巧轻盈，非实体填充) -->
+    <marker id="arr" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse">
+      <path d="M2 1.5 L7.5 5 L2 8.5" fill="none" stroke="#5A564B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <!-- 流程蓝开式箭头 (Mapping Table & Reader 读路径) -->
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse">
+      <path d="M2 1.5 L7.5 5 L2 8.5" fill="none" stroke="#3D5A80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <!-- 写入/安全绿开式箭头 (Writer 挂接 & 树分支) -->
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse">
+      <path d="M2 1.5 L7.5 5 L2 8.5" fill="none" stroke="#2F6B5E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <!-- 跨层琥珀黄开式箭头 (Masstree Trie 层级下降) -->
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M2 1.5 L7.5 5 L2 8.5" fill="none" stroke="#B07D2B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <!-- 告警/重试红开式箭头 -->
+    <marker id="arrRed" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="4.8" markerHeight="4.8" orient="auto-start-reverse">
+      <path d="M2 1.5 L7.5 5 L2 8.5" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- 画布背景 -->
+  <rect x="0" y="0" width="1240" height="810" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部标题区 -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">Masstree 与 Bw-Tree：两条高并发内存索引路线</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">共同目标是缩小共享热点；不同答案是「间接寻址 + Delta/CAS」与「缓存友好布局 + 乐观读/局部写锁」</text>
+
+  <!-- ==================== Left Panel: Bw-Tree ==================== -->
+  <rect x="48" y="94" width="552" height="466" rx="10" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.5"/>
+  <rect x="48" y="94" width="552" height="42" rx="10" fill="#E3EAF4"/>
+  <path d="M48,136 L600,136" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="68" y="121" font-size="14.5" font-weight="700" fill="#2C4460">A · Bw-Tree：不原地改页，CAS 替换逻辑页的当前状态</text>
+
+  <!-- Mapping Table -->
+  <text x="68" y="156" font-size="12" font-weight="700" fill="#2C4460">Mapping Table</text>
+  <text x="68" y="172" font-size="10" fill="#6B675C">PID → 当前物理页指针</text>
+  <rect x="68" y="180" width="132" height="175" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <line x1="68" y1="215" x2="200" y2="215" stroke="#AAB7C8"/>
+  <line x1="68" y1="250" x2="200" y2="250" stroke="#AAB7C8"/>
+  <line x1="68" y1="285" x2="200" y2="285" stroke="#AAB7C8"/>
+  <line x1="68" y1="320" x2="200" y2="320" stroke="#AAB7C8"/>
+  <text x="82" y="202" font-size="11" fill="#2C4460">PID 40</text>
+  <text x="82" y="237" font-size="11" fill="#2C4460">PID 41</text>
+  <!-- Highlighted active slot PID 42 -->
+  <rect x="72" y="253" width="124" height="29" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="82" y="272" font-size="11" font-weight="700" fill="#24473F">PID 42 → Δ head</text>
+  <text x="82" y="307" font-size="11" fill="#2C4460">PID 43</text>
+  <text x="82" y="342" font-size="10.5" fill="#6B675C">树内指针仅存 PID</text>
+
+  <!-- Mapping Table to Delta Chain Pointer Arrow (Smooth Bezier with Blue Non-solid Arrow) -->
+  <path d="M196,267 C224,267 224,198 240,198" fill="none" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="218" y="190" font-size="9.5" font-weight="700" fill="#3D5A80" text-anchor="middle">head 指针</text>
+
+  <!-- Delta Chain -->
+  <text x="244" y="156" font-size="12" font-weight="700" fill="#2C4460">Newest-first Delta Chain</text>
+  <text x="244" y="172" font-size="10" fill="#6B675C">单向增量链 (最新在头部)</text>
+
+  <!-- Insert Delta (Head) -->
+  <rect x="240" y="180" width="130" height="38" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="305" y="196" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">Insert Δ (head)</text>
+  <text x="305" y="211" font-size="9.5" fill="#733428" text-anchor="middle">key K / new value</text>
+  <!-- Down Arrow 1 -->
+  <line x1="305" y1="218" x2="305" y2="232" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- Modify Delta -->
+  <rect x="240" y="232" width="130" height="38" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="305" y="248" font-size="11" font-weight="700" fill="#7A5518" text-anchor="middle">Modify Δ</text>
+  <text x="305" y="263" font-size="9.5" fill="#7A5518" text-anchor="middle">same PID, new head</text>
+  <!-- Down Arrow 2 -->
+  <line x1="305" y1="270" x2="305" y2="284" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- Delete Delta -->
+  <rect x="240" y="284" width="130" height="38" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="305" y="300" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">Delete Δ</text>
+  <text x="305" y="315" font-size="9.5" fill="#6B675C" text-anchor="middle">tombstone for K</text>
+  <!-- Down Arrow 3 -->
+  <line x1="305" y1="322" x2="305" y2="336" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- Base Page -->
+  <rect x="240" y="336" width="130" height="40" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="305" y="353" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">Base Page (基页)</text>
+  <text x="305" y="369" font-size="9.5" fill="#2C4460" text-anchor="middle">有序 key / child 数组</text>
+
+  <!-- Writer Card -->
+  <rect x="402" y="180" width="180" height="84" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="492" y="200" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">Writer (写路径)</text>
+  <text x="414" y="219" font-size="10" fill="#24473F">① 离线构造 Δ，令 next = old</text>
+  <text x="414" y="236" font-size="10" fill="#24473F">② CAS(&amp;MT[42], old, Δ)</text>
+  <text x="414" y="254" font-size="9.8" font-weight="700" fill="#2F6B5E">✓ 成功 CAS 即线性化点</text>
+  <!-- Writer to Insert Delta Hook Arrow -->
+  <line x1="402" y1="198" x2="370" y2="198" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrGreen)"/>
+
+  <!-- Reader Card -->
+  <rect x="402" y="274" width="180" height="102" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="492" y="294" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">Reader (读路径)</text>
+  <text x="414" y="314" font-size="10" fill="#2C4460">· 从 head 向旧状态扫描</text>
+  <text x="414" y="331" font-size="10" fill="#2C4460">· 首个同 key Δ 决定结果</text>
+  <text x="414" y="348" font-size="10" fill="#2C4460">· 链中未命中 → Base Page 二分</text>
+  <text x="414" y="366" font-size="9.6" fill="#733428">· 链越长，读放大越高</text>
+  <!-- Reader scan traversal arrow -->
+  <path d="M402,296 C384,296 384,210 370,210" fill="none" stroke="#3D5A80" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrBlue)"/>
+
+  <!-- Consolidation Card -->
+  <rect x="68" y="388" width="514" height="46" rx="7" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="84" y="407" font-size="11" font-weight="700" fill="#4A473F">Consolidation (合并压缩)</text>
+  <text x="84" y="424" font-size="9.8" fill="#4A473F">折叠全链为新 Base Page，CAS 替换 Mapping Table；失败者丢弃候选页</text>
+  <!-- Chain to Consolidation Arrow -->
+  <line x1="305" y1="376" x2="305" y2="388" stroke="#5A564B" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- SMO and Hotspot subcards -->
+  <rect x="68" y="442" width="250" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="193" y="460" font-size="10.5" font-weight="700" fill="#7A5518" text-anchor="middle">SMO：B-link side link + 半分裂</text>
+  <text x="193" y="476" font-size="9.5" fill="#7A5518" text-anchor="middle">观察到未完成 split 的线程先帮助完成</text>
+
+  <rect x="332" y="442" width="250" height="44" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="457" y="460" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">热点代价：同一 slot 上 CAS 重试</text>
+  <text x="457" y="476" font-size="9.5" fill="#733428" text-anchor="middle">无 latch ≠ 无缓存行独占争用</text>
+
+  <text x="68" y="504" font-size="9.8" fill="#6B675C">机制要点：写者仅在 Mapping Table 单槽 CAS 替换当前指针</text>
+  <text x="68" y="520" font-size="9.8" fill="#6B675C">读者免锁沿链追溯，后台/前台定期 Consolidation 抑制读放大</text>
+
+  <!-- ==================== Right Panel: Masstree ==================== -->
+  <rect x="640" y="94" width="552" height="466" rx="10" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.5"/>
+  <rect x="640" y="94" width="552" height="42" rx="10" fill="#DCE9E3"/>
+  <path d="M640,136 L1192,136" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="660" y="121" font-size="14.5" font-weight="700" fill="#24473F">B · Masstree：8 B 切片 Trie + B+Tree，读乐观、写局部锁</text>
+
+  <!-- Variable Key Slicing -->
+  <text x="660" y="156" font-size="12" font-weight="700" fill="#24473F">变长 key 切片 (Trie 层次)</text>
+  <text x="825" y="156" font-size="10" fill="#6B675C">每层只比较 64-bit slice，消除长前缀开销</text>
+
+  <rect x="660" y="166" width="112" height="26" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="716" y="183" font-size="10.5" fill="#2C4460" text-anchor="middle">bytes 0–7</text>
+
+  <line x1="772" y1="179" x2="786" y2="179" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+
+  <rect x="786" y="166" width="112" height="26" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="842" y="183" font-size="10.5" fill="#24473F" text-anchor="middle">bytes 8–15</text>
+
+  <line x1="898" y1="179" x2="912" y2="179" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+
+  <rect x="912" y="166" width="112" height="26" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="968" y="183" font-size="10.5" fill="#7A5518" text-anchor="middle">bytes 16–23</text>
+
+  <line x1="1024" y1="179" x2="1038" y2="179" stroke="#5A564B" stroke-width="1.3" marker-end="url(#arr)"/>
+
+  <rect x="1038" y="166" width="134" height="26" rx="5" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="1105" y="183" font-size="10" fill="#4A473F" text-anchor="middle">按需展开更深层</text>
+
+  <!-- Left subcolumn: Layer 0 & Layer 1 Trees -->
+  <text x="660" y="210" font-size="11.5" font-weight="700" fill="#24473F">Layer 0 · B+Tree (slice 0)</text>
+  <rect x="660" y="218" width="244" height="34" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="782" y="239" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">Interior: 8B keys + child</text>
+
+  <!-- Branching arrows from Interior to Border nodes with vertical end tangents -->
+  <path d="M740,252 C740,266 718,266 718,276" fill="none" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrGreen)"/>
+  <path d="M824,252 C824,266 846,266 846,276" fill="none" stroke="#2F6B5E" stroke-width="1.4" marker-end="url(#arrGreen)"/>
+
+  <!-- Border node 1 (Terminal) -->
+  <rect x="660" y="276" width="116" height="50" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="718" y="295" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">Border node</text>
+  <text x="718" y="312" font-size="9.5" fill="#2C4460" text-anchor="middle">value / suffix</text>
+
+  <!-- Border node 2 (Next layer pointer) -->
+  <rect x="788" y="276" width="116" height="50" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="846" y="295" font-size="10.5" font-weight="700" fill="#7A5518" text-anchor="middle">Border node</text>
+  <text x="846" y="312" font-size="9.5" fill="#7A5518" text-anchor="middle">next_layer →</text>
+
+  <!-- Amber Arrow from Border node 2 directly down to Layer 1 B+Tree -->
+  <line x1="846" y1="326" x2="846" y2="370" stroke="#B07D2B" stroke-width="1.6" marker-end="url(#arrAmber)"/>
+  <text x="856" y="350" font-size="9.5" font-weight="700" fill="#7A5518">共享前缀下降</text>
+
+  <!-- Layer 1 B+Tree -->
+  <text x="660" y="358" font-size="11.5" font-weight="700" fill="#7A5518">Layer 1 · B+Tree (slice 1)</text>
+  <rect x="660" y="370" width="244" height="40" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="782" y="388" font-size="10.5" font-weight="700" fill="#7A5518" text-anchor="middle">深层 B+Tree 节点</text>
+  <text x="782" y="403" font-size="9.5" fill="#7A5518" text-anchor="middle">仅为实际出现的长公共前缀按需创建</text>
+
+  <!-- Right subcolumn: Concurrency in Border Node & Optimistic Reader -->
+  <rect x="920" y="210" width="252" height="118" rx="7" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="1046" y="229" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">Border node 并发发布</text>
+  <!-- Version & Permutation pills with flow arrow -->
+  <rect x="932" y="238" width="82" height="22" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="973" y="253" font-size="9.8" font-weight="700" fill="#24473F" text-anchor="middle">version</text>
+
+  <line x1="1014" y1="249" x2="1024" y2="249" stroke="#5A564B" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="1024" y="238" width="136" height="22" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="1092" y="253" font-size="9.8" font-weight="700" fill="#2C4460" text-anchor="middle">permutation (64b)</text>
+
+  <!-- Slot writing note -->
+  <rect x="932" y="266" width="228" height="36" rx="4" fill="#FBFBF6" stroke="#D8D5C8"/>
+  <text x="1046" y="281" font-size="9.5" fill="#4A473F" text-anchor="middle">① 先填空槽：keyslice / value</text>
+  <text x="1046" y="295" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">② 最后原子发布 permutation</text>
+  <text x="1046" y="318" font-size="9.5" fill="#733428" text-anchor="middle">writer：仅持本节点 spinlock</text>
+
+  <!-- Optimistic Reader Card -->
+  <rect x="920" y="336" width="252" height="74" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1046" y="355" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">Optimistic reader (乐观读)</text>
+  <text x="932" y="374" font-size="9.8" fill="#24473F">· v₀ = version → 读取节点 → v₁</text>
+  <text x="932" y="389" font-size="9.8" fill="#24473F">· v₀ == v₁ 且非 dirty：校验成功返回</text>
+  <text x="932" y="403" font-size="9.5" fill="#733428">· 发生冲突：从当前层或根重试</text>
+
+  <!-- Clarification banner -->
+  <rect x="660" y="422" width="512" height="42" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="916" y="439" font-size="10.2" font-weight="700" fill="#733428" text-anchor="middle">术语校准：lookup 乐观无锁；insert/update 持局部写锁</text>
+  <text x="916" y="455" font-size="9.5" fill="#733428" text-anchor="middle">整棵树非严格意义的全操作 lock-free，以此换取工程可控性</text>
+
+  <text x="660" y="504" font-size="9.8" fill="#6B675C">机制要点：8B 切片中等扇出兼顾缓存与前缀；Permutation 原子发布隔离写中态</text>
+  <text x="660" y="520" font-size="9.8" fill="#6B675C">读者仅做版本校验与重试，写者锁定极短局部，无全局加锁瓶颈</text>
+
+  <!-- ==================== Bottom Panel: EBR ==================== -->
+  <rect x="48" y="574" width="1144" height="216" rx="10" fill="#FBFBF6" stroke="#B07D2B" stroke-width="1.5"/>
+  <rect x="48" y="574" width="1144" height="38" rx="10" fill="#F3E8D3"/>
+  <path d="M48,612 L1192,612" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="68" y="598" font-size="14" font-weight="700" fill="#7A5518">C · 共同正确性底座 · Epoch-Based Reclamation（EBR）：逻辑断开 ≠ 物理释放</text>
+
+  <!-- Step 1 -->
+  <rect x="64" y="626" width="250" height="74" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="189" y="648" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">① publish / unlink</text>
+  <text x="189" y="668" font-size="10" fill="#2C4460" text-anchor="middle">新结构通过 CAS/指针发布</text>
+  <text x="189" y="686" font-size="9.8" fill="#4A473F" text-anchor="middle">旧结构不再被新读者取得</text>
+
+  <!-- Arrow 1 to 2 -->
+  <line x1="314" y1="663" x2="352" y2="663" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Step 2 -->
+  <rect x="352" y="626" width="250" height="74" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+  <text x="477" y="648" font-size="11.5" font-weight="700" fill="#7A5518" text-anchor="middle">② retire 到 epoch E</text>
+  <text x="477" y="668" font-size="10" fill="#7A5518" text-anchor="middle">先放入 limbo 待回收列表</text>
+  <text x="477" y="686" font-size="9.8" fill="#733428" text-anchor="middle">禁止立即 free (旧读者在沿链访问)</text>
+
+  <!-- Arrow 2 to 3 -->
+  <line x1="602" y1="663" x2="640" y2="663" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Step 3 -->
+  <rect x="640" y="626" width="250" height="74" rx="7" fill="#ECEAE0" stroke="#8A8574" stroke-width="1.3"/>
+  <text x="765" y="648" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">③ 活跃线程跨过静止态</text>
+  <text x="765" y="668" font-size="10" fill="#4A473F" text-anchor="middle">所有线程退出读临界区</text>
+  <text x="765" y="686" font-size="9.8" fill="#6B675C" text-anchor="middle">确认无早于 retire 的私有引用</text>
+
+  <!-- Arrow 3 to 4 -->
+  <line x1="890" y1="663" x2="928" y2="663" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Step 4 -->
+  <rect x="928" y="626" width="250" height="74" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1053" y="648" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">④ reclaim：安全物理回收</text>
+  <text x="1053" y="668" font-size="10" fill="#24473F" text-anchor="middle">跨过两代后批量回收内存空间</text>
+  <text x="1053" y="686" font-size="9.8" fill="#733428" text-anchor="middle">停顿线程会钉住 epoch 阻碍回收</text>
+
+  <!-- Bottom note -->
+  <text x="64" y="730" font-size="10.5" fill="#6B675C">核心纪律：不同实现推进策略可不同；不变的是「先断开新引用，再等旧读者全部离场，最后批量回收」。</text>
+  <text x="64" y="750" font-size="10" fill="#7A5518">生命周期洞见：无锁索引消除了读写锁排队，但安全回收的证明义务必须由 EBR 承担；读临界区绝不能长期阻塞。</text>
+</svg>

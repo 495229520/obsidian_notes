@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>PD 传输故障与降级决策阶梯</title>
+  <desc>展示直接 GDR 传输失败后，按剩余 TTFT 预算从链路自愈、换节点、Host Bounce、共享池恢复到重新 Prefill 与快速拒绝的阶梯决策流程。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 背景画布 -->
+  <rect x="0" y="0" width="1240" height="820" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部主副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">PD 传输故障与降级决策阶梯：基于剩余 TTFT 预算收敛</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">核心原则：每一次重试与降级前都严格评估剩余 SLO 预算；能满足则逐级收敛至 Commit，不可满足则快速熔断拒绝</text>
+
+  <!-- ============ Panel A: 决策流转全景 (Decision Flow) ============ -->
+  <rect x="48" y="94" width="1144" height="436" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="118" font-size="13" font-weight="700" fill="#4A473F">A · 降级决策阶梯流程图（Flowchart LR 级联瀑布流）</text>
+
+  <!-- 终态 Z: 继续 Commit (右上) -->
+  <rect x="1010" y="152" width="166" height="68" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.8"/>
+  <text x="1093" y="178" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">Z · 继续 Commit</text>
+  <text x="1093" y="200" font-size="10.5" fill="#24473F" text-anchor="middle">准入 Decode 批处理</text>
+
+  <!-- 终态 M: 快速拒绝 / 熔断 (右下) -->
+  <rect x="1010" y="366" width="166" height="68" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="1093" y="392" font-size="13" font-weight="700" fill="#733428" text-anchor="middle">M · 快速拒绝</text>
+  <text x="1093" y="412" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="middle">HTTP 503 Overloaded</text>
+
+  <!-- ============ Row 1: Level 1 ~ 3 快速链路自愈与节点重传 (y_center=186) ============ -->
+
+  <!-- 节点 A: 直接 GDR 失败 -->
+  <rect x="64" y="158" width="96" height="56" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="112" y="180" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">直接 GDR 失败</text>
+  <text x="112" y="198" font-size="9.5" fill="#733428" text-anchor="middle">QP 故障 / 超时</text>
+
+  <path d="M160,186 L180,186" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 判断 B: 剩余 TTFT 预算? -->
+  <polygon points="208,164 234,186 208,208 182,186" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="208" y="183" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">TTFT</text>
+  <text x="208" y="195" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">预算?</text>
+
+  <!-- B -> C (充足) -->
+  <path d="M234,186 L264,186" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arr-green)"/>
+  <text x="249" y="176" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">充足</text>
+
+  <!-- B -> M (不足 - 底部走线 y=424) -->
+  <path d="M208,208 L208,424 L1002,424" fill="none" stroke="#A64B3C" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arr-red)"/>
+  <text x="216" y="240" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="start">不足 (早熔断)</text>
+
+  <!-- 节点 C: 换 QP / 备用 Rail -->
+  <rect x="268" y="158" width="102" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="319" y="180" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">换 QP / 备用 Rail</text>
+  <text x="319" y="198" font-size="9.5" fill="#6B675C" text-anchor="middle">Secondary 路径</text>
+
+  <path d="M370,186 L392,186" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 判断 D: 仍失败? -->
+  <polygon points="416,164 440,186 416,208 392,186" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="416" y="190" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">仍失败?</text>
+
+  <!-- D -> 否 -> 顶部天花板通道 (y=130) -> Z -->
+  <path d="M416,164 L416,130 L1050,130 L1050,144" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="424" y="142" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="start">否 (自愈成功)</text>
+
+  <!-- D -> 是 -> 节点 E -->
+  <path d="M440,186 L468,186" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arr-amber)"/>
+  <text x="454" y="176" font-size="9.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">是</text>
+
+  <!-- 节点 E: 换 Decode 实例 -->
+  <rect x="472" y="158" width="102" height="56" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="523" y="180" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">换 Decode 实例</text>
+  <text x="523" y="198" font-size="9.5" fill="#6B675C" text-anchor="middle">预留 + 幂等重传</text>
+
+  <path d="M574,186 L596,186" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 判断 F: GDR 可用? -->
+  <polygon points="620,164 644,186 620,208 596,186" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="620" y="183" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">GDR</text>
+  <text x="620" y="195" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">可用?</text>
+
+  <!-- F -> 是 -> 顶部通道 (y=144) -> Z -->
+  <path d="M620,164 L620,144 L1002,144 L1002,168 L1004,168" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="628" y="154" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="start">是 (重传成功)</text>
+
+  <!-- F -> 否 -> 节点 G -->
+  <path d="M644,186 L674,186" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arr-amber)"/>
+  <text x="659" y="176" font-size="9.5" font-weight="700" fill="#8A6A3A" text-anchor="middle">否</text>
+
+  <!-- 节点 G: Pinned DRAM Bounce -->
+  <rect x="678" y="158" width="108" height="56" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="732" y="180" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Pinned DRAM</text>
+  <text x="732" y="198" font-size="9.5" fill="#6B4E28" text-anchor="middle">Host Bounce 降级</text>
+
+  <path d="M786,186 L808,186" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 判断 H: 仍满足 SLO? -->
+  <polygon points="832,164 858,186 832,208 806,186" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="832" y="183" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">满足</text>
+  <text x="832" y="195" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">SLO?</text>
+
+  <!-- H -> 是 -> 直接右行入 Z -->
+  <path d="M858,186 L1002,186" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="930" y="176" font-size="9.5" font-weight="700" fill="#2F6B5E" text-anchor="middle">是 (SLO 达标)</text>
+
+  <!-- H -> 否 -> 下行转入 Row 2 节点 I -->
+  <path d="M832,208 L832,246 L510,246 L510,270" fill="none" stroke="#8A6A3A" stroke-width="1.6" marker-end="url(#arr-amber)"/>
+  <text x="840" y="232" font-size="9.5" font-weight="700" fill="#8A6A3A" text-anchor="start">否 (SLO 告急)</text>
+
+  <!-- ============ Row 2: Level 4 共享池恢复 vs 重新 Prefill (y_center=330) ============ -->
+
+  <!-- 判断 I: 共享池有完整副本? -->
+  <polygon points="510,274 544,300 510,326 476,300" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="510" y="297" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">共享池</text>
+  <text x="510" y="309" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">有副本?</text>
+
+  <!-- I -> 是 (上分支) -> 节点 J -->
+  <path d="M510,274 L510,266 L578,266" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arr-green)"/>
+  <text x="528" y="260" font-size="9.5" font-weight="700" fill="#2F6B5E">是 (命中)</text>
+
+  <rect x="584" y="246" width="160" height="42" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="664" y="264" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">从 DRAM / NVMe 恢复</text>
+  <text x="664" y="279" font-size="9.5" fill="#24473F" text-anchor="middle">分层缓存温冷恢复</text>
+
+  <!-- I -> 否 (下分支) -> 节点 K -->
+  <path d="M510,326 L510,334 L578,334" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arr-red)"/>
+  <text x="528" y="348" font-size="9.5" font-weight="700" fill="#A64B3C">否 (未命中)</text>
+
+  <rect x="584" y="314" width="160" height="42" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="664" y="332" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">重新 Prefill 计算</text>
+  <text x="664" y="347" font-size="9.5" fill="#733428" text-anchor="middle">计算状态重派生</text>
+
+  <!-- J & K 汇入判断 L -->
+  <path d="M744,267 L780,267 L780,288" fill="none" stroke="#5A564B" stroke-width="1.6"/>
+  <path d="M744,335 L780,335 L780,312" fill="none" stroke="#5A564B" stroke-width="1.6"/>
+  <path d="M780,300 L804,300" fill="none" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 判断 L: 预算仍足? -->
+  <polygon points="832,278 858,300 832,322 806,300" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+  <text x="832" y="297" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">预算</text>
+  <text x="832" y="309" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">仍足?</text>
+
+  <!-- L -> 是 -> 汇入 Z (从下方入 Z) -->
+  <path d="M858,300 L950,300 L950,205 L1002,205" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="874" y="292" font-size="9.5" font-weight="700" fill="#2F6B5E">是 (达标)</text>
+
+  <!-- L -> 否 -> 汇入 M (y=386) -->
+  <path d="M832,322 L832,386 L1002,386" fill="none" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arr-red)"/>
+  <text x="840" y="360" font-size="9.5" font-weight="700" fill="#A64B3C" text-anchor="start">否 (超时熔断)</text>
+
+  <!-- Panel A 底部说明文字 (完全开阔无遮挡) -->
+  <text x="68" y="490" font-size="10.5" fill="#4A473F">· 降级核心：每个节点均有 SLO 退出门禁，避免无望请求拖垮集群</text>
+
+  <!-- ============ Panel B: 降级阶梯与代价量级账本 ============ -->
+  <rect x="48" y="546" width="1144" height="190" rx="8" fill="#F1EFE8" stroke="#4A473F" stroke-width="1.2"/>
+  <text x="68" y="570" font-size="13" font-weight="700" fill="#2B2A26">B · 降级阶梯动作、延迟代价与不可做清单</text>
+  <line x1="68" y1="580" x2="1172" y2="580" stroke="#9B968A" stroke-width="0.8"/>
+
+  <!-- 表头 -->
+  <text x="68" y="600" font-size="10.5" font-weight="700" fill="#4A473F">阶梯</text>
+  <text x="150" y="600" font-size="10.5" font-weight="700" fill="#4A473F">降级动作</text>
+  <text x="360" y="600" font-size="10.5" font-weight="700" fill="#4A473F">额外延迟量级</text>
+  <text x="540" y="600" font-size="10.5" font-weight="700" fill="#4A473F">触发条件与机制</text>
+  <text x="860" y="600" font-size="10.5" font-weight="700" fill="#A64B3C">不可做事项（防踩坑）</text>
+
+  <!-- 阶梯 1 -->
+  <text x="68" y="624" font-size="10" font-weight="700" fill="#2C4460">Level 1</text>
+  <text x="150" y="624" font-size="10" fill="#2C4460">换 QP / Secondary Rail</text>
+  <text x="360" y="624" font-size="10" fill="#2C4460">&lt; 100 μs（微秒级）</text>
+  <text x="540" y="624" font-size="10" fill="#2C4460">单网卡链路闪断、QP Error、PFC 拥塞</text>
+  <text x="860" y="624" font-size="10" fill="#733428">禁止在已失效的坏 QP 上死循环重试</text>
+
+  <!-- 阶梯 2 -->
+  <text x="68" y="648" font-size="10" font-weight="700" fill="#2C4460">Level 2</text>
+  <text x="150" y="648" font-size="10" fill="#2C4460">换 Decode 节点重传</text>
+  <text x="360" y="648" font-size="10" fill="#2C4460">1 ～ 5 ms（毫秒级）</text>
+  <text x="540" y="648" font-size="10" fill="#2C4460">对端实例失联、目标 HBM Credit 耗尽</text>
+  <text x="860" y="648" font-size="10" fill="#733428">禁止使用过期代次，新实例必须新 Reservation</text>
+
+  <!-- 阶梯 3 -->
+  <text x="68" y="672" font-size="10" font-weight="700" fill="#6B4E28">Level 3</text>
+  <text x="150" y="672" font-size="10" fill="#6B4E28">退回 Pinned DRAM Bounce</text>
+  <text x="360" y="672" font-size="10" fill="#6B4E28">5 ～ 20 ms（PCIe DMA）</text>
+  <text x="540" y="672" font-size="10" fill="#6B4E28">P2P 拓扑不支持、GDR 内存注册失败</text>
+  <text x="860" y="672" font-size="10" fill="#733428">禁止在热路径反复尝试 ibv_reg_mr 注册</text>
+
+  <!-- 阶梯 4 -->
+  <text x="68" y="696" font-size="10" font-weight="700" fill="#24473F">Level 4</text>
+  <text x="150" y="696" font-size="10" fill="#24473F">共享池取回 / 重新 Prefill</text>
+  <text x="360" y="696" font-size="10" fill="#24473F">20 ～ 100+ ms（视上下文）</text>
+  <text x="540" y="696" font-size="10" fill="#24473F">源端 HBM 副本丢失，依赖分层共享池</text>
+  <text x="860" y="696" font-size="10" fill="#733428">长 Prompt 优先拉共享池，短 Prompt 优先重算</text>
+
+  <!-- 阶梯 5 -->
+  <text x="68" y="720" font-size="10" font-weight="700" fill="#A64B3C">Level 5</text>
+  <text x="150" y="720" font-size="10" font-weight="700" fill="#A64B3C">快速拒绝（Early Reject）</text>
+  <text x="360" y="720" font-size="10" fill="#A64B3C">0 ms（即时返回）</text>
+  <text x="540" y="720" font-size="10" fill="#A64B3C">预测剩余耗时必定打破 TTFT SLO 门限</text>
+  <text x="860" y="720" font-size="10" font-weight="700" fill="#A64B3C">严禁无界慢排队，宁可早报错也不拖垮集群</text>
+
+  <!-- 底部口径 -->
+  <text x="48" y="760" font-size="11" fill="#4A473F">【准则】系统可靠性的底线是可控退出：当故障使 SLO 不可逆时，快速拒绝比拖延至超时更有价值。</text>
+</svg>

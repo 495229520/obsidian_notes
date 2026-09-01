@@ -1,0 +1,240 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 860" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>CXL 三协议、设备类型与内存资源形态</title>
+  <desc>上半部分解释 CXL.io、CXL.cache、CXL.mem 的事务方向和 Type-1、Type-2、Type-3 设备组合；下半部分区分内存扩展、池化和共享。</desc>
+  <defs>
+    <marker id="arrb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/></marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/></marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/></marker>
+    <marker id="arrr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker>
+    <marker id="arrn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker>
+  </defs>
+
+  <!-- 全局背景 -->
+  <rect x="0" y="0" width="1240" height="860" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部主副标题 -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">CXL：三种协议分工，与三种内存资源形态</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">先分清事务方向，再讨论 Type-1/2/3；Pooling 是库存切片绑定，Sharing 是多域并发一致性</text>
+
+  <!-- ==================== Panel A ==================== -->
+  <text x="48" y="106" font-size="13" font-weight="700" fill="#4A473F">A · 协议方向与设备类型：控制面、Host 内存缓存与设备内存扩展</text>
+  <rect x="48" y="118" width="1144" height="348" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Left: Host Root Complex -->
+  <rect x="68" y="136" width="270" height="312" rx="9" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="203" y="162" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">Host CPU / Root Complex</text>
+  <text x="203" y="180" font-size="10.5" fill="#3D5A80" text-anchor="middle">主机计算与一致性仲裁域</text>
+
+  <!-- Host Cores & LLC -->
+  <rect x="84" y="194" width="112" height="62" rx="6" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="140" y="219" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CPU Core</text>
+  <text x="140" y="239" font-size="10" fill="#3D5A80" text-anchor="middle">load / store 指令源</text>
+
+  <rect x="210" y="194" width="112" height="62" rx="6" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="266" y="219" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">LLC / HA</text>
+  <text x="266" y="239" font-size="10" fill="#3D5A80" text-anchor="middle">Snoop / 一致性仲裁</text>
+
+  <!-- Host Local DRAM -->
+  <rect x="84" y="268" width="238" height="78" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="203" y="293" font-size="12.5" font-weight="700" fill="#24473F" text-anchor="middle">Host Local DRAM</text>
+  <text x="203" y="313" font-size="10.5" fill="#2F6B5E" text-anchor="middle">低延迟高带宽本地主存</text>
+  <text x="203" y="331" font-size="10" fill="#4A473F" text-anchor="middle">CXL.cache 的被访问目标</text>
+
+  <!-- Host Bottom Description -->
+  <rect x="84" y="356" width="238" height="76" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="96" y="378" font-size="10.5" fill="#4A473F">• 内存控制器直连本地通道</text>
+  <text x="96" y="400" font-size="10.5" fill="#4A473F">• Home Agent 管理缓存行状态</text>
+  <text x="96" y="422" font-size="10" fill="#6B675C">• 统一编址 HPA 主机物理空间</text>
+
+  <!-- Center: CXL Link & 3 Protocols -->
+  <rect x="356" y="136" width="176" height="312" rx="9" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.4"/>
+  <text x="444" y="162" font-size="13.5" font-weight="700" fill="#4A473F" text-anchor="middle">CXL Link (PCIe 5/6)</text>
+  <text x="444" y="180" font-size="10.5" fill="#6B675C" text-anchor="middle">物理层与 Flit 协议复用</text>
+
+  <!-- CXL.io Channel -->
+  <rect x="372" y="196" width="144" height="68" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="444" y="218" font-size="12" font-weight="700" fill="#2C4460" text-anchor="middle">CXL.io</text>
+  <text x="444" y="236" font-size="10" fill="#3D5A80" text-anchor="middle">控制 · 枚举 · 寄存器</text>
+  <text x="444" y="252" font-size="9.5" fill="#6B675C" text-anchor="middle">非缓存一致 I/O 路径</text>
+
+  <!-- CXL.cache Channel -->
+  <rect x="372" y="274" width="144" height="74" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="444" y="296" font-size="12" font-weight="700" fill="#6B4E28" text-anchor="middle">CXL.cache</text>
+  <text x="444" y="316" font-size="10" fill="#8A6A3A" text-anchor="middle">设备 ➔ 访问 Host DRAM</text>
+  <text x="444" y="334" font-size="9.5" fill="#6B4E28" text-anchor="middle">设备一致性缓存主机内存</text>
+
+  <!-- CXL.mem Channel -->
+  <rect x="372" y="358" width="144" height="74" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="444" y="380" font-size="12" font-weight="700" fill="#24473F" text-anchor="middle">CXL.mem</text>
+  <text x="444" y="400" font-size="10" fill="#2F6B5E" text-anchor="middle">Host CPU ➔ 访问设备内存</text>
+  <text x="444" y="418" font-size="9.5" fill="#24473F" text-anchor="middle">主机一致性 load/store</text>
+
+  <!-- Right: 3 Device Types -->
+  <!-- Type-1 Card -->
+  <rect x="550" y="136" width="194" height="312" rx="9" fill="#FBFBF6" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="647" y="162" font-size="13.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Type-1 设备</text>
+  <text x="647" y="180" font-size="10.5" fill="#6B675C" text-anchor="middle">SmartNIC / PGAS 加速卡</text>
+
+  <rect x="568" y="196" width="158" height="26" rx="13" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="647" y="214" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">支持 CXL.io</text>
+
+  <rect x="568" y="228" width="158" height="26" rx="13" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="647" y="246" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">支持 CXL.cache</text>
+
+  <rect x="568" y="264" width="158" height="96" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="647" y="286" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">无本地 HDM 内存</text>
+  <text x="647" y="306" font-size="10.5" fill="#4A473F" text-anchor="middle">设备内置 D-Cache</text>
+  <text x="647" y="326" font-size="10.5" fill="#4A473F" text-anchor="middle">细粒度共享主机数据结构</text>
+  <text x="647" y="345" font-size="10" fill="#6B675C" text-anchor="middle">免除 DMA 乒乓等待</text>
+
+  <rect x="568" y="370" width="158" height="64" rx="6" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.2"/>
+  <text x="647" y="394" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">角色：设备主动缓存主机</text>
+  <text x="647" y="416" font-size="10" fill="#8A6A3A" text-anchor="middle">如网卡处理主机环形队列</text>
+
+  <!-- Type-2 Card -->
+  <rect x="760" y="136" width="194" height="312" rx="9" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="857" y="162" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">Type-2 设备</text>
+  <text x="857" y="180" font-size="10.5" fill="#6B675C" text-anchor="middle">GPU / FPGA / AI 加速器</text>
+
+  <rect x="778" y="196" width="158" height="24" rx="12" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="857" y="213" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">支持 CXL.io</text>
+
+  <rect x="778" y="224" width="158" height="24" rx="12" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="857" y="241" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">支持 CXL.cache</text>
+
+  <rect x="778" y="252" width="158" height="24" rx="12" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="857" y="269" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">支持 CXL.mem</text>
+
+  <rect x="778" y="284" width="158" height="76" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="857" y="306" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">计算核心 + 本地内存</text>
+  <text x="857" y="326" font-size="10" fill="#A64B3C" text-anchor="middle">(GPU HBM / FPGA DRAM)</text>
+  <text x="857" y="345" font-size="10.5" fill="#733428" text-anchor="middle">两端双向缓存一致性</text>
+
+  <rect x="778" y="370" width="158" height="64" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="857" y="394" font-size="10.5" font-weight="700" fill="#733428" text-anchor="middle">角色：异构对称共享</text>
+  <text x="857" y="416" font-size="10" fill="#A64B3C" text-anchor="middle">CPU与GPU零拷贝访问</text>
+
+  <!-- Type-3 Card -->
+  <rect x="970" y="136" width="202" height="312" rx="9" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="1071" y="162" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">Type-3 设备</text>
+  <text x="1071" y="180" font-size="10.5" fill="#6B675C" text-anchor="middle">Memory Expander 扩展器</text>
+
+  <rect x="988" y="196" width="166" height="26" rx="13" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="1071" y="214" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">支持 CXL.io</text>
+
+  <rect x="988" y="228" width="166" height="26" rx="13" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="1071" y="246" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">支持 CXL.mem</text>
+
+  <rect x="988" y="264" width="166" height="96" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="1071" y="286" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">Host-Managed Memory</text>
+  <text x="1071" y="306" font-size="10.5" fill="#2F6B5E" text-anchor="middle">DRAM / 持久内存扩展介质</text>
+  <text x="1071" y="326" font-size="10.5" fill="#24473F" text-anchor="middle">CPU 字节级 load/store</text>
+  <text x="1071" y="345" font-size="10" fill="#4A473F" text-anchor="middle">建模为 CPU-less NUMA</text>
+
+  <rect x="988" y="370" width="166" height="64" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="1071" y="394" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">角色：纯内存容量/带宽扩展</text>
+  <text x="1071" y="416" font-size="10" fill="#2F6B5E" text-anchor="middle">分层存储与池化核心主体</text>
+
+
+  <!-- ==================== Panel B ==================== -->
+  <text x="48" y="492" font-size="13" font-weight="700" fill="#4A473F">B · 内存资源形态：扩展、池化与共享的三级演进</text>
+  <rect x="48" y="504" width="1144" height="324" rx="10" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Card 1: Expansion -->
+  <rect x="68" y="520" width="350" height="292" rx="9" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.4"/>
+  <rect x="68" y="520" width="350" height="36" rx="9" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <rect x="68" y="546" width="350" height="10" fill="#DCE9E3"/>
+  <text x="243" y="544" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">Expansion · 单机直连扩展</text>
+
+  <!-- Expansion Schematic -->
+  <rect x="88" y="570" width="100" height="62" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="138" y="596" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">Host A</text>
+  <text x="138" y="615" font-size="10" fill="#3D5A80" text-anchor="middle">单机 CPU</text>
+
+  <path d="M188,601 L258,601" fill="none" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrg)"/>
+  <text x="223" y="594" font-size="9.5" fill="#2F6B5E" text-anchor="middle">直连 CXL.mem</text>
+
+  <rect x="260" y="570" width="138" height="62" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="329" y="596" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">Type-3 Memdev</text>
+  <text x="329" y="615" font-size="10" fill="#2F6B5E" text-anchor="middle">专属扩展容量</text>
+
+  <!-- Expansion Details -->
+  <rect x="88" y="644" width="310" height="152" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="100" y="668" font-size="10.5" fill="#4A473F">• 拓扑关系：1 对 1 点对点直连 PCIe 插槽</text>
+  <text x="100" y="692" font-size="10.5" fill="#4A473F">• 控制面：本机 BIOS / 内核直接枚举配置</text>
+  <text x="100" y="716" font-size="10.5" fill="#4A473F">• 数据面：作为本地 CPU-less NUMA 节点</text>
+  <text x="100" y="740" font-size="10.5" fill="#4A473F">• 核心价值：突破单机 DIMM 插槽容量墙</text>
+  <text x="100" y="764" font-size="10.5" fill="#4A473F">• 软件策略：支持 Linux 透明内存分层</text>
+  <text x="100" y="786" font-size="10" font-weight="700" fill="#2F6B5E">特点：结构最简单、第一代商用最成熟</text>
+
+  <!-- Card 2: Pooling -->
+  <rect x="445" y="520" width="350" height="292" rx="9" fill="#FBFBF6" stroke="#8A6A3A" stroke-width="1.4"/>
+  <rect x="445" y="520" width="350" height="36" rx="9" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <rect x="445" y="546" width="350" height="10" fill="#EFE7DA"/>
+  <text x="620" y="544" font-size="13.5" font-weight="700" fill="#6B4E28" text-anchor="middle">Pooling · 多机动态切片池化</text>
+
+  <!-- Pooling Schematic -->
+  <rect x="460" y="566" width="72" height="32" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="496" y="586" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">Host A</text>
+
+  <rect x="460" y="604" width="72" height="32" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="496" y="624" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">Host B</text>
+
+  <rect x="552" y="566" width="86" height="70" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+  <text x="595" y="591" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">CXL Switch</text>
+  <text x="595" y="609" font-size="9.5" fill="#6B675C" text-anchor="middle">Fabric Mgr</text>
+  <text x="595" y="625" font-size="9.5" fill="#8A6A3A" text-anchor="middle">切片仲裁</text>
+
+  <rect x="660" y="566" width="115" height="32" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="717" y="586" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">Slice 0 (A 独占)</text>
+
+  <rect x="660" y="604" width="115" height="32" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="717" y="624" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">Slice 1 (B 独占)</text>
+
+  <path d="M532,582 L552,592" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arra)"/>
+  <path d="M532,620 L552,610" fill="none" stroke="#8A6A3A" stroke-width="1.5" marker-end="url(#arra)"/>
+  <path d="M638,592 L660,582" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+  <path d="M638,610 L660,620" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrg)"/>
+
+  <!-- Pooling Details -->
+  <rect x="460" y="644" width="320" height="152" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="472" y="668" font-size="10.5" fill="#4A473F">• 拓扑关系：多 Host 经 Switch 连接 MLD 内存池</text>
+  <text x="472" y="692" font-size="10.5" fill="#4A473F">• 控制面：Fabric Manager 动态分配/解绑切片</text>
+  <text x="472" y="716" font-size="10.5" fill="#4A473F">• 数据面：空间排他隔离 (同一时刻单主拥有)</text>
+  <text x="472" y="740" font-size="10.5" fill="#4A473F">• 核心价值：跨机内存削峰填谷，消除容量碎片</text>
+  <text x="472" y="764" font-size="10.5" fill="#4A473F">• 生命周期：解绑前需下线页面并完成租户清理</text>
+  <text x="472" y="786" font-size="10" font-weight="700" fill="#8A6A3A">本质：公共库存动态切分，不等于多机共享</text>
+
+  <!-- Card 3: Sharing -->
+  <rect x="822" y="520" width="350" height="292" rx="9" fill="#FBFBF6" stroke="#A64B3C" stroke-width="1.4"/>
+  <rect x="822" y="520" width="350" height="36" rx="9" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <rect x="822" y="546" width="350" height="10" fill="#F0E0DB"/>
+  <text x="997" y="544" font-size="13.5" font-weight="700" fill="#733428" text-anchor="middle">Sharing · 多机真共享内存</text>
+
+  <!-- Sharing Schematic -->
+  <rect x="838" y="566" width="76" height="32" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="876" y="586" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">Host A</text>
+
+  <rect x="838" y="604" width="76" height="32" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="876" y="624" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">Host B</text>
+
+  <path d="M914,582 L964,592" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+  <path d="M914,620 L964,610" fill="none" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrr)"/>
+
+  <rect x="968" y="566" width="186" height="70" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1061" y="591" font-size="11.5" font-weight="700" fill="#733428" text-anchor="middle">Shared Memory Range</text>
+  <text x="1061" y="609" font-size="10" fill="#A64B3C" text-anchor="middle">多计算域并发 load/store</text>
+  <text x="1061" y="625" font-size="9.5" fill="#733428" text-anchor="middle">硬件一致性域 / 全局同步</text>
+
+  <!-- Sharing Details -->
+  <rect x="838" y="644" width="318" height="152" rx="6" fill="#F1EFE8" stroke="#8A8574" stroke-width="1"/>
+  <text x="850" y="668" font-size="10.5" fill="#4A473F">• 拓扑关系：多 Host 同时映射同一物理内存范围</text>
+  <text x="850" y="692" font-size="10.5" fill="#4A473F">• 一致性：需跨机 Coherence Domain 与总线仲裁</text>
+  <text x="850" y="716" font-size="10.5" fill="#4A473F">• 正确性挑战：分布式原子操作、锁生命周期管理</text>
+  <text x="850" y="740" font-size="10.5" fill="#4A473F">• 故障隔离：单 Host 崩溃后的锁回收与 Poison 传播</text>
+  <text x="850" y="764" font-size="10.5" fill="#4A473F">• 权限安全：多租户隔离、零初始化与安全审计</text>
+  <text x="850" y="786" font-size="10" font-weight="700" fill="#A64B3C">约束：CXL 3.x 引入，正确性复杂度高两个量级</text>
+
+  <!-- Bottom Global Summary -->
+  <text x="48" y="844" font-size="11" fill="#6B675C">记忆口诀：.io 管控制 · .cache 是设备看主机 · .mem 是主机看设备 ｜ 扩展是直连 · 池化是分库存 · 共享是并发读写</text>
+</svg>

@@ -1,142 +1,199 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="860" viewBox="0 0 1240 860" role="img" aria-labelledby="title desc">
-  <title id="title">gRPC 流式 RPC 的三层背压</title>
-  <desc id="desc">从应用发送队列、gRPC Completion Queue、HTTP/2 流窗口和连接窗口，到接收端应用消费与业务确认的完整反馈路径。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 810" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
-    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3D5A80"/>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
     </marker>
-    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2F6B5E"/>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
     </marker>
-    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B5B95"/>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
     </marker>
-    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#A64B3C"/>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
     </marker>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#28323C" flood-opacity="0.12"/>
-    </filter>
+    <marker id="arrPurple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B5B95"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
   </defs>
 
-  <rect x="0" y="0" width="1240" height="860" fill="#F5F4ED"/>
+  <title>gRPC 流式 RPC：三层背压流控与三种完成语义</title>
+  <desc>展示应用有界队列、gRPC CQ 门禁、HTTP/2 双窗口信用三层正向流控，以及本地 CQ Write Tag、HTTP/2 WINDOW_UPDATE、业务 ACK 三种完成语义的本质区别。</desc>
 
-  <text x="48" y="52" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="28" font-weight="700" fill="#25313D">gRPC 流式 RPC：三层背压与完成语义</text>
-  <text x="48" y="82" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="15" fill="#58636E">图示一个发送方向；Bidirectional Streaming 的反向路径完全对称</text>
+  <!-- 顶层背景 -->
+  <rect x="0" y="0" width="1240" height="810" fill="rgb(245, 244, 237)"/>
 
-  <!-- Column headings -->
-  <rect x="40" y="108" width="300" height="42" rx="12" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
-  <text x="190" y="135" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="700" fill="#2C4460">发送端应用</text>
+  <!-- 页面标题与副标题 -->
+  <text x="48" y="44" font-size="22" font-weight="700" fill="#2B2A26">gRPC 流式 RPC：三层背压流控与三种“完成”语义</text>
+  <text x="48" y="70" font-size="13" fill="#6B675C">传输流控防 Transport 溢出 · 应用水位防内存 OOM · 业务 ACK 确立端到端处理语义（图示单向流，双向流对称）</text>
 
-  <rect x="370" y="108" width="500" height="42" rx="12" fill="#E7E2EF" stroke="#6B5B95" stroke-width="1.5"/>
-  <text x="620" y="135" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="700" fill="#4A3F68">gRPC Runtime / HTTP/2</text>
+  <!-- ============ Panel A: 三层正向流控链路 ============ -->
+  <text x="48" y="104" font-size="13.5" font-weight="700" fill="#4A473F">A · 三层正向流控与数据推进链路</text>
+  <rect x="48" y="116" width="1144" height="308" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
 
-  <rect x="900" y="108" width="300" height="42" rx="12" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
-  <text x="1050" y="135" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="700" fill="#24473F">接收端应用</text>
+  <!-- Col 1: 发送端应用 · 水位控制 -->
+  <rect x="64" y="128" width="286" height="284" rx="7" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="76" y="150" font-size="13" font-weight="700" fill="#2C4460">① 发送端：应用有界队列</text>
+  <text x="76" y="167" font-size="10" fill="#6B675C">监控：bytes / msgs / age</text>
 
-  <!-- Sender panel -->
-  <rect x="40" y="174" width="300" height="360" rx="18" fill="#FFFFFF" stroke="#9AA7B4" stroke-width="1.2" filter="url(#shadow)"/>
-  <text x="64" y="208" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#25313D">① 有界发送队列</text>
-  <text x="64" y="235" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" fill="#58636E">计量：bytes / messages / oldest age</text>
+  <!-- 队列水位图解容器 -->
+  <rect x="76" y="178" width="262" height="136" rx="6" fill="#FBFBF6" stroke="#BBC3CC" stroke-width="1"/>
+  <rect x="76" y="178" width="262" height="42" fill="#FBEBE8" fill-opacity="0.6"/>
+  <rect x="76" y="220" width="262" height="48" fill="#EBF3FB" fill-opacity="0.6"/>
+  <rect x="76" y="268" width="262" height="46" fill="#EBF5F0" fill-opacity="0.6"/>
 
-  <rect x="72" y="270" width="236" height="150" rx="12" fill="#F7F8FA" stroke="#BBC3CC"/>
-  <line x1="88" y1="310" x2="292" y2="310" stroke="#A64B3C" stroke-width="2" stroke-dasharray="6 5"/>
-  <text x="286" y="301" text-anchor="end" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="700" fill="#733428">High watermark</text>
-  <line x1="88" y1="374" x2="292" y2="374" stroke="#2F6B5E" stroke-width="2" stroke-dasharray="6 5"/>
-  <text x="286" y="366" text-anchor="end" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="700" fill="#24473F">Low watermark</text>
+  <line x1="76" y1="220" x2="338" y2="220" stroke="#A64B3C" stroke-width="1.8" stroke-dasharray="5 4"/>
+  <text x="332" y="213" text-anchor="end" font-size="10" font-weight="700" fill="#A64B3C">High Watermark (4MB 暂停)</text>
 
-  <rect x="94" y="384" width="22" height="20" rx="3" fill="#DCE9E3" stroke="#2F6B5E"/>
-  <rect x="122" y="367" width="22" height="37" rx="3" fill="#DCE9E3" stroke="#2F6B5E"/>
-  <rect x="150" y="347" width="22" height="57" rx="3" fill="#E3EAF4" stroke="#3D5A80"/>
-  <rect x="178" y="327" width="22" height="77" rx="3" fill="#E3EAF4" stroke="#3D5A80"/>
-  <rect x="206" y="298" width="22" height="106" rx="3" fill="#F0E0DB" stroke="#A64B3C"/>
-  <rect x="234" y="280" width="22" height="124" rx="3" fill="#F0E0DB" stroke="#A64B3C"/>
+  <line x1="76" y1="268" x2="338" y2="268" stroke="#2F6B5E" stroke-width="1.8" stroke-dasharray="5 4"/>
+  <text x="332" y="262" text-anchor="end" font-size="10" font-weight="700" fill="#2F6B5E">Low Watermark (1MB 恢复)</text>
 
-  <rect x="64" y="440" width="252" height="72" rx="11" fill="#F0E0DB" stroke="#A64B3C"/>
-  <text x="190" y="463" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13.5" font-weight="700" fill="#733428">达到 High：停止继续生产</text>
-  <text x="190" y="484" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13.5" font-weight="700" fill="#733428">或暂停下一次 IssueRead</text>
-  <text x="190" y="505" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13.5" fill="#733428">降到 Low：恢复，避免临界点抖动</text>
+  <!-- 积压批次柱状图 -->
+  <rect x="90" y="280" width="20" height="30" rx="3" fill="#DCE9E3" stroke="#2F6B5E"/>
+  <rect x="116" y="260" width="20" height="50" rx="3" fill="#DCE9E3" stroke="#2F6B5E"/>
+  <rect x="142" y="240" width="20" height="70" rx="3" fill="#E3EAF4" stroke="#3D5A80"/>
+  <rect x="168" y="224" width="20" height="86" rx="3" fill="#E3EAF4" stroke="#3D5A80"/>
+  <rect x="194" y="196" width="20" height="114" rx="3" fill="#F0E0DB" stroke="#A64B3C"/>
 
-  <!-- Runtime panel -->
-  <rect x="370" y="174" width="500" height="360" rx="18" fill="#FFFFFF" stroke="#9AA7B4" stroke-width="1.2" filter="url(#shadow)"/>
-  <text x="394" y="208" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#25313D">② CQ 操作门禁</text>
+  <text x="224" y="240" font-size="9.5" font-weight="700" fill="#4A473F">当前积压: 4.2MB</text>
+  <rect x="222" y="250" width="108" height="22" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="276" y="265" text-anchor="middle" font-size="9.5" font-weight="700" fill="#733428">触发暂停补 Read</text>
 
-  <rect x="398" y="238" width="196" height="88" rx="12" fill="#E7E2EF" stroke="#6B5B95"/>
-  <text x="496" y="267" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#4A3F68">最多 1 个 Write 在途</text>
-  <text x="496" y="293" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" fill="#4A3F68">等 Write tag 后再发下一条</text>
-  <text x="496" y="314" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#6E6485">Read 可与 Write 同时在途</text>
+  <!-- 水位滞回策略说明 -->
+  <rect x="76" y="322" width="262" height="78" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="86" y="340" font-size="10.5" font-weight="700" fill="#733428">双水位滞回（Hysteresis）控制：</text>
+  <text x="86" y="358" font-size="10" fill="#733428">· ≥ High：暂停写入与 Read()</text>
+  <text x="86" y="374" font-size="10" fill="#733428">· ≤ Low：恢复生产与 Read</text>
+  <text x="86" y="390" font-size="9.5" fill="#5A564B">（防临界点频繁震荡）</text>
 
-  <rect x="620" y="238" width="222" height="88" rx="12" fill="#E3EAF4" stroke="#3D5A80"/>
-  <text x="731" y="266" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#2C4460">Write CQ completion</text>
-  <text x="731" y="292" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" fill="#2C4460">本次写操作已由 runtime 完成</text>
-  <text x="731" y="314" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#5D6F86">≠ 对端业务已处理</text>
+  <!-- Col 2: gRPC Runtime & HTTP/2 传输 -->
+  <rect x="364" y="128" width="488" height="284" rx="7" fill="#F4F1F8" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="378" y="150" font-size="13" font-weight="700" fill="#4A3F68">② CQ 门禁 与 ③ 双窗口信用</text>
+  <text x="378" y="167" font-size="10" fill="#6B675C">Runtime 串行化 + 传输层字节流控</text>
 
-  <text x="394" y="366" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#25313D">③ HTTP/2 双窗口信用</text>
+  <!-- Sub-block 1: ② CQ 门禁 -->
+  <rect x="378" y="178" width="460" height="98" rx="6" fill="#FBFBF6" stroke="#D8D5C8"/>
+  <rect x="388" y="186" width="216" height="82" rx="5" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="496" y="206" text-anchor="middle" font-size="11.5" font-weight="700" fill="#4A3F68">最多 1 个 Write 在途</text>
+  <text x="496" y="226" text-anchor="middle" font-size="10" fill="#4A3F68">等 Write Tag 返回后</text>
+  <text x="496" y="242" text-anchor="middle" font-size="10" fill="#4A3F68">再从队列取下一条发送</text>
+  <text x="496" y="258" text-anchor="middle" font-size="9.5" fill="#6B5B95">严禁多线程并发 Write</text>
 
-  <rect x="398" y="390" width="208" height="104" rx="12" fill="#E3EAF4" stroke="#3D5A80"/>
-  <text x="502" y="419" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#2C4460">Stream window</text>
-  <rect x="424" y="438" width="156" height="18" rx="9" fill="#D8DEE7"/>
-  <rect x="424" y="438" width="92" height="18" rx="9" fill="#3D5A80"/>
-  <text x="502" y="480" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#2C4460">限制当前 RPC 的 DATA</text>
+  <rect x="612" y="186" width="216" height="82" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="720" y="206" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2C4460">Read / Write 正交并发</text>
+  <text x="720" y="226" text-anchor="middle" font-size="10" fill="#2C4460">读写方向各自独立</text>
+  <text x="720" y="242" text-anchor="middle" font-size="10" fill="#2C4460">最多 1 Read + 1 Write 在途</text>
+  <text x="720" y="258" text-anchor="middle" font-size="9.5" fill="#3D5A80">需独立状态机维护</text>
 
-  <rect x="634" y="390" width="208" height="104" rx="12" fill="#DCE9E3" stroke="#2F6B5E"/>
-  <text x="738" y="419" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#24473F">Connection window</text>
-  <rect x="660" y="438" width="156" height="18" rx="9" fill="#D7E1DD"/>
-  <rect x="660" y="438" width="68" height="18" rx="9" fill="#2F6B5E"/>
-  <text x="738" y="480" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#24473F">限制同一连接全部 streams</text>
+  <!-- Sub-block 2: ③ HTTP/2 双窗口信用 -->
+  <rect x="378" y="284" width="460" height="116" rx="6" fill="#FBFBF6" stroke="#D8D5C8"/>
+  <rect x="388" y="292" width="216" height="74" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="398" y="310" font-size="11" font-weight="700" fill="#2C4460">Stream Window (流窗口)</text>
+  <text x="398" y="326" font-size="9.5" fill="#4A473F">限制单 RPC DATA 帧</text>
+  <rect x="398" y="334" width="196" height="14" rx="4" fill="#D8DEE7"/>
+  <rect x="398" y="334" width="138" height="14" rx="4" fill="#3D5A80"/>
+  <text x="398" y="358" font-size="9.5" fill="#2C4460">可用: 18 KB / 64 KB</text>
 
-  <!-- Receiver panel -->
-  <rect x="900" y="174" width="300" height="360" rx="18" fill="#FFFFFF" stroke="#9AA7B4" stroke-width="1.2" filter="url(#shadow)"/>
-  <text x="924" y="208" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#25313D">④ 接收与消费</text>
+  <rect x="612" y="292" width="216" height="74" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="622" y="310" font-size="11" font-weight="700" fill="#24473F">Connection Window (连接窗口)</text>
+  <text x="622" y="326" font-size="9.5" fill="#4A473F">限制整条连接所有流</text>
+  <rect x="622" y="334" width="196" height="14" rx="4" fill="#D7E1DD"/>
+  <rect x="622" y="334" width="168" height="14" rx="4" fill="#2F6B5E"/>
+  <text x="622" y="358" font-size="9.5" fill="#24473F">可用: 96 KB / 512 KB</text>
 
-  <rect x="924" y="238" width="252" height="80" rx="12" fill="#DCE9E3" stroke="#2F6B5E"/>
-  <text x="1050" y="267" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#24473F">gRPC 接收缓冲 / Read</text>
-  <text x="1050" y="293" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" fill="#24473F">消费数据后释放 transport credit</text>
+  <text x="608" y="388" text-anchor="middle" font-size="10" font-weight="700" fill="#6B4E28">可发 DATA ≤ min(W_stream, W_conn) · 控制帧不耗信用</text>
 
-  <rect x="924" y="344" width="252" height="80" rx="12" fill="#FFF7E5" stroke="#B98532"/>
-  <text x="1050" y="373" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#74531E">业务消费者</text>
-  <text x="1050" y="399" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" fill="#74531E">模型解码 / 落盘 / 指标聚合</text>
+  <!-- Col 3: 接收端应用 · 消费与下游背压 -->
+  <rect x="866" y="128" width="310" height="284" rx="7" fill="#EDF6F2" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="880" y="150" font-size="13" font-weight="700" fill="#24473F">④ 接收端：缓冲与消费</text>
+  <text x="880" y="167" font-size="10" fill="#6B675C">Transport 接收 → 业务消费</text>
 
-  <rect x="924" y="450" width="252" height="62" rx="11" fill="#F0E0DB" stroke="#A64B3C"/>
-  <text x="1050" y="476" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#733428">业务慢：必须选择策略</text>
-  <text x="1050" y="498" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#733428">背压 / 丢弃 / 合并 / 落盘 / 拒绝</text>
+  <rect x="880" y="178" width="282" height="64" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="892" y="198" font-size="11.5" font-weight="700" fill="#24473F">gRPC Transport Buffer</text>
+  <text x="892" y="216" font-size="10" fill="#24473F">· 组装 HTTP/2 DATA 帧</text>
+  <text x="892" y="232" font-size="10" fill="#2F6B5E">· Read(&amp;msg) 后返还信用</text>
 
-  <!-- Forward flow arrows -->
-  <path d="M 340 278 C 355 278, 370 278, 394 278" fill="none" stroke="#3D5A80" stroke-width="3" marker-end="url(#arrow-blue)"/>
-  <text x="366" y="264" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#2C4460">Write</text>
+  <rect x="880" y="250" width="282" height="66" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="892" y="270" font-size="11.5" font-weight="700" fill="#6B4E28">业务消费者 (Worker/DB)</text>
+  <text x="892" y="288" font-size="10" fill="#6B4E28">· 推理 / 解码 / 落盘 / 事务</text>
+  <text x="892" y="304" font-size="9.5" fill="#8A6A3A">· 真实耗时与网络异步脱钩</text>
 
-  <path d="M 594 282 C 604 282, 610 282, 620 282" fill="none" stroke="#6B5B95" stroke-width="3" marker-end="url(#arrow-purple)"/>
-  <path d="M 842 282 C 865 282, 884 278, 920 278" fill="none" stroke="#3D5A80" stroke-width="3" marker-end="url(#arrow-blue)"/>
-  <text x="880" y="264" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#2C4460">DATA</text>
+  <rect x="880" y="324" width="282" height="76" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="892" y="342" font-size="10.5" font-weight="700" fill="#733428">消费端过慢应对策略：</text>
+  <text x="892" y="360" font-size="10" fill="#733428">· 阻断：停调 Read() 触发反压</text>
+  <text x="892" y="376" font-size="10" fill="#733428">· 降级：丢弃 / 聚合 / 拒绝</text>
+  <text x="892" y="392" font-size="9.5" fill="#5A564B">（无界缓冲必致 OOM）</text>
 
-  <path d="M 1050 318 L 1050 342" fill="none" stroke="#2F6B5E" stroke-width="3" marker-end="url(#arrow-green)"/>
+  <!-- 正向推进箭头 -->
+  <path d="M 350 227 H 376" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrBlue)"/>
+  <text x="363" y="220" text-anchor="middle" font-size="9.5" font-weight="700" fill="#3D5A80">Write</text>
 
-  <!-- Feedback area -->
-  <rect x="40" y="570" width="1160" height="226" rx="18" fill="#FFFFFF" stroke="#9AA7B4" stroke-width="1.2" filter="url(#shadow)"/>
-  <text x="64" y="605" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#25313D">反馈路径：三种“完成”不能混为一谈</text>
+  <path d="M 852 210 H 878" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrGreen)"/>
+  <text x="865" y="203" text-anchor="middle" font-size="9.5" font-weight="700" fill="#2F6B5E">DATA</text>
 
-  <path d="M 1050 638 C 930 638, 836 638, 742 638" fill="none" stroke="#2F6B5E" stroke-width="3" marker-end="url(#arrow-green)"/>
-  <text x="896" y="625" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#24473F">消费 transport buffer</text>
+  <!-- ============ Panel B: 反馈回路与三种“完成”语义对照 ============ -->
+  <text x="48" y="448" font-size="13.5" font-weight="700" fill="#4A473F">B · 反馈回路与三种“完成”语义对照表（严防混淆）</text>
+  <rect x="48" y="460" width="1144" height="294" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
 
-  <path d="M 742 672 C 630 672, 542 672, 430 672" fill="none" stroke="#6B5B95" stroke-width="3" marker-end="url(#arrow-purple)"/>
-  <text x="586" y="659" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#4A3F68">WINDOW_UPDATE：补充 stream / connection credit</text>
+  <!-- 反馈回路三卡片 -->
+  <rect x="64" y="472" width="344" height="84" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="76" y="492" font-size="11.5" font-weight="700" fill="#2C4460">[反馈 1] CQ Write Tag 返回</text>
+  <text x="76" y="510" font-size="10" fill="#2C4460">· 发起源：本地 Runtime</text>
+  <text x="76" y="526" font-size="10" fill="#2C4460">· 扣减 pending_bytes，发下一条</text>
+  <text x="76" y="542" font-size="9.5" font-weight="700" fill="#A64B3C">· 警告：不代表网络已发完</text>
 
-  <path d="M 1028 724 C 806 786, 416 786, 194 724" fill="none" stroke="#A64B3C" stroke-width="3" stroke-dasharray="9 7" marker-end="url(#arrow-red)"/>
-  <rect x="415" y="748" width="390" height="30" rx="8" fill="#FFFFFF" fill-opacity="0.94"/>
-  <text x="610" y="769" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#733428">端到端处理保证：业务 ACK / sequence / credit</text>
+  <rect x="422" y="472" width="374" height="84" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="434" y="492" font-size="11.5" font-weight="700" fill="#4A3F68">[反馈 2] WINDOW_UPDATE 帧</text>
+  <text x="434" y="510" font-size="10" fill="#4A3F68">· 发起源：对端 Transport</text>
+  <text x="434" y="526" font-size="10" fill="#4A3F68">· 归还 Stream / Conn 信用</text>
+  <text x="434" y="542" font-size="9.5" font-weight="700" fill="#A64B3C">· 警告：不代表业务处理完成</text>
 
-  <rect x="64" y="626" width="248" height="96" rx="12" fill="#E3EAF4" stroke="#3D5A80"/>
-  <text x="188" y="655" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#2C4460">应用水位</text>
-  <text x="188" y="681" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#2C4460">控制生产速率与内存上限</text>
-  <text x="188" y="704" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#5D6F86">High 停、Low 恢复</text>
+  <rect x="810" y="472" width="366" height="84" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="822" y="492" font-size="11.5" font-weight="700" fill="#6B4E28">[反馈 3] 业务显式 ACK</text>
+  <text x="822" y="510" font-size="10" fill="#6B4E28">· 发起源：对端业务应用</text>
+  <text x="822" y="526" font-size="10" fill="#6B4E28">· 发送端安全移除重试分片</text>
+  <text x="822" y="542" font-size="9.5" font-weight="700" fill="#2F6B5E">· 结论：端到端一致性唯一凭据</text>
 
-  <rect x="438" y="700" width="342" height="50" rx="12" fill="#E7E2EF" stroke="#6B5B95"/>
-  <text x="609" y="730" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#4A3F68">HTTP/2 credit 只说明接收端传输层可再接收字节</text>
+  <!-- 对照表格 -->
+  <rect x="64" y="566" width="1112" height="26" rx="4" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="583" font-size="10.5" font-weight="700" fill="#4A473F">完成类型</text>
+  <text x="250" y="583" font-size="10.5" font-weight="700" fill="#4A473F">发起源与机制</text>
+  <text x="430" y="583" font-size="10.5" font-weight="700" fill="#4A473F">真正物理含义</text>
+  <text x="660" y="583" font-size="10.5" font-weight="700" fill="#4A473F">非代表含义 (误区)</text>
+  <text x="920" y="583" font-size="10.5" font-weight="700" fill="#4A473F">架构职责与动作</text>
 
-  <rect x="892" y="626" width="284" height="96" rx="12" fill="#FFF7E5" stroke="#B98532"/>
-  <text x="1034" y="655" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#74531E">业务完成</text>
-  <text x="1034" y="681" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#74531E">必须由业务协议显式确认</text>
-  <text x="1034" y="704" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#8B6B35">例如 checkpoint shard ACK</text>
+  <!-- 行 1: CQ Write Tag -->
+  <line x1="64" y1="592" x2="1176" y2="592" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="612" font-size="10.5" font-weight="700" fill="#2C4460">CQ Write Tag</text>
+  <text x="250" y="612" font-size="10" fill="#4A473F">本地 Runtime CQ</text>
+  <text x="430" y="612" font-size="10" fill="#4A473F">已交框架底层发送缓冲</text>
+  <text x="660" y="612" font-size="10" font-weight="700" fill="#A64B3C">≠ 对端已收，≠ 业务处理</text>
+  <text x="920" y="612" font-size="10" fill="#2C4460">扣减积压，推进发送队列</text>
 
-  <text x="48" y="833" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" fill="#6B747D">关键结论：传输流控避免 runtime 被淹没；应用背压保护业务队列；业务 ACK 才能表达“对端已经处理”。</text>
+  <!-- 行 2: WINDOW_UPDATE -->
+  <line x1="64" y1="626" x2="1176" y2="626" stroke="#EDEBE3" stroke-width="1"/>
+  <text x="76" y="646" font-size="10.5" font-weight="700" fill="#4A3F68">WINDOW_UPDATE</text>
+  <text x="250" y="646" font-size="10" fill="#4A473F">对端 Transport 帧</text>
+  <text x="430" y="646" font-size="10" fill="#4A473F">传输缓冲腾空，可再收字节</text>
+  <text x="660" y="646" font-size="10" font-weight="700" fill="#A64B3C">≠ 数据落盘，≠ 业务正常</text>
+  <text x="920" y="646" font-size="10" fill="#4A3F68">解除发送阻塞，保护协议栈</text>
+
+  <!-- 行 3: 业务 ACK -->
+  <line x1="64" y1="660" x2="1176" y2="660" stroke="#EDEBE3" stroke-width="1"/>
+  <text x="76" y="680" font-size="10.5" font-weight="700" fill="#6B4E28">业务显式 ACK</text>
+  <text x="250" y="680" font-size="10" fill="#4A473F">对端业务 protobuf</text>
+  <text x="430" y="680" font-size="10" fill="#24473F">已持久化、落盘或计算完成</text>
+  <text x="660" y="680" font-size="10" fill="#6B675C">（端到端强一致确认点）</text>
+  <text x="920" y="680" font-size="10" font-weight="700" fill="#2F6B5E">从重试窗口移除，确立终态</text>
+
+  <line x1="64" y1="696" x2="1176" y2="696" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="76" y="714" font-size="10" fill="#6B675C">铁律：勿把下层流控当作业务完成；每层只解决本层背压。</text>
+  <text x="76" y="732" font-size="10" fill="#733428">强一致性必须在 protobuf 中定义 sequence 与 ACK 消息并维护重试集。</text>
+
+  <!-- ============ Bottom Summary Banner ============ -->
+  <rect x="48" y="764" width="1144" height="32" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="620" y="784" text-anchor="middle" font-size="11" font-weight="700" fill="#6B4E28">总结：HTTP/2 窗口防止传输层爆仓 · CQ 门禁防止 API 重入 · 水位控制防止应用 OOM · 业务 ACK 保证数据不丢</text>
 </svg>
