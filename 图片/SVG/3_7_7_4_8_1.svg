@@ -1,0 +1,488 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1620" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif">
+  <defs>
+    <!-- 阴影滤镜 -->
+    <filter id="cardShadow" x="-3%" y="-2%" width="106%" height="106%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.04"/>
+    </filter>
+
+    <!-- 箭头标记 -->
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1.5 L8,5 L0,8.5 z" fill="#B83A2C"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1.5 L8,5 L0,8.5 z" fill="#1E7052"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1.5 L8,5 L0,8.5 z" fill="#2B5584"/>
+    </marker>
+    <marker id="arrGray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1.5 L8,5 L0,8.5 z" fill="#7C8794"/>
+    </marker>
+  </defs>
+
+  <!-- 全局背景 -->
+  <rect width="1240" height="1620" fill="#F5F4F0"/>
+
+  <!-- ================= 页面主标题区 ================= -->
+  <g transform="translate(48, 42)">
+    <text x="0" y="0" font-size="23" font-weight="800" fill="#1C1F26" letter-spacing="0.2">HTTP/1.1 · HTTP/2 · HTTP/3：全链路分层封装与队头阻塞（HoLB）演进</text>
+    <text x="0" y="26" font-size="12.5" fill="#5E6773">从协议栈物理报文（PDU）结构拆解，探寻传输层与应用层队头阻塞的成因、代偿方案与终极消灭路径</text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- Panel A: HTTP/1.1                                                         -->
+  <!-- ========================================================================= -->
+  <g transform="translate(48, 92)">
+    <!-- 外卡片 -->
+    <rect width="1144" height="424" rx="8" fill="#FFFFFF" stroke="#D9DFE5" stroke-width="1" filter="url(#cardShadow)"/>
+
+    <!-- 标题栏 -->
+    <path d="M0,8 Q0,0 8,0 L1136,0 Q1144,0 1144,8 L1144,40 L0,40 Z" fill="#F4F6F8"/>
+    <line x1="0" y1="40" x2="1144" y2="40" stroke="#E1E5EA" stroke-width="1"/>
+    <text x="20" y="20" dominant-baseline="central" font-size="14.5" font-weight="700" fill="#2B5584">A · HTTP/1.1 架构：纯文本请求行 + 单 TCP 字节流（双重队头阻塞）</text>
+    <rect x="948" y="9" width="176" height="22" rx="11" fill="#FDF1F0" stroke="#F1B5AF" stroke-width="1"/>
+    <circle cx="962" cy="20" r="3.5" fill="#B83A2C"/>
+    <text x="974" y="20" dominant-baseline="central" font-size="11" font-weight="700" fill="#B83A2C">应用层 + 传输层 双重阻塞</text>
+
+    <!-- 左栏：分层封装形式 (Width: 512, x=20) -->
+    <text x="20" y="62" dominant-baseline="central" font-size="12" font-weight="700" fill="#4B5363">【分层封装拓扑】</text>
+
+    <!-- 5. 应用层 -->
+    <g transform="translate(20, 78)">
+      <rect width="512" height="66" rx="5" fill="#F4F7FB" stroke="#2B5584" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,66 L5,66 Q0,66 0,61 Z" fill="#2B5584"/>
+      <text x="37" y="24" dominant-baseline="central" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">5. 应用层</text>
+      <text x="37" y="42" dominant-baseline="central" font-size="9" fill="#B6D2F0" text-anchor="middle">纯文本序列</text>
+
+      <rect x="86" y="8" width="414" height="25" rx="3" fill="#FFFFFF" stroke="#CCD7E6" stroke-width="1"/>
+      <text x="96" y="20" dominant-baseline="central" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10" font-weight="600" fill="#1C385C">GET /index.html HTTP/1.1\r\nHost: a.com\r\n\r\n</text>
+      <text x="88" y="48" dominant-baseline="central" font-size="9.5" fill="#697386">无 Stream ID 概念，请求/响应严格依赖传输的【发送 FIFO 顺序】隐式对齐匹配</text>
+    </g>
+
+    <!-- 4. 传输层 -->
+    <g transform="translate(20, 152)">
+      <rect width="512" height="56" rx="5" fill="#F0F7F4" stroke="#1E7052" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,56 L5,56 Q0,56 0,51 Z" fill="#1E7052"/>
+      <text x="37" y="20" dominant-baseline="central" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">4. 传输层</text>
+      <text x="37" y="36" dominant-baseline="central" font-size="9" fill="#B3E2D1" text-anchor="middle">TCP 字节流</text>
+
+      <rect x="86" y="8" width="130" height="40" rx="3" fill="#FFFFFF" stroke="#1E7052" stroke-width="1"/>
+      <text x="151" y="21" dominant-baseline="central" font-size="10" font-weight="700" fill="#1E7052" text-anchor="middle">TCP 报头 (20 Bytes)</text>
+      <text x="151" y="35" dominant-baseline="central" font-family="monospace" font-size="9" fill="#526071" text-anchor="middle">Seq: 10001 | Ack: 5001</text>
+
+      <rect x="224" y="8" width="276" height="40" rx="3" fill="#FFFFFF" stroke="#2B5584" stroke-width="1"/>
+      <text x="362" y="28" dominant-baseline="central" font-size="10" fill="#2B5584" text-anchor="middle">TCP 载荷 Payload (直接包裹 HTTP 明文数据流)</text>
+    </g>
+
+    <!-- 3/2. 网络与链路层 -->
+    <g transform="translate(20, 216)">
+      <rect width="512" height="46" rx="5" fill="#F6F4FA" stroke="#5E4B8B" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,46 L5,46 Q0,46 0,41 Z" fill="#5E4B8B"/>
+      <text x="37" y="23" dominant-baseline="central" font-size="10.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">3/2. 底层</text>
+
+      <rect x="86" y="7" width="124" height="32" rx="3" fill="#FFFFFF" stroke="#5E4B8B" stroke-width="1"/>
+      <text x="148" y="23" dominant-baseline="central" font-size="9.5" fill="#5E4B8B" text-anchor="middle">IP 头: 192.168.1.10</text>
+
+      <rect x="218" y="7" width="138" height="32" rx="3" fill="#FFFFFF" stroke="#8A6A3A" stroke-width="1"/>
+      <text x="287" y="23" dominant-baseline="central" font-size="9.5" fill="#8A6A3A" text-anchor="middle">以太网头: 源/目 MAC</text>
+
+      <rect x="364" y="7" width="136" height="32" rx="3" fill="#ECE9E2" stroke="#8A8679" stroke-width="1"/>
+      <text x="432" y="23" dominant-baseline="central" font-size="9.5" fill="#4B483E" text-anchor="middle">FCS 帧尾校验 (4B)</text>
+    </g>
+
+    <!-- 协议代偿说明 -->
+    <g transform="translate(20, 270)">
+      <rect width="512" height="66" rx="5" fill="#FAF9F5" stroke="#E5E0D0" stroke-width="1"/>
+      <text x="14" y="20" dominant-baseline="central" font-size="10" font-weight="700" fill="#B83A2C">时代的妥协方案：</text>
+      <text x="106" y="20" dominant-baseline="central" font-size="9.5" fill="#383D48">浏览器单域名开 6 条 TCP 并发管道；雪碧图合并、Inlining Base64、域名分片。</text>
+      <text x="14" y="42" dominant-baseline="central" font-size="9.5" fill="#697386">代偿代价：频繁 TCP+TLS 握手高延迟、多连接慢启动争抢拥塞窗口、服务端连接承载承载雪崩。</text>
+    </g>
+
+    <!-- 分隔虚线 -->
+    <line x1="556" y1="56" x2="556" y2="408" stroke="#E1E5EA" stroke-width="1" stroke-dasharray="4 3"/>
+
+    <!-- 右栏：HoLB 发生原理 (Width: 556, x=576) -->
+    <text x="576" y="62" dominant-baseline="central" font-size="12" font-weight="700" fill="#4B5363">【队头阻塞 (HoLB) 物理发生点】</text>
+
+    <!-- 右上：应用层 HoLB -->
+    <g transform="translate(576, 78)">
+      <rect width="548" height="126" rx="6" fill="#FEF9F8" stroke="#F1B5AF" stroke-width="1.2"/>
+      <text x="16" y="18" dominant-baseline="central" font-size="11.5" font-weight="700" fill="#B83A2C">1. 应用层 HoLB（响应在管道内必须严格按序返回）</text>
+
+      <rect x="16" y="34" width="160" height="34" rx="4" fill="#FDECE8" stroke="#EAA196" stroke-width="1"/>
+      <text x="96" y="46" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#852115" text-anchor="middle">请求 1: 大报表 API</text>
+      <text x="96" y="58" dominant-baseline="central" font-size="8.5" fill="#B83A2C" text-anchor="middle">后端慢查询 · 需 3s</text>
+
+      <rect x="186" y="34" width="168" height="34" rx="4" fill="#E8F4EE" stroke="#A2D4BE" stroke-width="1"/>
+      <text x="270" y="46" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#1E7052" text-anchor="middle">请求 2: main.css</text>
+      <text x="270" y="58" dominant-baseline="central" font-size="8.5" fill="#1E7052" text-anchor="middle">静态缓存命中 · 1ms 就绪</text>
+
+      <rect x="364" y="34" width="168" height="34" rx="4" fill="#E8F4EE" stroke="#A2D4BE" stroke-width="1"/>
+      <text x="448" y="46" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#1E7052" text-anchor="middle">请求 3: app.js</text>
+      <text x="448" y="58" dominant-baseline="central" font-size="8.5" fill="#1E7052" text-anchor="middle">静态缓存命中 · 1ms 就绪</text>
+
+      <!-- 阻塞解释 -->
+      <path d="M 96,68 L 96,78 L 360,78" fill="none" stroke="#B83A2C" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arrRed)"/>
+      <text x="16" y="93" dominant-baseline="central" font-size="10" font-weight="700" fill="#B83A2C">💥 强制阻塞：请求 1 计算未完，服务端绝不可提前将请求 2 和 3 的响应推入 TCP 字节流！</text>
+      <text x="16" y="110" dominant-baseline="central" font-size="9" fill="#7C8794">（因为 HTTP/1.1 无 Stream 标记，若提前返回，客户端解析器会把 CSS 误认作报表的内容）</text>
+    </g>
+
+    <!-- 右下：传输层 HoLB -->
+    <g transform="translate(576, 214)">
+      <rect width="548" height="126" rx="6" fill="#FEF9F8" stroke="#F1B5AF" stroke-width="1.2"/>
+      <text x="16" y="18" dominant-baseline="central" font-size="11.5" font-weight="700" fill="#B83A2C">2. 传输层 HoLB（TCP 协议栈单字节流必须绝对连续交付）</text>
+
+      <rect x="16" y="34" width="160" height="34" rx="4" fill="#FDF1F0" stroke="#B83A2C" stroke-width="1.2" stroke-dasharray="4 2"/>
+      <text x="96" y="46" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#B83A2C" text-anchor="middle">❌ TCP Segment 1</text>
+      <text x="96" y="58" dominant-baseline="central" font-size="8.5" fill="#852115" text-anchor="middle">途中丢失 (Seq 10001)</text>
+
+      <rect x="186" y="34" width="168" height="34" rx="4" fill="#F4F6F9" stroke="#CCD7E6" stroke-width="1"/>
+      <text x="270" y="46" dominant-baseline="central" font-size="9.5" fill="#3D4B5C" text-anchor="middle">📦 Segment 2 (已入内核区)</text>
+      <text x="270" y="58" dominant-baseline="central" font-size="8.5" fill="#7C8794" text-anchor="middle">正常接收 (Seq 11461)</text>
+
+      <rect x="364" y="34" width="168" height="34" rx="4" fill="#F4F6F9" stroke="#CCD7E6" stroke-width="1"/>
+      <text x="448" y="46" dominant-baseline="central" font-size="9.5" fill="#3D4B5C" text-anchor="middle">📦 Segment 3 (已入内核区)</text>
+      <text x="448" y="58" dominant-baseline="central" font-size="8.5" fill="#7C8794" text-anchor="middle">正常接收 (Seq 12921)</text>
+
+      <path d="M 96,68 L 96,78 L 360,78" fill="none" stroke="#B83A2C" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arrRed)"/>
+      <text x="16" y="93" dominant-baseline="central" font-size="10" font-weight="700" fill="#B83A2C">💥 内核挂起：因 Segment 1 缺失，内核套接字接收缓冲区（rcvbuf）锁死！</text>
+      <text x="16" y="110" dominant-baseline="central" font-size="9" fill="#7C8794">后续即使 Seg 2、3 完好到达网卡，应用层调用 read() 也会被死死挂起，直至重传填平空洞。</text>
+    </g>
+  </g>
+
+
+  <!-- ========================================================================= -->
+  <!-- Panel B: HTTP/2                                                           -->
+  <!-- ========================================================================= -->
+  <g transform="translate(48, 532)">
+    <rect width="1144" height="434" rx="8" fill="#FFFFFF" stroke="#D9DFE5" stroke-width="1" filter="url(#cardShadow)"/>
+
+    <!-- 标题栏 -->
+    <path d="M0,8 Q0,0 8,0 L1136,0 Q1144,0 1144,8 L1144,40 L0,40 Z" fill="#F4F6F8"/>
+    <line x1="0" y1="40" x2="1144" y2="40" stroke="#E1E5EA" stroke-width="1"/>
+    <text x="20" y="20" dominant-baseline="central" font-size="14.5" font-weight="700" fill="#2B5584">B · HTTP/2 架构：二进制分帧多路复用 + 单 TCP 流（应用层解耦，传输层单点放大）</text>
+    <rect x="918" y="9" width="206" height="22" rx="11" fill="#FEF7ED" stroke="#F4CE98" stroke-width="1"/>
+    <circle cx="932" cy="20" r="3.5" fill="#B8741A"/>
+    <text x="944" y="20" dominant-baseline="central" font-size="11" font-weight="700" fill="#A35C00">应用层解决 · 传输层单点恶化</text>
+
+    <!-- 左栏：分层封装形式 (Width: 512, x=20) -->
+    <text x="20" y="62" dominant-baseline="central" font-size="12" font-weight="700" fill="#4B5363">【分层封装拓扑】</text>
+
+    <!-- 5. 应用层二进制分帧 -->
+    <g transform="translate(20, 78)">
+      <rect width="512" height="106" rx="5" fill="#F4F7FB" stroke="#2B5584" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,106 L5,106 Q0,106 0,101 Z" fill="#2B5584"/>
+      <text x="37" y="44" dominant-baseline="central" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">5. 应用层</text>
+      <text x="37" y="62" dominant-baseline="central" font-size="9" fill="#B6D2F0" text-anchor="middle">二进制分帧</text>
+
+      <!-- 9B 帧头完整结构 (长宽比例严格设计: 424px) -->
+      <g transform="translate(86, 8)">
+        <rect width="414" height="42" rx="3" fill="#FFFFFF" stroke="#CCD7E6" stroke-width="1"/>
+        <text x="8" y="14" dominant-baseline="central" font-size="9" font-weight="700" fill="#2B5584">9-Byte 标准帧头结构：</text>
+
+        <!-- Length 24b (120px) -->
+        <rect x="8" y="22" width="112" height="16" fill="#EDF3F9" stroke="#2B5584" stroke-width="0.8"/>
+        <text x="64" y="30" dominant-baseline="central" font-size="8" fill="#1C385C" text-anchor="middle">Length (24 bits)</text>
+
+        <!-- Type 8b (46px) -->
+        <rect x="122" y="22" width="46" height="16" fill="#EDF3F9" stroke="#2B5584" stroke-width="0.8"/>
+        <text x="145" y="30" dominant-baseline="central" font-size="8" fill="#1C385C" text-anchor="middle">Type (8b)</text>
+
+        <!-- Flags 8b (46px) -->
+        <rect x="170" y="22" width="46" height="16" fill="#EDF3F9" stroke="#2B5584" stroke-width="0.8"/>
+        <text x="193" y="30" dominant-baseline="central" font-size="8" fill="#1C385C" text-anchor="middle">Flags (8b)</text>
+
+        <!-- R + Stream ID 31b (178px) 重点突出 -->
+        <rect x="218" y="22" width="188" height="16" fill="#FEF7ED" stroke="#B8741A" stroke-width="1.2"/>
+        <text x="312" y="30" dominant-baseline="central" font-size="8.5" font-weight="700" fill="#A35C00" text-anchor="middle">R(1b) + Stream ID (31 bits)</text>
+      </g>
+
+      <!-- 交织的流分块 -->
+      <g transform="translate(86, 56)">
+        <rect x="0" y="0" width="134" height="42" rx="3" fill="#FFFFFF" stroke="#2B5584" stroke-width="1"/>
+        <text x="67" y="14" dominant-baseline="central" font-size="9" font-weight="700" fill="#2B5584" text-anchor="middle">[Stream 1 报表帧]</text>
+        <text x="67" y="29" dominant-baseline="central" font-size="8" fill="#526071" text-anchor="middle">Payload 切片 A (部分)</text>
+
+        <rect x="140" y="0" width="134" height="42" rx="3" fill="#E8F4EE" stroke="#1E7052" stroke-width="1.2"/>
+        <text x="207" y="14" dominant-baseline="central" font-size="9" font-weight="700" fill="#1E7052" text-anchor="middle">[Stream 3 CSS 完整帧]</text>
+        <text x="207" y="29" dominant-baseline="central" font-size="8" fill="#1E7052" text-anchor="middle">Payload: 完整样式表</text>
+
+        <rect x="280" y="0" width="134" height="42" rx="3" fill="#F6F4FA" stroke="#5E4B8B" stroke-width="1.2"/>
+        <text x="347" y="14" dominant-baseline="central" font-size="9" font-weight="700" fill="#5E4B8B" text-anchor="middle">[Stream 5 JS 完整帧]</text>
+        <text x="347" y="29" dominant-baseline="central" font-size="8" fill="#5E4B8B" text-anchor="middle">Payload: 完整脚本</text>
+      </g>
+    </g>
+
+    <!-- 4. 传输层 -->
+    <g transform="translate(20, 192)">
+      <rect width="512" height="54" rx="5" fill="#F0F7F4" stroke="#1E7052" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,54 L5,54 Q0,54 0,49 Z" fill="#1E7052"/>
+      <text x="37" y="20" dominant-baseline="central" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">4. 传输层</text>
+      <text x="37" y="36" dominant-baseline="central" font-size="9" fill="#B3E2D1" text-anchor="middle">单条 TCP 连接</text>
+
+      <rect x="86" y="7" width="130" height="40" rx="3" fill="#FFFFFF" stroke="#1E7052" stroke-width="1"/>
+      <text x="151" y="20" dominant-baseline="central" font-size="10" font-weight="700" fill="#1E7052" text-anchor="middle">TCP 报头 (20B)</text>
+      <text x="151" y="34" dominant-baseline="central" font-family="monospace" font-size="9" fill="#526071" text-anchor="middle">Seq: 20001 (全局单序列)</text>
+
+      <rect x="224" y="7" width="276" height="40" rx="3" fill="#FFF9F2" stroke="#B8741A" stroke-width="1"/>
+      <text x="362" y="27" dominant-baseline="central" font-size="10" fill="#854C00" text-anchor="middle">无差别混装所有 Stream 二进制帧的线性字节序列</text>
+    </g>
+
+    <!-- 3/2. 底层与优势 -->
+    <g transform="translate(20, 254)">
+      <rect width="512" height="38" rx="5" fill="#F6F4FA" stroke="#5E4B8B" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,38 L5,38 Q0,38 0,33 Z" fill="#5E4B8B"/>
+      <text x="37" y="19" dominant-baseline="central" font-size="10.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">3/2. 底层</text>
+      <text x="86" y="19" dominant-baseline="central" font-size="9.5" fill="#423563">IP 报文 ──> 以太网帧（所有 Stream 捆绑在同一条 TCP 管道生命周期内）</text>
+    </g>
+
+    <g transform="translate(20, 300)">
+      <rect width="512" height="52" rx="5" fill="#FAF9F5" stroke="#E5E0D0" stroke-width="1"/>
+      <text x="14" y="18" dominant-baseline="central" font-size="10" font-weight="700" fill="#1E7052">架构革命：HPACK 算法 + 多路复用</text>
+      <text x="14" y="36" dominant-baseline="central" font-size="9.5" fill="#5E6773">极大压低请求头体积；将浏览器发往同源主机的连接数收敛到 1 条，杜绝多连接慢启动竞争。</text>
+    </g>
+
+    <!-- 分隔虚线 -->
+    <line x1="556" y1="56" x2="556" y2="418" stroke="#E1E5EA" stroke-width="1" stroke-dasharray="4 3"/>
+
+    <!-- 右栏：HTTP/2 阻塞机制 (Width: 556, x=576) -->
+    <text x="576" y="62" dominant-baseline="central" font-size="12" font-weight="700" fill="#4B5363">【队头阻塞 (HoLB) 演进现状】</text>
+
+    <!-- 右上：应用层消灭 -->
+    <g transform="translate(576, 78)">
+      <rect width="548" height="110" rx="6" fill="#F2F9F5" stroke="#A2D4BE" stroke-width="1.2"/>
+      <text x="16" y="18" dominant-baseline="central" font-size="11.5" font-weight="700" fill="#1E7052">1. 应用层 HoLB：✅ 已彻底消灭！</text>
+      <text x="16" y="38" dominant-baseline="central" font-size="10" font-weight="700" fill="#1E7052">服务端一旦准备好 Stream 3 (CSS) 与 Stream 5 (JS)，即刻切帧交错发出！</text>
+      <text x="16" y="58" dominant-baseline="central" font-size="9.5" fill="#2E384D">客户端网络驱动收到交错帧后，依据 31 位 Stream ID 将二进制帧直接分流重组。</text>
+      <text x="16" y="76" dominant-baseline="central" font-size="9.5" fill="#2E384D">即使 Stream 1 报表计算耗时 3s，CSS 和 JS 已在浏览器毫秒级并行解析与渲染！</text>
+      <text x="16" y="94" dominant-baseline="central" font-size="9" fill="#1E7052">★ 突破了 HTTP/1.1 管道中“后发请求必须等待先发响应完成”的历史枷锁。</text>
+    </g>
+
+    <!-- 右下：传输层恶化 -->
+    <g transform="translate(576, 196)">
+      <rect width="548" height="156" rx="6" fill="#FEF9F8" stroke="#F1B5AF" stroke-width="1.2"/>
+      <text x="16" y="18" dominant-baseline="central" font-size="11.5" font-weight="700" fill="#B83A2C">2. 传输层 HoLB：❌ 反遭单连接多路复用数倍放大！</text>
+
+      <rect x="16" y="34" width="160" height="36" rx="4" fill="#FDF1F0" stroke="#B83A2C" stroke-width="1.2" stroke-dasharray="4 2"/>
+      <text x="96" y="46" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#B83A2C" text-anchor="middle">❌ TCP Segment A (丢包)</text>
+      <text x="96" y="59" dominant-baseline="central" font-size="8.5" fill="#852115" text-anchor="middle">装有 Stream 1 的碎片</text>
+
+      <rect x="186" y="34" width="168" height="36" rx="4" fill="#F4F6F9" stroke="#CCD7E6" stroke-width="1"/>
+      <text x="270" y="46" dominant-baseline="central" font-size="9.5" fill="#3D4B5C" text-anchor="middle">📦 Segment B (已达网卡)</text>
+      <text x="270" y="59" dominant-baseline="central" font-size="8.5" fill="#1E7052" text-anchor="middle">装有 Stream 3 (CSS)</text>
+
+      <rect x="364" y="34" width="168" height="36" rx="4" fill="#F4F6F9" stroke="#CCD7E6" stroke-width="1"/>
+      <text x="448" y="46" dominant-baseline="central" font-size="9.5" fill="#3D4B5C" text-anchor="middle">📦 Segment C (已达网卡)</text>
+      <text x="448" y="59" dominant-baseline="central" font-size="8.5" fill="#5E4B8B" text-anchor="middle">装有 Stream 5 (JS)</text>
+
+      <path d="M 96,70 L 96,80 L 360,80" fill="none" stroke="#B83A2C" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arrRed)"/>
+      <text x="16" y="96" dominant-baseline="central" font-size="10" font-weight="700" fill="#B83A2C">💥 传输层致命连锁阻断：</text>
+      <text x="16" y="113" dominant-baseline="central" font-size="9.5" fill="#B83A2C">内核 TCP 协议栈对应用层透明，根本不识别内部的 Stream 3 和 Stream 5！</text>
+      <text x="16" y="129" dominant-baseline="central" font-size="9.5" fill="#4B5363">由于 Segment A 丢包，内核强制拒绝把段 B、C 提交给浏览器进程。所有无关 Stream 统统挂起！</text>
+      <text x="16" y="145" dominant-baseline="central" font-size="9" fill="#7C8794">（实测在 2%~3% 弱网丢包环境下，HTTP/2 单连接的吞吐性能显著劣于 HTTP/1.1 多 TCP 竞争）</text>
+    </g>
+  </g>
+
+
+  <!-- ========================================================================= -->
+  <!-- Panel C: HTTP/3                                                           -->
+  <!-- ========================================================================= -->
+  <g transform="translate(48, 982)">
+    <rect width="1144" height="434" rx="8" fill="#FFFFFF" stroke="#D9DFE5" stroke-width="1" filter="url(#cardShadow)"/>
+
+    <!-- 标题栏 -->
+    <path d="M0,8 Q0,0 8,0 L1136,0 Q1144,0 1144,8 L1144,40 L0,40 Z" fill="#F4F6F8"/>
+    <line x1="0" y1="40" x2="1144" y2="40" stroke="#E1E5EA" stroke-width="1"/>
+    <text x="20" y="20" dominant-baseline="central" font-size="14.5" font-weight="700" fill="#1E7052">C · HTTP/3 架构：QUIC 传输层原生多流 + 独立 UDP 数据报（彻底粉碎队头阻塞）</text>
+    <rect x="914" y="9" width="210" height="22" rx="11" fill="#E8F4EE" stroke="#A2D4BE" stroke-width="1"/>
+    <circle cx="928" cy="20" r="3.5" fill="#1E7052"/>
+    <text x="940" y="20" dominant-baseline="central" font-size="11" font-weight="700" fill="#1E7052">全链路零阻塞 · 0-RTT · 连接迁移</text>
+
+    <!-- 左栏：分层封装形式 (Width: 512, x=20) -->
+    <text x="20" y="62" dominant-baseline="central" font-size="12" font-weight="700" fill="#4B5363">【分层封装拓扑】</text>
+
+    <!-- 5. 应用层 HTTP/3 -->
+    <g transform="translate(20, 78)">
+      <rect width="512" height="42" rx="5" fill="#F4F7FB" stroke="#2B5584" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,42 L5,42 Q0,42 0,37 Z" fill="#2B5584"/>
+      <text x="37" y="21" dominant-baseline="central" font-size="10.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">5. HTTP/3</text>
+      <text x="86" y="21" dominant-baseline="central" font-size="10" fill="#1C385C">HTTP/3 帧格式（引入 QPACK 动态表压缩，专为乱序无序抵达的数据流设计）</text>
+    </g>
+
+    <!-- 4.5 QUIC 传输层与内置安全 -->
+    <g transform="translate(20, 126)">
+      <rect width="512" height="114" rx="5" fill="#FFFBF5" stroke="#B8741A" stroke-width="1.4"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,114 L5,114 Q0,114 0,109 Z" fill="#B8741A"/>
+      <text x="37" y="48" dominant-baseline="central" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">4.5 QUIC</text>
+      <text x="37" y="66" dominant-baseline="central" font-size="8.5" fill="#FFE8C7" text-anchor="middle">用户空间传输</text>
+      <text x="37" y="80" dominant-baseline="central" font-size="8.5" fill="#FFE8C7" text-anchor="middle">内置 TLS 1.3</text>
+
+      <!-- QUIC 包头 -->
+      <rect x="86" y="8" width="414" height="28" rx="3" fill="#FFFFFF" stroke="#D18F36" stroke-width="1"/>
+      <text x="96" y="22" dominant-baseline="central" font-size="9" font-weight="700" fill="#854C00">QUIC Packet Header:</text>
+      <text x="216" y="22" dominant-baseline="central" font-size="8.5" fill="#4B5363">Connection ID (64-bit CID) | Packet Number (单调递增包号 #88)</text>
+
+      <!-- 原生 STREAM 帧划分 -->
+      <g transform="translate(86, 42)">
+        <rect width="202" height="64" rx="3" fill="#E8F4EE" stroke="#1E7052" stroke-width="1.2"/>
+        <text x="10" y="14" dominant-baseline="central" font-size="9" font-weight="700" fill="#1E7052">STREAM Frame (Stream 3):</text>
+        <text x="10" y="32" dominant-baseline="central" font-size="8.5" fill="#1E7052">Offset: 0 (流内绝对偏移) | Len: 500B</text>
+        <text x="10" y="50" dominant-baseline="central" font-size="8.5" fill="#526071">Data: CSS 样式表 (TLS 密文段)</text>
+
+        <rect x="212" y="0" width="202" height="64" rx="3" fill="#F6F4FA" stroke="#5E4B8B" stroke-width="1.2"/>
+        <text x="222" y="14" dominant-baseline="central" font-size="9" font-weight="700" fill="#5E4B8B">STREAM Frame (Stream 5):</text>
+        <text x="222" y="32" dominant-baseline="central" font-size="8.5" fill="#5E4B8B">Offset: 0 (流内绝对偏移) | Len: 400B</text>
+        <text x="222" y="50" dominant-baseline="central" font-size="8.5" fill="#526071">Data: JS 业务脚本 (TLS 密文段)</text>
+      </g>
+    </g>
+
+    <!-- 4. UDP 传输层 -->
+    <g transform="translate(20, 246)">
+      <rect width="512" height="52" rx="5" fill="#F0F7F4" stroke="#1E7052" stroke-width="1.2"/>
+      <path d="M0,5 Q0,0 5,0 L74,0 L74,52 L5,52 Q0,52 0,47 Z" fill="#1E7052"/>
+      <text x="37" y="20" dominant-baseline="central" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle">4. UDP 层</text>
+      <text x="37" y="36" dominant-baseline="central" font-size="9" fill="#B3E2D1" text-anchor="middle">无连接报文</text>
+
+      <rect x="86" y="7" width="130" height="38" rx="3" fill="#FFFFFF" stroke="#1E7052" stroke-width="1"/>
+      <text x="151" y="20" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#1E7052" text-anchor="middle">UDP 报头 (8B 极简)</text>
+      <text x="151" y="34" dominant-baseline="central" font-family="monospace" font-size="8.5" fill="#526071" text-anchor="middle">Port: 54321 -> 443</text>
+
+      <rect x="224" y="7" width="276" height="38" rx="3" fill="#FFFBF5" stroke="#B8741A" stroke-width="1"/>
+      <text x="362" y="26" dominant-baseline="central" font-size="10" fill="#854C00" text-anchor="middle">独立 QUIC 加密数据报（无底层顺序承诺约束）</text>
+    </g>
+
+    <!-- 3/2. 底层与优势 -->
+    <g transform="translate(20, 304)">
+      <rect width="512" height="36" rx="5" fill="#F6F4FA" stroke="#5E4B8B" stroke-width="1.2"/>
+      <text x="16" y="18" dominant-baseline="central" font-size="9.5" fill="#423563">3/2. 底层：操作系统内核仅做无状态直通递送，不维护任何单字节流全局锁</text>
+    </g>
+
+    <g transform="translate(20, 346)">
+      <rect width="512" height="66" rx="5" fill="#FAF9F5" stroke="#E5E0D0" stroke-width="1"/>
+      <text x="14" y="20" dominant-baseline="central" font-size="10" font-weight="700" fill="#1E7052">网络迁移与握手红利：</text>
+      <text x="120" y="20" dominant-baseline="central" font-size="9.5" fill="#383D48">Wi-Fi 切 5G 导致四元组突变时，依靠 Connection ID 零感平滑续传。</text>
+      <text x="14" y="44" dominant-baseline="central" font-size="9.5" fill="#697386">QUIC 传输握手内嵌 TLS 1.3 密钥协商：初次建连仅需 1-RTT，会话复用（0-RTT）即可随首包直接发送业务数据。</text>
+    </g>
+
+    <!-- 分隔虚线 -->
+    <line x1="556" y1="56" x2="556" y2="422" stroke="#E1E5EA" stroke-width="1" stroke-dasharray="4 3"/>
+
+    <!-- 右栏：彻底消灭 HoLB 原理 (Width: 556, x=576) -->
+    <text x="576" y="62" dominant-baseline="central" font-size="12" font-weight="700" fill="#4B5363">【传输层 HoLB 彻底消灭机制】</text>
+
+    <g transform="translate(576, 78)">
+      <rect width="548" height="334" rx="6" fill="#F2F9F5" stroke="#A2D4BE" stroke-width="1.4"/>
+      <text x="16" y="20" dominant-baseline="central" font-size="12" font-weight="700" fill="#1E7052">🚀 原生多流正交独立：流与流之间互不感知、互不拖累</text>
+
+      <!-- 丢包场景模拟卡片 -->
+      <g transform="translate(16, 36)">
+        <rect width="160" height="48" rx="4" fill="#FDF1F0" stroke="#B83A2C" stroke-width="1.2" stroke-dasharray="4 2"/>
+        <text x="80" y="16" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#B83A2C" text-anchor="middle">❌ UDP 包 1 (丢包)</text>
+        <text x="80" y="32" dominant-baseline="central" font-size="8.5" fill="#852115" text-anchor="middle">包含 Stream 1 (报表)</text>
+
+        <rect x="176" y="0" width="168" height="48" rx="4" fill="#FFFFFF" stroke="#1E7052" stroke-width="1.2"/>
+        <text x="260" y="16" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#1E7052" text-anchor="middle">✅ UDP 包 2 (成功到达)</text>
+        <text x="260" y="32" dominant-baseline="central" font-size="8.5" fill="#1E7052" text-anchor="middle">包含 Stream 3 (CSS)</text>
+
+        <rect x="358" y="0" width="168" height="48" rx="4" fill="#FFFFFF" stroke="#5E4B8B" stroke-width="1.2"/>
+        <text x="442" y="16" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#5E4B8B" text-anchor="middle">✅ UDP 包 3 (成功到达)</text>
+        <text x="442" y="32" dominant-baseline="central" font-size="8.5" fill="#5E4B8B" text-anchor="middle">包含 Stream 5 (JS)</text>
+      </g>
+
+      <!-- 解构逻辑 1 -->
+      <text x="16" y="104" dominant-baseline="central" font-size="11" font-weight="700" fill="#1E7052">1. 内核 UDP 协议栈无状态极速直通：</text>
+      <text x="16" y="124" dominant-baseline="central" font-size="9.5" fill="#2E384D">UDP 协议栈没有“序列号必须严格连续”的枷锁，网卡收到包 2 与包 3 后瞬间直推用户空间 QUIC 引擎！</text>
+
+      <!-- 解构逻辑 2 -->
+      <text x="16" y="152" dominant-baseline="central" font-size="11" font-weight="700" fill="#1E7052">2. 用户空间 QUIC 引擎流式精准派发：</text>
+      <text x="28" y="172" dominant-baseline="central" font-size="9.5" fill="#1E7052">● <tspan font-weight="700">Stream 3 (CSS)</tspan>：校验 Offset=0 数据完整，<tspan font-weight="700">零延迟直接送入浏览器排版引擎渲染页面！</tspan></text>
+      <text x="28" y="192" dominant-baseline="central" font-size="9.5" fill="#5E4B8B">● <tspan font-weight="700">Stream 5 (JS)</tspan>：校验 Offset=0 数据完整，<tspan font-weight="700">零延迟直接送入 V8 引擎编译执行！</tspan></text>
+      <text x="28" y="212" dominant-baseline="central" font-size="9.5" fill="#B83A2C">● <tspan font-weight="700">Stream 1 (报表)</tspan>：仅此单个 Stream 在后台向服务端申请 ACK 范围重传，其他流完全不受影响。</text>
+
+      <!-- 核心结论卡片 -->
+      <g transform="translate(16, 234)">
+        <rect width="516" height="84" rx="4" fill="#FFFFFF" stroke="#1E7052" stroke-width="1"/>
+        <text x="14" y="20" dominant-baseline="central" font-size="11" font-weight="700" fill="#1E7052">💡 架构结论：</text>
+        <text x="14" y="42" dominant-baseline="central" font-size="9.5" fill="#1C385C">HTTP/3 把“流（Stream）”的控制权从内核生硬的单 TCP 序列号中彻底剥离，</text>
+        <text x="14" y="62" dominant-baseline="central" font-size="10" font-weight="700" fill="#B83A2C">真正实现了在物理链路层面的：“谁丢包，谁重传重组；其余正交流绝不陪葬！”</text>
+      </g>
+    </g>
+  </g>
+
+
+  <!-- ========================================================================= -->
+  <!-- Panel D: 横向对比总结表                                                    -->
+  <!-- ========================================================================= -->
+  <g transform="translate(48, 1432)">
+    <rect width="1144" height="162" rx="8" fill="#FFFFFF" stroke="#D9DFE5" stroke-width="1" filter="url(#cardShadow)"/>
+
+    <text x="20" y="22" dominant-baseline="central" font-size="14" font-weight="700" fill="#1C1F26">D · 三代 HTTP 协议关键指标与队头阻塞（HoLB）终极对比</text>
+
+    <!-- 表头 (x: 20 to 1124, width: 1104) -->
+    <rect x="20" y="38" width="1104" height="26" fill="#F4F6F8" rx="3"/>
+    <text x="32" y="51" dominant-baseline="central" font-size="10" font-weight="700" fill="#526071">协议版本</text>
+    <text x="130" y="51" dominant-baseline="central" font-size="10" font-weight="700" fill="#526071">应用层 PDU 形态</text>
+    <text x="310" y="51" dominant-baseline="central" font-size="10" font-weight="700" fill="#526071">传输与安全层协议</text>
+    <text x="510" y="51" dominant-baseline="central" font-size="10" font-weight="700" fill="#526071">应用层 HoLB</text>
+    <text x="660" y="51" dominant-baseline="central" font-size="10" font-weight="700" fill="#526071">传输层 HoLB</text>
+    <text x="830" y="51" dominant-baseline="central" font-size="10" font-weight="700" fill="#526071">建连时延 (首字节)</text>
+    <text x="980" y="51" dominant-baseline="central" font-size="10" font-weight="700" fill="#526071">网络切网 (IP变化)</text>
+
+    <!-- Row 1: HTTP/1.1 -->
+    <g transform="translate(20, 64)">
+      <line x1="0" y1="30" x2="1104" y2="30" stroke="#F0F2F5" stroke-width="1"/>
+      <text x="12" y="15" dominant-baseline="central" font-size="10" font-weight="700" fill="#2B5584">HTTP/1.1</text>
+      <text x="110" y="15" dominant-baseline="central" font-size="9.5" fill="#4B5363">ASCII 明文行 (\r\n 换行分隔)</text>
+      <text x="290" y="15" dominant-baseline="central" font-size="9.5" fill="#4B5363">单 TCP 字节流 (TLS 1.2 需独立握手)</text>
+
+      <!-- 应用层阻塞 Tag -->
+      <rect x="490" y="4" width="124" height="22" rx="11" fill="#FDF1F0"/>
+      <text x="552" y="15" dominant-baseline="central" font-size="9" font-weight="700" fill="#B83A2C" text-anchor="middle">⚠️ 严重 (FIFO 阻塞)</text>
+
+      <!-- 传输层阻塞 Tag -->
+      <rect x="640" y="4" width="136" height="22" rx="11" fill="#FDF1F0"/>
+      <text x="708" y="15" dominant-baseline="central" font-size="9" font-weight="700" fill="#B83A2C" text-anchor="middle">⚠️ 单 TCP 丢包全停</text>
+
+      <text x="810" y="15" dominant-baseline="central" font-size="9.5" fill="#4B5363">2 ~ 3 RTT (TCP+TLS)</text>
+      <text x="960" y="15" dominant-baseline="central" font-size="9.5" fill="#B83A2C">连接中断，强制重新握手</text>
+    </g>
+
+    <!-- Row 2: HTTP/2 -->
+    <g transform="translate(20, 94)">
+      <rect width="1104" height="30" fill="#FDFDFE"/>
+      <line x1="0" y1="30" x2="1104" y2="30" stroke="#F0F2F5" stroke-width="1"/>
+      <text x="12" y="15" dominant-baseline="central" font-size="10" font-weight="700" fill="#B8741A">HTTP/2</text>
+      <text x="110" y="15" dominant-baseline="central" font-size="9.5" fill="#4B5363">二进制分帧 (9B Header + Stream ID)</text>
+      <text x="290" y="15" dominant-baseline="central" font-size="9.5" fill="#4B5363">单 TCP 字节流 (所有 Stream 混装复用)</text>
+
+      <!-- 应用层解决 Tag -->
+      <rect x="490" y="4" width="124" height="22" rx="11" fill="#E8F4EE"/>
+      <text x="552" y="15" dominant-baseline="central" font-size="9" font-weight="700" fill="#1E7052" text-anchor="middle">✅ 已彻底解决</text>
+
+      <!-- 传输层恶化 Tag -->
+      <rect x="640" y="4" width="136" height="22" rx="11" fill="#FDF1F0"/>
+      <text x="708" y="15" dominant-baseline="central" font-size="9" font-weight="700" fill="#B83A2C" text-anchor="middle">❌ 单点严重放大</text>
+
+      <text x="810" y="15" dominant-baseline="central" font-size="9.5" fill="#4B5363">1 ~ 2 RTT (TCP+TLS 1.3)</text>
+      <text x="960" y="15" dominant-baseline="central" font-size="9.5" fill="#B83A2C">连接中断，强制重新握手</text>
+    </g>
+
+    <!-- Row 3: HTTP/3 -->
+    <g transform="translate(20, 124)">
+      <text x="12" y="17" dominant-baseline="central" font-size="10" font-weight="700" fill="#1E7052">HTTP/3</text>
+      <text x="110" y="17" dominant-baseline="central" font-size="9.5" fill="#4B5363">HTTP/3 帧 (QPACK 乱序头压缩)</text>
+      <text x="290" y="17" dominant-baseline="central" font-size="9.5" fill="#4B5363">QUIC over UDP (内置 TLS 1.3 + 原生多流)</text>
+
+      <!-- 应用层解决 Tag -->
+      <rect x="490" y="6" width="124" height="22" rx="11" fill="#E8F4EE"/>
+      <text x="552" y="17" dominant-baseline="central" font-size="9" font-weight="700" fill="#1E7052" text-anchor="middle">✅ 已彻底解决</text>
+
+      <!-- 传输层解决 Tag -->
+      <rect x="640" y="6" width="136" height="22" rx="11" fill="#E8F4EE"/>
+      <text x="708" y="17" dominant-baseline="central" font-size="9" font-weight="700" fill="#1E7052" text-anchor="middle">✅ 彻底解决 (独立多流)</text>
+
+      <text x="810" y="17" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#1E7052">1 RTT 初次 / 0 RTT 极速</text>
+      <text x="960" y="17" dominant-baseline="central" font-size="9.5" font-weight="700" fill="#1E7052">✅ CID 零感知平滑迁移</text>
+    </g>
+  </g>
+</svg>
