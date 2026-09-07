@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" role="img" aria-labelledby="title desc" font-family="'Noto Sans CJK SC','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+<title id="title">One-Sided KV：地址、布局与所有权</title>
+<desc id="desc">教学布局。客户端通过 RDMA 操作远端注册内存。64 字节 Bucket 包括 8 字节 owner、4 字节 used、4 字节 flags 和三个 16 字节 Slot。Slot 包含 fingerprint 和相对偏移。64 字节 Record 包括 8 字节 version、16 字节 key、4 字节 value_len、4 字节 flags 和32字节 value。CAS 的目标是 owner，整个记录不因此成为原子快照。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/></marker><marker id="green-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/></marker></defs>
+<rect x="0" y="0" width="1240" height="680" fill="rgb(245, 244, 237)"/>
+<text x="48" y="48" font-size="22" font-weight="700" text-anchor="start" fill="#2B2A26">One-Sided KV：地址、布局与所有权</text>
+<text x="48" y="76" font-size="13" font-weight="400" text-anchor="start" fill="#6B675C">教学布局 · key 16 B / value ≤ 32 B · 非 HERD 源码布局</text>
+<rect x="48" y="104" width="220" height="122" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+<text x="70" y="134" font-size="16" font-weight="700" text-anchor="start" fill="#2B2A26">Client</text>
+<text x="70" y="160" font-size="14" font-weight="400" text-anchor="start" fill="#2B2A26">hash(key) → bucket</text>
+<rect x="70" y="178" width="176" height="30" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<text x="158" y="198" font-size="13" font-weight="600" text-anchor="middle" fill="#2C4460">本端 RNIC</text>
+<text x="365" y="155" font-size="14" font-weight="600" text-anchor="middle" fill="#3D5A80">READ / WRITE / CAS</text>
+<path d="M268,192 H456" fill="none" stroke="#3D5A80" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="462" y="104" width="730" height="122" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+<text x="484" y="133" font-size="16" font-weight="700" text-anchor="start" fill="#2B2A26">Remote Registered Memory</text>
+<rect x="484" y="151" width="264" height="57" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<text x="616" y="176" font-size="15" font-weight="600" text-anchor="middle" fill="#2C4460">Hash Table / Buckets</text>
+<text x="616" y="196" font-size="12" font-weight="400" text-anchor="middle" fill="#2C4460">索引区</text>
+<rect x="902" y="151" width="268" height="57" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+<text x="1036" y="176" font-size="15" font-weight="600" text-anchor="middle" fill="#24473F">Record Arena</text>
+<text x="1036" y="196" font-size="12" font-weight="400" text-anchor="middle" fill="#24473F">记录区</text>
+<text x="825" y="168" font-size="13" font-weight="400" text-anchor="middle" fill="#2F6B5E">slot.offset</text>
+<path d="M750,187 H897" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#green-arrow)"/>
+<text x="48" y="280" font-size="17" font-weight="700" text-anchor="start" fill="#2B2A26">Bucket · 64 B</text>
+<text x="1192" y="280" font-size="12" font-weight="400" text-anchor="end" fill="#6B675C">字段偏移 / 字节（B）</text>
+<text x="72.0" y="314" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">0</text>
+<text x="209.0" y="314" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">8</text>
+<text x="277.5" y="314" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">12</text>
+<text x="346.0" y="314" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">16</text>
+<text x="620.0" y="314" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">32</text>
+<text x="894.0" y="314" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">48</text>
+<text x="1168.0" y="314" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">64</text>
+<rect x="72.0" y="326" width="137.0" height="74" rx="0" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+<rect x="209.0" y="326" width="68.5" height="74" rx="0" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+<rect x="277.5" y="326" width="68.5" height="74" rx="0" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+<rect x="346.0" y="326" width="274.0" height="74" rx="0" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<rect x="620.0" y="326" width="274.0" height="74" rx="0" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<rect x="894.0" y="326" width="274.0" height="74" rx="0" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<text x="140.5" y="353" font-size="15" font-weight="700" text-anchor="middle" fill="#6B4E28">owner</text>
+<text x="140.5" y="379" font-size="13" font-weight="500" text-anchor="middle" fill="#6B4E28">CAS · 8 B</text>
+<text x="243.25" y="354" font-size="13" font-weight="400" text-anchor="middle" fill="#2B2A26">used</text>
+<text x="243.25" y="380" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">4 B</text>
+<text x="311.75" y="354" font-size="13" font-weight="400" text-anchor="middle" fill="#2B2A26">flags</text>
+<text x="311.75" y="380" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">4 B</text>
+<text x="483.0" y="350" font-size="14" font-weight="600" text-anchor="middle" fill="#2C4460">Slot 0 · 16 B</text>
+<path d="M346.0,360 H620.0" fill="none" stroke="#3D5A80" stroke-width="0.8"/>
+<path d="M483.0,360 V400" fill="none" stroke="#3D5A80" stroke-width="0.8"/>
+<text x="414.5" y="385" font-size="13" font-weight="400" text-anchor="middle" fill="#2C4460">fingerprint</text>
+<text x="551.5" y="385" font-size="13" font-weight="400" text-anchor="middle" fill="#2C4460">offset</text>
+<text x="757.0" y="350" font-size="14" font-weight="600" text-anchor="middle" fill="#2C4460">Slot 1 · 16 B</text>
+<path d="M620.0,360 H894.0" fill="none" stroke="#3D5A80" stroke-width="0.8"/>
+<path d="M757.0,360 V400" fill="none" stroke="#3D5A80" stroke-width="0.8"/>
+<text x="688.5" y="385" font-size="13" font-weight="400" text-anchor="middle" fill="#2C4460">fingerprint</text>
+<text x="825.5" y="385" font-size="13" font-weight="400" text-anchor="middle" fill="#2C4460">offset</text>
+<text x="1031.0" y="350" font-size="14" font-weight="600" text-anchor="middle" fill="#2C4460">Slot 2 · 16 B</text>
+<path d="M894.0,360 H1168.0" fill="none" stroke="#3D5A80" stroke-width="0.8"/>
+<path d="M1031.0,360 V400" fill="none" stroke="#3D5A80" stroke-width="0.8"/>
+<text x="962.5" y="385" font-size="13" font-weight="400" text-anchor="middle" fill="#2C4460">fingerprint</text>
+<text x="1099.5" y="385" font-size="13" font-weight="400" text-anchor="middle" fill="#2C4460">offset</text>
+<path d="M825.5,400 V428 H28 V537 H68" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#green-arrow)"/>
+<text x="488" y="420" font-size="12" font-weight="400" text-anchor="start" fill="#2F6B5E">MR 基准 + slot.offset → Record</text>
+<text x="48" y="458" font-size="17" font-weight="700" text-anchor="start" fill="#2B2A26">Record · 64 B</text>
+<text x="1192" y="458" font-size="12" font-weight="400" text-anchor="end" fill="#6B675C">完整 key 校验；value_len ≤ 32</text>
+<text x="72.0" y="484" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">0</text>
+<text x="209.0" y="484" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">8</text>
+<text x="483.0" y="484" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">24</text>
+<text x="551.5" y="484" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">28</text>
+<text x="620.0" y="484" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">32</text>
+<text x="1168.0" y="484" font-size="12" font-weight="400" text-anchor="middle" fill="#6B675C">64</text>
+<rect x="72.0" y="496" width="137.0" height="82" rx="0" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+<rect x="209.0" y="496" width="274.0" height="82" rx="0" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+<rect x="483.0" y="496" width="68.5" height="82" rx="0" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+<rect x="551.5" y="496" width="68.5" height="82" rx="0" fill="#F1EFE8" stroke="#8A8574" stroke-width="1.2"/>
+<rect x="620.0" y="496" width="548.0" height="82" rx="0" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+<text x="140.5" y="530" font-size="15" font-weight="600" text-anchor="middle" fill="#6B4E28">version</text>
+<text x="140.5" y="556" font-size="13" font-weight="400" text-anchor="middle" fill="#6B4E28">8 B</text>
+<text x="346.0" y="530" font-size="15" font-weight="600" text-anchor="middle" fill="#24473F">Full Key</text>
+<text x="346.0" y="556" font-size="13" font-weight="400" text-anchor="middle" fill="#24473F">16 B</text>
+<text x="517.25" y="530" font-size="13" font-weight="600" text-anchor="middle" fill="#2B2A26">len</text>
+<text x="517.25" y="556" font-size="13" font-weight="400" text-anchor="middle" fill="#2B2A26">4 B</text>
+<text x="585.75" y="530" font-size="13" font-weight="600" text-anchor="middle" fill="#2B2A26">flags</text>
+<text x="585.75" y="556" font-size="13" font-weight="400" text-anchor="middle" fill="#2B2A26">4 B</text>
+<text x="894.0" y="530" font-size="15" font-weight="600" text-anchor="middle" fill="#24473F">Value</text>
+<text x="894.0" y="556" font-size="13" font-weight="400" text-anchor="middle" fill="#24473F">32 B</text>
+<path d="M48,610 H1192" fill="none" stroke="#D8D5C8" stroke-width="1"/>
+<text x="48" y="642" font-size="14" font-weight="600" text-anchor="start" fill="#6B4E28">CAS：owner 8 B</text>
+<text x="440" y="642" font-size="14" font-weight="600" text-anchor="start" fill="#2B2A26">Version：内容代际</text>
+<text x="1192" y="642" font-size="14" font-weight="600" text-anchor="end" fill="#733428">64 B 布局 ≠ 原子快照</text>
+</svg>

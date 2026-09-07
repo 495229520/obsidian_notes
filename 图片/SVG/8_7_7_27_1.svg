@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="690" viewBox="0 0 1240 690" role="img" aria-labelledby="title desc">
+<title id="title">Zero-Copy 的边界：两段 DMA，共用服务器缓冲</title><desc id="desc">RPC 操作描述与 payload 分开。Payload 经客户端内存、客户端网卡、服务器网卡、BIO DMA-safe 内存，再由 NVMe 控制器传往 SSD；服务器 DRAM 不会消失，图中没有 NIC 到 SSD 的直接 P2P 路径。</desc>
+<defs>
+<marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#3D5A80"/></marker>
+<marker id="arrow-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#2F6B5E"/></marker>
+<marker id="arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#8A6A3A"/></marker>
+<marker id="arrow-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#A64B3C"/></marker>
+<marker id="arrow-neutral" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#8B8679"/></marker>
+</defs>
+<style>text {font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;}</style>
+<rect id="background" x="0" y="0" width="1240" height="690" fill="rgb(245, 244, 237)"/>
+<text id="txt-1" x="48" y="49" font-size="22" fill="#2B2A26" text-anchor="start" font-weight="600" data-role="title">Zero-Copy 的边界：两段 DMA，共用服务器缓冲</text>
+<text id="txt-2" x="48" y="78" font-size="14" fill="#6B675C" text-anchor="start" font-weight="400" data-role="subtitle">大块 NVMe I/O · 已配置的 RDMA 路径 · update 的字节方向从左到右，fetch 反向</text>
+<rect id="rpcplane" x="40" y="104" width="1160" height="68" rx="12" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text id="txt-3" x="60" y="132" font-size="15" fill="#2B2A26" text-anchor="start" font-weight="600" data-role="body">操作描述</text>
+<text id="txt-4" x="60" y="157" font-size="14" fill="#6B675C" text-anchor="start" font-weight="400" data-role="body">对象 / key / extent / 事务</text>
+<rect id="rpc" x="338" y="118" width="243" height="40" rx="10" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text id="txt-5" x="459.5" y="144.88" font-size="16" fill="#2C4460" text-anchor="middle" font-weight="600" data-role="body" data-owner="rpc">CaRT / Mercury RPC</text>
+<path d="M 255 140 H 331" fill="none" stroke="#3D5A80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-blue)"/>
+<path d="M 581 140 H 672" fill="none" stroke="#3D5A80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-blue)"/>
+<text id="txt-6" x="688" y="136" font-size="16" fill="#2B2A26" text-anchor="start" font-weight="600" data-role="body">服务端处理操作</text>
+<text id="txt-7" x="688" y="157" font-size="14" fill="#6B675C" text-anchor="start" font-weight="400" data-role="body">布局、版本与完成语义仍然需要 CPU</text>
+<rect id="cl" x="40" y="195" width="266" height="370" rx="12" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text id="txt-8" x="60" y="223" font-size="16" fill="#2B2A26" text-anchor="start" font-weight="600" data-role="body">客户端内存与网卡</text>
+<rect id="sv" x="354" y="195" width="485" height="370" rx="12" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text id="txt-9" x="374" y="223" font-size="16" fill="#2B2A26" text-anchor="start" font-weight="600" data-role="body">服务器 engine / DRAM</text>
+<rect id="de" x="888" y="195" width="312" height="370" rx="12" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text id="txt-10" x="908" y="223" font-size="16" fill="#2B2A26" text-anchor="start" font-weight="600" data-role="body">服务器本地 SSD</text>
+<rect id="clientbuf" x="68" y="284" width="209" height="132" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text id="txt-11" x="85" y="312" font-size="16" fill="#24473F" text-anchor="start" font-weight="600" data-role="body" data-owner="clientbuf">应用缓冲 [0..N)</text>
+<rect id="clientrange1" x="85" y="332" width="176" height="28" rx="2" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.3"/>
+<text id="txt-12" x="173" y="351" font-size="13.5" fill="#24473F" text-anchor="middle" font-weight="400" data-role="body" data-owner="clientrange1">源 / 目标字节范围</text>
+<text id="txt-13" x="85" y="388" font-size="15" fill="#24473F" text-anchor="start" font-weight="400" data-role="body" data-owner="clientbuf">完成前保持有效</text>
+<rect id="cnic" x="88" y="448" width="168" height="55" rx="10" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text id="txt-14" x="172.0" y="482.38" font-size="16" fill="#2C4460" text-anchor="middle" font-weight="600" data-role="body" data-owner="cnic">客户端 NIC</text>
+<path d="M 172 442 V 422" fill="none" stroke="#2F6B5E" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-start="url(#arrow-green)" marker-end="url(#arrow-green)"/>
+<rect id="snic" x="375" y="448" width="150" height="55" rx="10" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text id="txt-15" x="450.0" y="482.38" font-size="16" fill="#2C4460" text-anchor="middle" font-weight="600" data-role="body" data-owner="snic">服务器 NIC</text>
+<path d="M 262 476 H 369" fill="none" stroke="#3D5A80" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+<text id="txt-16" x="315" y="435" font-size="14" fill="#2C4460" text-anchor="middle" font-weight="400" data-role="body">① 网络 RDMA</text>
+<rect id="biobuf" x="565" y="306" width="247" height="136" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text id="txt-17" x="583" y="334" font-size="16" fill="#24473F" text-anchor="start" font-weight="600" data-role="body" data-owner="biobuf">BIO DMA-safe 缓冲</text>
+<rect id="biorange" x="583" y="353" width="211" height="28" rx="2" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.3"/>
+<text id="txt-18" x="688.5" y="373" font-size="14" fill="#24473F" text-anchor="middle" font-weight="400" data-role="body" data-owner="biorange">同一段 payload 内存</text>
+<text id="txt-19" x="583" y="415" font-size="15" fill="#24473F" text-anchor="start" font-weight="400" data-role="body" data-owner="biobuf">DMA 访问 ≠ 已持久化</text>
+<path d="M 531 476 H 547 V 374 H 559" fill="none" stroke="#3D5A80" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+<rect id="ctrl" x="930" y="344" width="232" height="65" rx="10" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+<text id="txt-20" x="1046.0" y="371.38" font-size="16" fill="#6B4E28" text-anchor="middle" font-weight="600" data-role="body" data-owner="ctrl">NVMe 控制器</text>
+<text id="txt-21" x="1046.0" y="395.38" font-size="16" fill="#6B4E28" text-anchor="middle" font-weight="400" data-role="body" data-owner="ctrl">执行命令 / 搬运数据</text>
+<path d="M 818 375 H 924" fill="none" stroke="#8A6A3A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-start="url(#arrow-amber)" marker-end="url(#arrow-amber)"/>
+<text id="txt-22" x="872" y="315" font-size="14" fill="#6B4E28" text-anchor="middle" font-weight="400" data-role="body">② 存储 DMA</text>
+<rect id="nand" x="930" y="465" width="232" height="60" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+<text id="txt-23" x="1046.0" y="501.88" font-size="16" fill="#6B4E28" text-anchor="middle" font-weight="600" data-role="body" data-owner="nand">SSD 持久介质</text>
+<path d="M 1046 415 V 459" fill="none" stroke="#8A6A3A" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" marker-start="url(#arrow-amber)" marker-end="url(#arrow-amber)"/>
+<rect id="cpu" x="565" y="470" width="247" height="67" rx="10" fill="#F1EFE8" stroke="#8B8679" stroke-width="1.3"/>
+<text id="txt-24" x="688.5" y="497.95" font-size="15" fill="#4A473F" text-anchor="middle" font-weight="600" data-role="body" data-owner="cpu">CPU 仍参与</text>
+<text id="txt-25" x="688.5" y="521.95" font-size="15" fill="#4A473F" text-anchor="middle" font-weight="400" data-role="body" data-owner="cpu">协议 / 索引 / 校验 / EC</text>
+<path d="M 688 470 V 447" fill="none" stroke="#8B8679" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="5 5" marker-end="url(#arrow-neutral)"/>
+<text id="txt-26" x="688" y="557" font-size="13.5" fill="#6B4E28" text-anchor="middle" font-weight="400" data-role="body">SPDK 驱动在主机运行</text>
+<rect id="cost" x="40" y="587" width="1160" height="66" rx="12" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text id="txt-27" x="60" y="613" font-size="15" fill="#24473F" text-anchor="start" font-weight="600" data-role="body">可能减少</text>
+<text id="txt-28" x="160" y="613" font-size="15" fill="#24473F" text-anchor="start" font-weight="400" data-role="body">额外的 payload memcpy 与部分通用栈开销</text>
+<text id="txt-29" x="60" y="640" font-size="15" fill="#733428" text-anchor="start" font-weight="600" data-role="body">不会消失</text>
+<text id="txt-30" x="160" y="640" font-size="15" fill="#733428" text-anchor="start" font-weight="400" data-role="body">DRAM 流量、内存注册、CPU 处理、错误清理和持久化协议</text>
+<text id="txt-31" x="48" y="682" font-size="14" fill="#6B675C" text-anchor="start" font-weight="400" data-role="footer">物理路径示意，不表示所有大小、provider、对象 class 或上层接口都采用相同优化。</text>
+</svg>

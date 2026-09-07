@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" role="img" aria-labelledby="title desc">
+<title id="title">eRPC：MsgBuffer 与收发拷贝边界</title><desc id="desc">上方展示 Header0、连续应用数据容量、对齐及后续包头的内存布局。中间对照 IB 非 inline 的 SGE 引用与当前 DPDK 的 memcpy。下方区分前台单包请求的接收借用和其他路径的接收复制。</desc>
+<defs>
+<marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#3D5A80"/></marker>
+<marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#2F6B5E"/></marker>
+<marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#5D655F"/></marker>
+<marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#B07D2B"/></marker>
+</defs>
+<g font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+<rect x="0" y="0" width="1240" height="700" rx="0" fill="rgb(245, 244, 237)"/>
+<text x="48" y="48" font-size="22" fill="#273530" text-anchor="start" font-weight="700">eRPC：MsgBuffer 与收发拷贝边界</text>
+<text x="48" y="77" font-size="14" fill="#5D655F" text-anchor="start">实现快照 de83dab · “零拷贝”必须注明后端、方向和缓冲边界</text>
+<rect x="48" y="98" width="1144" height="166" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="68" y="126" font-size="15" fill="#273530" text-anchor="start" font-weight="700">内存布局：实际消息长度与分配容量分离</text>
+<rect x="68" y="147" width="100" height="54" rx="0" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="118.0" y="179" font-size="14" fill="#2C4460" text-anchor="middle">H0</text>
+<rect x="168" y="147" width="362" height="54" rx="0" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="349.0" y="179" font-size="14" fill="#24473F" text-anchor="middle">实际应用数据</text>
+<rect x="530" y="147" width="378" height="54" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="719.0" y="179" font-size="14" fill="#5D655F" text-anchor="middle">尚未使用的容量</text>
+<rect x="908" y="147" width="64" height="54" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="940.0" y="179" font-size="14" fill="#5D655F" text-anchor="middle">对齐</text>
+<rect x="972" y="147" width="200" height="54" rx="0" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="1072.0" y="179" font-size="14" fill="#2C4460" text-anchor="middle">H1、H2、…</text>
+<path d="M 168 227 L 168 203" fill="none" stroke="#2F6B5E" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow-green)"/>
+<text x="183" y="229" font-size="13" fill="#24473F" text-anchor="start">buf_：第一个应用字节</text>
+<text x="598" y="227" font-size="13" fill="#5D655F" text-anchor="start">resize 不搬移尾部包头</text>
+<text x="978" y="227" font-size="13" fill="#2C4460" text-anchor="start">按 max_data_size_ 定位</text>
+<rect x="48" y="283" width="552" height="187" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="640" y="283" width="552" height="187" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="68" y="312" font-size="15" fill="#273530" text-anchor="start" font-weight="700">TX / IBTransport：非 inline 路径</text>
+<rect x="68" y="346" width="192" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="164.0" y="379.0" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="600">MsgBuffer</text>
+<path d="M 260 374 L 398 374" fill="none" stroke="#3D5A80" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow-blue)"/>
+<text x="329" y="357" font-size="13" fill="#2C4460" text-anchor="middle">SGE 引用</text>
+<text x="329" y="396" font-size="13" fill="#5D655F" text-anchor="middle">NIC 读取原缓冲</text>
+<rect x="406" y="346" width="174" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="493.0" y="379.0" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="600">NIC / DMA</text>
+<text x="68" y="438" font-size="13" fill="#5D655F" text-anchor="start">首包一个 SGE；后续包为包头 + 数据两个 SGE</text>
+<text x="660" y="312" font-size="15" fill="#273530" text-anchor="start" font-weight="700">TX / DpdkTransport：本提交有复制</text>
+<rect x="660" y="346" width="144" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="732.0" y="379.0" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="600">MsgBuffer</text>
+<path d="M 804 374 L 839 374" fill="none" stroke="#B07D2B" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow-amber)"/>
+<rect x="846" y="346" width="174" height="56" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="933.0" y="379.0" font-size="15" fill="#6B4E28" text-anchor="middle" font-weight="600">rte_mbuf</text>
+<path d="M 1020 374 L 1050 374" fill="none" stroke="#3D5A80" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow-blue)"/>
+<rect x="1057" y="346" width="115" height="56" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="1114.5" y="379.0" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="600">NIC</text>
+<text x="817" y="334" font-size="13" fill="#6B4E28" text-anchor="middle">memcpy</text>
+<text x="660" y="438" font-size="13" fill="#6B4E28" text-anchor="start">先生成独立 packet 存储，再交给 DPDK 发送</text>
+<rect x="48" y="490" width="1144" height="167" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="68" y="518" font-size="15" fill="#273530" text-anchor="start" font-weight="700">RX / 前台单包 request</text>
+<text x="660" y="518" font-size="15" fill="#273530" text-anchor="start" font-weight="700">RX / 后台、大 request、client response</text>
+<rect x="68" y="545" width="166" height="56" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="151.0" y="570" font-size="15" fill="#24473F" text-anchor="middle" font-weight="600">RX ring / mbuf</text>
+<text x="151.0" y="591" font-size="13" fill="#24473F" text-anchor="middle">接收存储</text>
+<path d="M 234 573 L 327 573" fill="none" stroke="#2F6B5E" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow-green)"/>
+<text x="281" y="559" font-size="13" fill="#24473F" text-anchor="middle">借用视图</text>
+<rect x="334" y="545" width="246" height="56" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="457.0" y="570" font-size="15" fill="#24473F" text-anchor="middle" font-weight="600">前台 handler</text>
+<text x="457.0" y="591" font-size="13" fill="#24473F" text-anchor="middle">不额外复制短请求 payload</text>
+<rect x="660" y="545" width="144" height="56" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="732.0" y="578.0" font-size="15" fill="#24473F" text-anchor="middle" font-weight="600">RX bytes</text>
+<path d="M 804 573 L 917 573" fill="none" stroke="#B07D2B" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow-amber)"/>
+<text x="861" y="559" font-size="13" fill="#6B4E28" text-anchor="middle">memcpy</text>
+<rect x="924" y="545" width="248" height="56" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="1048.0" y="570" font-size="15" fill="#6B4E28" text-anchor="middle" font-weight="600">独立 MsgBuffer</text>
+<text x="1048.0" y="591" font-size="13" fill="#6B4E28" text-anchor="middle">后台处理 / 重组 / 结果交付</text>
+<text x="68" y="634" font-size="13" fill="#24473F" text-anchor="start">必须在借用结束前读完；不能保存为异步数据指针</text>
+<text x="660" y="634" font-size="13" fill="#6B4E28" text-anchor="start">减少拷贝与延长存储寿命，是相互关联的取舍</text>
+<text x="620" y="682" font-size="13" fill="#5D655F" text-anchor="middle">IB inline 会把数据放入 WQE；此图不是“整条 RPC 无任何复制”的承诺</text>
+</g></svg>
