@@ -17,10 +17,17 @@
 - Store images in `图片/` and reference them with relative paths; avoid embedding large binaries in note folders.
 - Keep code samples minimal, 4-space indented inside fences, and include expected output when helpful.
 
+## Language & Communication Style
+- **Chinese Output Rule**: All Chinese responses, explanations, and note edits must strictly follow the `humanizer-zh` guidelines (`~/.gemini/config/skills/humanizer-zh/SKILL.md`).
+  - Eliminate AI-generated tropes, buzzwords, empty rhetorical framing, and exaggerated significance.
+  - Avoid filler transitions and connector crutches (e.g., "值得注意的是", "不仅……而且……", "深入探讨", "至关重要", "总而言之").
+  - Avoid formulaic formatting: break up robotic bold-title lists, omit unnecessary decorative emojis, and vary sentence length and rhythm naturally.
+  - State facts and engineering rationale directly, trusting the reader without patronizing fluff or servile pleasantries.
+
 ## SVG Workflow
 - When a note contains raw `<svg>...</svg>` markup, export each SVG into `图片/SVG/` and replace the inline block with an Obsidian embed.
 - Every exported SVG must include a solid background rectangle with `fill="rgb(245, 244, 237)"`.
-- Prefer the local Skill at `.codex/skills/obsidian-svg-bg/SKILL.md` and its script for this workflow.
+- Prefer the globally shared `obsidian-svg` Skill at `~/.agents/skills/obsidian-svg/SKILL.md` and its scripts for this workflow.
 - **Client Visualization Preference**: Whenever creating or referencing SVG diagrams in conversation, always render the SVG directly in the chat/Artifacts using `![caption](/absolute/path/to/svg)` (copy to artifact dir if needed) or provide a clickable direct link so the user can immediately view and inspect the diagram in the client interface.
 
 

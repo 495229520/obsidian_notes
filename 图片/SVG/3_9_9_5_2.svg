@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 730" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>队头阻塞对比：HTTP/2 over TCP vs HTTP/3 over QUIC</title>
+  <desc>左侧展示 TCP 全局有序字节流中单个 Segment 丢失导致多条 HTTP/2 Stream 一同阻塞；右侧展示 QUIC 解耦至单 Stream 重组队列，使一条 Stream 的缺口不阻塞其他 Stream 的交付。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <!-- 全图底色 -->
+  <rect x="0" y="0" width="1240" height="730" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部标题区 (y <= 100) -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">队头阻塞对比：HTTP/2 over TCP vs HTTP/3 over QUIC</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">TCP 全局字节流使单个丢包阻塞全连接；QUIC 解耦至单 Stream 重组队列，消除跨流 HOL</text>
+
+  <!-- ============ Left Panel: HTTP/2 over TCP ============ -->
+  <text x="48" y="116" font-size="14" font-weight="700" fill="#4A473F">A · HTTP/2 over TCP：全局字节流，单点丢包阻塞整条连接</text>
+
+  <rect x="48" y="128" width="560" height="494" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="64" y="150" font-size="11" fill="#6B675C">三条 Stream 汇入单条 TCP 字节流，由内核保序交付</text>
+
+  <!-- Stream Sources -->
+  <rect x="64" y="164" width="88" height="28" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="108" y="182" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">Stream A</text>
+
+  <rect x="64" y="200" width="88" height="28" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="108" y="218" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">Stream B</text>
+
+  <rect x="64" y="236" width="88" height="28" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="108" y="254" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">Stream C</text>
+
+  <!-- Multiplexing arrows -->
+  <path d="M152,178 C168,178 168,214 176,214" fill="none" stroke="#3D5A80" stroke-width="1.3"/>
+  <path d="M152,214 L176,214" fill="none" stroke="#2F6B5E" stroke-width="1.3"/>
+  <path d="M152,250 C168,250 168,214 176,214" fill="none" stroke="#B07D2B" stroke-width="1.3"/>
+
+  <!-- TCP Conveyor Belt Queue -->
+  <rect x="178" y="164" width="414" height="100" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="385" y="182" font-size="11" font-weight="700" fill="#4A473F" text-anchor="middle">TCP 发送与接收字节流（按全局 Seq 编号）</text>
+
+  <!-- Segments -->
+  <rect x="186" y="192" width="46" height="42" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="209" y="212" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">A0</text>
+  <text x="209" y="227" font-size="9.5" fill="#2C4460" text-anchor="middle">已收</text>
+
+  <rect x="236" y="192" width="46" height="42" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="259" y="212" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">B0</text>
+  <text x="259" y="227" font-size="9.5" fill="#24473F" text-anchor="middle">已收</text>
+
+  <!-- Lost Segment -->
+  <rect x="286" y="192" width="74" height="42" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.8"/>
+  <text x="323" y="212" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">丢包 ✗</text>
+  <text x="323" y="227" font-size="9.5" fill="#A64B3C" text-anchor="middle">Seq 缺口</text>
+
+  <rect x="364" y="192" width="46" height="42" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="387" y="212" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">C0</text>
+  <text x="387" y="227" font-size="9.5" fill="#A64B3C" text-anchor="middle">受阻</text>
+
+  <rect x="414" y="192" width="46" height="42" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="437" y="212" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">B1</text>
+  <text x="437" y="227" font-size="9.5" fill="#A64B3C" text-anchor="middle">受阻</text>
+
+  <rect x="464" y="192" width="46" height="42" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="487" y="212" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">A1</text>
+  <text x="487" y="227" font-size="9.5" fill="#A64B3C" text-anchor="middle">受阻</text>
+
+  <text x="385" y="254" font-size="9.5" fill="#733428" text-anchor="middle">C0 / B1 / A1 已到达接收端内核，但无法越过缺口交付</text>
+
+  <!-- Barrier Card -->
+  <rect x="64" y="278" width="528" height="102" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="78" y="300" font-size="12" font-weight="700" fill="#733428">TCP 交付门（Delivery Gate）因缺口锁死</text>
+  <text x="78" y="322" font-size="10.5" fill="#733428">• TCP 套接字仅暴露连续有序字节流，缺口不补齐则全线等待</text>
+  <text x="78" y="342" font-size="10.5" fill="#733428">• 即使 B、C 的数据已完整到达，HTTP/2 解析器也完全读不到</text>
+  <text x="78" y="362" font-size="10.5" fill="#733428">• 后果：Stream A 出现 1 个报文丢包，导致 Stream B、C 全部冻结</text>
+
+  <!-- Diagnosis Table Card -->
+  <rect x="64" y="392" width="528" height="118" rx="6" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="78" y="414" font-size="11.5" font-weight="700" fill="#4A3F6B">HTTP/2 over TCP 阻塞特征：</text>
+  <text x="78" y="436" font-size="10.5" fill="#4A473F">• 阻塞作用域：整条 TCP Connection（全局多流连带受阻）</text>
+  <text x="78" y="456" font-size="10.5" fill="#4A473F">• 架构根因：传输层缺乏 Stream 标识，保序粒度过粗</text>
+  <text x="78" y="476" font-size="10.5" fill="#4A473F">• 恢复代价：必须等待重传 RTT 填补 Seq 缺口，期间所有应用交互停滞</text>
+  <text x="78" y="496" font-size="10.5" fill="#733428">• 表现：弱网与丢包环境下，多路复用优势可能反转劣于 HTTP/1.1</text>
+
+  <!-- Bottom Tag -->
+  <rect x="64" y="522" width="528" height="36" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="328" y="544" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">传输层 cross-stream HOL：单点缺口阻断整条物理连接</text>
+
+  <!-- ============ Right Panel: HTTP/3 over QUIC ============ -->
+  <text x="632" y="116" font-size="14" font-weight="700" fill="#4A473F">B · HTTP/3 over QUIC：按 Stream 独立重组，消除跨流 HOL</text>
+
+  <rect x="632" y="128" width="560" height="494" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="648" y="150" font-size="11" fill="#6B675C">Packet 先解密，按 Stream ID + Offset 独立入队分发</text>
+
+  <!-- Demux Box -->
+  <rect x="648" y="164" width="528" height="36" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="912" y="186" font-size="11" font-weight="700" fill="#2C4460" text-anchor="middle">UDP Datagram 到达 ｜ Packet 独立解密 ｜ 按 Stream ID 解复用</text>
+
+  <!-- Lane 1: Stream A (Has Gap) -->
+  <rect x="648" y="210" width="528" height="48" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="660" y="239" font-size="11" font-weight="700" fill="#2C4460">Stream A 队列</text>
+
+  <rect x="752" y="218" width="102" height="32" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="803" y="238" font-size="10" fill="#24473F" text-anchor="middle">0–999 (已收)</text>
+
+  <rect x="860" y="218" width="112" height="32" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="916" y="238" font-size="10" font-weight="700" fill="#733428" text-anchor="middle">缺口 (Gap)</text>
+
+  <rect x="978" y="218" width="108" height="32" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="1032" y="238" font-size="10" fill="#4A473F" text-anchor="middle">2000–2999</text>
+
+  <text x="1166" y="239" font-size="10.5" font-weight="700" fill="#A64B3C" text-anchor="end">仅 A 等待重传</text>
+
+  <!-- Lane 2: Stream B (Smooth) -->
+  <rect x="648" y="266" width="528" height="44" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="660" y="293" font-size="11" font-weight="700" fill="#24473F">Stream B 队列</text>
+
+  <rect x="752" y="274" width="232" height="28" rx="4" fill="#CDE3D8" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="868" y="292" font-size="10" fill="#24473F" text-anchor="middle">offset 0–4096 完整接收</text>
+
+  <text x="1166" y="293" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="end">✓ 立即交付应用，零等待！</text>
+
+  <!-- Lane 3: Stream C (Smooth) -->
+  <rect x="648" y="318" width="528" height="44" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="660" y="345" font-size="11" font-weight="700" fill="#6B4E28">Stream C 队列</text>
+
+  <rect x="752" y="326" width="232" height="28" rx="4" fill="#EAD9B8" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="868" y="344" font-size="10" fill="#6B4E28" text-anchor="middle">offset 0–2048 完整接收</text>
+
+  <text x="1166" y="345" font-size="10.5" font-weight="700" fill="#8A6A3A" text-anchor="end">✓ 立即交付应用，零等待！</text>
+
+  <!-- Key Advantage Box -->
+  <rect x="648" y="374" width="528" height="76" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="662" y="396" font-size="12" font-weight="700" fill="#24473F">彻底消除传输层跨 Stream HOL 阻塞</text>
+  <text x="662" y="418" font-size="10.5" fill="#24473F">• 某条 Stream 的缺口只阻塞该 Stream 内部缺口之后的字节</text>
+  <text x="662" y="438" font-size="10.5" fill="#24473F">• 其他 Stream（如 B、C）数据只要完整，HTTP/3 解析器立即处理</text>
+
+  <!-- Diagnosis Table Card -->
+  <rect x="648" y="462" width="528" height="118" rx="6" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="662" y="484" font-size="11.5" font-weight="700" fill="#4A3F6B">HTTP/3 over QUIC 阻塞特征：</text>
+  <text x="662" y="506" font-size="10.5" fill="#4A473F">• 阻塞作用域：仅局限于缺口所在的单个 Stream</text>
+  <text x="662" y="526" font-size="10.5" fill="#4A473F">• 核心机制：Stream ID + Offset 解耦重组序列，各自独立推进</text>
+  <text x="662" y="546" font-size="10.5" fill="#4A473F">• 恢复机制：仅重新封装丢失 Frame 语义，分配全新 Packet Number</text>
+  <text x="662" y="566" font-size="10.5" fill="#2F6B5E">• 优势：网络丢包时仍保持多路复用并发度，消除跨流级联延迟</text>
+
+  <!-- Bottom Tag -->
+  <rect x="648" y="588" width="528" height="34" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="912" y="609" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">独立重组作用域：单流缺口隔离在 Stream 内部</text>
+
+  <!-- ============ Footer: 关键认知与边界 (y >= 730 - 90 = 640) ============ -->
+  <rect x="48" y="644" width="1144" height="62" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="68" y="668" font-size="11.5" font-weight="700" fill="#6B4E28">关键认知（QUIC 并非消除所有等待）：</text>
+  <text x="296" y="668" font-size="11" fill="#6B4E28">① 单 Stream 内部仍严格按 offset 保序；② 丢包依然导致 Connection 级拥塞窗口 (cwnd) 与 pacing 下降；</text>
+  <text x="68" y="688" font-size="11" fill="#6B4E28">③ 连接级 MAX_DATA 耗尽、QPACK 动态表依赖、Socket/NIC 饱和及业务依赖（如 HTML 等待 CSS）仍会造成共享等待。</text>
+</svg>

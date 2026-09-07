@@ -1,6 +1,6 @@
 ---
 title: Skills 总目录
-date: 2026-08-31
+date: 2026-09-03
 status: active
 tags:
   - AI编程
@@ -15,25 +15,25 @@ tags:
 > [!success] 已完成整理
 > 个人共享 Skill 统一从 `/Users/melene/.agents/skills/` 管理；Claude、Gemini 保留各自入口，但重复实体已改为符号链接。Codex 直接加载共享目录，不再每小时复制 Claude Skill。
 
-最后核对：2026-08-31。
+最后核对：2026-09-03。
 
 ## 一、整理后的结构
 
 ```mermaid
 flowchart TD
-    A["~/.agents/skills<br/>个人共享目录：30 个"]
+    A["~/.agents/skills<br/>个人共享目录：31 个"]
     C["~/.cc-switch/skills<br/>CC Switch 源：6 个"]
-    CL["~/.claude/skills<br/>Claude 入口：17 个 SKILL.md"]
+    CL["~/.claude/skills<br/>Claude 入口：18 个 SKILL.md"]
     CO["~/.codex/skills<br/>Codex 专属：系统 + chronicle + 插件包装"]
-    GE["~/.gemini/config/skills<br/>Gemini 入口：28 个"]
+    GE["~/.gemini/config/skills<br/>Gemini 入口：29 个"]
     PR["obsidian_notes-main/.agents/skills<br/>项目 Trellis：12 个"]
     AR["~/.skill-archive/2026-08-31-before-consolidation<br/>整理前回滚区"]
 
     C -->|5 个受管源| A
-    A -->|13 个入口| CL
+    A -->|14 个入口| CL
     C -->|3 个直接入口| CL
     A -->|Codex 直接加载| CO
-    A -->|28 个入口| GE
+    A -->|29 个入口| GE
     PR -.项目内独立加载.-> CO
     PR -.项目内独立加载.-> CL
     PR -.项目内独立加载.-> GE
@@ -53,7 +53,7 @@ flowchart TD
 
 主入口：`/Users/melene/.agents/skills/`
 
-当前共 30 个 Skill，其中 25 个是本目录实体，5 个由 CC Switch 提供源文件。
+当前共 31 个 Skill，其中 26 个是本目录实体，5 个由 CC Switch 提供源文件。
 
 ```text
 ~/.agents/skills/
@@ -65,6 +65,7 @@ flowchart TD
 ├── exam-creator/
 ├── find-skills/
 ├── github-note-push -> ~/.cc-switch/skills/github-note-push/
+├── humanizer-zh/
 ├── invest-note-creator/
 ├── json-canvas/
 ├── leetcode-note/
@@ -95,7 +96,7 @@ flowchart TD
 
 | 分类 | Skill |
 |---|---|
-| 通用工具 | `computer-use`、`find-skills`、`claude-design`、`no-ai-slop` |
+| 通用工具 | `computer-use`、`find-skills`、`claude-design`、`no-ai-slop`、`humanizer-zh` |
 | Obsidian 基础 | `obsidian-bases`、`obsidian-cli`、`obsidian-markdown`、`obsidian-svg`、`github-note-push` |
 | 笔记路由 | `note-creator`、`note-extender`、`note-locator` |
 | 学习与出题 | `cpp-tutor`、`english-drill`、`exam-creator`、`numerical-analysis`、`tutor` |
@@ -131,13 +132,14 @@ CC Switch 设置仍为：
 
 目录：`/Users/melene/.claude/skills/`
 
-Claude 仍有 17 个 `SKILL.md`，但共享内容不再保存为重复实体：
+Claude 现在有 18 个 `SKILL.md`，但共享内容不再保存为重复实体：
 
 ```text
 ~/.claude/skills/
 ├── claude-design-skill -> ~/.agents/skills/claude-design/
 ├── english-drill -> ~/.agents/skills/english-drill/
 ├── github-note-push -> ~/.cc-switch/skills/github-note-push/
+├── humanizer-zh -> ~/.agents/skills/humanizer-zh/
 ├── no-ai-slop -> ~/.agents/skills/no-ai-slop/
 ├── no-ai-slop1/skills/no-ai-slop/SKILL.md   # 插件包装，仍保留
 ├── note-creator -> ~/.agents/skills/note-creator/
@@ -154,7 +156,9 @@ Claude 仍有 17 个 `SKILL.md`，但共享内容不再保存为重复实体：
 └── paseo-loop -> ~/.agents/skills/paseo-loop/
 ```
 
-有效名称是 16 个；`no-ai-slop1` 内部又包装了同一个 `no-ai-slop`，所以文件数为 17。
+有效名称是 17 个；`no-ai-slop1` 内部又包装了同一个 `no-ai-slop`，所以文件数为 18。
+
+新增的 `humanizer-zh` 来自 [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh)，实体目录位于 `/Users/melene/.agents/skills/humanizer-zh/`。Claude 和 Gemini 使用各自的符号链接入口，Codex 从共享目录直接加载。
 
 ## 五、Codex 入口
 
@@ -196,11 +200,11 @@ Claude 仍有 17 个 `SKILL.md`，但共享内容不再保存为重复实体：
 
 用户目录：`/Users/melene/.gemini/config/skills/`
 
-28 个用户级 Skill 入口全部已改为指向 `/Users/melene/.agents/skills/` 的符号链接：
+29 个用户级 Skill 入口全部已改为指向 `/Users/melene/.agents/skills/` 的符号链接：
 
 ```text
 claude-design, cpp-tutor, debug-logger, english-drill, exam-creator,
-github-note-push, invest-note-creator, json-canvas, leetcode-note,
+github-note-push, humanizer-zh, invest-note-creator, json-canvas, leetcode-note,
 leetcode-solver, llm-note-creator, no-ai-slop, note-creator,
 note-extender, note-locator, numerical-analysis, obsidian-bases,
 obsidian-cli, obsidian-markdown, obsidian-svg, paseo, paseo-advisor,

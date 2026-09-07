@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 730" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrGreen" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrRed" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <title>Linux 内核邻居状态机（NUD）流转全景</title>
+  <desc>展示 Linux 内核邻居子系统 NUD 状态流转关系：从 INCOMPLETE 到 REACHABLE、STALE、DELAY、PROBE 以及 FAILED，右侧配有状态特征速查表与数据面零阻塞设计解析。</desc>
+
+  <!-- 画布背景 -->
+  <rect x="0" y="0" width="1240" height="730" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部标题区 -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">Linux 内核邻居状态机（NUD）：ARP 与 NDP 缓存生命周期</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">判断准则：REACHABLE 快速直通，STALE 先行发包零阻塞，DELAY 靠上层确认，PROBE 主动单播保活</text>
+
+  <!-- ================= 面板 A：状态机拓扑 ================= -->
+  <rect x="48" y="96" width="716" height="530" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="126" font-size="15" font-weight="700" fill="#4A473F">A · 状态迁移拓扑（Neighbor Unreachability Detection）</text>
+
+  <!-- 触发解析胶囊 -->
+  <rect x="72" y="166" width="116" height="44" rx="22" fill="#EDEBE3" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="130" y="188" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle" dominant-baseline="central">发起解析 (新目的 IP)</text>
+  <line x1="188" y1="188" x2="238" y2="188" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- 状态 1: INCOMPLETE -->
+  <rect x="240" y="160" width="156" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="318" y="179" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">INCOMPLETE</text>
+  <text x="318" y="199" font-size="10.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">正在发广播请求 MAC</text>
+
+  <!-- INCOMPLETE -> REACHABLE -->
+  <line x1="396" y1="188" x2="480" y2="188" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrGreen)"/>
+  <text x="438" y="176" font-size="10.5" font-weight="700" fill="#2F6B5E" text-anchor="middle" dominant-baseline="central">收到应答</text>
+
+  <!-- INCOMPLETE -> FAILED -->
+  <line x1="318" y1="216" x2="318" y2="288" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrRed)"/>
+  <text x="324" y="252" font-size="10.5" fill="#A64B3C" dominant-baseline="central">超时无应答 (3次)</text>
+
+  <!-- 状态 2: REACHABLE -->
+  <rect x="482" y="160" width="190" height="56" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.5"/>
+  <text x="577" y="179" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle" dominant-baseline="central">REACHABLE (可达)</text>
+  <text x="577" y="199" font-size="10.5" fill="#24473F" text-anchor="middle" dominant-baseline="central">直通发送 · 有效期约 30s</text>
+
+  <!-- REACHABLE -> STALE -->
+  <line x1="577" y1="216" x2="577" y2="268" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="585" y="242" font-size="10.5" fill="#6B675C" dominant-baseline="central">超时未验证 (~30s)</text>
+
+  <!-- 状态 3: STALE -->
+  <rect x="482" y="270" width="190" height="56" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.5"/>
+  <text x="577" y="289" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">STALE (陈旧)</text>
+  <text x="577" y="309" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle" dominant-baseline="central">先发数据包！零发包延迟</text>
+
+  <!-- STALE -> DELAY -->
+  <line x1="577" y1="326" x2="577" y2="378" stroke="#3D5A80" stroke-width="1.6" marker-end="url(#arrBlue)"/>
+  <text x="585" y="352" font-size="10.5" fill="#2C4460" dominant-baseline="central">有新数据包发出</text>
+
+  <!-- 状态 4: DELAY -->
+  <rect x="482" y="380" width="190" height="56" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="577" y="399" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">DELAY (延迟确认)</text>
+  <text x="577" y="419" font-size="10.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">给上层 5s 等待 TCP ACK</text>
+
+  <!-- DELAY -> REACHABLE 回环 -->
+  <path d="M672,408 L720,408 L720,188 L674,188" fill="none" stroke="#2F6B5E" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrGreen)"/>
+  <text x="726" y="298" font-size="10" font-weight="700" fill="#2F6B5E" dominant-baseline="central">收到 TCP ACK</text>
+  <text x="726" y="314" font-size="9.5" fill="#2F6B5E" dominant-baseline="central">(dst_confirm)</text>
+
+  <!-- DELAY -> PROBE -->
+  <line x1="577" y1="436" x2="577" y2="488" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="585" y="462" font-size="10.5" fill="#6B675C" dominant-baseline="central">5s 内无上层确认</text>
+
+  <!-- 状态 5: PROBE -->
+  <rect x="482" y="490" width="190" height="56" rx="7" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="577" y="509" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">PROBE (单播探测)</text>
+  <text x="577" y="529" font-size="10.5" fill="#6B4E28" text-anchor="middle" dominant-baseline="central">单播发 ARP/NS 探对端</text>
+
+  <!-- PROBE -> REACHABLE 回环 -->
+  <path d="M482,518 L430,518 L430,200 L480,200" fill="none" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrGreen)"/>
+  <text x="424" y="342" font-size="10" font-weight="700" fill="#2F6B5E" text-anchor="end" dominant-baseline="central">单播应答到</text>
+  <text x="424" y="358" font-size="9.5" fill="#2F6B5E" text-anchor="end" dominant-baseline="central">恢复可达</text>
+
+  <!-- 状态 6: FAILED -->
+  <rect x="240" y="290" width="156" height="56" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="318" y="309" font-size="13" font-weight="700" fill="#733428" text-anchor="middle" dominant-baseline="central">FAILED (失败)</text>
+  <text x="318" y="329" font-size="10.5" fill="#733428" text-anchor="middle" dominant-baseline="central">抛出 EHOSTUNREACH</text>
+
+  <!-- PROBE -> FAILED -->
+  <path d="M577,546 L577,576 L318,576 L318,348" fill="none" stroke="#A64B3C" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrRed)"/>
+  <text x="448" y="588" font-size="10.5" fill="#A64B3C" text-anchor="middle" dominant-baseline="central">3 次探测均无应答</text>
+
+  <!-- ================= 面板 B：速查表与核心机制 ================= -->
+  <rect x="780" y="96" width="412" height="530" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="802" y="126" font-size="15" font-weight="700" fill="#4A473F">B · 状态行为特征与数据面设计</text>
+
+  <!-- 表格 -->
+  <rect x="802" y="146" width="368" height="26" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="814" y="159" font-size="11" font-weight="700" fill="#4A473F" dominant-baseline="central">状态</text>
+  <text x="894" y="159" font-size="11" font-weight="700" fill="#4A473F" dominant-baseline="central">发包策略</text>
+  <text x="978" y="159" font-size="11" font-weight="700" fill="#4A473F" dominant-baseline="central">存活与触发条件</text>
+
+  <rect x="802" y="172" width="368" height="24" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="0.8"/>
+  <text x="814" y="184" font-size="10" font-weight="700" fill="#24473F" dominant-baseline="central">REACHABLE</text>
+  <text x="894" y="184" font-size="10" fill="#24473F" dominant-baseline="central">直接成帧发送</text>
+  <text x="978" y="184" font-size="10" fill="#4A473F" dominant-baseline="central">有效期约 30s (15~45s 随机)</text>
+
+  <rect x="802" y="196" width="368" height="24" fill="#F7F9FC" stroke="#D8D5C8" stroke-width="0.8"/>
+  <text x="814" y="208" font-size="10" font-weight="700" fill="#2C4460" dominant-baseline="central">STALE</text>
+  <text x="894" y="208" font-size="10" font-weight="700" fill="#2C4460" dominant-baseline="central">直接复用旧 MAC</text>
+  <text x="978" y="208" font-size="10" fill="#4A473F" dominant-baseline="central">长期存活，直到有新包触发</text>
+
+  <rect x="802" y="220" width="368" height="24" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="0.8"/>
+  <text x="814" y="232" font-size="10" font-weight="700" fill="#6B4E28" dominant-baseline="central">DELAY</text>
+  <text x="894" y="232" font-size="10" fill="#4A473F" dominant-baseline="central">照常成帧发送</text>
+  <text x="978" y="232" font-size="10" fill="#4A473F" dominant-baseline="central">5s 宽限期，等待上层 ACK</text>
+
+  <rect x="802" y="244" width="368" height="24" fill="#F7F9FC" stroke="#D8D5C8" stroke-width="0.8"/>
+  <text x="814" y="256" font-size="10" font-weight="700" fill="#6B4E28" dominant-baseline="central">PROBE</text>
+  <text x="894" y="256" font-size="10" fill="#4A473F" dominant-baseline="central">照常成帧发送</text>
+  <text x="978" y="256" font-size="10" fill="#4A473F" dominant-baseline="central">主动单播探测 3 次 (间隔 1s)</text>
+
+  <rect x="802" y="268" width="368" height="24" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="0.8"/>
+  <text x="814" y="280" font-size="10" font-weight="700" fill="#6B4E28" dominant-baseline="central">INCOMPLETE</text>
+  <text x="894" y="280" font-size="10" fill="#A64B3C" dominant-baseline="central">排队阻塞 (丢多余包)</text>
+  <text x="978" y="280" font-size="10" fill="#4A473F" dominant-baseline="central">广播发请求 3 次</text>
+
+  <rect x="802" y="292" width="368" height="24" fill="#F7F9FC" stroke="#D8D5C8" stroke-width="0.8"/>
+  <text x="814" y="304" font-size="10" font-weight="700" fill="#733428" dominant-baseline="central">FAILED</text>
+  <text x="894" y="304" font-size="10" fill="#A64B3C" dominant-baseline="central">丢弃并报错</text>
+  <text x="978" y="304" font-size="10" fill="#4A473F" dominant-baseline="central">不可达，等待内核 GC 清理</text>
+
+  <!-- 机制剖析卡片 1 -->
+  <rect x="802" y="330" width="368" height="136" rx="6" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="818" y="352" font-size="12" font-weight="700" fill="#4A473F">核心机制 · 为什么 STALE 状态不发探测？</text>
+  <text x="818" y="374" font-size="10.5" fill="#4A473F">• 传统直觉：条目过期 → 阻塞线程 → 发包验证 → 延时激增</text>
+  <text x="818" y="394" font-size="10.5" fill="#2F6B5E">• 内核实现：直接复用旧 MAC 发出业务包，零发包延迟</text>
+  <text x="818" y="414" font-size="10.5" fill="#4A473F">• 延迟探测：包发出去后进入 DELAY，先等待 5s 宽限期</text>
+  <text x="818" y="434" font-size="10.5" fill="#4A473F">• 上层确认：TCP 收到数据回传 ACK 时，自动保活刷回 REACHABLE</text>
+  <text x="818" y="454" font-size="10.5" fill="#2C4460">• 仅在没有 TCP 等上层流量确认时，才退化为 PROBE 单播探测</text>
+
+  <!-- 机制剖析卡片 2 -->
+  <rect x="802" y="478" width="368" height="132" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="818" y="500" font-size="12" font-weight="700" fill="#4A473F">工程启示 · 运维排障要点</text>
+  <text x="818" y="522" font-size="10.5" fill="#4A473F">• 查看完整状态：ip neigh show nud all (默认不显 STALE)</text>
+  <text x="818" y="542" font-size="10.5" fill="#4A473F">• STALE 属于正常存活状态，绝不代表网络断开或解析失败</text>
+  <text x="818" y="562" font-size="10.5" fill="#4A473F">• 广播风暴防范：INCOMPLETE 仅缓冲最新报文，防挤爆内存</text>
+  <text x="818" y="582" font-size="10.5" fill="#4A473F">• FAILED 状态会缓存负向结果数秒，防止持续发无用广播</text>
+
+  <!-- ================= 底部信息条 ================= -->
+  <rect x="48" y="642" width="1144" height="60" rx="6" fill="#EDEBE3" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="68" y="666" font-size="11" font-weight="700" fill="#4A473F">诊断命令：</text>
+  <text x="130" y="666" font-size="11" font-family="ui-monospace,monospace" fill="#2C4460">ip neigh show nud all  |  sudo ip neigh flush all  |  sudo tcpdump -i eth0 -n 'arp or icmp6'</text>
+  <text x="68" y="688" font-size="11" font-weight="700" fill="#4A473F">内核旋钮：</text>
+  <text x="130" y="688" font-size="11" font-family="ui-monospace,monospace" fill="#6B4E28">/proc/sys/net/ipv4/neigh/default/{base_reachable_time_ms(30000), delay_first_probe_time(5), ucast_probes(3)}</text>
+</svg>
