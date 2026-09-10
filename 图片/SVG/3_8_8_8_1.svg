@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="620" viewBox="0 0 1240 620" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
   <defs>
     <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
@@ -6,101 +6,172 @@
     <marker id="arrA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
     </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
   </defs>
 
-  <title>发送方的滑动窗口：四个区与 rwnd 的约束</title>
-  <desc>上半部分把发送队列切成"已确认""已发送未确认""可立即发送""还不能发"四个区，标出 SND.UNA、SND.NXT 和窗口右边界；下半部分对比窗口右滑与被 rwnd 压窄两种情况。</desc>
+  <title>rwnd 与 cwnd：决定 TCP 发送窗口的双重约束</title>
+  <desc>对比接收窗口 rwnd 与拥塞窗口 cwnd 的控制方、物理依据、通告途径与防御目标，并图解 min(rwnd, cwnd) 短板决策矩阵。</desc>
 
-  <rect x="0" y="0" width="1240" height="620" fill="rgb(245, 244, 237)"/>
+  <!-- Top-level solid background -->
+  <rect x="0" y="0" width="1240" height="680" fill="rgb(245, 244, 237)"/>
 
-  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">发送方的滑动窗口：四个区，和 rwnd 怎么约束它</text>
-  <text x="48" y="80" font-size="13" fill="#6B675C">窗口里装的是"现在就允许发出去"的字节；窗口外的字节要么已经确认完，要么还没拿到许可</text>
+  <!-- Page Header (Header region: y <= 100) -->
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">rwnd 与 cwnd：决定 TCP 发送窗口的双重约束</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">rwnd 防接收端溢出（流控制），cwnd 防网络设备瘫痪（拥塞控制）；实际发送窗口取 min(rwnd, cwnd)</text>
 
-  <!-- ===================== Panel A ===================== -->
-  <rect x="48" y="104" width="1144" height="250" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · 一条发送队列上的四个区</text>
+  <!-- ===================== Panel A: 概念对比与拓扑汇聚 ===================== -->
+  <rect x="48" y="104" width="1144" height="294" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="132" font-size="15" font-weight="700" fill="#4A473F">A · 两个窗口的本质区别与协同约束（端到端拓扑）</text>
 
-  <!-- window bracket -->
-  <path d="M346,168 L346,158 L886,158 L886,168" fill="none" stroke="#5A564B" stroke-width="1.4"/>
-  <rect x="470" y="140" width="292" height="18" fill="#FBFBF6"/>
-  <text x="616" y="153" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">发送窗口 = min(rwnd, cwnd)</text>
+  <!-- Left Card: cwnd -->
+  <rect x="72" y="148" width="324" height="234" rx="7" fill="#FBFBF6" stroke="#B07D2B" stroke-width="1.2"/>
+  <path d="M72,184 L72,155 Q72,148 79,148 L389,148 Q396,148 396,155 L396,184 Z" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="234" y="170" font-size="13.5" font-weight="700" fill="#6B4E28" text-anchor="middle">cwnd · 拥塞窗口</text>
+  <text x="234" y="200" font-size="10.5" fill="#8A6A3A" text-anchor="middle">发送端内核变量（报文无此字段）</text>
+  <line x1="88" y1="210" x2="380" y2="210" stroke="#E3DEC3" stroke-width="0.8"/>
 
-  <!-- bar regions -->
-  <rect x="130" y="176" width="216" height="44" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
-  <rect x="346" y="176" width="324" height="44" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
-  <rect x="670" y="176" width="216" height="44" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <rect x="886" y="176" width="216" height="44" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <!-- cwnd Row 1 -->
+  <rect x="88" y="218" width="62" height="20" rx="3" fill="#EFE7DA"/>
+  <text x="119" y="232" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">评估目标</text>
+  <text x="160" y="233" font-size="11" fill="#4A473F">中间链路传输能力</text>
 
-  <!-- cell separators -->
-  <line x1="184" y1="176" x2="184" y2="220" stroke="#C9C5B8" stroke-width="0.8"/>
-  <line x1="238" y1="176" x2="238" y2="220" stroke="#C9C5B8" stroke-width="0.8"/>
-  <line x1="292" y1="176" x2="292" y2="220" stroke="#C9C5B8" stroke-width="0.8"/>
-  <line x1="400" y1="176" x2="400" y2="220" stroke="#B9C7D8" stroke-width="0.8"/>
-  <line x1="454" y1="176" x2="454" y2="220" stroke="#B9C7D8" stroke-width="0.8"/>
-  <line x1="508" y1="176" x2="508" y2="220" stroke="#B9C7D8" stroke-width="0.8"/>
-  <line x1="562" y1="176" x2="562" y2="220" stroke="#B9C7D8" stroke-width="0.8"/>
-  <line x1="616" y1="176" x2="616" y2="220" stroke="#B9C7D8" stroke-width="0.8"/>
-  <line x1="724" y1="176" x2="724" y2="220" stroke="#B4CDC3" stroke-width="0.8"/>
-  <line x1="778" y1="176" x2="778" y2="220" stroke="#B4CDC3" stroke-width="0.8"/>
-  <line x1="832" y1="176" x2="832" y2="220" stroke="#B4CDC3" stroke-width="0.8"/>
-  <line x1="940" y1="176" x2="940" y2="220" stroke="#DEDACD" stroke-width="0.8"/>
-  <line x1="994" y1="176" x2="994" y2="220" stroke="#DEDACD" stroke-width="0.8"/>
-  <line x1="1048" y1="176" x2="1048" y2="220" stroke="#DEDACD" stroke-width="0.8"/>
+  <!-- cwnd Row 2 -->
+  <rect x="88" y="246" width="62" height="20" rx="3" fill="#EFE7DA"/>
+  <text x="119" y="260" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">物理依据</text>
+  <text x="160" y="261" font-size="11" fill="#4A473F">丢包率 / RTT 时延</text>
 
-  <!-- region labels -->
-  <text x="238" y="244" font-size="11.5" font-weight="700" fill="#4A473F" text-anchor="middle">① 已发送、已确认</text>
-  <text x="238" y="262" font-size="9.5" fill="#8A8578" text-anchor="middle">可以从发送缓冲区丢掉了</text>
-  <text x="508" y="244" font-size="11.5" font-weight="700" fill="#2C4460" text-anchor="middle">② 已发送、未确认</text>
-  <text x="508" y="262" font-size="9.5" fill="#8A8578" text-anchor="middle">还在网络里飞，等 ACK</text>
-  <text x="778" y="244" font-size="11.5" font-weight="700" fill="#24473F" text-anchor="middle">③ 可以立即发送</text>
-  <text x="778" y="262" font-size="9.5" fill="#8A8578" text-anchor="middle">窗口剩下的额度</text>
-  <text x="994" y="244" font-size="11.5" font-weight="700" fill="#6B675C" text-anchor="middle">④ 还不能发</text>
-  <text x="994" y="262" font-size="9.5" fill="#8A8578" text-anchor="middle">等窗口右滑才轮得到</text>
+  <!-- cwnd Row 3 -->
+  <rect x="88" y="274" width="62" height="20" rx="3" fill="#EFE7DA"/>
+  <text x="119" y="288" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">调节算法</text>
+  <text x="160" y="289" font-size="11" fill="#4A473F">慢启动 / 拥塞避免 / CUBIC</text>
 
-  <!-- pointers -->
-  <line x1="346" y1="170" x2="346" y2="284" stroke="#3D5A80" stroke-width="2.2"/>
-  <line x1="670" y1="170" x2="670" y2="284" stroke="#2F6B5E" stroke-width="2.2"/>
-  <line x1="886" y1="170" x2="886" y2="284" stroke="#B07D2B" stroke-width="2.2"/>
-  <text x="346" y="300" font-size="10.5" font-weight="700" fill="#2C4460" text-anchor="middle">SND.UNA</text>
-  <text x="346" y="316" font-size="9" fill="#8A8578" text-anchor="middle">最早的未确认字节</text>
-  <text x="670" y="300" font-size="10.5" font-weight="700" fill="#24473F" text-anchor="middle">SND.NXT</text>
-  <text x="670" y="316" font-size="9" fill="#8A8578" text-anchor="middle">下一个要发的字节</text>
-  <text x="886" y="300" font-size="10.5" font-weight="700" fill="#6B4E28" text-anchor="middle">SND.UNA + 窗口</text>
-  <text x="886" y="316" font-size="9" fill="#8A8578" text-anchor="middle">窗口右边界</text>
+  <!-- cwnd Row 4 -->
+  <rect x="88" y="302" width="62" height="20" rx="3" fill="#EFE7DA"/>
+  <text x="119" y="316" font-size="10" font-weight="700" fill="#6B4E28" text-anchor="middle">防御目标</text>
+  <text x="160" y="317" font-size="11" fill="#4A473F">路由器队列积压与溢出</text>
 
-  <text x="72" y="340" font-size="11" fill="#6B675C">①②的分界由 ACK 推动，③④的分界由接收方通告的窗口决定。应用层 write 进来的数据只是排到④后面去，并不代表马上就能上路</text>
+  <!-- cwnd Summary Badge -->
+  <rect x="88" y="342" width="292" height="26" rx="4" fill="#F1EFE8"/>
+  <text x="234" y="359" font-size="10" font-weight="500" fill="#8A6A3A" text-anchor="middle">核心角色：自主探测网络可用带宽</text>
 
-  <!-- ===================== Panel B ===================== -->
-  <rect x="48" y="374" width="1144" height="200" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
-  <line x1="620" y1="390" x2="620" y2="558" stroke="#E3E0D6" stroke-width="1"/>
+  <!-- Center Card: Min Decision Gate -->
+  <rect x="418" y="148" width="404" height="234" rx="7" fill="#FBFBF6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <path d="M418,184 L418,155 Q418,148 425,148 L815,148 Q822,148 822,155 L822,184 Z" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="620" y="170" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">双重约束汇聚：木桶短板原则</text>
 
-  <!-- left: slide right -->
-  <text x="72" y="400" font-size="13" font-weight="700" fill="#4A473F">① 收到新 ACK → 窗口整体右滑</text>
-  <path d="M180,436 L180,428 L370,428 L370,436" fill="none" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="275" y="422" font-size="9.5" fill="#8A8578" text-anchor="middle">旧窗口（5）</text>
-  <rect x="104" y="442" width="76" height="32" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
-  <rect x="180" y="442" width="76" height="32" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
-  <rect x="256" y="442" width="190" height="32" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
-  <rect x="446" y="442" width="38" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1" stroke-dasharray="4 3"/>
-  <text x="218" y="462" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">刚被确认</text>
-  <path d="M256,488 L256,496 L446,496 L446,488" fill="none" stroke="#2F6B5E" stroke-width="1.4"/>
-  <text x="351" y="510" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">新窗口（还是 5）</text>
-  <text x="72" y="534" font-size="10.5" fill="#4A473F">ACK 确认掉左边 2 个单位，左边界前移 2</text>
-  <text x="72" y="554" font-size="10.5" fill="#4A473F">右边界 = 左边界 + 通告窗口，跟着前移 2，宽度不变</text>
+  <!-- Input Arrows -->
+  <line x1="396" y1="216" x2="434" y2="216" stroke="#B07D2B" stroke-width="1.8" marker-end="url(#arrA)"/>
+  <line x1="844" y1="216" x2="806" y2="216" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
 
-  <!-- right: shrink -->
-  <text x="668" y="400" font-size="13" font-weight="700" fill="#4A473F">② rwnd 变小 → 窗口被压窄</text>
-  <path d="M776,436 L776,428 L966,428 L966,436" fill="none" stroke="#9B968A" stroke-width="1.2"/>
-  <text x="871" y="422" font-size="9.5" fill="#8A8578" text-anchor="middle">旧窗口（5）</text>
-  <rect x="700" y="442" width="76" height="32" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
-  <rect x="776" y="442" width="76" height="32" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
-  <rect x="852" y="442" width="114" height="32" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
-  <rect x="966" y="442" width="114" height="32" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1" stroke-dasharray="4 3"/>
-  <text x="814" y="462" font-size="9.5" font-weight="700" fill="#6B4E28" text-anchor="middle">刚被确认</text>
-  <path d="M852,488 L852,496 L966,496 L966,488" fill="none" stroke="#A64B3C" stroke-width="1.4"/>
-  <text x="909" y="510" font-size="9.5" font-weight="700" fill="#733428" text-anchor="middle">新窗口（3）</text>
-  <text x="668" y="534" font-size="10.5" fill="#4A473F">左边界照常前移 2，但接收方把通告窗口从 5 降到 3</text>
-  <text x="668" y="554" font-size="10.5" fill="#4A473F">右边界原地不动，窗口宽度 5 → 3，这就是在踩刹车</text>
+  <!-- Formula badge -->
+  <rect x="444" y="194" width="352" height="48" rx="6" fill="#F1EFE8" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="620" y="217" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">发送窗口 = min(rwnd, cwnd)</text>
+  <text x="620" y="234" font-size="10" fill="#6B675C" text-anchor="middle">木桶短板：按较小者设限</text>
 
-  <text x="48" y="602" font-size="11" fill="#6B675C">接收方要收窄窗口，只能靠"右边界少往前推"，不能把已经通告出去的右边界往回撤——RFC 1122 把后者叫 shrinking the window，会让对端已经合法发出的数据凭空变成越界数据</text>
+  <!-- Sub-card 1: 硬约束 -->
+  <rect x="444" y="252" width="352" height="52" rx="5" fill="#FFFFFF" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="456" y="260" width="56" height="18" rx="3" fill="#DCE9E3"/>
+  <text x="484" y="273" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">硬约束</text>
+  <text x="522" y="274" font-size="11" font-weight="700" fill="#2B2A26">在途未确认字节 ≤ 发送窗口</text>
+  <text x="456" y="295" font-size="10" fill="#6B675C">网络中飞行的未确认数据受此上限压制</text>
+
+  <!-- Sub-card 2: 安全底线 -->
+  <rect x="444" y="312" width="352" height="52" rx="5" fill="#FFFFFF" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="456" y="320" width="56" height="18" rx="3" fill="#DCE9E3"/>
+  <text x="484" y="333" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">安全底线</text>
+  <text x="522" y="334" font-size="11" font-weight="700" fill="#2B2A26">不压垮网络 · 不淹没对端</text>
+  <text x="456" y="355" font-size="10" fill="#6B675C">单向硬塞会引发严重重传、丢包或死锁</text>
+
+  <!-- Right Card: rwnd -->
+  <rect x="844" y="148" width="324" height="234" rx="7" fill="#FBFBF6" stroke="#3D5A80" stroke-width="1.2"/>
+  <path d="M844,184 L844,155 Q844,148 851,148 L1161,148 Q1168,148 1168,155 L1168,184 Z" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="1006" y="170" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">rwnd · 接收窗口</text>
+  <text x="1006" y="200" font-size="10.5" fill="#3D5A80" text-anchor="middle">接收端通告（写入 TCP 首部）</text>
+  <line x1="860" y1="210" x2="1152" y2="210" stroke="#C8D4E2" stroke-width="0.8"/>
+
+  <!-- rwnd Row 1 -->
+  <rect x="860" y="218" width="62" height="20" rx="3" fill="#E3EAF4"/>
+  <text x="891" y="232" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">评估目标</text>
+  <text x="932" y="233" font-size="11" fill="#4A473F">接收套接字缓冲区</text>
+
+  <!-- rwnd Row 2 -->
+  <rect x="860" y="246" width="62" height="20" rx="3" fill="#E3EAF4"/>
+  <text x="891" y="260" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">物理依据</text>
+  <text x="932" y="261" font-size="11" fill="#4A473F">rcvbuf 剩余空闲字节</text>
+
+  <!-- rwnd Row 3 -->
+  <rect x="860" y="274" width="62" height="20" rx="3" fill="#E3EAF4"/>
+  <text x="891" y="288" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">调节机制</text>
+  <text x="932" y="289" font-size="11" fill="#4A473F">应用层 read() 读走后回升</text>
+
+  <!-- rwnd Row 4 -->
+  <rect x="860" y="302" width="62" height="20" rx="3" fill="#E3EAF4"/>
+  <text x="891" y="316" font-size="10" font-weight="700" fill="#2C4460" text-anchor="middle">防御目标</text>
+  <text x="932" y="317" font-size="11" fill="#4A473F">接收端缓存溢出丢包</text>
+
+  <!-- rwnd Summary Badge -->
+  <rect x="860" y="342" width="292" height="26" rx="4" fill="#F1EFE8"/>
+  <text x="1006" y="359" font-size="10" font-weight="500" fill="#3D5A80" text-anchor="middle">核心角色：对端反压流量控制</text>
+
+  <!-- ===================== Panel B: 典型场景与决策分支 ===================== -->
+  <rect x="48" y="412" width="1144" height="204" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="436" font-size="15" font-weight="700" fill="#4A473F">B · 典型场景与短板决策：哪个窗口在踩刹车？</text>
+
+  <!-- Left Scenario Card: rwnd < cwnd -->
+  <rect x="72" y="448" width="540" height="152" rx="6" fill="#FFFFFF" stroke="#D8D5C8" stroke-width="1"/>
+  <path d="M72,476 L72,454 Q72,448 78,448 L606,448 Q612,448 612,454 L612,476 Z" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="84" y="467" font-size="12" font-weight="700" fill="#2C4460">rwnd &lt; cwnd · 接收端瓶颈（流控制生效）</text>
+
+  <!-- Left Card Rows -->
+  <rect x="84" y="482" width="38" height="18" rx="3" fill="#F1EFE8"/>
+  <text x="103" y="495" font-size="9.5" fill="#4A473F" text-anchor="middle">工况</text>
+  <text x="130" y="495" font-size="10.5" fill="#4A473F">局域网极佳 (cwnd=512KB)</text>
+
+  <rect x="84" y="504" width="38" height="18" rx="3" fill="#F1EFE8"/>
+  <text x="103" y="517" font-size="9.5" fill="#4A473F" text-anchor="middle">瓶颈</text>
+  <text x="130" y="517" font-size="10.5" fill="#A64B3C">对端 GC / 读盘慢 (rwnd=16KB)</text>
+
+  <rect x="84" y="526" width="38" height="18" rx="3" fill="#DCE9E3"/>
+  <text x="103" y="539" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">窗口</text>
+  <text x="130" y="539" font-size="10.5" font-weight="700" fill="#24473F">实际发送窗口 = 16 KB (按 rwnd)</text>
+
+  <rect x="84" y="548" width="38" height="18" rx="3" fill="#F1EFE8"/>
+  <text x="103" y="561" font-size="9.5" fill="#4A473F" text-anchor="middle">机制</text>
+  <text x="130" y="561" font-size="10.5" fill="#4A473F">流控制生效 · 减速等 read()</text>
+
+  <rect x="84" y="570" width="38" height="18" rx="3" fill="#F0E0DB"/>
+  <text x="103" y="583" font-size="9.5" fill="#733428" text-anchor="middle">极值</text>
+  <text x="130" y="583" font-size="10.5" fill="#733428">rwnd=0 触发零窗口探测</text>
+
+  <!-- Right Scenario Card: cwnd < rwnd -->
+  <rect x="652" y="448" width="540" height="152" rx="6" fill="#FFFFFF" stroke="#D8D5C8" stroke-width="1"/>
+  <path d="M652,476 L652,454 Q652,448 658,448 L1186,448 Q1192,448 1192,454 L1192,476 Z" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="664" y="467" font-size="12" font-weight="700" fill="#6B4E28">cwnd &lt; rwnd · 网络链路瓶颈（拥塞控制生效）</text>
+
+  <!-- Right Card Rows -->
+  <rect x="664" y="482" width="38" height="18" rx="3" fill="#F1EFE8"/>
+  <text x="683" y="495" font-size="9.5" fill="#4A473F" text-anchor="middle">工况</text>
+  <text x="710" y="495" font-size="10.5" fill="#4A473F">对端空闲充裕 (rwnd=1MB)</text>
+
+  <rect x="664" y="504" width="38" height="18" rx="3" fill="#F1EFE8"/>
+  <text x="683" y="517" font-size="9.5" fill="#4A473F" text-anchor="middle">瓶颈</text>
+  <text x="710" y="517" font-size="10.5" fill="#A64B3C">公网路由排队 / 拥塞丢包</text>
+
+  <rect x="664" y="526" width="38" height="18" rx="3" fill="#DCE9E3"/>
+  <text x="683" y="539" font-size="9.5" font-weight="700" fill="#24473F" text-anchor="middle">窗口</text>
+  <text x="710" y="539" font-size="10.5" font-weight="700" fill="#24473F">实际发送窗口 = 32 KB (按 cwnd)</text>
+
+  <rect x="664" y="548" width="38" height="18" rx="3" fill="#F1EFE8"/>
+  <text x="683" y="561" font-size="9.5" fill="#4A473F" text-anchor="middle">机制</text>
+  <text x="710" y="561" font-size="10.5" fill="#4A473F">拥塞控制生效 · 算法主动退避</text>
+
+  <rect x="664" y="570" width="38" height="18" rx="3" fill="#F0E0DB"/>
+  <text x="683" y="583" font-size="9.5" fill="#733428" text-anchor="middle">极值</text>
+  <text x="710" y="583" font-size="10.5" fill="#733428">丢包时 cwnd 减半或重置为 1 MSS</text>
+
+  <!-- Footer summary bar (Footer region: y >= 680 - 90 = 590) -->
+  <rect x="48" y="628" width="1144" height="32" rx="6" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1"/>
+  <text x="620" y="649" font-size="11.5" fill="#4A473F" text-anchor="middle">口径总结：rwnd 是对端通知的剩余缓存（显式字段），cwnd 是本端摸索的网络容量（算法估算），二者合力守住安全上界</text>
 </svg>

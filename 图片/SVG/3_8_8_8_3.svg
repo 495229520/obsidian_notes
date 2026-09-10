@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="810" viewBox="0 0 1240 810" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <title>流控制全过程：rwnd 从 8000 降到 0，再靠零窗口探测恢复</title>
+  <desc>发送方与接收方的报文往返时序，右侧同步显示 9000 字节接收缓冲区的水位，以及 rwnd 归零后零窗口探测如何打破死锁。</desc>
+
+  <rect x="0" y="0" width="1240" height="810" fill="rgb(245, 244, 237)"/>
+
+  <text x="48" y="52" font-size="22" font-weight="700" fill="#2B2A26">rwnd 是怎么一路降到 0，又怎么恢复的</text>
+  <text x="48" y="80" font-size="13" fill="#6B675C">接收缓冲区共 9000 字节；rwnd 每次通告的都是"此刻还剩多少空位"，右侧水位条与它一一对应</text>
+
+  <!-- lane headers -->
+  <rect x="170" y="112" width="160" height="30" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="250" y="132" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">发送方</text>
+  <rect x="660" y="112" width="160" height="30" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="740" y="132" font-size="13" font-weight="700" fill="#24473F" text-anchor="middle">接收方</text>
+  <text x="930" y="132" font-size="12" font-weight="700" fill="#4A473F" text-anchor="middle">接收缓冲区水位（共 9000）</text>
+
+  <line x1="250" y1="146" x2="250" y2="700" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="740" y1="146" x2="740" y2="700" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="5 4"/>
+
+  <!-- r1 data 1000 -->
+  <line x1="250" y1="190" x2="740" y2="190" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="495" y="181" font-size="11" fill="#2C4460" text-anchor="middle">数据 1000 字节</text>
+
+  <!-- r2 ack 8000 -->
+  <line x1="740" y1="232" x2="250" y2="232" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="495" y="223" font-size="11" fill="#24473F" text-anchor="middle">ACK，rwnd = 8000</text>
+  <text x="60" y="236" font-size="10.5" font-weight="700" fill="#2C4460">还可以发 8000</text>
+  <rect x="830" y="222" width="200" height="20" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="830" y="222" width="22" height="20" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="1042" y="236" font-size="9.5" fill="#6B675C">已用 1000 / 9000</text>
+
+  <!-- r3 data 5000 -->
+  <line x1="250" y1="282" x2="740" y2="282" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="495" y="273" font-size="11" fill="#2C4460" text-anchor="middle">数据 5000 字节</text>
+
+  <!-- r4 ack 3000 -->
+  <line x1="740" y1="324" x2="250" y2="324" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="495" y="315" font-size="11" fill="#24473F" text-anchor="middle">ACK，rwnd = 3000</text>
+  <text x="60" y="328" font-size="10.5" font-weight="700" fill="#2C4460">只剩 3000 额度</text>
+  <rect x="830" y="314" width="200" height="20" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="830" y="314" width="133" height="20" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="1042" y="328" font-size="9.5" fill="#6B675C">已用 6000 / 9000</text>
+
+  <!-- r5 data 3000 -->
+  <line x1="250" y1="374" x2="740" y2="374" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="495" y="365" font-size="11" fill="#2C4460" text-anchor="middle">数据 3000 字节</text>
+
+  <!-- r6 ack 0 -->
+  <line x1="740" y1="416" x2="250" y2="416" stroke="#A64B3C" stroke-width="2" marker-end="url(#arrR)"/>
+  <text x="495" y="407" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">ACK，rwnd = 0　（缓冲区满了，别发了）</text>
+  <text x="60" y="420" font-size="10.5" font-weight="700" fill="#733428">额度归零</text>
+  <rect x="830" y="406" width="200" height="20" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1042" y="420" font-size="9.5" font-weight="700" fill="#733428">已用 9000 / 9000</text>
+
+  <!-- pause band -->
+  <rect x="170" y="450" width="160" height="46" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="250" y="470" font-size="11" font-weight="700" fill="#733428" text-anchor="middle">发送方停发</text>
+  <text x="250" y="487" font-size="9.5" fill="#733428" text-anchor="middle">启动持续计时器</text>
+
+  <!-- r8 probe -->
+  <line x1="250" y1="520" x2="740" y2="520" stroke="#B07D2B" stroke-width="1.8" marker-end="url(#arrA)"/>
+  <text x="495" y="511" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">零窗口探测（1 字节）</text>
+
+  <!-- r9 ack 0 again -->
+  <line x1="740" y1="560" x2="250" y2="560" stroke="#A64B3C" stroke-width="1.8" marker-end="url(#arrR)"/>
+  <text x="495" y="551" font-size="11" fill="#733428" text-anchor="middle">ACK，rwnd = 0</text>
+  <text x="60" y="564" font-size="10.5" fill="#733428">继续等，退避重探</text>
+  <rect x="830" y="550" width="200" height="20" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="1042" y="564" font-size="9.5" fill="#733428">已用 9000 / 9000</text>
+
+  <!-- r10 app read -->
+  <circle cx="740" cy="600" r="5" fill="#2F6B5E"/>
+  <text x="728" y="604" font-size="11" font-weight="700" fill="#24473F" text-anchor="end">接收方的应用层终于 read() 走了 4000 字节</text>
+
+  <!-- r11 window update -->
+  <line x1="740" y1="640" x2="250" y2="640" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrG)"/>
+  <text x="495" y="631" font-size="11" font-weight="700" fill="#24473F" text-anchor="middle">窗口更新 ACK，rwnd = 4000</text>
+  <text x="60" y="644" font-size="10.5" font-weight="700" fill="#24473F">恢复，可发 4000</text>
+  <rect x="830" y="630" width="200" height="20" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <rect x="830" y="630" width="111" height="20" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="1042" y="644" font-size="9.5" fill="#6B675C">已用 5000 / 9000</text>
+
+  <!-- r12 resume -->
+  <line x1="250" y1="680" x2="740" y2="680" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arrB)"/>
+  <text x="495" y="671" font-size="11" fill="#2C4460" text-anchor="middle">继续发数据</text>
+
+  <!-- card -->
+  <rect x="48" y="716" width="1144" height="76" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="740" font-size="13" font-weight="700" fill="#4A473F">为什么非要有零窗口探测</text>
+  <text x="72" y="762" font-size="11" fill="#4A473F">窗口更新是一个纯 ACK：不带数据、不占序号，因此不在 TCP 的重传范围内——它在路上丢了就是丢了，没人会重发。</text>
+  <text x="72" y="781" font-size="11" fill="#4A473F">于是接收方以为"我通知过了"，发送方还在等通知，两边一起挂死。打破死锁的责任在发送方：它靠持续计时器定期发 1 字节探测，逼对方回一个当前窗口。</text>
+</svg>
