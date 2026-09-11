@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="750" viewBox="0 0 1240 750" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arrN" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect x="0" y="0" width="1240" height="750" fill="rgb(245, 244, 237)"/>
+
+  <!-- ===================== Header ===================== -->
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">为什么“可写”不等于“成功”：EPOLLOUT 假象与 SO_ERROR 判官</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">握手完成与连接失败在内核中均会唤醒 EPOLLOUT；必须用 getsockopt 探测 sk_err，且该状态阅后即焚</text>
+
+  <!-- ===================== Panel A: 对照全景 ===================== -->
+  <rect x="48" y="94" width="1144" height="426" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="120" font-size="14" font-weight="700" fill="#4A473F">A · 跨层时序对照：为什么成功与失败在事件驱动层长得一模一样？</text>
+
+  <!-- 左列：成功路径 (x=68, w=540) -->
+  <rect x="68" y="132" width="540" height="372" rx="7" fill="#F4F8F6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <rect x="68" y="132" width="540" height="28" rx="7" fill="#DCE9E3"/>
+  <text x="86" y="151" font-size="12.5" font-weight="700" fill="#24473F">路径 ① · 握手成功（真可写）</text>
+  <text x="510" y="151" font-size="10.5" font-weight="700" fill="#2F6B5E">ESTABLISHED</text>
+
+  <!-- 左列 - 1. 用户态 -->
+  <rect x="84" y="170" width="508" height="66" rx="6" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1"/>
+  <text x="96" y="188" font-size="10" font-weight="700" fill="#3D5A80">【用户态 · Application】</text>
+  <text x="96" y="208" font-size="11" fill="#2C4460">getsockopt(fd, SO_ERROR, &amp;err) 探测</text>
+  <text x="96" y="226" font-size="10.5" font-weight="700" fill="#2F6B5E">✓ 读出 err == 0 → 验真成功，放心调用 send()</text>
+
+  <!-- 左列 - 向上事件箭头 -->
+  <line x1="338" y1="250" x2="338" y2="236" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arrG)"/>
+  <text x="346" y="246" font-size="10" font-weight="700" fill="#2F6B5E">EPOLLOUT 唤醒</text>
+
+  <!-- 左列 - 2. 内核态 Socket -->
+  <rect x="84" y="252" width="508" height="120" rx="6" fill="#FFFFFF" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="96" y="270" font-size="10" font-weight="700" fill="#2F6B5E">【内核态 · struct sock】</text>
+  
+  <!-- 缓冲区小示意图 -->
+  <rect x="96" y="282" width="220" height="34" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+  <text x="106" y="303" font-size="10" fill="#2C4460">发送缓冲：就绪 (空闲容量充裕)</text>
+
+  <!-- 待决错误寄存器示意 -->
+  <rect x="330" y="282" width="246" height="34" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="340" y="303" font-size="10.5" font-weight="700" fill="#24473F">sk-&gt;sk_err = 0 (待决错误为空)</text>
+
+  <text x="96" y="336" font-size="10.5" fill="#4A473F">状态流转：SYN_SENT → ESTABLISHED</text>
+  <text x="96" y="356" font-size="10.5" fill="#6B675C">触发逻辑：发送队列可写，正常通知 EPOLLOUT</text>
+
+  <!-- 左列 - 3. 网络链路 -->
+  <rect x="84" y="386" width="508" height="104" rx="6" fill="#FFFFFF" stroke="#9B968A" stroke-width="1"/>
+  <text x="96" y="404" font-size="10" font-weight="700" fill="#6B675C">【网络协议线 · 三次握手】</text>
+  
+  <!-- 报文交互线条 -->
+  <line x1="120" y1="424" x2="420" y2="436" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="240" y="424" font-size="9.5" fill="#5A564B">① [SYN] Seq=x</text>
+
+  <line x1="420" y1="446" x2="120" y2="458" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arrG)"/>
+  <text x="230" y="450" font-size="9.5" font-weight="700" fill="#2F6B5E">② [SYN, ACK] Ack=x+1</text>
+
+  <line x1="120" y1="468" x2="420" y2="480" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="240" y="472" font-size="9.5" fill="#5A564B">③ [ACK] Seq=x+1</text>
+
+  <!-- 右列：失败路径 (x=632, w=540) -->
+  <rect x="632" y="132" width="540" height="372" rx="7" fill="#FAF4F2" stroke="#A64B3C" stroke-width="1.2"/>
+  <rect x="632" y="132" width="540" height="28" rx="7" fill="#F0E0DB"/>
+  <text x="650" y="151" font-size="12.5" font-weight="700" fill="#733428">路径 ② · 握手失败（假可写！）</text>
+  <text x="1090" y="151" font-size="10.5" font-weight="700" fill="#A64B3C">CLOSED</text>
+
+  <!-- 右列 - 1. 用户态 -->
+  <rect x="648" y="170" width="508" height="66" rx="6" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="660" y="188" font-size="10" font-weight="700" fill="#A64B3C">【用户态 · 错路 vs 正路】</text>
+  <text x="660" y="208" font-size="10" fill="#A64B3C">✗ 盲判可写直接发：调 send() → 触发 SIGPIPE 杀进程！</text>
+  <text x="660" y="226" font-size="10.5" font-weight="700" fill="#2F6B5E">✓ 判官检验：getsockopt 读出 err != 0，识破伪证关 fd</text>
+
+  <!-- 右列 - 向上事件箭头 (假象) -->
+  <line x1="902" y1="250" x2="902" y2="236" stroke="#A64B3C" stroke-width="2" marker-end="url(#arrR)"/>
+  <text x="910" y="246" font-size="10" font-weight="700" fill="#A64B3C">同样触发 EPOLLOUT！(陷阱)</text>
+
+  <!-- 右列 - 2. 内核态 Socket -->
+  <rect x="648" y="252" width="508" height="120" rx="6" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="660" y="270" font-size="10" font-weight="700" fill="#A64B3C">【内核态 · struct sock】</text>
+
+  <!-- 待决错误寄存器高亮 -->
+  <rect x="660" y="282" width="260" height="34" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.4"/>
+  <text x="670" y="303" font-size="10.5" font-weight="700" fill="#733428">sk-&gt;sk_err = 111 (ECONNREFUSED)</text>
+
+  <rect x="930" y="282" width="214" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+  <text x="940" y="303" font-size="10" fill="#4A473F">POSIX规则：未决错误必唤醒</text>
+
+  <text x="660" y="336" font-size="10.5" fill="#733428">状态流转：SYN_SENT → CLOSED (连接已夭折)</text>
+  <text x="660" y="356" font-size="10.5" fill="#6B675C">根本原因：内核不能让进程永久死等，故强行唤醒事件</text>
+
+  <!-- 右列 - 3. 网络链路 -->
+  <rect x="648" y="386" width="508" height="104" rx="6" fill="#FFFFFF" stroke="#9B968A" stroke-width="1"/>
+  <text x="660" y="404" font-size="10" font-weight="700" fill="#6B675C">【网络协议线 · 异常中断】</text>
+
+  <!-- 报文交互线条 -->
+  <line x1="684" y1="428" x2="984" y2="442" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arrN)"/>
+  <text x="804" y="430" font-size="9.5" fill="#5A564B">① [SYN] 发起建连</text>
+
+  <line x1="984" y1="462" x2="684" y2="476" stroke="#A64B3C" stroke-width="2" marker-end="url(#arrR)"/>
+  <text x="770" y="464" font-size="9.5" font-weight="700" fill="#A64B3C">② [RST, ACK] 端口未开 / 直接拒绝！</text>
+
+  <!-- ===================== Panel B: 阅后即焚 ===================== -->
+  <rect x="48" y="534" width="1144" height="152" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="72" y="560" font-size="14" font-weight="700" fill="#4A473F">B · 内部微观时序：SO_ERROR 为什么“阅后即焚”（Read-Once and Clear）？</text>
+
+  <!-- 阶段 1 -->
+  <rect x="72" y="578" width="220" height="92" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="86" y="600" font-size="11" font-weight="700" fill="#4A473F">t₀ · 内核记录故障</text>
+  <text x="86" y="622" font-size="10" fill="#6B675C">对端回送 RST 报文</text>
+  <rect x="86" y="632" width="188" height="26" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="96" y="649" font-size="10.5" font-weight="700" fill="#733428">sk-&gt;sk_err = 111</text>
+
+  <line x1="292" y1="624" x2="332" y2="624" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arrN)"/>
+
+  <!-- 阶段 2 -->
+  <rect x="338" y="578" width="310" height="92" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="352" y="600" font-size="11" font-weight="700" fill="#6B4E28">t₁ · 第 1 次调用 getsockopt()</text>
+  <text x="352" y="622" font-size="10" fill="#24473F">出参拿到真因：err = 111 (REFUSED)</text>
+  <rect x="352" y="632" width="278" height="26" rx="4" fill="#FFFFFF" stroke="#B07D2B" stroke-width="1"/>
+  <text x="362" y="649" font-size="10.5" font-weight="700" fill="#A64B3C">内核副作用：sk-&gt;sk_err 当场清零！</text>
+
+  <line x1="648" y1="624" x2="688" y2="624" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrR)"/>
+
+  <!-- 阶段 3 -->
+  <rect x="694" y="578" width="260" height="92" rx="6" fill="#FAF4F2" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="708" y="600" font-size="11" font-weight="700" fill="#733428">t₂ · 第 2 次重复查询 (大坑)</text>
+  <text x="708" y="622" font-size="10" fill="#A64B3C">出参读出假象：err = 0 (无错)</text>
+  <rect x="708" y="632" width="232" height="26" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="718" y="649" font-size="10" font-weight="700" fill="#733428">致命误判：死连接被认作成功！</text>
+
+  <!-- 防御准则 -->
+  <rect x="970" y="578" width="202" height="92" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="984" y="602" font-size="11" font-weight="700" fill="#2C4460">★ 生产防御守则</text>
+  <text x="984" y="626" font-size="10" fill="#2C4460">• SO_ERROR 全局只读一次</text>
+  <text x="984" y="644" font-size="10" fill="#2C4460">• 将 err 保存为变量后分发</text>
+  <text x="984" y="662" font-size="10" fill="#2C4460">• 严禁在多分支重复查询</text>
+
+  <!-- ===================== Footer ===================== -->
+  <text x="48" y="718" font-size="11" fill="#6B675C">总结准则：EPOLLOUT 只代表网络交互结束；判官是 getsockopt，err == 0 确认无误后再调用 send()，查完即清零不可重查。</text>
+</svg>
