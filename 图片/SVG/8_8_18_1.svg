@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="Noto Sans CJK SC,Microsoft YaHei,PingFang SC,sans-serif">
+<title>一次 AllReduce：语义、算法与物理链路不是同一层</title><desc>由上到下回答不同的问题；Ring 的逻辑边可以同时映射到 NVLink 与跨机网络。。原创教学示意；数字不是硬件实测；详细条件与出处见对应 Markdown 笔记。</desc>
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker>
+<marker id="blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/></marker>
+<marker id="green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/></marker>
+<marker id="red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker>
+<marker id="amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/></marker>
+</defs>
+<rect x="0" y="0" width="1240" height="680" rx="0" fill="rgb(245, 244, 237)" stroke="none" stroke-width="1.3"/>
+<text x="48" y="52" font-size="22" fill="#2B2A26" font-weight="700" text-anchor="start">一次 AllReduce：语义、算法与物理链路不是同一层</text>
+<text x="48" y="81" font-size="14" fill="#6B675C" font-weight="400" text-anchor="start">由上到下回答不同的问题；Ring 的逻辑边可以同时映射到 NVLink 与跨机网络。</text>
+<rect x="48" y="109" width="1144" height="84" rx="8" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="48" y="205" width="1144" height="78" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="48" y="295" width="1144" height="79" rx="8" fill="#EDEAF3" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="48" y="386" width="1144" height="82" rx="8" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="48" y="480" width="1144" height="108" rx="8" fill="#F3E8D3" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="64" y="139" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">① Collective</text>
+<text x="64" y="163" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">结果契约</text>
+<text x="64" y="234" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">② Algorithm</text>
+<text x="64" y="258" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">逻辑邻接</text>
+<text x="64" y="324" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">③ Runtime</text>
+<text x="64" y="348" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">并行与就绪</text>
+<text x="64" y="416" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">④ Transport</text>
+<text x="64" y="440" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">邻居如何相连</text>
+<text x="64" y="513" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">⑤ Physical</text>
+<text x="64" y="537" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">字节经过哪里</text>
+<rect x="245" y="126" width="600" height="50" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="545.0" y="156.0" font-size="17" fill="#2C4460" font-weight="700" text-anchor="middle">AllReduce：y[j] = Σ x_r[j]</text>
+<rect x="920" y="126" width="240" height="50" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1040.0" y="156.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle">每个 rank 得到结果</text>
+<line x1="848" y1="151" x2="916" y2="151" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<rect x="245" y="219" width="245" height="48" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="367.5" y="248.0" font-size="14" fill="#4A473F" font-weight="700" text-anchor="middle">Ring</text>
+<rect x="550" y="219" width="245" height="48" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="672.5" y="248.0" font-size="14" fill="#4A473F" font-weight="700" text-anchor="middle">Tree</text>
+<rect x="855" y="219" width="305" height="48" rx="8" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="1007.5" y="248.0" font-size="14" fill="#4A473F" font-weight="700" text-anchor="middle">其他支持的算法 / 卸载</text>
+<path d="M 545,180 L 545,198 L 1007,198" fill="none" stroke="#5A564B" stroke-width="1.8" stroke-linejoin="round"/>
+<line x1="367" y1="198" x2="1007" y2="198" stroke="#5A564B" stroke-width="1.8"/>
+<line x1="367" y1="198" x2="367" y2="215" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="672" y1="198" x2="672" y2="215" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="1007" y1="198" x2="1007" y2="215" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<rect x="245" y="308" width="915" height="50" rx="8" fill="#EDEAF3" stroke="#82709B" stroke-width="1.3"/>
+<text x="702.5" y="338.0" font-size="16" fill="#625476" font-weight="700" text-anchor="middle">共同规划：Channels × Chunks × Protocol</text>
+<line x1="367" y1="270" x2="367" y2="287" stroke="#5A564B" stroke-width="1.8"/>
+<line x1="672" y1="270" x2="672" y2="287" stroke="#5A564B" stroke-width="1.8"/>
+<line x1="1007" y1="270" x2="1007" y2="287" stroke="#5A564B" stroke-width="1.8"/>
+<line x1="367" y1="287" x2="1007" y2="287" stroke="#5A564B" stroke-width="1.8"/>
+<line x1="702" y1="287" x2="702" y2="304" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<rect x="245" y="401" width="245" height="50" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="367.5" y="431.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle">P2P</text>
+<rect x="550" y="401" width="245" height="50" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="672.5" y="431.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle">SHM</text>
+<rect x="855" y="401" width="305" height="50" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1007.5" y="431.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle">NET / 网络插件</text>
+<line x1="702" y1="361" x2="702" y2="380" stroke="#5A564B" stroke-width="1.8"/>
+<line x1="367" y1="380" x2="1007" y2="380" stroke="#5A564B" stroke-width="1.8"/>
+<line x1="367" y1="380" x2="367" y2="397" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="672" y1="380" x2="672" y2="397" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="1007" y1="380" x2="1007" y2="397" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<rect x="245" y="510" width="245" height="57" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="367.5" y="532.5" font-size="14" fill="#2C4460" font-weight="700" text-anchor="middle">NVLink / PCIe</text>
+<text x="367.5" y="554.5" font-size="13" fill="#2C4460" font-weight="400" text-anchor="middle">GPU ↔ GPU</text>
+<rect x="550" y="510" width="245" height="57" rx="8" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="672.5" y="532.5" font-size="14" fill="#6B4E28" font-weight="700" text-anchor="middle">主机共享缓冲</text>
+<text x="672.5" y="554.5" font-size="13" fill="#6B4E28" font-weight="400" text-anchor="middle">GPU ↔ Host ↔ GPU</text>
+<rect x="855" y="499" width="305" height="79" rx="8" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="1007.5" y="521.5" font-size="14" fill="#6B4E28" font-weight="700" text-anchor="middle">PCIe → NIC → Fabric</text>
+<text x="1007.5" y="543.5" font-size="13" fill="#6B4E28" font-weight="400" text-anchor="middle">IB / RoCE / Socket 路径</text>
+<text x="1007.5" y="565.5" font-size="13" fill="#6B4E28" font-weight="400" text-anchor="middle">GDR 或 host staging</text>
+<line x1="367" y1="455" x2="367" y2="506" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="672" y1="455" x2="672" y2="506" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="1007" y1="455" x2="1007" y2="495" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<line x1="48" y1="609" x2="1192" y2="609" stroke="#D8D5C8" stroke-width="1"/>
+<text x="48" y="637" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">层次示意，不枚举全部快路径；NVSwitch 属于 GPU 互联域，不等于 RDMA 网络交换机。</text>
+<text x="48" y="660" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start">对应 8.18 §1、§6；固定实现基线 v2.27.7-1，实际组合依硬件、版本与插件。</text>
+</svg>

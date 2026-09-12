@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 680" width="1240" height="680" font-family="Noto Sans CJK SC, PingFang SC, Microsoft YaHei, sans-serif">
+<title>从流到 CPU：每一段由不同的机制选择</title>
+<desc>RSS 选队列；IRQ 选通知位置；RPS/RFS 可转交后续处理；应用调度仍然独立。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker><marker id="redarr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker></defs>
+<rect x="0" y="0" width="1240" height="680" fill="rgb(245, 244, 237)"/>
+<text x="48" y="52" font-size="22" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="title">从流到 CPU：每一段由不同的机制选择</text>
+<text x="48" y="82" font-size="14" fill="#6B675C" text-anchor="start" data-role="subtitle">RSS 选队列；IRQ 选通知位置；RPS/RFS 可转交后续处理；应用调度仍然独立。</text>
+<rect x="48" y="108" width="1144" height="300" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="65" y="136" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="section">① 流（示意）</text>
+<text x="288" y="136" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="section">② RSS 桶 → 队列</text>
+<text x="492" y="136" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="section">③ RX Ring</text>
+<text x="732" y="136" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="section">④ IRQ / NAPI</text>
+<text x="1004" y="136" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="section">⑤ 协议栈 CPU</text>
+<rect x="65" y="162" width="164" height="44" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<text x="147.0" y="188.42" font-size="13" fill="#733428" text-anchor="middle" font-weight="700" data-role="body">Flow A · 大象流</text>
+<path d="M232,184 L275,184" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="282" y="162" width="159" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="361.5" y="188.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">桶 0 / 4 → Q0</text>
+<path d="M443,184 L486,184" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="490" y="162" width="187" height="44" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<text x="504" y="189" font-size="13" fill="#733428" text-anchor="start" font-weight="700" data-role="body">Q0</text>
+<rect x="535" y="174" width="20" height="20" rx="2" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<rect x="560" y="174" width="20" height="20" rx="2" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<rect x="585" y="174" width="20" height="20" rx="2" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<rect x="610" y="174" width="20" height="20" rx="2" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<rect x="635" y="174" width="20" height="20" rx="2" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<path d="M680,184 L718,184" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="722" y="162" width="192" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="818.0" y="188.42" font-size="13" fill="#24473F" text-anchor="middle" font-weight="700" data-role="body">向量 0 → CPU 4</text>
+<path d="M917,184 L978,184" fill="none" stroke="#A64B3C" stroke-width="1.7" marker-end="url(#redarr)" stroke-dasharray="5 4"/>
+<rect x="983" y="162" width="189" height="44" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="1077.5" y="188.42" font-size="13" fill="#6B4E28" text-anchor="middle" font-weight="700" data-role="body">CPU 6（可转交）</text>
+<rect x="65" y="220" width="164" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="147.0" y="246.42" font-size="13" fill="#2C4460" text-anchor="middle" font-weight="700" data-role="body">Flow B</text>
+<path d="M232,242 L275,242" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="282" y="220" width="159" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="361.5" y="246.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">桶 1 / 5 → Q1</text>
+<path d="M443,242 L486,242" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="490" y="220" width="187" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="504" y="247" font-size="13" fill="#2C4460" text-anchor="start" font-weight="700" data-role="body">Q1</text>
+<rect x="535" y="232" width="20" height="20" rx="2" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<rect x="560" y="232" width="20" height="20" rx="2" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<path d="M680,242 L718,242" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="722" y="220" width="192" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="818.0" y="246.42" font-size="13" fill="#24473F" text-anchor="middle" font-weight="700" data-role="body">向量 1 → CPU 5</text>
+<path d="M917,242 L978,242" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="983" y="220" width="189" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="1077.5" y="246.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">CPU 5（本地）</text>
+<rect x="65" y="278" width="164" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="147.0" y="304.42" font-size="13" fill="#2C4460" text-anchor="middle" font-weight="700" data-role="body">Flow C</text>
+<path d="M232,300 L275,300" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="282" y="278" width="159" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="361.5" y="304.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">桶 2 / 6 → Q2</text>
+<path d="M443,300 L486,300" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="490" y="278" width="187" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="504" y="305" font-size="13" fill="#2C4460" text-anchor="start" font-weight="700" data-role="body">Q2</text>
+<rect x="535" y="290" width="20" height="20" rx="2" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<rect x="560" y="290" width="20" height="20" rx="2" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<path d="M680,300 L718,300" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="722" y="278" width="192" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="818.0" y="304.42" font-size="13" fill="#24473F" text-anchor="middle" font-weight="700" data-role="body">向量 2 → CPU 6</text>
+<path d="M917,300 L978,300" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="983" y="278" width="189" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="1077.5" y="304.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">CPU 6（本地）</text>
+<rect x="65" y="336" width="164" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="147.0" y="362.42" font-size="13" fill="#2C4460" text-anchor="middle" font-weight="700" data-role="body">Flow D</text>
+<path d="M232,358 L275,358" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="282" y="336" width="159" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="361.5" y="362.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">桶 3 / 7 → Q3</text>
+<path d="M443,358 L486,358" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="490" y="336" width="187" height="44" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="504" y="363" font-size="13" fill="#2C4460" text-anchor="start" font-weight="700" data-role="body">Q3</text>
+<rect x="535" y="348" width="20" height="20" rx="2" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<rect x="560" y="348" width="20" height="20" rx="2" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<path d="M680,358 L718,358" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="722" y="336" width="192" height="44" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="818.0" y="362.42" font-size="13" fill="#24473F" text-anchor="middle" font-weight="700" data-role="body">向量 3 → CPU 7</text>
+<path d="M917,358 L978,358" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="983" y="336" width="189" height="44" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="1077.5" y="362.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">CPU 7（本地）</text>
+<text x="729" y="399" font-size="12" fill="#6B675C" text-anchor="start" data-role="body">示例映射；并非固定 1∶1∶1</text>
+<rect x="48" y="427" width="1144" height="180" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="65" y="454" font-size="15" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="section">B · 看清选择方向，避免“绑一个核就全绑定”的误判</text>
+<rect x="70" y="480" width="172" height="58" rx="7" fill="#EDEAF3" stroke="#82759D" stroke-width="1.3"/>
+<text x="156.0" y="503.76" font-size="14" fill="#6B5B95" text-anchor="middle" font-weight="700" data-role="body">应用线程</text>
+<text x="156.0" y="523.76" font-size="14" fill="#6B5B95" text-anchor="middle" data-role="body">当前执行 CPU</text>
+<rect x="330" y="480" width="183" height="58" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="421.5" y="503.42" font-size="13" fill="#2C4460" text-anchor="middle" font-weight="700" data-role="body">XPS</text>
+<text x="421.5" y="523.42" font-size="13" fill="#2C4460" text-anchor="middle" data-role="body">CPU 或 RX 队列映射</text>
+<rect x="601" y="480" width="180" height="58" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="691.0" y="503.76" font-size="14" fill="#24473F" text-anchor="middle" font-weight="700" data-role="body">TX queue</text>
+<text x="691.0" y="523.76" font-size="14" fill="#24473F" text-anchor="middle" data-role="body">发送队列归属</text>
+<rect x="874" y="480" width="281" height="58" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="1014.5" y="503.42" font-size="13" fill="#4A473F" text-anchor="middle" font-weight="700" data-role="body">发送完成处理</text>
+<text x="1014.5" y="523.42" font-size="13" fill="#4A473F" text-anchor="middle" data-role="body">另查 CQ / NAPI / IRQ 映射</text>
+<path d="M245,509 L326,509" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<path d="M516,509 L597,509" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<path d="M784,509 L870,509" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<text x="71" y="577" font-size="13" fill="#733428" text-anchor="start" data-role="body">接收：流稳定 ≠ 工作量均匀</text>
+<text x="418" y="577" font-size="13" fill="#6B4E28" text-anchor="start" data-role="body">应用位置 ≠ 协议栈位置</text>
+<text x="812" y="577" font-size="13" fill="#24473F" text-anchor="start" data-role="body">发送队列 ≠ 完成处理 CPU</text>
+<path d="M48,621 L1192,621" fill="none" stroke="#D8D5C8" stroke-width="1"/>
+<text x="48" y="651" font-size="12.5" fill="#6B675C" text-anchor="start" data-role="footer">口径：普通 Linux socket 路径的职责图；色块数量仅示意负载，不代表实测队列深度。</text>
+</svg>

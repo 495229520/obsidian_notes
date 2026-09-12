@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="'Noto Sans CJK SC','PingFang SC','Microsoft YaHei',sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">同一个 train_step()，两套通信生命周期</title><desc id="desc">8.22 · 图 6　对应正文 train_dist.py；框架触发通信，应用不再重复手工规约梯度。原创教学图，非实测数据。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker><marker id="red-arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker></defs>
+<rect x="0" y="0" width="1240" height="680" rx="0" fill="rgb(245, 244, 237)"/>
+<text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26" text-anchor="start">同一个 train_step()，两套通信生命周期</text>
+<text x="48" y="78" font-size="14" font-weight="400" fill="#6B675C" text-anchor="start">8.22 · 图 6　对应正文 train_dist.py；框架触发通信，应用不再重复手工规约梯度</text>
+<rect x="48" y="110" width="356" height="62" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="226.0" y="135.225" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">ToyNet().to(device)</text>
+<text x="226.0" y="156.225" font-size="13.5" font-weight="400" fill="#2C4460" text-anchor="middle">各 rank 相同初始化</text>
+<rect x="442" y="110" width="356" height="62" rx="7" fill="#EDEAF3" stroke="#8F80A8" stroke-width="1.3"/>
+<text x="620.0" y="135.225" font-size="13.5" font-weight="700" fill="#6B5B95" text-anchor="middle">wrap_model()</text>
+<text x="620.0" y="156.225" font-size="13.5" font-weight="400" fill="#6B5B95" text-anchor="middle">DDP 或 fully_shard</text>
+<rect x="836" y="110" width="356" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1014.0" y="135.225" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">AdamW(model.parameters())</text>
+<text x="1014.0" y="156.225" font-size="13.5" font-weight="400" fill="#24473F" text-anchor="middle">并行转换后创建</text>
+<polyline points="409,141 436,141" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="803,141 830,141" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="49" y="211" font-size="15" font-weight="700" fill="#2B2A26" text-anchor="start">每个 rank 的 autograd / CUDA 执行</text>
+<text x="64" y="267" font-size="15" font-weight="700" fill="#2B2A26" text-anchor="start">DDP</text>
+<rect x="230" y="235" width="280" height="55" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="370.0" y="256.725" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">model(x) → backward()</text>
+<text x="370.0" y="277.725" font-size="13.5" font-weight="400" fill="#2C4460" text-anchor="middle">完整参数，本地计算</text>
+<rect x="570" y="235" width="285" height="55" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="712.5" y="256.725" font-size="13.5" font-weight="700" fill="#6B4E28" text-anchor="middle">reducer → AllReduce</text>
+<text x="712.5" y="277.725" font-size="13.5" font-weight="400" fill="#6B4E28" text-anchor="middle">bucket 按一致序号</text>
+<rect x="915" y="235" width="277" height="55" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1053.5" y="256.725" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">optimizer.step()</text>
+<text x="1053.5" y="277.725" font-size="13.5" font-weight="400" fill="#24473F" text-anchor="middle">等待同步梯度可用</text>
+<polyline points="515,263 564,263" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="860,263 909,263" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="64" y="342" font-size="15" font-weight="700" fill="#2B2A26" text-anchor="start">FSDP2</text>
+<rect x="230" y="310" width="280" height="65" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="370.0" y="336.725" font-size="13.5" font-weight="700" fill="#2C4460" text-anchor="middle">AllGather → model(x)</text>
+<text x="370.0" y="357.725" font-size="13.5" font-weight="400" fill="#2C4460" text-anchor="middle">按策略释放完整参数</text>
+<rect x="570" y="310" width="285" height="65" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="712.5" y="336.725" font-size="13.5" font-weight="700" fill="#6B4E28" text-anchor="middle">backward()：AG / RS</text>
+<text x="712.5" y="357.725" font-size="13.5" font-weight="400" fill="#6B4E28" text-anchor="middle">参数就绪后计算</text>
+<rect x="915" y="310" width="277" height="65" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1053.5" y="336.725" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">optimizer.step()</text>
+<text x="1053.5" y="357.725" font-size="13.5" font-weight="400" fill="#24473F" text-anchor="middle">更新本地分片</text>
+<polyline points="515,342 564,342" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="860,342 909,342" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="49" y="415" font-size="15" font-weight="700" fill="#2B2A26" text-anchor="start">计时窗口：训练前后有边界，热循环内不逐 step 同步 CPU</text>
+<rect x="48" y="431" width="142" height="42" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="119.0" y="456.55" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">预热</text>
+<polyline points="193,452 208,452" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="213" y="431" width="180" height="42" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="303.0" y="456.55" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">barrier + sync</text>
+<polyline points="396,452 411,452" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="416" y="431" width="164" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="498.0" y="456.55" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">连续 steps</text>
+<polyline points="583,452 598,452" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="603" y="431" width="164" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="685.0" y="456.55" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">CUDA sync</text>
+<polyline points="770,452 785,452" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="790" y="431" width="195" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="887.5" y="456.55" font-size="13" font-weight="700" fill="#2C4460" text-anchor="middle">max_rank 汇总</text>
+<polyline points="988,452 1003,452" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="1008" y="431" width="184" height="42" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="1100.0" y="456.55" font-size="13" font-weight="700" fill="#4A473F" text-anchor="middle">退出 / destroy</text>
+<text x="49" y="518" font-size="15" font-weight="700" fill="#2B2A26" text-anchor="start">DDP 梯度累积：no_sync() 必须包住 forward + backward</text>
+<rect x="48" y="537" width="342" height="62" rx="7" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="219.0" y="562.225" font-size="13.5" font-weight="700" fill="#4A473F" text-anchor="middle">微批次 0 … K−2</text>
+<text x="219.0" y="583.225" font-size="13.5" font-weight="400" fill="#4A473F" text-anchor="middle">本地梯度累积，不规约</text>
+<rect x="451" y="537" width="342" height="62" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="622.0" y="562.225" font-size="13.5" font-weight="700" fill="#6B4E28" text-anchor="middle">最后微批次 K−1</text>
+<text x="622.0" y="583.225" font-size="13.5" font-weight="400" fill="#6B4E28" text-anchor="middle">同步累积梯度</text>
+<rect x="853" y="537" width="339" height="62" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1022.5" y="562.225" font-size="13.5" font-weight="700" fill="#24473F" text-anchor="middle">optimizer.step()</text>
+<text x="1022.5" y="583.225" font-size="13.5" font-weight="400" fill="#24473F" text-anchor="middle">每 K 个微批次一次更新</text>
+<polyline points="395,568 445,568" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="798,568 847,568" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<line x1="48" y1="623" x2="1192" y2="623" stroke="#D8D5C8" stroke-width="1.2"/>
+<text x="48" y="643" font-size="13" font-weight="400" fill="#4A473F" text-anchor="start">前后段 trace 才能解释“谁在等”；窗口均值不是 P99，allocator 峰值也不是设备总显存。</text>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" width="1240" height="700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">AF_XDP 四环：两条闭环，一套明确的 frame 所有权</title><desc id="desc">FILL 用户到内核供应空闲帧，RX 内核到用户发布报文；TX 用户到内核提交发送，COMPLETION 内核到用户回收发送帧。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker></defs>
+<rect x="0" y="0" width="1240" height="700" fill="rgb(245, 244, 237)"/>
+<text x="48" y="48" font-size="22" fill="#2B2A26" font-weight="700" text-anchor="start" data-region="caption">AF_XDP 四环：两条闭环，一套明确的 frame 所有权</text>
+<text x="48" y="78" font-size="14" fill="#6B675C" font-weight="400" text-anchor="start" data-region="caption">非共享、单 XSK 模型；Ring 承载地址或描述符，UMEM 承载报文。箭头是发布方向，不是额外 payload copy。</text>
+<rect x="48" y="112" width="1144" height="494" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="77" y="141" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start" data-region="caption">用户态 · worker / frame allocator</text>
+<text x="463" y="141" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start" data-region="caption">共享 Ring · SPSC</text>
+<text x="889" y="141" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start" data-region="caption">内核 · 驱动 / NIC</text>
+<rect x="78" y="166" width="283" height="55" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="219.5" y="188.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle" data-region="body" data-box="78,166,283,55">可用于接收的空闲 frame</text>
+<text x="219.5" y="209.0" font-size="12.5" fill="#24473F" font-weight="400" text-anchor="middle" data-region="body" data-box="78,166,283,55">发布后不能再改写</text>
+<rect x="460" y="166" width="323" height="55" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="621.5" y="188.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle" data-region="body" data-box="460,166,323,55">FILL · 用户 → 内核</text>
+<text x="621.5" y="209.0" font-size="12.5" fill="#24473F" font-weight="400" text-anchor="middle" data-region="body" data-box="460,166,323,55">addr · 空闲 frame 标识</text>
+<rect x="883" y="166" width="278" height="55" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1022.0" y="188.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle" data-region="body" data-box="883,166,278,55">接收缓冲供应</text>
+<text x="1022.0" y="209.0" font-size="12.5" fill="#24473F" font-weight="400" text-anchor="middle" data-region="body" data-box="883,166,278,55">可先进入驱动 / 硬件队列</text>
+<path d="M361,193 L454,193" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M783,193 L877,193" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="78" y="280" width="283" height="55" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="219.5" y="302.0" font-size="14" fill="#2C4460" font-weight="700" text-anchor="middle" data-region="body" data-box="78,280,283,55">收到报文，取得 frame</text>
+<text x="219.5" y="323.0" font-size="12.5" fill="#2C4460" font-weight="400" text-anchor="middle" data-region="body" data-box="78,280,283,55">读取或保留，再明确回收</text>
+<rect x="460" y="280" width="323" height="55" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="621.5" y="302.0" font-size="14" fill="#2C4460" font-weight="700" text-anchor="middle" data-region="body" data-box="460,280,323,55">RX · 内核 → 用户</text>
+<text x="621.5" y="323.0" font-size="12.5" fill="#2C4460" font-weight="400" text-anchor="middle" data-region="body" data-box="460,280,323,55">addr + len + options</text>
+<rect x="883" y="280" width="278" height="55" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="1022.0" y="302.0" font-size="14" fill="#2C4460" font-weight="700" text-anchor="middle" data-region="body" data-box="883,280,278,55">已收到的报文</text>
+<text x="1022.0" y="323.0" font-size="12.5" fill="#2C4460" font-weight="400" text-anchor="middle" data-region="body" data-box="883,280,278,55">XDP 选择此 XSK</text>
+<path d="M883,307 L789,307" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M460,307 L367,307" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="78" y="419" width="283" height="55" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="219.5" y="441.0" font-size="14" fill="#6B4E28" font-weight="700" text-anchor="middle" data-region="body" data-box="78,419,283,55">准备发送内容</text>
+<text x="219.5" y="462.0" font-size="12.5" fill="#6B4E28" font-weight="400" text-anchor="middle" data-region="body" data-box="78,419,283,55">TX submit 后交出所有权</text>
+<rect x="460" y="419" width="323" height="55" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="621.5" y="441.0" font-size="14" fill="#6B4E28" font-weight="700" text-anchor="middle" data-region="body" data-box="460,419,323,55">TX · 用户 → 内核</text>
+<text x="621.5" y="462.0" font-size="12.5" fill="#6B4E28" font-weight="400" text-anchor="middle" data-region="body" data-box="460,419,323,55">addr + len + options</text>
+<rect x="883" y="419" width="278" height="55" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="1022.0" y="441.0" font-size="14" fill="#6B4E28" font-weight="700" text-anchor="middle" data-region="body" data-box="883,419,278,55">发送路径持有 frame</text>
+<text x="1022.0" y="462.0" font-size="12.5" fill="#6B4E28" font-weight="400" text-anchor="middle" data-region="body" data-box="883,419,278,55">TX 槽位消费不等于可复用</text>
+<path d="M361,446 L454,446" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M783,446 L877,446" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="78" y="533" width="283" height="55" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="219.5" y="555.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle" data-region="body" data-box="78,533,283,55">frame 再次可用</text>
+<text x="219.5" y="576.0" font-size="12.5" fill="#24473F" font-weight="400" text-anchor="middle" data-region="body" data-box="78,533,283,55">进入 free list 或下一轮供给</text>
+<rect x="460" y="533" width="323" height="55" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="621.5" y="555.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle" data-region="body" data-box="460,533,323,55">COMPLETION · 内核 → 用户</text>
+<text x="621.5" y="576.0" font-size="12.5" fill="#24473F" font-weight="400" text-anchor="middle" data-region="body" data-box="460,533,323,55">addr · 已处理的 TX frame</text>
+<rect x="883" y="533" width="278" height="55" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1022.0" y="555.0" font-size="14" fill="#24473F" font-weight="700" text-anchor="middle" data-region="body" data-box="883,533,278,55">TX 处理 / 回收</text>
+<text x="1022.0" y="576.0" font-size="12.5" fill="#24473F" font-weight="400" text-anchor="middle" data-region="body" data-box="883,533,278,55">归还 frame 所有权</text>
+<path d="M883,560 L789,560" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M460,560 L367,560" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M1023,221 L1023,274" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="1038" y="251" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-region="body">接收推进</text>
+<path d="M1023,474 L1023,527" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="1038" y="504" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-region="body">完成推进</text>
+<path d="M78,308 L62,308 L62,193 L73,193" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)" stroke-dasharray="5 4"/>
+<text x="92" y="253" font-size="12" fill="#24473F" font-weight="400" text-anchor="start" data-region="body">回收 / 重新供应</text>
+<path d="M77,380 L1161,380" fill="none" stroke="#D8D5C8" stroke-width="1.7" stroke-linejoin="round"/>
+<text x="77" y="402" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start" data-region="caption">发送闭环与接收闭环共享帧池，但同一 frame 不得同时提交给 FILL 与 TX。</text>
+<rect x="48" y="632" width="1144" height="38" rx="7" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="65" y="657" font-size="13" fill="#4A473F" font-weight="400" text-anchor="start" data-region="caption">两个关键区分：RX release() 只归还描述符槽位；COMPLETION 归还本地所有权，不证明对端接收或业务完成。</text>
+</svg>

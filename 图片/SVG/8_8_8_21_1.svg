@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="'Noto Sans CJK SC','PingFang SC','Microsoft YaHei',sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">NCCL 的完成条件：先连接依赖，再寻找重叠</title><desc id="desc">8.21 · 图 1　生产 → 通信 → 消费；CPU 返回并不是 buffer 的释放点。原创教学图，非实测数据。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker><marker id="red-arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker></defs>
+<rect x="0" y="0" width="1240" height="680" rx="0" fill="rgb(245, 244, 237)"/>
+<text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26" text-anchor="start">NCCL 的完成条件：先连接依赖，再寻找重叠</text>
+<text x="48" y="78" font-size="14" font-weight="400" fill="#6B675C" text-anchor="start">8.21 · 图 1　生产 → 通信 → 消费；CPU 返回并不是 buffer 的释放点</text>
+<rect x="48" y="110" width="1144" height="70" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="64" y="136" font-size="14" font-weight="700" fill="#2B2A26" text-anchor="start">CPU 线程</text>
+<rect x="230" y="126" width="210" height="38" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="335.0" y="149.9" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">enqueue_bucket()</text>
+<polyline points="445,146 514,146" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="520" y="126" width="220" height="38" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="630.0" y="149.9" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">函数返回 · 继续提交</text>
+<rect x="895" y="126" width="270" height="38" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3" stroke-dasharray="6 4"/>
+<text x="1030.0" y="150.0" font-size="13" font-weight="400" fill="#4A473F" text-anchor="middle">可选：等待 finished</text>
+<rect x="48" y="205" width="1144" height="100" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="64" y="231" font-size="14" font-weight="700" fill="#2B2A26" text-anchor="start">Compute stream</text>
+<rect x="230" y="230" width="190" height="50" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="325.0" y="249.4" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">fill_value(grad)</text>
+<text x="325.0" y="270.4" font-size="14" font-weight="400" fill="#2C4460" text-anchor="middle">生产输入</text>
+<rect x="490" y="230" width="210" height="50" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="595.0" y="249.4" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">fill_value(scratch)</text>
+<text x="595.0" y="270.4" font-size="14" font-weight="400" fill="#24473F" text-anchor="middle">独立工作</text>
+<rect x="720" y="230" width="155" height="50" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3" stroke-dasharray="6 4"/>
+<text x="797.5" y="260.0" font-size="13" font-weight="400" fill="#4A473F" text-anchor="middle">等 reduced</text>
+<rect x="915" y="230" width="250" height="50" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="1040.0" y="249.4" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">scale_value(grad)</text>
+<text x="1040.0" y="270.4" font-size="14" font-weight="400" fill="#2C4460" text-anchor="middle">消费规约结果</text>
+<polyline points="425,255 485,255" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="705,255 715,255" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="880,255 910,255" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<rect x="48" y="340" width="1144" height="100" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="64" y="366" font-size="14" font-weight="700" fill="#2B2A26" text-anchor="start">Comm stream</text>
+<rect x="230" y="365" width="190" height="50" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3" stroke-dasharray="6 4"/>
+<text x="325.0" y="395.0" font-size="13" font-weight="400" fill="#4A473F" text-anchor="middle">等 produced</text>
+<rect x="490" y="365" width="385" height="50" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="682.5" y="384.4" font-size="14" font-weight="700" fill="#6B4E28" text-anchor="middle">ncclAllReduce(grad)</text>
+<text x="682.5" y="405.4" font-size="14" font-weight="400" fill="#6B4E28" text-anchor="middle">GPU 通信 + 对端进度</text>
+<polyline points="425,390 485,390" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="407,281 407,332 325,332 325,362" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="480" y="327" font-size="13" font-weight="400" fill="#6B675C" text-anchor="start">cudaEventRecord(produced)</text>
+<polyline points="875,390 891,390 891,317 796,317 796,282" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="915" y="330" font-size="13" font-weight="400" fill="#6B675C" text-anchor="start">cudaEventRecord(reduced)</text>
+<polyline points="1153,230 1153,183 1153,169" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="989" y="199" font-size="13" font-weight="400" fill="#6B675C" text-anchor="start">finished</text>
+<rect x="48" y="470" width="1144" height="115" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="64" y="498" font-size="15" font-weight="700" fill="#4A473F" text-anchor="start">Buffer 生命周期：grad 与 scratch 不重叠</text>
+<rect x="230" y="519" width="190" height="42" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="325.0" y="544.9" font-size="14" font-weight="700" fill="#2C4460" text-anchor="middle">grad：生产者写</text>
+<rect x="490" y="519" width="385" height="42" rx="7" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="682.5" y="544.9" font-size="14" font-weight="700" fill="#6B4E28" text-anchor="middle">grad：规约在飞，禁止外部读写</text>
+<rect x="915" y="519" width="250" height="42" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1040.0" y="544.9" font-size="14" font-weight="700" fill="#24473F" text-anchor="middle">grad：消费者读写</text>
+<polyline points="425,540 485,540" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<polyline points="880,540 910,540" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr)"/>
+<line x1="48" y1="606" x2="1192" y2="606" stroke="#D8D5C8" stroke-width="1.2"/>
+<text x="48" y="626" font-size="13" font-weight="400" fill="#4A473F" text-anchor="start">依赖事件只约束相关 stream；复用/释放 buffer 要等最后一个 GPU 使用者。</text>
+<text x="48" y="649" font-size="12.5" font-weight="400" fill="#6B675C" text-anchor="start">示意图：块宽不代表耗时。默认假设为常规 communicator、没有尚未结束的 NCCL group。</text>
+</svg>

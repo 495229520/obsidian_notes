@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="Noto Sans CJK SC,Microsoft YaHei,PingFang SC,sans-serif">
+<title>四 rank Ring：先归约分片，再把结果传给所有人</title><desc>环为 0 → 1 → 2 → 3 → 0；只跟踪 C0 的一个元素，其余块同时推进。。原创教学示意；数字不是硬件实测；详细条件与出处见对应 Markdown 笔记。</desc>
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker>
+<marker id="blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/></marker>
+<marker id="green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/></marker>
+<marker id="red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker>
+<marker id="amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/></marker>
+</defs>
+<rect x="0" y="0" width="1240" height="680" rx="0" fill="rgb(245, 244, 237)" stroke="none" stroke-width="1.3"/>
+<text x="48" y="52" font-size="22" fill="#2B2A26" font-weight="700" text-anchor="start">四 rank Ring：先归约分片，再把结果传给所有人</text>
+<text x="48" y="81" font-size="14" fill="#6B675C" font-weight="400" text-anchor="start">环为 0 → 1 → 2 → 3 → 0；只跟踪 C0 的一个元素，其余块同时推进。</text>
+<text x="64" y="120" font-size="15" fill="#4A473F" font-weight="700" text-anchor="start">A · ReduceScatter：C0 的部分和沿环累积</text>
+<rect x="72" y="146" width="204" height="104" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="174.0" y="181.0" font-size="16" fill="#2C4460" font-weight="700" text-anchor="middle">rank 1</text>
+<text x="174.0" y="203.0" font-size="13" fill="#2C4460" font-weight="400" text-anchor="middle">C0：10</text>
+<text x="174.0" y="225.0" font-size="13" fill="#2C4460" font-weight="400" text-anchor="middle">本地贡献：10</text>
+<rect x="369" y="146" width="204" height="104" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="471.0" y="181.0" font-size="16" fill="#2C4460" font-weight="700" text-anchor="middle">rank 2</text>
+<text x="471.0" y="203.0" font-size="13" fill="#2C4460" font-weight="400" text-anchor="middle">C0：110</text>
+<text x="471.0" y="225.0" font-size="13" fill="#2C4460" font-weight="400" text-anchor="middle">本地贡献：100</text>
+<rect x="666" y="146" width="204" height="104" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="768.0" y="181.0" font-size="16" fill="#2C4460" font-weight="700" text-anchor="middle">rank 3</text>
+<text x="768.0" y="203.0" font-size="13" fill="#2C4460" font-weight="400" text-anchor="middle">C0：1110</text>
+<text x="768.0" y="225.0" font-size="13" fill="#2C4460" font-weight="400" text-anchor="middle">本地贡献：1000</text>
+<rect x="963" y="146" width="204" height="104" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1065.0" y="181.0" font-size="16" fill="#24473F" font-weight="700" text-anchor="middle">rank 0</text>
+<text x="1065.0" y="203.0" font-size="13" fill="#24473F" font-weight="400" text-anchor="middle">C0：1111</text>
+<text x="1065.0" y="225.0" font-size="13" fill="#24473F" font-weight="400" text-anchor="middle">本地贡献：1</text>
+<line x1="280" y1="198" x2="363" y2="198" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="322.5" y="179" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="middle">+100</text>
+<line x1="577" y1="198" x2="660" y2="198" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="619.5" y="179" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="middle">+1000</text>
+<line x1="874" y1="198" x2="957" y2="198" stroke="#5A564B" stroke-width="1.8" marker-end="url(#arr)"/>
+<text x="916.5" y="179" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="middle">+1</text>
+<text x="72" y="280" font-size="14" fill="#4A473F" font-weight="400" text-anchor="start">每轮只发送一块的部分结果；最终 rank r 持有完整归约后的 Cr。</text>
+<text x="64" y="326" font-size="15" fill="#4A473F" font-weight="700" text-anchor="start">B · AllGather：每轮复制完整结果块，不再叠加原始输入</text>
+<rect x="64" y="350" width="1112" height="225" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="64" y="350" width="1112" height="45" rx="0" fill="#EDEBE3" stroke="none" stroke-width="1.3"/>
+<text x="76" y="378.35" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">状态</text>
+<text x="206" y="378.35" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">rank 0</text>
+<text x="452" y="378.35" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">rank 1</text>
+<text x="698" y="378.35" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">rank 2</text>
+<text x="944" y="378.35" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">rank 3</text>
+<line x1="64" y1="395" x2="1176" y2="395" stroke="#D8D5C8" stroke-width="1"/>
+<text x="76" y="423.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">AG 前</text>
+<text x="206" y="423.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C0</text>
+<text x="452" y="423.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C1</text>
+<text x="698" y="423.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C2</text>
+<text x="944" y="423.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C3</text>
+<rect x="65" y="440" width="1110" height="45" rx="0" fill="rgb(245, 244, 237)" stroke="none" stroke-width="1.3"/>
+<line x1="64" y1="440" x2="1176" y2="440" stroke="#D8D5C8" stroke-width="1"/>
+<text x="76" y="468.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">AG-1 后</text>
+<text x="206" y="468.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C0 · C3</text>
+<text x="452" y="468.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C1 · C0</text>
+<text x="698" y="468.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C2 · C1</text>
+<text x="944" y="468.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C3 · C2</text>
+<line x1="64" y1="485" x2="1176" y2="485" stroke="#D8D5C8" stroke-width="1"/>
+<text x="76" y="513.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">AG-2 后</text>
+<text x="206" y="513.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C0 · C3 · C2</text>
+<text x="452" y="513.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C1 · C0 · C3</text>
+<text x="698" y="513.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C2 · C1 · C0</text>
+<text x="944" y="513.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C3 · C2 · C1</text>
+<rect x="65" y="530" width="1110" height="45" rx="0" fill="rgb(245, 244, 237)" stroke="none" stroke-width="1.3"/>
+<line x1="64" y1="530" x2="1176" y2="530" stroke="#D8D5C8" stroke-width="1"/>
+<text x="76" y="558.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">AG-3 后</text>
+<text x="206" y="558.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C0 · C1 · C2 · C3</text>
+<text x="452" y="558.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C0 · C1 · C2 · C3</text>
+<text x="698" y="558.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C0 · C1 · C2 · C3</text>
+<text x="944" y="558.35" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">C0 · C1 · C2 · C3</text>
+<line x1="48" y1="609" x2="1192" y2="609" stroke="#D8D5C8" stroke-width="1"/>
+<text x="48" y="637" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">10 → 110 → 1110 → 1111 是教学数值，不是实际 NCCL 输出；C0 表示逻辑块，不是硬件缓冲槽。</text>
+<text x="48" y="660" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start">对应 8.18 §3；真实 Ring 会分 Channel、循环切块，并可融合阶段交接。</text>
+</svg>

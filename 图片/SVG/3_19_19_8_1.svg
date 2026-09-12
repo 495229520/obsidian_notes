@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+<title>同一个接收方向，不同的执行与内存边界</title><desc>并排对照普通socket、nativeXDP、AF_XDP的两种模式、直接DPDK和硬件RDMA。</desc>
+<defs>
+<marker id="arr-ink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker>
+<marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/></marker>
+<marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/></marker>
+<marker id="arr-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker>
+</defs>
+<rect x="0" y="0" width="1240" height="700" rx="0" fill="rgb(245, 244, 237)" stroke="none" stroke-width="1.3"/>
+<text x="48" y="51" font-size="22" fill="#2B2A26" font-weight="700" text-anchor="start" data-role="body">同一个接收方向，不同的执行与内存边界</text>
+<text x="48" y="81" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start" data-role="body">六行独立路径；AF_XDP 拆分 copy / ZC；RDMA 采用普通 one-sided WRITE 目标端。</text>
+<rect x="56" y="116" width="1128" height="75" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="75" y="148" font-size="13.5" fill="#2B2A26" font-weight="700" text-anchor="start" data-role="body">Kernel socket</text>
+<rect x="235" y="126" width="150" height="35" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="310.0" y="147.5" font-size="12.5" fill="#4A3F68" font-weight="700" text-anchor="middle" data-role="body">NIC</text>
+<polyline points="388,144 428,144" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="433" y="126" width="181" height="35" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="523.5" y="147.5" font-size="12.5" fill="#2C4460" font-weight="700" text-anchor="middle" data-role="body">RX buffer</text>
+<polyline points="617,144 657,144" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="662" y="126" width="220" height="35" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="772.0" y="147.5" font-size="12.5" fill="#2C4460" font-weight="700" text-anchor="middle" data-role="body">NAPI / skb / TCP-IP</text>
+<polyline points="885,144 925,144" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="930" y="126" width="225" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1042.5" y="147.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">socket → 用户 buffer</text>
+<text x="237" y="181" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-role="body">普通 recv 基线含用户/内核复制</text>
+<rect x="56" y="199" width="1128" height="75" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="75" y="231" font-size="13.5" fill="#2B2A26" font-weight="700" text-anchor="start" data-role="body">native XDP</text>
+<rect x="235" y="209" width="150" height="35" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="310.0" y="230.5" font-size="12.5" fill="#4A3F68" font-weight="700" text-anchor="middle" data-role="body">NIC</text>
+<polyline points="388,227 428,227" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="433" y="209" width="181" height="35" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="523.5" y="230.5" font-size="12.5" fill="#2C4460" font-weight="700" text-anchor="middle" data-role="body">驱动 RX buffer</text>
+<polyline points="617,227 657,227" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="662" y="209" width="220" height="35" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="772.0" y="230.5" font-size="12.5" fill="#2C4460" font-weight="700" text-anchor="middle" data-role="body">早期 XDP 程序</text>
+<polyline points="885,227 925,227" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="930" y="209" width="225" height="35" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="1042.5" y="230.5" font-size="12.5" fill="#2C4460" font-weight="700" text-anchor="middle" data-role="body">DROP / TX / REDIRECT</text>
+<text x="237" y="264" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-role="body">PASS 分支继续常规网络栈</text>
+<rect x="56" y="282" width="1128" height="75" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="75" y="314" font-size="13.5" fill="#2B2A26" font-weight="700" text-anchor="start" data-role="body">AF_XDP copy</text>
+<rect x="235" y="292" width="150" height="35" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="310.0" y="313.5" font-size="12.5" fill="#4A3F68" font-weight="700" text-anchor="middle" data-role="body">NIC</text>
+<polyline points="388,310 428,310" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="433" y="292" width="181" height="35" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="523.5" y="313.5" font-size="12.5" fill="#2C4460" font-weight="700" text-anchor="middle" data-role="body">驱动 RX buffer</text>
+<polyline points="617,310 657,310" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="662" y="292" width="220" height="35" rx="8" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+<text x="772.0" y="313.5" font-size="12.5" fill="#6B4E28" font-weight="700" text-anchor="middle" data-role="body">CPU copy → UMEM</text>
+<polyline points="885,310 925,310" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="930" y="292" width="225" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1042.5" y="313.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">用户态 frame 处理</text>
+<text x="237" y="347" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-role="body">映射 UMEM 不消除前面的复制</text>
+<rect x="56" y="365" width="1128" height="75" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="75" y="397" font-size="13.5" fill="#2B2A26" font-weight="700" text-anchor="start" data-role="body">AF_XDP ZC</text>
+<rect x="235" y="375" width="150" height="35" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="310.0" y="396.5" font-size="12.5" fill="#4A3F68" font-weight="700" text-anchor="middle" data-role="body">NIC</text>
+<polyline points="388,393 428,393" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="433" y="375" width="181" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="523.5" y="396.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">DMA → UMEM</text>
+<polyline points="617,393 657,393" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="662" y="375" width="220" height="35" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="772.0" y="396.5" font-size="12.5" fill="#2C4460" font-weight="700" text-anchor="middle" data-role="body">驱动 / XDP / rings</text>
+<polyline points="885,393 925,393" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="930" y="375" width="225" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1042.5" y="396.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">用户态 frame 处理</text>
+<text x="237" y="430" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-role="body">ZC 必须经配置与实际模式核验</text>
+<rect x="56" y="448" width="1128" height="75" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="75" y="480" font-size="13.5" fill="#2B2A26" font-weight="700" text-anchor="start" data-role="body">DPDK direct</text>
+<rect x="235" y="458" width="150" height="35" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="310.0" y="479.5" font-size="12.5" fill="#4A3F68" font-weight="700" text-anchor="middle" data-role="body">NIC</text>
+<polyline points="388,476 428,476" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="433" y="458" width="181" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="523.5" y="479.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">DMA → packet buffer</text>
+<polyline points="617,476 657,476" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="662" y="458" width="220" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="772.0" y="479.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">用户 PMD / mbuf</text>
+<polyline points="885,476 925,476" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="930" y="458" width="225" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1042.5" y="479.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">用户数据面</text>
+<text x="237" y="513" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-role="body">非 inline 典型路径；不含用户 TCP 栈</text>
+<rect x="56" y="531" width="1128" height="75" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="75" y="563" font-size="13.5" fill="#2B2A26" font-weight="700" text-anchor="start" data-role="body">硬件 RDMA</text>
+<rect x="235" y="541" width="150" height="35" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="310.0" y="562.5" font-size="12.5" fill="#4A3F68" font-weight="700" text-anchor="middle" data-role="body">本机 RNIC</text>
+<polyline points="388,559 428,559" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="433" y="541" width="181" height="35" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="523.5" y="562.5" font-size="12.5" fill="#4A3F68" font-weight="700" text-anchor="middle" data-role="body">权限 / 放置引擎</text>
+<polyline points="617,559 657,559" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)"/>
+<rect x="662" y="541" width="220" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="772.0" y="562.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">DMA → 目标 MR</text>
+<polyline points="885,559 925,559" fill="none" stroke="#5A564B" stroke-width="1.7" stroke-linejoin="round" marker-end="url(#arr-ink)" stroke-dasharray="5 4"/>
+<rect x="930" y="541" width="225" height="35" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="1042.5" y="562.5" font-size="12.5" fill="#24473F" font-weight="700" text-anchor="middle" data-role="body">目标业务后续消费</text>
+<text x="237" y="596" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-role="body">普通 WRITE 不自动生成目标 recv CQE</text>
+<text x="74" y="646" font-size="12" fill="#4A3F68" font-weight="400" text-anchor="start" data-role="body">紫：设备</text>
+<text x="246" y="646" font-size="12" fill="#2C4460" font-weight="400" text-anchor="start" data-role="body">蓝：内核路径</text>
+<text x="455" y="646" font-size="12" fill="#24473F" font-weight="400" text-anchor="start" data-role="body">绿：用户可访问数据 / 用户代码</text>
+<text x="851" y="646" font-size="12" fill="#6B4E28" font-weight="400" text-anchor="start" data-role="body">琥珀：特定 CPU copy</text>
+<text x="48" y="673" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start" data-role="footer">不是性能排行榜：DROP、packet 交付、可靠消息与内存操作，不是同一份工作。</text>
+</svg>

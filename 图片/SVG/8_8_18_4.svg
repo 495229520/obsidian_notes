@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="Noto Sans CJK SC,Microsoft YaHei,PingFang SC,sans-serif">
+<title>Ring 字节账：发送、接收与归一化带宽分开算</title><desc>M 是每个 rank 的完整输入字节数；图示 P = 8，忽略 flags、报文头与尾部对齐。。原创教学示意；数字不是硬件实测；详细条件与出处见对应 Markdown 笔记。</desc>
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker>
+<marker id="blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/></marker>
+<marker id="green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/></marker>
+<marker id="red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/></marker>
+<marker id="amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/></marker>
+</defs>
+<rect x="0" y="0" width="1240" height="680" rx="0" fill="rgb(245, 244, 237)" stroke="none" stroke-width="1.3"/>
+<text x="48" y="52" font-size="22" fill="#2B2A26" font-weight="700" text-anchor="start">Ring 字节账：发送、接收与归一化带宽分开算</text>
+<text x="48" y="81" font-size="14" fill="#6B675C" font-weight="400" text-anchor="start">M 是每个 rank 的完整输入字节数；图示 P = 8，忽略 flags、报文头与尾部对齐。</text>
+<text x="64" y="172" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">输入向量 M</text>
+<rect x="285" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="335" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="393" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="443" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="501" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="551" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="609" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="659" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="717" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="767" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="825" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="875" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="933" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="983" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="1041" y="142" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="1091" y="172" font-size="14" fill="#4A473F" font-weight="400" text-anchor="middle">M/8</text>
+<text x="1200" y="172" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="end">M</text>
+<text x="64" y="264" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">ReduceScatter 发送</text>
+<rect x="285" y="234" width="101" height="49" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="335" y="264" font-size="14" fill="#2C4460" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="393" y="234" width="101" height="49" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="443" y="264" font-size="14" fill="#2C4460" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="501" y="234" width="101" height="49" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="551" y="264" font-size="14" fill="#2C4460" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="609" y="234" width="101" height="49" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="659" y="264" font-size="14" fill="#2C4460" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="717" y="234" width="101" height="49" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="767" y="264" font-size="14" fill="#2C4460" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="825" y="234" width="101" height="49" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="875" y="264" font-size="14" fill="#2C4460" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="933" y="234" width="101" height="49" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="983" y="264" font-size="14" fill="#2C4460" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="1041" y="234" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3" stroke-dasharray="4 3"/>
+<text x="1091" y="264" font-size="14" fill="#9B968A" font-weight="400" text-anchor="middle">—</text>
+<text x="1200" y="264" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="end">7M/8</text>
+<text x="64" y="356" font-size="15" fill="#2B2A26" font-weight="700" text-anchor="start">AllGather 发送</text>
+<rect x="285" y="326" width="101" height="49" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="335" y="356" font-size="14" fill="#24473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="393" y="326" width="101" height="49" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="443" y="356" font-size="14" fill="#24473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="501" y="326" width="101" height="49" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="551" y="356" font-size="14" fill="#24473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="609" y="326" width="101" height="49" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="659" y="356" font-size="14" fill="#24473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="717" y="326" width="101" height="49" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="767" y="356" font-size="14" fill="#24473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="825" y="326" width="101" height="49" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="875" y="356" font-size="14" fill="#24473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="933" y="326" width="101" height="49" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="983" y="356" font-size="14" fill="#24473F" font-weight="400" text-anchor="middle">M/8</text>
+<rect x="1041" y="326" width="101" height="49" rx="4" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3" stroke-dasharray="4 3"/>
+<text x="1091" y="356" font-size="14" fill="#9B968A" font-weight="400" text-anchor="middle">—</text>
+<text x="1200" y="356" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="end">7M/8</text>
+<rect x="64" y="420" width="1112" height="156" rx="6" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="64" y="420" width="1112" height="39" rx="0" fill="#EDEBE3" stroke="none" stroke-width="1.3"/>
+<text x="76" y="444.57" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">统计口径</text>
+<text x="376" y="444.57" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">一般 P</text>
+<text x="784" y="444.57" font-size="14" fill="#2B2A26" font-weight="700" text-anchor="start">P = 8，M = 1 GiB</text>
+<line x1="64" y1="459" x2="1176" y2="459" stroke="#D8D5C8" stroke-width="1"/>
+<text x="76" y="483.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">每 rank 发送</text>
+<text x="376" y="483.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">2(P−1)M/P</text>
+<text x="784" y="483.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">1.75 GiB</text>
+<rect x="65" y="498" width="1110" height="39" rx="0" fill="rgb(245, 244, 237)" stroke="none" stroke-width="1.3"/>
+<line x1="64" y1="498" x2="1176" y2="498" stroke="#D8D5C8" stroke-width="1"/>
+<text x="76" y="522.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">每 rank 接收</text>
+<text x="376" y="522.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">2(P−1)M/P</text>
+<text x="784" y="522.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">1.75 GiB</text>
+<line x1="64" y1="537" x2="1176" y2="537" stroke="#D8D5C8" stroke-width="1"/>
+<text x="76" y="561.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">每 rank 收发合计</text>
+<text x="376" y="561.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">4(P−1)M/P</text>
+<text x="784" y="561.57" font-size="14" fill="#2B2A26" font-weight="400" text-anchor="start">3.50 GiB</text>
+<line x1="48" y1="609" x2="1192" y2="609" stroke="#D8D5C8" stroke-width="1"/>
+<text x="48" y="637" font-size="13" fill="#6B675C" font-weight="400" text-anchor="start">algbw = M/T；AllReduce busbw = algbw × 2(P−1)/P。busbw 是归一化量，不是 NIC 端口直接计数。</text>
+<text x="48" y="660" font-size="12" fill="#6B675C" font-weight="400" text-anchor="start">对应 8.18 §4、§7；模型计算不代表某种 GPU、NIC 或网络的实测成绩。</text>
+</svg>
