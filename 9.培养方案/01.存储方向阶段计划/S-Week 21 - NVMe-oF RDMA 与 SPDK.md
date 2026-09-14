@@ -92,5 +92,5 @@ status: active
 - [[NVMe-oF 专题 - TCP 与 RDMA transport 取舍]]
 - [[副本与 EC 取舍专题]]（配菜阅读线）
 - [[S-Week 10 - io_uring 深入]]（IOPOLL：同一个"CPU 换延迟"哲学）
-- [[13.6 Reactor模式与EventLoop]]（事件驱动 vs 轮询的对照背景）
+- [[6.6 Reactor模式与EventLoop]]（事件驱动 vs 轮询的对照背景）
 - SPDK 文档；DCQCN 论文（SIGCOMM 2015）；JuiceFS / 3FS 架构文档

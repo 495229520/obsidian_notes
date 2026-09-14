@@ -61,7 +61,7 @@ status: active
 在 S-Week 5 的三模型对照表基础上加两节：
 
 1. **特性消融结论**：每个特性一行——消掉的开销、实测收益（本机数据）、代价、什么场景开。
-2. **epoll vs io_uring 决策矩阵**：网络低连接数 / 网络海量连接 / 存储低 QD / 存储高 QD 四象限，各自选什么、为什么。与 [[13.4 epoll模型]]、[[13.6 Reactor模式与EventLoop]]、[[13.5 串讲]] 互链，把 select → poll → epoll → io_uring 的演进故事补上最后一环。
+2. **epoll vs io_uring 决策矩阵**：网络低连接数 / 网络海量连接 / 存储低 QD / 存储高 QD 四象限，各自选什么、为什么。与 [[6.4 epoll模型]]、[[6.6 Reactor模式与EventLoop]]、[[6.5 串讲]] 互链，把 select → poll → epoll → io_uring 的演进故事补上最后一环。
 
 ## 4. 推理保温（约 25%）
 

@@ -65,7 +65,7 @@ RDMA 三大机制，各自消掉 TCP 路径上的一项成本：
 - read/write（单边）：对端 CPU **零参与**，适合大块数据——NVMe-oF 数据面、**PD 分离的 KV cache transfer**（[[Week 8 - Prefill Decode + Open Source Repro]]，两条培养线的交汇点）。
 - 单边 write 的完成感知三答案：WRITE_WITH_IMM（对端出 CQE）、轮询尾部标志字节、补一个小 send。
 
-完成收割的两种模式又是那道选择题：poll_cq 忙轮询（延迟最低、烧核）vs completion channel 事件通知（省 CPU、多一次唤醒延迟）——与 epoll/io_uring/IOPOLL 的完成模型放进同一张对照表（本周面试保底正好是 [[13.7 eventfd、timerfd与跨线程唤醒]]）。
+完成收割的两种模式又是那道选择题：poll_cq 忙轮询（延迟最低、烧核）vs completion channel 事件通知（省 CPU、多一次唤醒延迟）——与 epoll/io_uring/IOPOLL 的完成模型放进同一张对照表（本周面试保底正好是 [[6.7 eventfd、timerfd与跨线程唤醒]]）。
 
 ## 5. 错误现场速查（自己造过一遍的）
 

@@ -83,7 +83,7 @@ pause，逐跳背压保不丢。但 PFC 有三个著名副作用：按优先级�
 - [[S-Week 21 - NVMe-oF RDMA 与 SPDK]]（本专题服务的周计划）
 - [[S-Week 21 - 前置知识 - NVMe-oF RDMA 与 SPDK]]（五环逻辑链的教学版）
 - [[NVMe-oF 专题 - TCP 与 RDMA transport 取舍]]（这笔运维账的去处）
-- [[8.10 拥塞控制]]（TCP 侧对照：窗口 vs 速率、隐式 vs 显式信号）
+- [[2.4 拥塞控制]]（TCP 侧对照：窗口 vs 速率、隐式 vs 显式信号）
 - [[soft-RoCE 与实验真实性边界专题]]（认知边界声明）
 - [[00.存储方向专题清单索引]]
 - DCQCN 论文：*Congestion Control for Large-Scale RDMA Deployments*（SIGCOMM 2015）

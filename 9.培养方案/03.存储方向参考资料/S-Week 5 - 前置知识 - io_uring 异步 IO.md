@@ -181,7 +181,7 @@ QD1 的意义：排除并发因素，纯验证"io_uring 读回来的字节和 pr
 - [[S-Week 10 - 前置知识 - io_uring 深入]]（阶段 1：SQPOLL/IOPOLL/registered buffers）
 - [[S-Week 2 - 前置知识 - O_DIRECT + 持久化语义]]（对齐 buffer 池的来源）
 - [[S-Week 3 - 前置知识 - fio 对照与 Benchmark Matrix]]（Little's law 与对账方法）
-- [[13.4 epoll模型]]（就绪模型对照，本周 `io_models.md` 要用）
+- [[6.4 epoll模型]]（就绪模型对照，本周 `io_models.md` 要用）
 
 ## 参考
 

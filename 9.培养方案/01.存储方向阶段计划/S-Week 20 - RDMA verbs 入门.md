@@ -59,7 +59,7 @@ ibv_rc_pingpong -d rxe0 -g 0 <server>   # client
 > 阶段 2 八股按章清账第 9 讲：三种完成通知模型对照。
 
 - 算法（5-8 题）：[[CodeTop 高频题 Top300]] 前 150 未刷高频冲刺第一轮（按频率降序补）。
-- 八股（1 章）：事件通知机制。过 [[13.7 eventfd、timerfd与跨线程唤醒]]、[[13.6.1 回调函数与Reactor事件分发]]、[[13.8 连接对象生命周期与RAII]]。验收：对比"epoll 就绪通知 / io_uring CQ / RDMA CQ"三种完成模型的异同。
+- 八股（1 章）：事件通知机制。过 [[6.7 eventfd、timerfd与跨线程唤醒]]、[[6.6.1 回调函数与Reactor事件分发]]、[[6.8 连接对象生命周期与RAII]]。验收：对比"epoll 就绪通知 / io_uring CQ / RDMA CQ"三种完成模型的异同。
 - 项目问答：10 个 Q&A（本周素材：MR 与 pin、状态机、单边写）。
 
 ## 6. 本周产出文件

@@ -137,7 +137,7 @@ JD 依据（2026-07-15 核验）：CoreWeave GPU Infrastructure 岗要求 Go / P
 | vLLM / SGLang 部署经验 | [[Week 6 - Observability + Metrics]] | S4a KV cache offload 实验的负载发生器 |
 | AI Agent 工程流（correctness gate、人工验证边界） | 推理版执行原则章节 | 所有存储项目沿用同一套规范 |
 | Nsight / profiling 思维 | [[3.4 CUDA Nsight Compute 指标速查]] | 换成 perf / iostat / blktrace / eBPF，方法论相同 |
-| 本仓库 Linux 笔记（epoll、TCP、并发同步） | [[13.4 epoll模型]]、[[8.13 TCP内核队列与参数调优]] | NVMe-oF over TCP、RDMA、存储引擎并发控制的直接前置知识 |
+| 本仓库 Linux 笔记（epoll、TCP、并发同步） | [[6.4 epoll模型]]、[[8.2 TCP内核队列与参数调优]] | NVMe-oF over TCP、RDMA、存储引擎并发控制的直接前置知识 |
 
 ## 四、能力主线
 
@@ -283,7 +283,7 @@ io_uring 与 fsync/fdatasync 路径，使用 fio / iostat 分析 IOPS、
 新增内容：
 
 - 块层与观测：blktrace / blkparse、eBPF（biolatency / biosnoop）、`iostat -x` 的 util / await / aqu-sz 怎么读，把一笔 I/O 的块层生命周期讲清楚。
-- io_uring 深入：polling 模式、registered buffers、和 epoll 的模型对比（关联 [[13.4 epoll模型]]）。
+- io_uring 深入：polling 模式、registered buffers、和 epoll 的模型对比（关联 [[6.4 epoll模型]]）。
 - readahead / `posix_fadvise` 效果实验。
 - 一次真实 p99 毛刺的定位记录（用 biolatency 直方图 + blktrace 交叉验证）。
 - 产出 `io_path_notes.md`：手画 read 全路径图（用户态 → VFS → page cache → 块层 → NVMe driver → 设备），标注每层延迟量级。
@@ -348,7 +348,7 @@ io_uring 与 fsync/fdatasync 路径，使用 fio / iostat 分析 IOPS、
 - RDMA 实操（加深）：verbs 编程模型、**QP / WQE / CQ 状态机**、内存注册、zero-copy、kernel bypass；写一个 rc_pingpong 级最小 verbs 程序（跑在 soft-RoCE 上），用 `ibv_perftest`（ib_send_lat / ib_send_bw）做基准。
 - RoCE 拥塞控制概念：PFC、ECN、**DCQCN**（lossless Ethernet 为什么需要它们、各自的副作用），概念 + 面试口述级，不要求调优实战。
 - SPDK：`hello_bdev` / `spdk perf`，理解用户态轮询的收益和代价（CPU 独占、生态隔离）。
-- 关联已有笔记：[[8.13 TCP内核队列与参数调优]]、[[13.6 Reactor模式与EventLoop]]。
+- 关联已有笔记：[[8.2 TCP内核队列与参数调优]]、[[6.6 Reactor模式与EventLoop]]。
 
 实验路径：
 

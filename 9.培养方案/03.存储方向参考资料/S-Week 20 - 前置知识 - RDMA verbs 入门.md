@@ -194,7 +194,7 @@ ibv_rc_pingpong -d rxe0 -g 1 <server_ip>
 - [[S-Week 10 - io_uring 深入]]（registered buffers 与 MR 同源）
 - [[S-Week 18 - 前置知识 - NVMe 命令模型与本地基线]]（SQ/CQ/doorbell 第一次出现）
 - [[Week 8 - Prefill Decode + Open Source Repro]]（KV transfer：单边 write 的推理侧应用）
-- [[13.7 eventfd、timerfd与跨线程唤醒]]（事件通知 vs 轮询的八股互证，本周面试保底）
+- [[6.7 eventfd、timerfd与跨线程唤醒]]（事件通知 vs 轮询的八股互证，本周面试保底）
 
 ## 参考
 

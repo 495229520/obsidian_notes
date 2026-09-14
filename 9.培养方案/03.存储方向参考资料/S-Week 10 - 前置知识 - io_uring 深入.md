@@ -144,7 +144,7 @@ liburing 版本（dpkg -l liburing-dev）             # 特性接口随版本变
 - [[S-Week 10 - io_uring 深入]]（本篇服务的周计划）
 - [[S-Week 5 - io_uring 异步 IO]]（SQ/CQ 基础与 baseline 程序）
 - [[io_uring 异步 IO 专题]]（体系化对照与面试口述）
-- [[13.4 epoll模型]]、[[13.6 Reactor模式与EventLoop]]（就绪模型一侧）
+- [[6.4 epoll模型]]、[[6.6 Reactor模式与EventLoop]]（就绪模型一侧）
 - [[S-Week 2 - O_DIRECT + 持久化语义]]（对齐 buffer 池的来源）
 
 ## 参考

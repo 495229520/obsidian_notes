@@ -62,10 +62,10 @@ io_uring 的回答：两个共享内存环 + 批量化 + 可选地把每一项�
 选型决策（面试常追问"为什么不全上 io_uring"）：
 
 - **存储高 QD**：io_uring 无争议——同步模型根本发不出并发。
-- **网络海量连接、低频交互**：epoll 仍是主流。就绪模型配 Reactor（[[13.6 Reactor模式与EventLoop]]）生态成熟；io_uring 需要为每个潜在读预挂 buffer，内存与编程模型代价不小。
+- **网络海量连接、低频交互**：epoll 仍是主流。就绪模型配 Reactor（[[6.6 Reactor模式与EventLoop]]）生态成熟；io_uring 需要为每个潜在读预挂 buffer，内存与编程模型代价不小。
 - **网络高吞吐代理/存储后端网络**：io_uring 批量与零 syscall 有实测收益，逐步渗透中。
 
-把 select → poll → epoll → io_uring 讲成一条演进线（每代解决上一代什么问题），底稿在 [[13.5 串讲]] + S-Week 10 的 `io_models.md` v2。
+把 select → poll → epoll → io_uring 讲成一条演进线（每代解决上一代什么问题），底稿在 [[6.5 串讲]] + S-Week 10 的 `io_models.md` v2。
 
 ## 5. 面试口述模板
 
@@ -92,6 +92,6 @@ io_uring 通知时数据已经就位；epoll 对普通文件无意义，因为�
 - [[S-Week 5 - io_uring 异步 IO]]（基础模型、QD 扫描、正确性 gate）
 - [[S-Week 10 - io_uring 深入]]（特性消融实验）
 - [[S-Week 10 - 前置知识 - io_uring 深入]]（特性的内核机制与环境预检）
-- [[13.4 epoll模型]]、[[13.5 串讲]]、[[13.6 Reactor模式与EventLoop]]（就绪模型一侧）
+- [[6.4 epoll模型]]、[[6.5 串讲]]、[[6.6 Reactor模式与EventLoop]]（就绪模型一侧）
 - [[S-Week 1 - Linux I O 路径专题 - VFS 到 NVMe 全路径]]（io_uring 在全路径中的位置）
 - [[00.存储方向专题清单索引]]

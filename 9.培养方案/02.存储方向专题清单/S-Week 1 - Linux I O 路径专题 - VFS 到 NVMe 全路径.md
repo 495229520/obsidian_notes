@@ -136,5 +136,5 @@ CPU 一个在设备。我在 linux-io-lab 里用冷/热实验加 iostat 验证�
 - [[O_DIRECT 与持久化语义专题]]（分叉路径，S-Week 2）
 - [[io_uring 异步 IO 专题]]（syscall 开销的解法，S-Week 5）
 - [[块层观测专题 - iostat blktrace eBPF]]（第 ⑤ 层实测，阶段 1）
-- [[4.1 打开、读取、写入、关闭]]、[[13.4 epoll模型]]
+- [[4.1 打开、读取、写入、关闭]]、[[6.4 epoll模型]]
 - [[00.存储方向专题清单索引]]

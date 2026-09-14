@@ -75,7 +75,7 @@ io_uring_cqe_seen(&ring, cqe);
 
 | 模型 | 通知语义 | 适用 | 关键笔记 |
 |---|---|---|---|
-| epoll + read | 就绪通知（readiness） | 网络 fd | [[13.4 epoll模型]]、[[13.6 Reactor模式与EventLoop]] |
+| epoll + read | 就绪通知（readiness） | 网络 fd | [[6.4 epoll模型]]、[[6.6 Reactor模式与EventLoop]] |
 | Linux AIO | 完成通知，限 O_DIRECT | 老式数据库 | — |
 | io_uring | 完成通知（completion），文件+网络统一 | 高 QD 存储、现代 server | 本周实验 |
 
@@ -124,6 +124,6 @@ io_uring_cqe_seen(&ring, cqe);
 - [[S-Week 6 - MVP 收口与报告]]
 - [[S-Week 5 - 前置知识 - io_uring 异步 IO]]
 - [[io_uring 异步 IO 专题]]
-- [[13.4 epoll模型]]
-- [[13.6 Reactor模式与EventLoop]]
+- [[6.4 epoll模型]]
+- [[6.6 Reactor模式与EventLoop]]
 - liburing（axboe/liburing）examples
