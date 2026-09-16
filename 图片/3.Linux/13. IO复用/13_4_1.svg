@@ -1,118 +1,145 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="1160px"
-    height="560px"
-    viewBox="0 0 1160 560"
-    version="1.1"
-    shape-rendering="geometricPrecision"
->
-    <title>epoll ET 非阻塞读空边界</title>
-    <desc>Explain why edge-triggered epoll requires non-blocking read until EAGAIN, and why blocking read can stall the event loop.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="660" viewBox="0 0 1240 660" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
 
-    <rect x="0" y="0" width="1160" height="560" fill="rgb(245, 244, 237)" />
+  <title>epoll ET：为什么必须配合非阻塞读到 EAGAIN</title>
+  <desc>从数据搬运路径出发，对比 LT 与 ET 的触发机制差异，深入剖析阻塞与非阻塞在读空边界时的本质区别与卡死机理。</desc>
+  <rect x="0" y="0" width="1240" height="660" fill="rgb(245, 244, 237)"/>
 
-    <defs>
-        <marker id="arrowDark" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="strokeWidth">
-            <path d="M1 1 L8 4.5 L1 8" fill="none" stroke="#475569" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-        </marker>
-        <marker id="arrowGreen" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="strokeWidth">
-            <path d="M1 1 L8 4.5 L1 8" fill="none" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-        </marker>
-        <marker id="arrowRed" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="strokeWidth">
-            <path d="M1 1 L8 4.5 L1 8" fill="none" stroke="#dc2626" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-        </marker>
-        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#94a3b8" flood-opacity="0.22" />
-        </filter>
-    </defs>
+  <!-- 主标题区 -->
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">epoll ET：为什么必须配合非阻塞读到 EAGAIN</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">数据在内核缓冲而非用户态；ET 只提醒一次逼出 while 循环，阻塞 fd 读空即睡死，非阻塞方知 EAGAIN 边界</text>
 
-    <text
-        x="580"
-        y="38"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        fill="#1f2937"
-        font-size="28"
-        font-weight="700"
-        font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif"
-    >epoll ET：为什么必须非阻塞读到 EAGAIN</text>
+  <!-- ==================== Panel A: 数据搬运路径 ==================== -->
+  <rect x="48" y="94" width="1144" height="128" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="118" font-size="14" font-weight="700" fill="#4A473F">A · 数据搬运路径：socket 可读的本质是内核缓冲区有数据</text>
+  <text x="530" y="118" font-size="11" fill="#6B675C">read() / recv() 是系统调用，将内核接收缓冲中的数据拷贝到用户态 buf</text>
 
-    <g id="data-path">
-        <rect x="60" y="82" width="1040" height="108" rx="22" fill="#ecfeff" stroke="#06b6d4" stroke-width="2.2" filter="url(#shadow)" />
-        <text x="94" y="112" fill="#164e63" font-size="19" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">数据搬运路径</text>
+  <!-- Step 1 -->
+  <rect x="68" y="132" width="220" height="72" rx="6" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="82" y="155" font-size="11" font-weight="700" fill="#2C4460">① 网络数据到达网卡</text>
+  <text x="82" y="174" font-size="9.8" fill="#4A473F">网卡 DMA 拷贝到内存</text>
+  <text x="82" y="191" font-size="9.5" fill="#6B675C">软中断驱动走完 TCP/IP 协议栈</text>
 
-        <rect x="100" y="132" width="150" height="42" rx="14" fill="#ffffff" stroke="#475569" stroke-width="1.8" />
-        <text x="175" y="153" text-anchor="middle" dominant-baseline="middle" fill="#1f2937" font-size="16" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">网络数据到达</text>
+  <line x1="288" y1="168" x2="318" y2="168" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
 
-        <rect x="340" y="122" width="220" height="62" rx="16" fill="#dbeafe" stroke="#3b82f6" stroke-width="2" />
-        <text x="450" y="145" text-anchor="middle" dominant-baseline="middle" fill="#1e3a8a" font-size="17" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">内核接收缓冲区</text>
-        <text x="450" y="169" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="13" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">fd 是否可读看这里</text>
+  <!-- Step 2 -->
+  <rect x="318" y="132" width="280" height="72" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+  <text x="332" y="155" font-size="11" font-weight="700" fill="#1E3A8A">② 内核 socket 接收缓冲区</text>
+  <text x="332" y="174" font-size="9.8" font-weight="700" fill="#B07D2B">【核心判据】fd 是否可读看这里</text>
+  <text x="332" y="191" font-size="9.5" fill="#4A473F">sk_receive_queue 有数据即唤醒</text>
 
-        <rect x="650" y="132" width="150" height="42" rx="14" fill="#fff7ed" stroke="#f97316" stroke-width="1.8" />
-        <text x="725" y="153" text-anchor="middle" dominant-baseline="middle" fill="#9a3412" font-size="16" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">read / recv</text>
+  <line x1="598" y1="168" x2="628" y2="168" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
 
-        <rect x="890" y="122" width="160" height="62" rx="16" fill="#dcfce7" stroke="#22c55e" stroke-width="2" />
-        <text x="970" y="145" text-anchor="middle" dominant-baseline="middle" fill="#166534" font-size="17" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">用户态 buf</text>
-        <text x="970" y="169" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="13" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">交给业务解析</text>
+  <!-- Step 3 -->
+  <rect x="628" y="132" width="240" height="72" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.1"/>
+  <text x="642" y="155" font-size="11" font-weight="700" fill="#6B4E28">③ read() / recv() 系统调用</text>
+  <text x="642" y="174" font-size="9.8" fill="#4A473F">从用户态陷入内核态</text>
+  <text x="642" y="191" font-size="9.5" fill="#6B4E28">调用 copy_to_user() 搬运字节</text>
 
-        <line x1="250" y1="153" x2="334" y2="153" stroke="#475569" stroke-width="2.2" marker-end="url(#arrowDark)" />
-        <line x1="560" y1="153" x2="644" y2="153" stroke="#475569" stroke-width="2.2" marker-end="url(#arrowDark)" />
-        <line x1="800" y1="153" x2="884" y2="153" stroke="#475569" stroke-width="2.2" marker-end="url(#arrowDark)" />
-    </g>
+  <line x1="868" y1="168" x2="898" y2="168" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
 
-    <g id="lt-panel">
-        <rect x="60" y="230" width="500" height="236" rx="24" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.2" filter="url(#shadow)" />
-        <rect x="190" y="250" width="240" height="46" rx="16" fill="#dcfce7" stroke="#22c55e" stroke-width="2" />
-        <text x="310" y="273" text-anchor="middle" dominant-baseline="middle" fill="#166534" font-size="19" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">LT：只要还有数据就提醒</text>
+  <!-- Step 4 -->
+  <rect x="898" y="132" width="274" height="72" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="912" y="155" font-size="11" font-weight="700" fill="#24473F">④ 写入用户态 buf</text>
+  <text x="912" y="174" font-size="9.8" fill="#24473F">数据正式交付上层业务逻辑</text>
+  <text x="912" y="191" font-size="9.5" fill="#4A473F">进入协议拆包与业务计算流程</text>
 
-        <rect x="104" y="326" width="144" height="54" rx="14" fill="#ffffff" stroke="#16a34a" stroke-width="1.8" />
-        <text x="176" y="345" text-anchor="middle" dominant-baseline="middle" fill="#14532d" font-size="15" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">缓冲区仍有数据</text>
-        <text x="176" y="366" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="13" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">未读完</text>
+  <!-- ==================== Panel B: LT vs ET 机制对照 ==================== -->
+  <rect x="48" y="234" width="1144" height="156" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="258" font-size="14" font-weight="700" fill="#4A473F">B · 触发模式对照：LT 与 ET 对“未读完数据”的反应差异</text>
+  <text x="530" y="258" font-size="11" fill="#6B675C">ET 逼出 while 循环；若不读到 EAGAIN，残留数据将永远失去唤醒通知</text>
 
-        <rect x="376" y="326" width="144" height="54" rx="14" fill="#ffffff" stroke="#16a34a" stroke-width="1.8" />
-        <text x="448" y="345" text-anchor="middle" dominant-baseline="middle" fill="#14532d" font-size="15" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">下次 epoll_wait</text>
-        <text x="448" y="366" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="13" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">继续返回</text>
+  <!-- Left: LT -->
+  <rect x="68" y="272" width="550" height="104" rx="6" fill="#F4F8F6" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="84" y="293" font-size="11.5" font-weight="700" fill="#24473F">LT (Level Triggered) · 水平触发模式</text>
+  <text x="480" y="293" font-size="10" font-weight="700" fill="#2F6B5E">只要有数据就提醒</text>
+  <text x="84" y="313" font-size="10" fill="#4A473F">• 触发逻辑：内核接收缓冲区只要还有数据未读完，每次 epoll_wait 均会返回</text>
+  <text x="84" y="331" font-size="10" fill="#4A473F">• 编程容错：支持分批慢读，不用担心一次没读完导致数据卡死</text>
+  <text x="84" y="349" font-size="10" fill="#6B4E28">• 代价与缺陷：就绪链表 rdllist 频繁重复挂载，高并发吞吐受限</text>
+  <text x="84" y="365" font-size="9.5" fill="#6B675C">机制：epoll 将事件交给用户后会检查是否仍就绪，是则重新挂回 rdllist</text>
 
-        <line x1="248" y1="353" x2="370" y2="353" stroke="#16a34a" stroke-width="2.3" marker-end="url(#arrowGreen)" />
-        <text x="310" y="335" text-anchor="middle" dominant-baseline="middle" fill="#166534" font-size="13" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">水平触发</text>
+  <!-- Right: ET -->
+  <rect x="638" y="272" width="534" height="104" rx="6" fill="#FAF4F2" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="654" y="293" font-size="11.5" font-weight="700" fill="#733428">ET (Edge Triggered) · 边缘触发模式</text>
+  <text x="1030" y="293" font-size="10" font-weight="700" fill="#A64B3C">状态变化只提醒一次</text>
+  <text x="654" y="313" font-size="10" fill="#4A473F">• 触发逻辑：仅在缓冲区由「空」变「非空」的跳变瞬间触发一次事件</text>
+  <text x="654" y="331" font-size="10" fill="#733428">• 核心风险：若一次只读部分即退出，剩余数据将失去后续所有通知！</text>
+  <text x="654" y="349" font-size="10" fill="#24473F">• 必选策略：必须配合 while 循环读取，直到彻底把缓冲区读空</text>
+  <text x="654" y="365" font-size="9.5" fill="#6B675C">机制：epoll_wait 交出项后不做回填检查，省去重复挂载，吞吐更高</text>
 
-        <text x="310" y="422" text-anchor="middle" dominant-baseline="middle" fill="#14532d" font-size="15" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">
-            <tspan x="310" dy="0">可以分批读；只要接收缓冲区还有数据，</tspan>
-            <tspan x="310" dy="22">后续仍会收到可读通知。</tspan>
-        </text>
-    </g>
+  <!-- ==================== Panel C: 阻塞 vs 非阻塞 (卡死根因) ==================== -->
+  <rect x="48" y="402" width="1144" height="188" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="426" font-size="14" font-weight="700" fill="#4A473F">C · 读空边界抉择：阻塞 vs 非阻塞（为什么阻塞 fd 会卡死事件循环）</text>
+  <text x="560" y="426" font-size="11" fill="#6B675C">缓冲区为空时：阻塞 fd 会让线程睡死；非阻塞 fd 用 EAGAIN 给出合法刹车信号</text>
 
-    <g id="et-panel">
-        <rect x="600" y="230" width="500" height="236" rx="24" fill="#fff7ed" stroke="#f97316" stroke-width="2.2" filter="url(#shadow)" />
-        <rect x="730" y="250" width="240" height="46" rx="16" fill="#ffedd5" stroke="#f97316" stroke-width="2" />
-        <text x="850" y="273" text-anchor="middle" dominant-baseline="middle" fill="#9a3412" font-size="19" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">ET：状态变化只提醒一次</text>
+  <!-- Left: 阻塞卡死致命路径 -->
+  <rect x="68" y="438" width="550" height="138" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="84" y="458" font-size="11.5" font-weight="700" fill="#733428">✗ 致命组合：ET 配合阻塞 fd + while 循环读</text>
+  <text x="480" y="458" font-size="10" font-weight="700" fill="#A64B3C">整个事件循环卡死！</text>
 
-        <rect x="636" y="322" width="132" height="58" rx="14" fill="#ffffff" stroke="#f97316" stroke-width="1.8" />
-        <text x="702" y="342" text-anchor="middle" dominant-baseline="middle" fill="#9a3412" font-size="15" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">新数据到达</text>
-        <text x="702" y="364" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="13" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">触发一次</text>
+  <!-- Step flow in Left -->
+  <rect x="84" y="470" width="150" height="44" rx="4" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="94" y="488" font-size="10" font-weight="700" fill="#24473F">第 1..N 次 read()</text>
+  <text x="94" y="504" font-size="9.5" fill="#4A473F">正常读到数据，缓冲渐空</text>
 
-        <rect x="820" y="322" width="132" height="58" rx="14" fill="#ffffff" stroke="#f97316" stroke-width="1.8" />
-        <text x="886" y="342" text-anchor="middle" dominant-baseline="middle" fill="#9a3412" font-size="15" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">循环读取</text>
-        <text x="886" y="364" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="13" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">直到读空</text>
+  <line x1="234" y1="492" x2="254" y2="492" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrR)"/>
 
-        <rect x="996" y="322" width="72" height="58" rx="14" fill="#fee2e2" stroke="#ef4444" stroke-width="1.8" />
-        <text x="1032" y="342" text-anchor="middle" dominant-baseline="middle" fill="#991b1b" font-size="15" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">EAGAIN</text>
-        <text x="1032" y="364" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="12" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">停下边界</text>
+  <rect x="254" y="470" width="150" height="44" rx="4" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="264" y="488" font-size="10" font-weight="700" fill="#6B4E28">第 N+1 次 read()</text>
+  <text x="264" y="504" font-size="9.5" fill="#733428">缓冲区已空，发起调用</text>
 
-        <line x1="768" y1="351" x2="814" y2="351" stroke="#475569" stroke-width="2.2" marker-end="url(#arrowDark)" />
-        <line x1="952" y1="351" x2="990" y2="351" stroke="#dc2626" stroke-width="2.2" marker-end="url(#arrowRed)" />
+  <line x1="404" y1="492" x2="424" y2="492" stroke="#A64B3C" stroke-width="1.5" marker-end="url(#arrR)"/>
 
-        <text x="850" y="422" text-anchor="middle" dominant-baseline="middle" fill="#9a3412" font-size="15" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">
-            <tspan x="850" dy="0">非阻塞 fd 读空时返回 -1 + EAGAIN；</tspan>
-            <tspan x="850" dy="22">阻塞 fd 会睡眠，事件循环被卡住。</tspan>
-        </text>
-    </g>
+  <rect x="424" y="470" width="180" height="44" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="434" y="488" font-size="10" font-weight="700" fill="#733428">线程直接睡死在内核！</text>
+  <text x="434" y="504" font-size="9.5" fill="#733428">无 EAGAIN，调用绝不返回</text>
 
-    <g id="bottom-rule">
-        <rect x="180" y="500" width="800" height="36" rx="18" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1.8" />
-        <text x="580" y="518" text-anchor="middle" dominant-baseline="middle" fill="#5b21b6" font-size="16" font-weight="700" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">
-            记忆：ET 要把当前接收缓冲区读空，并用 EAGAIN / EWOULDBLOCK 作为本轮结束信号
-        </text>
-    </g>
+  <text x="84" y="534" font-size="10" font-weight="700" fill="#733428">【灾难后果】卡住的不是单条连接，而是 Reactor 事件循环所在的主线程！</text>
+  <text x="84" y="552" font-size="9.8" fill="#733428">服务器对所有其他并发连接彻底失去响应；代码表面无任何报错，最隐蔽的生产事故。</text>
+
+  <!-- Right: 非阻塞安全退出路径 -->
+  <rect x="638" y="438" width="534" height="138" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="654" y="458" font-size="11.5" font-weight="700" fill="#24473F">✓ 正确范式：ET 配合非阻塞 fd + 循环读到 EAGAIN</text>
+  <text x="1060" y="458" font-size="10" font-weight="700" fill="#2F6B5E">安全读尽</text>
+
+  <!-- Step flow in Right -->
+  <rect x="654" y="470" width="145" height="44" rx="4" fill="#FFFFFF" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="664" y="488" font-size="10" font-weight="700" fill="#24473F">第 1..N 次 read()</text>
+  <text x="664" y="504" font-size="9.5" fill="#4A473F">n &gt; 0：持续追加 buffer</text>
+
+  <line x1="799" y1="492" x2="819" y2="492" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrG)"/>
+
+  <rect x="819" y="470" width="155" height="44" rx="4" fill="#FFFFFF" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="829" y="488" font-size="10" font-weight="700" fill="#6B4E28">第 N+1 次 read()</text>
+  <text x="829" y="504" font-size="9.5" fill="#24473F">返回 -1 且置 EAGAIN</text>
+
+  <line x1="974" y1="492" x2="994" y2="492" stroke="#2F6B5E" stroke-width="1.5" marker-end="url(#arrG)"/>
+
+  <rect x="994" y="470" width="164" height="44" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="1004" y="488" font-size="10" font-weight="700" fill="#24473F">识别读空边界退出循环</text>
+  <text x="1004" y="504" font-size="9.5" fill="#24473F">线程返回继续 epoll_wait</text>
+
+  <text x="654" y="534" font-size="10" font-weight="700" fill="#24473F">【安全保障】EAGAIN 不是网络错误，而是非阻塞 IO 专门约定的“已读空”安全刹车令！</text>
+  <text x="654" y="552" font-size="9.8" fill="#24473F">当前接收缓冲区彻底清空，线程毫无阻碍地退回 epoll 事件循环，继续服务其他就绪连接。</text>
+
+  <!-- ==================== Footer 口诀 ==================== -->
+  <text x="48" y="616" font-size="11" font-weight="700" fill="#4A473F">核心记忆：</text>
+  <text x="116" y="616" font-size="11" fill="#4A473F">ET 只提醒一次，逼出 while 循环读尽；若用阻塞 fd，读空最后一刻必睡死在内核，拖垮整个事件循环；</text>
+  <text x="48" y="636" font-size="11" fill="#4A473F">唯有非阻塞 fd 返回 -1 且置 EAGAIN，方能作为安全的读空刹车令，既不丢数据，也不卡线程。</text>
 </svg>

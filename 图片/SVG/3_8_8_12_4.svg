@@ -1,0 +1,244 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="880" viewBox="0 0 1240 880" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A64B3C"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B07D2B"/>
+    </marker>
+  </defs>
+
+  <title>非阻塞 TCP 全流程：建连、收发接力、反压与优雅关闭</title>
+  <desc>从设置非阻塞和 connect 验真开始，经过 epoll 事件循环中的读写、短写缓冲和高低水位反压，最后在写空后优雅关闭。</desc>
+  <rect x="0" y="0" width="1240" height="880" fill="rgb(245, 244, 237)"/>
+
+  <!-- 主标题区 -->
+  <text x="48" y="46" font-size="22" font-weight="700" fill="#2B2A26">非阻塞 TCP 全流程：建连、收发接力、反压与优雅关闭</text>
+  <text x="48" y="72" font-size="13" fill="#6B675C">事件只负责唤醒，状态机负责验真；收发双缓冲循环到 EAGAIN；发空即摘 EPOLLOUT，水位反压，写完再关</text>
+
+  <!-- ==================== Panel A: 建连阶段 ==================== -->
+  <rect x="48" y="94" width="1144" height="202" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="118" font-size="14" font-weight="700" fill="#4A473F">A · 建连阶段：非阻塞发起与 SO_ERROR 验真判定</text>
+  <text x="420" y="118" font-size="11" fill="#6B675C">可写不等于成功，必须查验 SO_ERROR</text>
+
+  <!-- Step 1 -->
+  <rect x="68" y="132" width="190" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="78" y="150" font-size="11" font-weight="700" fill="#2C4460">① 设非阻塞并发起</text>
+  <text x="78" y="167" font-size="9.8" fill="#4A473F">fcntl(O_NONBLOCK) → connect()</text>
+
+  <line x1="258" y1="155" x2="282" y2="155" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Step 2 -->
+  <rect x="284" y="132" width="195" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.2"/>
+  <text x="294" y="150" font-size="11" font-weight="700" fill="#6B4E28">② 内核握手中 (非阻塞返回)</text>
+  <text x="294" y="167" font-size="9.8" fill="#6B4E28">ret == -1 且 errno == EINPROGRESS</text>
+
+  <line x1="479" y1="155" x2="503" y2="155" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Step 3 -->
+  <rect x="505" y="132" width="195" height="46" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="515" y="150" font-size="11" font-weight="700" fill="#2C4460">③ 挂载哨兵与超时</text>
+  <text x="515" y="167" font-size="9.8" fill="#4A473F">监听 EPOLLOUT + 定时器防死等</text>
+
+  <line x1="700" y1="155" x2="724" y2="155" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Step 4 -->
+  <rect x="726" y="132" width="180" height="46" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+  <text x="736" y="150" font-size="11" font-weight="700" fill="#6B5B95">④ 唤醒：可写通知</text>
+  <text x="736" y="167" font-size="9.8" fill="#4A473F">epoll_wait 唤醒 (可写≠成功)</text>
+
+  <line x1="906" y1="155" x2="930" y2="155" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- Step 5 -->
+  <rect x="932" y="132" width="240" height="46" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.4"/>
+  <text x="942" y="150" font-size="11" font-weight="700" fill="#6B4E28">⑤ 核心裁决：SO_ERROR</text>
+  <text x="942" y="167" font-size="9.8" fill="#6B4E28">SOL_SOCKET, SO_ERROR, &amp;err</text>
+
+  <!-- Clean non-overlapping fork connectors from Step 5 -->
+  <path d="M 980,178 v 10 H 331 v 10" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrG)"/>
+  <path d="M 1080,178 v 20" fill="none" stroke="#A64B3C" stroke-width="1.6" marker-end="url(#arrR)"/>
+
+  <!-- Branch Outcomes -->
+  <rect x="68" y="198" width="526" height="84" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="82" y="218" font-size="11.5" font-weight="700" fill="#24473F">✓ err == 0 · 握手成功 (ESTABLISHED)</text>
+  <text x="82" y="238" font-size="10" fill="#24473F">• 链路畅通；立即取消超时定时器防误杀</text>
+  <text x="82" y="258" font-size="10" fill="#24473F">• epoll_ctl(MOD, EPOLLIN) 恢复日常读</text>
+
+  <rect x="614" y="198" width="558" height="84" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="628" y="218" font-size="11.5" font-weight="700" fill="#733428">✗ err != 0 或超时 · 握手失败/拒绝</text>
+  <text x="628" y="238" font-size="10" fill="#733428">• 提取 ECONNREFUSED / ETIMEDOUT 错误码</text>
+  <text x="628" y="258" font-size="10" fill="#733428">• SO_ERROR 阅后即焚；取消定时器并 close</text>
+
+  <!-- ==================== Panel B: 事件循环阶段 ==================== -->
+  <rect x="48" y="308" width="1144" height="364" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="332" font-size="14" font-weight="700" fill="#4A473F">B · 事件循环：双缓冲接力、短写保护与 EPOLLOUT 纪律</text>
+  <text x="510" y="332" font-size="11" fill="#6B675C">保持 FIFO 顺序；读写至 EAGAIN；发空必摘写事件</text>
+
+  <!-- Row B1: 读路径 -->
+  <rect x="68" y="346" width="1104" height="80" rx="6" fill="#EDF1F7" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="76" y="354" width="146" height="64" rx="5" fill="#FFFFFF" stroke="#3D5A80" stroke-width="1"/>
+  <text x="86" y="374" font-size="11" font-weight="700" fill="#3D5A80">EPOLLIN · 读路径</text>
+  <text x="86" y="392" font-size="9.8" fill="#6B675C">常驻监听态</text>
+  <text x="86" y="407" font-size="9.5" fill="#4A473F">内核缓冲有数据即唤醒</text>
+
+  <!-- Col 1 -->
+  <rect x="234" y="354" width="221" height="64" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.1"/>
+  <text x="244" y="376" font-size="11" font-weight="700" fill="#2C4460">while recv(fd, buf, ...)</text>
+  <text x="244" y="397" font-size="9.8" fill="#4A473F">ET/LT 均须循环读尽</text>
+
+  <line x1="455" y1="386" x2="473" y2="386" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Col 2 -->
+  <rect x="473" y="354" width="221" height="64" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="483" y="376" font-size="11" font-weight="700" fill="#24473F">n &gt; 0：追加 input_buffer</text>
+  <text x="483" y="397" font-size="9.8" fill="#4A473F">交付应用层解包 / 业务计算</text>
+
+  <line x1="694" y1="386" x2="712" y2="386" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Col 3 -->
+  <rect x="712" y="354" width="221" height="64" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.1"/>
+  <text x="722" y="376" font-size="10.5" font-weight="700" fill="#6B4E28">EAGAIN / EWOULDBLOCK</text>
+  <text x="722" y="397" font-size="9.8" fill="#6B4E28">接收缓冲读空，安全退出等下次</text>
+
+  <!-- Col 4 -->
+  <rect x="951" y="354" width="221" height="64" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.1"/>
+  <text x="961" y="376" font-size="10.5" font-weight="700" fill="#733428">[EOF] 对端发送 FIN</text>
+  <text x="961" y="397" font-size="9.8" fill="#733428">对端已正常关闭，触发释放</text>
+
+  <!-- Row B2: 发送入口 -->
+  <rect x="68" y="432" width="1104" height="106" rx="6" fill="#E6EFEA" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="76" y="440" width="146" height="90" rx="5" fill="#FFFFFF" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="86" y="462" font-size="11" font-weight="700" fill="#2F6B5E">send_data 发送入口</text>
+  <text x="86" y="482" font-size="9.8" fill="#24473F">原则 1：严格保持 FIFO</text>
+  <text x="86" y="499" font-size="9.5" fill="#6B675C">已有积压绝不插队发</text>
+  <text x="86" y="515" font-size="9.5" fill="#4A473F">避免 TCP 字节流乱序</text>
+
+  <!-- Col 1 -->
+  <rect x="234" y="440" width="221" height="78" rx="6" fill="#FFFFFF" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="244" y="462" font-size="11" font-weight="700" fill="#24473F">检查 output_buffer</text>
+  <text x="244" y="482" font-size="10.5" font-weight="700" fill="#24473F">empty() == true ?</text>
+  <text x="244" y="501" font-size="9.5" fill="#6B675C">前面是否有未发完排队旧账</text>
+
+  <!-- Fast path arrow -->
+  <path d="M 455,466 h 18" fill="none" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrG)"/>
+
+  <!-- Col 2 -->
+  <rect x="473" y="440" width="221" height="78" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.1"/>
+  <text x="483" y="460" font-size="10.5" font-weight="700" fill="#24473F">[是] Fast Path 直发</text>
+  <text x="483" y="480" font-size="9.5" fill="#24473F">• 全量写入内核：零拷贝直接返回</text>
+  <text x="483" y="498" font-size="9.5" fill="#6B4E28">• 遇短写/EAGAIN：剩余进缓冲区</text>
+
+  <!-- Short-write to queue arrow -->
+  <line x1="694" y1="466" x2="712" y2="466" stroke="#B07D2B" stroke-width="1.5" marker-end="url(#arrAmber)"/>
+
+  <!-- Col 3 -->
+  <rect x="712" y="440" width="221" height="78" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.1"/>
+  <text x="722" y="460" font-size="10.5" font-weight="700" fill="#6B4E28">[否 / 遇短写] 缓冲排队</text>
+  <text x="722" y="480" font-size="9.5" fill="#4A473F">• 剩余字节追加存入 buffer 队尾</text>
+  <text x="722" y="498" font-size="9.5" fill="#6B4E28">• 禁止新数据插队导致解包崩溃</text>
+
+  <!-- Slow path bypass line under Col 2 -->
+  <path d="M 344,518 v 11 h 478 v -11" fill="none" stroke="#B07D2B" stroke-width="1.5" marker-end="url(#arrAmber)"/>
+  <rect x="515" y="521" width="136" height="16" rx="3" fill="#FAF5ED" stroke="#B07D2B" stroke-width="0.8"/>
+  <text x="583" y="533" font-size="9.5" text-anchor="middle" font-weight="700" fill="#6B4E28">!empty (已有积压直接排队)</text>
+
+  <!-- Col 3 to Col 4 arrow -->
+  <line x1="933" y1="479" x2="951" y2="479" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Col 4 -->
+  <rect x="951" y="440" width="221" height="78" rx="6" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+  <text x="961" y="460" font-size="10.5" font-weight="700" fill="#6B5B95">挂载 EPOLLOUT 写事件</text>
+  <text x="961" y="480" font-size="9.5" fill="#4A473F">epoll_ctl(MOD, EPOLLIN|EPOLLOUT)</text>
+  <text x="961" y="498" font-size="9.5" fill="#6B5B95">缓冲腾空时由 epoll 唤醒续写</text>
+
+  <!-- Row B3: 续写路径 -->
+  <rect x="68" y="546" width="1104" height="114" rx="6" fill="#F4E9E4" stroke="#D8D5C8" stroke-width="1"/>
+  <rect x="76" y="554" width="146" height="98" rx="5" fill="#FFFFFF" stroke="#A64B3C" stroke-width="1"/>
+  <text x="86" y="576" font-size="11" font-weight="700" fill="#A64B3C">on_writable 续写</text>
+  <text x="86" y="596" font-size="9.8" fill="#A64B3C">EPOLLOUT 激活态</text>
+  <text x="86" y="614" font-size="9.5" fill="#4A473F">内核发送缓冲腾空触发</text>
+  <text x="86" y="630" font-size="9.5" fill="#733428">写完即摘防 100% 空转</text>
+
+  <!-- Col 1 -->
+  <rect x="234" y="554" width="221" height="98" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.1"/>
+  <text x="244" y="576" font-size="10.5" font-weight="700" fill="#6B4E28">while (!buffer.empty())</text>
+  <text x="244" y="596" font-size="9.5" fill="#4A473F">n = send(c-&gt;fd, data, len)</text>
+  <text x="244" y="615" font-size="9.5" fill="#24473F">• n &gt; 0：consume(n) 消费续写</text>
+  <text x="244" y="632" font-size="9.5" fill="#4A473F">• EINTR 慢信号打断直接重试</text>
+
+  <line x1="455" y1="603" x2="473" y2="603" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Col 2 -->
+  <rect x="473" y="554" width="221" height="98" rx="6" fill="#FFF6F4" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="483" y="576" font-size="10.5" font-weight="700" fill="#733428">遇 EAGAIN：绝不可提前摘除！</text>
+  <text x="483" y="596" font-size="9.5" fill="#4A473F">• 发送缓冲再次写满，仍有积压</text>
+  <text x="483" y="615" font-size="9.5" fill="#733428">• 必须保留 EPOLLOUT 并退出</text>
+  <text x="483" y="632" font-size="9.5" fill="#733428">• 若误摘：剩余数据永远死锁</text>
+
+  <line x1="694" y1="603" x2="712" y2="603" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Col 3 -->
+  <rect x="712" y="554" width="221" height="98" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="722" y="576" font-size="10.5" font-weight="700" fill="#24473F">发空瞬间：立刻摘除写事件！</text>
+  <text x="722" y="596" font-size="9.5" fill="#24473F">• empty() == true 时立刻 MOD</text>
+  <text x="722" y="615" font-size="9.5" fill="#733428">• 铁律：若发空不摘，LT 将空转</text>
+  <text x="722" y="632" font-size="9.5" fill="#733428">• CPU 核心瞬间 100% 跑满打死</text>
+
+  <line x1="933" y1="603" x2="951" y2="603" stroke="#2F6B5E" stroke-width="1.6" marker-end="url(#arrG)"/>
+
+  <!-- Col 4 -->
+  <rect x="951" y="554" width="221" height="98" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="961" y="576" font-size="10.5" font-weight="700" fill="#2C4460">恢复日常态：仅监听 EPOLLIN</text>
+  <text x="961" y="596" font-size="9.5" fill="#3D5A80">epoll_ctl(MOD, EPOLLIN)</text>
+  <text x="961" y="615" font-size="9.5" fill="#24473F">• 积压全清，回到静默等待态</text>
+  <text x="961" y="632" font-size="9.5" fill="#6B675C">• 仅在内核有新数据时被唤醒</text>
+
+  <!-- ==================== Panel C: 保护防线与收口 ==================== -->
+  <rect x="48" y="682" width="1144" height="136" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="704" font-size="14" font-weight="700" fill="#4A473F">C · 两大收口防线：高低水位反压 与 优雅关闭</text>
+  <text x="490" y="704" font-size="11" fill="#6B675C">反压防内存击穿；发空再 shutdown 拒绝截断</text>
+
+  <!-- Card 1: 反压 -->
+  <rect x="68" y="716" width="540" height="90" rx="6" fill="#EDF1F7" stroke="#3D5A80" stroke-width="1.2"/>
+  <text x="82" y="736" font-size="11.5" font-weight="700" fill="#2C4460">防线 ① · 高低水位反压 (Backpressure)</text>
+  <text x="82" y="756" font-size="10" fill="#733428">• 超过高水位：摘除 EPOLLIN 暂停读入新请求</text>
+  <text x="82" y="774" font-size="10" fill="#24473F">• 跌回低水位：挂回 EPOLLIN 恢复正常读取</text>
+  <text x="82" y="792" font-size="9.8" fill="#4A473F">• 双水位迟滞消除震荡；通过 rwnd 传导至对端</text>
+
+  <!-- Mini gauge -->
+  <rect x="410" y="736" width="55" height="46" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="437" y="754" font-size="9.5" text-anchor="middle" fill="#24473F">正常</text>
+  <text x="437" y="771" font-size="8.5" text-anchor="middle" fill="#6B675C">&lt;低水位</text>
+  <rect x="468" y="736" width="60" height="46" rx="4" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1"/>
+  <text x="498" y="754" font-size="9.5" text-anchor="middle" fill="#6B4E28">积压中</text>
+  <text x="498" y="771" font-size="8.5" text-anchor="middle" fill="#6B675C">排队续写</text>
+  <rect x="531" y="736" width="65" height="46" rx="4" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+  <text x="563" y="754" font-size="9.5" text-anchor="middle" fill="#733428">反压生效</text>
+  <text x="563" y="771" font-size="8.5" text-anchor="middle" fill="#733428">&gt;高水位</text>
+
+  <!-- Card 2: 优雅关闭 -->
+  <rect x="628" y="716" width="544" height="90" rx="6" fill="#E6EFEA" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="642" y="736" font-size="11.5" font-weight="700" fill="#24473F">防线 ② · 优雅关闭 (Graceful Shutdown)</text>
+  <text x="642" y="756" font-size="10" fill="#733428">• 业务置 closing=true：严禁直接 close(fd)</text>
+  <text x="642" y="774" font-size="10" fill="#24473F">• 挂在发空回调：发空再调 shutdown(WR)</text>
+  <text x="642" y="792" font-size="9.8" fill="#4A473F">• 送出 FIN 半关；对端回 FIN (recv=0) 后 close</text>
+
+  <!-- Mini sequence pill -->
+  <rect x="970" y="736" width="188" height="46" rx="4" fill="#FFFFFF" stroke="#2F6B5E" stroke-width="1"/>
+  <text x="1064" y="754" font-size="9.5" text-anchor="middle" font-weight="700" fill="#24473F">①发空 → ②shutdown(WR)</text>
+  <text x="1064" y="771" font-size="9.5" text-anchor="middle" fill="#4A473F">③对端FIN → ④close(fd)</text>
+
+  <!-- ==================== Footer 口诀 ==================== -->
+  <text x="48" y="842" font-size="11" font-weight="700" fill="#4A473F">全流程口诀：</text>
+  <text x="116" y="842" font-size="11" fill="#4A473F">EINPROGRESS 挂定时器，可写查 SO_ERROR 验真；收发双缓冲循环至 EAGAIN；</text>
+  <text x="48" y="860" font-size="11" fill="#4A473F">已有积压走 FIFO 排队，发空那一刻必摘 EPOLLOUT；高低水位反压踩刹车，发空再 shutdown 优雅关闭。</text>
+</svg>
