@@ -273,7 +273,7 @@ This vault is managed by Trellis. Study planning and execution state live under 
 - `.trellis/workflow.md` — task lifecycle and working phases
 - `.trellis/tasks/` — active and archived learning tasks
 - `.trellis/workspace/` — journals and session traces
-- `9.培养方案/04.Trellis学习任务/` — read-only Obsidian projection of Trellis tasks
+- `8.高性能存储/90.学习与实践/01.任务看板/` — read-only Obsidian projection of Trellis tasks
 
 Create future study arrangements as Trellis Tasks. Treat `.trellis/tasks/` as the authority and the Obsidian dashboard as a generated read-only view.
 

@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="780" viewBox="0 0 1280 780">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#455a64"/>
+    </marker>
+    <style>
+      .title { font: 700 32px Arial, sans-serif; fill: #1f2933; }
+      .h2 { font: 700 22px Arial, sans-serif; fill: #263238; }
+      .h3 { font: 700 17px Arial, sans-serif; fill: #263238; }
+      .text { font: 15px Arial, sans-serif; fill: #37474f; }
+      .small { font: 13px Arial, sans-serif; fill: #455a64; }
+      .tiny { font: 12px Arial, sans-serif; fill: #546e7a; }
+      .host { fill: #e3f2fd; stroke: #1976d2; stroke-width: 2.2; rx: 14; }
+      .os { fill: #f1f8e9; stroke: #689f38; stroke-width: 2.2; rx: 14; }
+      .device { fill: #e8f5e9; stroke: #388e3c; stroke-width: 2.2; rx: 14; }
+      .panel { fill: #ffffff; stroke: #90a4ae; stroke-width: 1.8; rx: 13; }
+      .note { fill: #f5f5f5; stroke: #b0bec5; stroke-width: 1.5; rx: 10; }
+      .bad { fill: #ffebee; stroke: #c62828; stroke-width: 2; rx: 10; }
+      .good { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 2; rx: 10; }
+      .h2d { fill: #e1f5fe; stroke: #0288d1; stroke-width: 2; rx: 8; }
+      .kernel { fill: #fff8e1; stroke: #f9a825; stroke-width: 2; rx: 8; }
+      .d2h { fill: #f3e5f5; stroke: #8e24aa; stroke-width: 2; rx: 8; }
+      .axis { stroke: #78909c; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .grid { stroke: #cfd8dc; stroke-width: 1.1; fill: none; }
+      .arrow { stroke: #455a64; stroke-width: 2.1; fill: none; marker-end: url(#arrow); }
+      .overlap { stroke: #c62828; stroke-width: 2.2; fill: none; stroke-dasharray: 8 6; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="780" fill="rgb(245, 244, 237)"/>
+  <text x="42" y="54" class="title">cudaMemcpyAsync：异步提交到真正 overlap</text>
+
+  <rect x="42" y="94" width="360" height="218" class="host"/>
+  <text x="74" y="136" class="h2">Host 线程</text>
+  <text x="74" y="176" class="text">提交 H2D copy</text>
+  <text x="74" y="208" class="text">提交 kernel launch</text>
+  <text x="74" y="240" class="text">提交 D2H copy</text>
+  <text x="74" y="272" class="text">继续准备下一批数据</text>
+  <text x="74" y="300" class="small">异步首先是相对 CPU 线程而言</text>
+
+  <rect x="460" y="94" width="360" height="218" class="os"/>
+  <text x="492" y="136" class="h2">OS / Host Memory</text>
+  <rect x="492" y="166" width="130" height="54" class="bad"/>
+  <text x="526" y="199" class="text">pageable</text>
+  <rect x="654" y="166" width="130" height="54" class="good"/>
+  <text x="697" y="199" class="text">pinned</text>
+  <text x="492" y="250" class="small">pageable：可能需要 staging，中途更容易阻塞 host</text>
+  <text x="492" y="282" class="small">pinned：页面被 OS 锁住，更适合 DMA 直接传输</text>
+
+  <rect x="878" y="94" width="360" height="218" class="device"/>
+  <text x="910" y="136" class="h2">Device / GPU</text>
+  <text x="910" y="176" class="text">copy engine：执行 H2D / D2H</text>
+  <text x="910" y="208" class="text">SM：执行 kernel</text>
+  <text x="910" y="240" class="text">stream：维护任务顺序</text>
+  <text x="910" y="272" class="text">timeline：证明是否真的重叠</text>
+
+  <path d="M402 202 C432 202, 432 202, 460 202" class="arrow"/>
+  <path d="M820 202 C850 202, 850 202, 878 202" class="arrow"/>
+
+  <rect x="42" y="352" width="1196" height="344" class="panel"/>
+  <text x="74" y="392" class="h2">硬件资源时间线：不同资源同时处理不同 chunk，才叫 overlap</text>
+
+  <text x="74" y="458" class="h3">H2D copy engine</text>
+  <text x="74" y="538" class="h3">SM compute</text>
+  <text x="74" y="618" class="h3">D2H copy engine</text>
+
+  <path d="M260 436 L1150 436" class="axis"/>
+  <path d="M260 516 L1150 516" class="axis"/>
+  <path d="M260 596 L1150 596" class="axis"/>
+
+  <line x1="260" y1="420" x2="260" y2="640" class="grid"/>
+  <line x1="420" y1="420" x2="420" y2="640" class="grid"/>
+  <line x1="580" y1="420" x2="580" y2="640" class="grid"/>
+  <line x1="740" y1="420" x2="740" y2="640" class="grid"/>
+  <line x1="900" y1="420" x2="900" y2="640" class="grid"/>
+  <line x1="1060" y1="420" x2="1060" y2="640" class="grid"/>
+
+  <rect x="282" y="448" width="138" height="40" class="h2d"/>
+  <text x="323" y="473" class="small">H2D c0</text>
+  <rect x="442" y="448" width="138" height="40" class="h2d"/>
+  <text x="483" y="473" class="small">H2D c1</text>
+  <rect x="602" y="448" width="138" height="40" class="h2d"/>
+  <text x="643" y="473" class="small">H2D c2</text>
+
+  <rect x="442" y="528" width="138" height="40" class="kernel"/>
+  <text x="475" y="553" class="small">Kernel c0</text>
+  <rect x="602" y="528" width="138" height="40" class="kernel"/>
+  <text x="635" y="553" class="small">Kernel c1</text>
+  <rect x="762" y="528" width="138" height="40" class="kernel"/>
+  <text x="795" y="553" class="small">Kernel c2</text>
+
+  <rect x="602" y="608" width="138" height="40" class="d2h"/>
+  <text x="644" y="633" class="small">D2H c0</text>
+  <rect x="762" y="608" width="138" height="40" class="d2h"/>
+  <text x="804" y="633" class="small">D2H c1</text>
+  <rect x="922" y="608" width="138" height="40" class="d2h"/>
+  <text x="964" y="633" class="small">D2H c2</text>
+
+  <path d="M442 492 L580 492" class="overlap"/>
+  <text x="468" y="512" class="tiny">c0 kernel 与 c1 H2D 重叠</text>
+  <path d="M602 572 L740 572" class="overlap"/>
+  <text x="626" y="592" class="tiny">c1 kernel 与 c0 D2H 重叠</text>
+
+  <rect x="74" y="658" width="1132" height="28" class="note"/>
+  <text x="98" y="677" class="small">判断标准：不是“代码里用了 cudaMemcpyAsync”，而是 Nsight Systems timeline 上不同资源轨道的任务矩形真的在时间上重叠。</text>
+</svg>

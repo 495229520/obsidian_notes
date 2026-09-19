@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 560" width="1240" height="560">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="danger-arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,1 L9,5 L0,9 z" fill="#A64B3C"/>
+    </marker>
+  </defs>
+
+  <!-- 顶部标题区 -->
+  <text x="48" y="44" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="22" font-weight="700" fill="#2B2A26">栈缓冲区溢出与返回地址篡改机理</text>
+  <text x="48" y="72" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" fill="#6B675C">局部数组越界写入覆盖返回地址的破坏过程与现代编译安全防御</text>
+
+  <!-- 左侧面板：正常与溢出内存对比 -->
+  <g transform="translate(48, 100)">
+    <rect x="0" y="0" width="560" height="430" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+    <text x="20" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#2B2A26">A · 越界覆写路径 (向高地址溢出)</text>
+    <text x="540" y="28" font-family="Menlo,Consolas,monospace" font-size="11" fill="#9B968A" text-anchor="end">Low Addr ↑ / High Addr ↓</text>
+
+    <!-- 栈槽位演示 -->
+    <g transform="translate(30, 48)">
+      <!-- 局部数组 buffer[8] -->
+      <rect x="0" y="0" width="370" height="66" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+      <text x="18" y="26" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#2C4460">[ebp - 8] 局部数组 buf[8]</text>
+      <text x="18" y="48" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#3D5A80">容量 8 字节；向高地址连续填充</text>
+
+      <!-- 保存的旧 EBP -->
+      <rect x="0" y="78" width="370" height="64" rx="5" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.3"/>
+      <text x="18" y="104" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#6B4E28">[ebp + 0] 保存的旧 EBP</text>
+      <text x="18" y="126" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#8A6A3A">栈底基准；受损导致栈崩溃</text>
+
+      <!-- 返回地址 Return Address -->
+      <rect x="0" y="154" width="370" height="74" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.5"/>
+      <text x="18" y="180" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#733428">[ebp + 4] 返回地址 (4 字节)</text>
+      <text x="18" y="202" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" font-weight="600" fill="#A64B3C">攻击目标！ret 弹入 EIP 执行</text>
+
+      <!-- 函数入参 -->
+      <rect x="0" y="240" width="370" height="54" rx="5" fill="#EDEAF3" stroke="#8C7CA8" stroke-width="1.1"/>
+      <text x="18" y="266" font-family="Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#4A3F6B">[ebp + 8...] 函数形参列表</text>
+      <text x="18" y="284" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11" fill="#6B5B95">高地址，主调上下文</text>
+
+      <!-- 溢出攻击箭头 -->
+      <line x1="400" y1="25" x2="400" y2="200" stroke="#A64B3C" stroke-width="3" stroke-dasharray="6 3" marker-end="url(#danger-arr)"/>
+      <text x="414" y="90" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" font-weight="700" fill="#A64B3C">strcpy 越界写入</text>
+      <text x="414" y="112" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11" fill="#A64B3C">从低向高连续灌入</text>
+      <text x="414" y="134" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11" fill="#A64B3C">冲垮边界覆盖返回地址</text>
+    </g>
+
+    <!-- 攻击结果提示条 -->
+    <rect x="30" y="360" width="500" height="50" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+    <text x="44" y="382" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="12" font-weight="700" fill="#733428">控制流劫持后果：</text>
+    <text x="44" y="400" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11" fill="#A64B3C">ret 弹出被篡改地址，EIP 跳往注入代码</text>
+  </g>
+
+  <!-- 右侧面板：现代安全防御体系 -->
+  <g transform="translate(632, 100)">
+    <rect x="0" y="0" width="560" height="430" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+    <text x="20" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#2B2A26">B · 现代防御的三道防线</text>
+
+    <!-- 防御 1：Stack Canary -->
+    <g transform="translate(20, 48)">
+      <rect x="0" y="0" width="520" height="98" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+      <rect x="16" y="12" width="100" height="24" rx="4" fill="#2F6B5E"/>
+      <text x="66" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">防线 1 · 金丝雀</text>
+      <text x="128" y="28" font-family="Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#24473F">Stack Canary / GS 保护</text>
+      <text x="16" y="56" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#24473F">机制：插入随机校验标记 Canary</text>
+      <text x="16" y="78" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#2F6B5E">拦截：ret 前校验标记；篡改则触发 abort</text>
+    </g>
+
+    <!-- 防御 2：DEP / NX -->
+    <g transform="translate(20, 158)">
+      <rect x="0" y="0" width="520" height="98" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+      <rect x="16" y="12" width="112" height="24" rx="4" fill="#3D5A80"/>
+      <text x="72" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">防线 2 · 硬件不可执行</text>
+      <text x="140" y="28" font-family="Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#2C4460">DEP / NX 保护</text>
+      <text x="16" y="56" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#2C4460">机制：利用 CPU 页表硬件 NX 位</text>
+      <text x="16" y="78" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#3D5A80">拦截：堆栈只读写，执行即触发段错误</text>
+    </g>
+
+    <!-- 防御 3：ASLR -->
+    <g transform="translate(20, 268)">
+      <rect x="0" y="0" width="520" height="98" rx="6" fill="#EDEAF3" stroke="#8C7CA8" stroke-width="1.3"/>
+      <rect x="16" y="12" width="100" height="24" rx="4" fill="#6B5B95"/>
+      <text x="66" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">防线 3 · 随机化</text>
+      <text x="128" y="28" font-family="Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#4A3F6B">ASLR 地址空间随机化</text>
+      <text x="16" y="56" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#4A3F6B">机制：随机偏移栈、堆与动态库基址</text>
+      <text x="16" y="78" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#6B5B95">拦截：破坏攻击跳板地址预测</text>
+    </g>
+
+    <!-- 底部口径条 -->
+    <text x="280" y="405" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" font-weight="600" fill="#6B675C" text-anchor="middle">安全准则：改用 snprintf / fgets 等边界安全 API</text>
+  </g>
+</svg>

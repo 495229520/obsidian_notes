@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 680" width="1240" height="680">
+  <rect width="100%" height="100%" fill="rgb(245, 244, 237)"/>
+  <defs>
+    <marker id="arr-gray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#8A6A3A"/>
+    </marker>
+    <marker id="arr-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#6B5B95"/>
+    </marker>
+  </defs>
+
+  <!-- 顶部标题区 -->
+  <text x="48" y="44" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="22" font-weight="700" fill="#2B2A26">栈帧内存解剖与相对寻址基准</text>
+  <text x="48" y="72" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" fill="#6B675C">x86-32 __cdecl 约定下活动函数的栈空间槽位分布与 EBP/ESP 寻址原理</text>
+
+  <!-- 左侧：地址坐标轴与栈增长指示 -->
+  <g transform="translate(48, 105)">
+    <rect x="0" y="0" width="120" height="545" rx="8" fill="#F1EFE8" stroke="#D8D5C8" stroke-width="1.2"/>
+    <text x="60" y="32" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#3D5A80" text-anchor="middle">低地址 (Top)</text>
+    <text x="60" y="52" font-family="Menlo,Consolas,monospace" font-size="11" fill="#6B675C" text-anchor="middle">0x00000000</text>
+
+    <!-- 地址递增箭头（向下） -->
+    <line x1="38" y1="75" x2="38" y2="465" stroke="#5A564B" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr-gray)"/>
+    <text x="25" y="270" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#5A564B" text-anchor="middle" transform="rotate(-90, 25, 270)">内存地址递增方向</text>
+
+    <!-- 压栈方向箭头（向上） -->
+    <line x1="82" y1="465" x2="82" y2="75" stroke="#6B5B95" stroke-width="1.8" marker-end="url(#arr-purple)"/>
+    <text x="95" y="270" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" font-weight="600" fill="#6B5B95" text-anchor="middle" transform="rotate(90, 95, 270)">push 栈扩展方向</text>
+
+    <text x="60" y="505" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#A64B3C" text-anchor="middle">高地址 (Bottom)</text>
+    <text x="60" y="525" font-family="Menlo,Consolas,monospace" font-size="11" fill="#6B675C" text-anchor="middle">0xFFFFFFFF</text>
+  </g>
+
+  <!-- 中间：栈内存槽位核心区 -->
+  <g transform="translate(190, 105)">
+    <!-- 外轮廓卡片 -->
+    <rect x="0" y="0" width="530" height="545" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+    <text x="20" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#4A473F">当前进程内存堆栈槽位 (Stack Slots)</text>
+    <text x="510" y="28" font-family="Menlo,Consolas,monospace" font-size="11" fill="#9B968A" text-anchor="end">4 Bytes / Slot</text>
+
+    <!-- 槽位 1：局部变量 temp -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="490" height="68" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+      <text x="18" y="28" font-family="Menlo,Consolas,monospace" font-size="13.5" font-weight="700" fill="#2C4460">[ebp - 4]</text>
+      <text x="120" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#2C4460">局部变量区：int temp = 0</text>
+      <text x="18" y="50" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#3D5A80">当前栈顶。sub esp, 4Ch 预留局部空间，通过负偏移访问</text>
+      <text x="475" y="40" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#2C4460" text-anchor="end">0x00000000</text>
+    </g>
+
+    <!-- 指针连线：ESP 指向局部变量顶部 -->
+    <line x1="-30" y1="76" x2="16" y2="76" stroke="#3D5A80" stroke-width="2" marker-end="url(#arr-blue)"/>
+    <rect x="-112" y="62" width="78" height="28" rx="4" fill="#3D5A80"/>
+    <text x="-73" y="81" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">ESP 栈顶</text>
+
+    <!-- 槽位 2：保存的旧 EBP -->
+    <g transform="translate(20, 120)">
+      <rect x="0" y="0" width="490" height="68" rx="6" fill="#F3E8D3" stroke="#B07D2B" stroke-width="1.5"/>
+      <text x="18" y="28" font-family="Menlo,Consolas,monospace" font-size="13.5" font-weight="700" fill="#6B4E28">[ebp + 0]</text>
+      <text x="120" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#6B4E28">保存的旧 EBP (Saved EBP)</text>
+      <text x="18" y="50" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#8A6A3A">push ebp 压入 main 的栈底基准，用于函数退出时恢复现场</text>
+      <text x="475" y="40" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#6B4E28" text-anchor="end">旧 ebp 地址</text>
+    </g>
+
+    <!-- 指针连线：EBP 指向此处 -->
+    <line x1="-30" y1="154" x2="16" y2="154" stroke="#8A6A3A" stroke-width="2" marker-end="url(#arr-amber)"/>
+    <rect x="-112" y="140" width="78" height="28" rx="4" fill="#8A6A3A"/>
+    <text x="-73" y="159" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">EBP 基址</text>
+
+    <!-- 槽位 3：返回地址 -->
+    <g transform="translate(20, 198)">
+      <rect x="0" y="0" width="490" height="68" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+      <text x="18" y="28" font-family="Menlo,Consolas,monospace" font-size="13.5" font-weight="700" fill="#24473F">[ebp + 4]</text>
+      <text x="120" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#24473F">返回地址 (Return Address)</text>
+      <text x="18" y="50" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#2F6B5E">call sum 隐式压栈，记录 main 函数中 call 的下一条指令 EIP</text>
+      <text x="475" y="40" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#24473F" text-anchor="end">Next EIP</text>
+    </g>
+
+    <!-- 槽位 4：实参 a -->
+    <g transform="translate(20, 276)">
+      <rect x="0" y="0" width="490" height="64" rx="6" fill="#EDEAF3" stroke="#8C7CA8" stroke-width="1.3"/>
+      <text x="18" y="27" font-family="Menlo,Consolas,monospace" font-size="13.5" font-weight="700" fill="#4A3F6B">[ebp + 8]</text>
+      <text x="120" y="27" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#4A3F6B">形参 a (实际参数 10)</text>
+      <text x="18" y="48" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#6B5B95">由调用者 main 压入：push ecx (取出 a 的值 10)</text>
+      <text x="475" y="37" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#4A3F6B" text-anchor="end">0x0000000A</text>
+    </g>
+
+    <!-- 槽位 5：实参 b -->
+    <g transform="translate(20, 350)">
+      <rect x="0" y="0" width="490" height="64" rx="6" fill="#EDEAF3" stroke="#8C7CA8" stroke-width="1.3"/>
+      <text x="18" y="27" font-family="Menlo,Consolas,monospace" font-size="13.5" font-weight="700" fill="#4A3F6B">[ebp + 12]</text>
+      <text x="120" y="27" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#4A3F6B">形参 b (实际参数 20)</text>
+      <text x="18" y="48" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#6B5B95">由调用者 main 最先压入（__cdecl 规则：参数从右至左入栈）</text>
+      <text x="475" y="37" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#4A3F6B" text-anchor="end">0x00000014</text>
+    </g>
+
+    <!-- 槽位 6：调用者 main 栈帧上下文 -->
+    <g transform="translate(20, 424)">
+      <rect x="0" y="0" width="490" height="102" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2" stroke-dasharray="4 3"/>
+      <text x="18" y="28" font-family="Menlo,Consolas,monospace" font-size="13" font-weight="700" fill="#4A473F">[ebp + 16...]</text>
+      <text x="120" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#4A473F">调用者 (main) 栈帧私有空间</text>
+      <text x="18" y="52" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#5A564B">存储 main 的局部变量：int a = 10 (ebp-4), int b = 20 (ebp-8)</text>
+      <text x="18" y="74" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#5A564B">在 sum 返回并执行 add esp, 8 平栈后，main 重新获得栈顶控制权</text>
+    </g>
+  </g>
+
+  <!-- 右侧：工程剖析面板 -->
+  <g transform="translate(742, 105)">
+    <!-- 面板 A：寄存器寻址机制 -->
+    <rect x="0" y="0" width="450" height="262" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+    <text x="20" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#2B2A26">A · 双指针协作与寻址分工</text>
+
+    <!-- 条目 1 -->
+    <g transform="translate(20, 44)">
+      <rect x="0" y="0" width="410" height="60" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1"/>
+      <text x="14" y="22" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#2C4460">ESP (Stack Pointer) 动态浮动</text>
+      <text x="14" y="42" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#3D5A80">始终指向当前已用栈顶。函数内临时 push/pop 会导致其数值频繁变动</text>
+    </g>
+
+    <!-- 条目 2 -->
+    <g transform="translate(20, 114)">
+      <rect x="0" y="0" width="410" height="60" rx="5" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1"/>
+      <text x="14" y="22" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#6B4E28">EBP (Base Pointer) 静态基准</text>
+      <text x="14" y="42" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#8A6A3A">序言期确立后全程不变。充当相对偏移的原点，编译期静态确定访问偏移</text>
+    </g>
+
+    <!-- 寻址规则总结框 -->
+    <g transform="translate(20, 184)">
+      <rect x="0" y="0" width="410" height="64" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1"/>
+      <text x="14" y="24" font-family="Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#4A473F">[ebp - offset] 访问局部变量（向栈顶方向开辟）</text>
+      <text x="14" y="46" font-family="Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#4A473F">[ebp + offset] 访问入参（+4为返回地址，+8起为实参列表）</text>
+    </g>
+
+    <!-- 面板 B：核心底层契约 -->
+    <g transform="translate(0, 276)">
+      <rect x="0" y="0" width="450" height="269" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+      <text x="20" y="28" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#2B2A26">B · 调用契约与生命周期保障</text>
+
+      <g transform="translate(20, 44)">
+        <rect x="0" y="0" width="410" height="62" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1"/>
+        <text x="14" y="22" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#24473F">返回值脱离栈传递：EAX 寄存器</text>
+        <text x="14" y="43" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#2F6B5E">函数返回值存入 EAX。栈帧销毁后该寄存器保留结果，由调用者接收</text>
+      </g>
+
+      <g transform="translate(20, 116)">
+        <rect x="0" y="0" width="410" height="62" rx="5" fill="#EDEAF3" stroke="#8C7CA8" stroke-width="1"/>
+        <text x="14" y="22" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#4A3F6B">__cdecl 主调清栈 (Caller Cleanup)</text>
+        <text x="14" y="43" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#6B5B95">由 main 负责执行 add esp, 8 回收参数。支持 printf 等变参函数</text>
+      </g>
+
+      <g transform="translate(20, 188)">
+        <rect x="0" y="0" width="410" height="67" rx="5" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1"/>
+        <text x="14" y="22" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#733428">悬空指针与安全禁忌</text>
+        <text x="14" y="43" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" font-size="11.5" fill="#A64B3C">禁止返回指向 temp 的指针。栈帧释放后该地址随时会被覆写</text>
+      </g>
+    </g>
+  </g>
+</svg>
