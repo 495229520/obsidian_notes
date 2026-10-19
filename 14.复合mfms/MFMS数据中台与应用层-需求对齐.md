@@ -134,3 +134,7 @@ version: v0.1
 - [[14.复合mfms/14.1 Task/Trellis详情/08-23-p0-a-lower-machine-control-contract|Trellis：P0-A 控制契约]]
 - [[14.复合mfms/14.1 Task/Trellis详情/08-23-p0-b-redis-stream-contract|Trellis：P0-B Stream 契约]]
 - [[14.复合mfms/14.1 Task/Trellis详情/08-23-p0-c-requirement-order-waybill-contract|Trellis：P0-C 数据契约]]
+
+
+> [!info] 2026-09-19 博赛德当前业务入口
+> 应用层六字段接单、进度反馈和开门协作，以及调度v2协议汇总见 [[14.3 数据中台与应用层及调度对接-当前需求]]。该摘要区分已确认需求、本地实现和现场待联调项。

@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="690" viewBox="0 0 1240 690" font-family="Noto Sans CJK SC,Microsoft YaHei,PingFang SC,sans-serif">
+<title>读 trace：把一段 NCCL activity 接回业务关键路径</title>
+<desc>关联 ID → 运行时 launch → GPU activity → 消费者；先识别边界，再解释空白与长条</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker></defs>
+<rect x="0" y="0" width="1240" height="690" rx="0" fill="#F5F4ED" stroke="none" stroke-width="1.3"/>
+<text x="48" y="47" font-size="22" fill="#2B2A26" text-anchor="start" font-weight="700">读 trace：把一段 NCCL activity 接回业务关键路径</text>
+<text x="48" y="77" font-size="14" fill="#6B675C" text-anchor="start" font-weight="400">关联 ID → 运行时 launch → GPU activity → 消费者；先识别边界，再解释空白与长条</text>
+<rect x="48" y="123" width="244" height="78" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="170" y="155.5" font-size="15" fill="#24473F" text-anchor="middle" font-weight="700">应用逻辑键</text>
+<text x="170" y="178.5" font-size="14" fill="#24473F" text-anchor="middle" font-weight="400">rank / step / collective_seq</text>
+<rect x="319" y="123" width="252" height="78" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="445" y="155.5" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="700">NVTX / 外层 API</text>
+<text x="445" y="178.5" font-size="14" fill="#2C4460" text-anchor="middle" font-weight="400">进入、返回、group 边界</text>
+<rect x="598" y="123" width="257" height="78" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="726.5" y="155.5" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="700">CUDA correlation</text>
+<text x="726.5" y="178.5" font-size="14" fill="#2C4460" text-anchor="middle" font-weight="400">进程 / context / stream</text>
+<rect x="882" y="123" width="310" height="78" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="1037" y="155.5" font-size="15" fill="#4A3F68" text-anchor="middle" font-weight="700">GPU activity → 消费者</text>
+<text x="1037" y="178.5" font-size="14" fill="#4A3F68" text-anchor="middle" font-weight="400">开始、结束、最后依赖</text>
+<line x1="296" y1="162" x2="314" y2="162" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="575" y1="162" x2="593" y2="162" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="859" y1="162" x2="877" y2="162" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="48" y="217" width="1144" height="53" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="67" y="239" font-size="14" fill="#6B4E28" text-anchor="start" font-weight="700">一对一不是前提</text>
+<text x="273" y="240" font-size="14" fill="#6B4E28" text-anchor="start" font-weight="400">group 融合 / 多 kernel / CUDA Graph replay</text>
+<text x="273" y="259" font-size="13" fill="#6B4E28" text-anchor="start" font-weight="400">允许多对多映射；不要按最近时间强行匹配</text>
+<rect x="48" y="295" width="208" height="37" rx="0" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="63" y="319" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700">第一次偏离</text>
+<rect x="256" y="295" width="398" height="37" rx="0" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="271" y="319" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700">下一项证据</text>
+<rect x="654" y="295" width="538" height="37" rx="0" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.3"/>
+<text x="669" y="319" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="700">不能立刻断言</text>
+<rect x="48" y="332" width="208" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="63" y="364" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">API 晚</text>
+<rect x="256" y="332" width="398" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="271" y="364" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">ready、队列、group、CPU 栈</text>
+<rect x="654" y="332" width="538" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="669" y="364" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">不是 GPU 带宽结论</text>
+<rect x="48" y="384" width="208" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="63" y="416" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">API 后启动晚</text>
+<rect x="256" y="384" width="398" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="271" y="416" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">生产依赖、CUDA launch、资源</text>
+<rect x="654" y="384" width="538" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="669" y="416" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">间隙不全是 launch overhead</text>
+<rect x="48" y="436" width="208" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="63" y="468" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">通信 kernel 长</text>
+<rect x="256" y="436" width="398" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="271" y="468" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">同轮各 rank、NIC、独立/联合对照</text>
+<rect x="654" y="436" width="538" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="669" y="468" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">不全是 wire time</text>
+<rect x="48" y="488" width="208" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="63" y="520" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">通信后消费晚</text>
+<rect x="256" y="488" width="398" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="271" y="520" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">其他依赖、调度、消费者 launch</text>
+<rect x="654" y="488" width="538" height="52" rx="0" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="669" y="520" font-size="14" fill="#2B2A26" text-anchor="start" font-weight="400">更快的通信未必改善 step</text>
+<rect x="48" y="561" width="1144" height="49" rx="7" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+<text x="67" y="591" font-size="15" fill="#733428" text-anchor="start" font-weight="700">两个警告</text>
+<text x="263" y="591" font-size="14" fill="#733428" text-anchor="start" font-weight="400">Kernel 可早于 launch API 返回开始</text>
+<text x="718" y="591" font-size="14" fill="#733428" text-anchor="start" font-weight="400">跨 host 裸时间戳不可直接相减</text>
+<line x1="48" y1="629" x2="1192" y2="629" stroke="#D8D5C8" stroke-width="1.5"/>
+<text x="48" y="658" font-size="13" fill="#6B675C" text-anchor="start" font-weight="400">先保存低扰动基线，再抓短窗口；API 总和、kernel 总和与端到端窗口通常不是同一个测量对象。</text>
+</svg>

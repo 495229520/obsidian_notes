@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>无重复字符的最长子串 - 滑动窗口算法演示</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes pulse-highlight {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    .animate-pop {
+      animation: pulse-highlight 0.3s ease-in-out;
+    }
+    .code-line-active {
+      background-color: rgba(59, 130, 246, 0.25) !important;
+      border-left: 3px solid #3b82f6;
+    }
+    .window-track-transition {
+      transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .pointer-transition {
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  </style>
+</head>
+<body class="bg-[var(--background,#0f172a)] text-[var(--foreground,#f8fafc)] antialiased min-h-screen p-4 md:p-6 font-sans">
+  <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <header class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-2xl p-5 shadow-lg">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">LeetCode 3</span>
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">双指针 / 滑动窗口</span>
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">哈希表 O(1) 跃迁</span>
+          </div>
+          <h1 class="text-xl md:text-2xl font-bold tracking-tight text-[var(--foreground,#f8fafc)]">
+            无重复字符的最长子串 · 算法动画
+          </h1>
+          <p class="text-xs md:text-sm text-[var(--muted-foreground,#94a3b8)] mt-1">
+            记录每个字符最近出现的下标，遇到重复字符时 <code class="text-emerald-400 font-mono">slow = max(slow, last[s[fast]] + 1)</code> 实现跨步跃迁。
+          </p>
+        </div>
+
+        <!-- Preset Buttons -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-[var(--muted-foreground,#94a3b8)]">预设用例:</span>
+          <button onclick="setPreset('abcabcbb')" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-[var(--secondary,#334155)] hover:bg-blue-600 transition-colors">abcabcbb</button>
+          <button onclick="setPreset('pwwkew')" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-[var(--secondary,#334155)] hover:bg-blue-600 transition-colors">pwwkew</button>
+          <button onclick="setPreset('bbbbb')" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-[var(--secondary,#334155)] hover:bg-blue-600 transition-colors">bbbbb</button>
+          <button onclick="setPreset('abba')" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-[var(--secondary,#334155)] hover:bg-blue-600 transition-colors border border-amber-500/40" title="检验 max(slow, ...) 关键边界">abba (陷阱例)</button>
+        </div>
+      </div>
+
+      <!-- Custom Input & Controls -->
+      <div class="mt-4 pt-4 border-t border-[var(--border,#334155)] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-1 max-w-md">
+          <input id="strInput" type="text" value="abcabcbb" maxlength="24"
+            class="flex-1 bg-[var(--background,#0f172a)] border border-[var(--border,#334155)] rounded-xl px-3 py-1.5 text-sm font-mono text-[var(--foreground,#f8fafc)] focus:outline-none focus:border-blue-500 transition-colors"
+            placeholder="输入字符串 (最多24字符)...">
+          <button onclick="applyInput()" class="px-3.5 py-1.5 text-sm font-semibold rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm">
+            加载
+          </button>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="flex items-center gap-2">
+          <button onclick="prevStep()" id="btnPrev" class="p-2 rounded-xl bg-[var(--secondary,#334155)] hover:bg-slate-600 transition disabled:opacity-40 disabled:cursor-not-allowed" title="上一步">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <button onclick="togglePlay()" id="btnPlay" class="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm flex items-center gap-1.5 transition shadow-sm">
+            <span id="playIcon">▶</span> <span id="playText">自动播放</span>
+          </button>
+          <button onclick="nextStep()" id="btnNext" class="p-2 rounded-xl bg-[var(--secondary,#334155)] hover:bg-slate-600 transition disabled:opacity-40 disabled:cursor-not-allowed" title="下一步">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="resetTimeline()" class="p-2 rounded-xl bg-[var(--secondary,#334155)] hover:bg-slate-600 transition text-xs" title="重置">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+          <div class="flex items-center gap-1.5 ml-2">
+            <span class="text-xs text-[var(--muted-foreground,#94a3b8)]">速度:</span>
+            <select id="speedSelect" onchange="changeSpeed(this.value)" class="bg-[var(--background,#0f172a)] border border-[var(--border,#334155)] rounded-lg text-xs py-1 px-1.5 text-[var(--foreground,#f8fafc)] focus:outline-none">
+              <option value="1500">0.7x</option>
+              <option value="900" selected>1.0x</option>
+              <option value="450">2.0x</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Visual Dashboard -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Left 2 Cols: Interactive String & Pointer Canvas -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- String Array & Window Canvas -->
+        <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-2xl p-5 shadow-md">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground,#94a3b8)]">字符串与滑动窗口</h2>
+            <div class="flex items-center gap-3 text-xs">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500 inline-block"></span> slow 指针</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-500/30 border border-blue-500 inline-block"></span> fast 指针</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-500/30 border border-amber-500 inline-block"></span> 当前有效窗口</span>
+            </div>
+          </div>
+
+          <!-- String Cells Container -->
+          <div class="relative overflow-x-auto py-8 px-2 flex justify-start items-center min-h-[190px]" id="stringCanvasWrapper">
+            <!-- Dynamic String Display -->
+            <div id="stringCellsContainer" class="flex gap-3 relative z-10 select-none">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- Animated Sliding Window Background Box -->
+            <div id="windowHighlightBox" class="absolute h-[68px] top-[46px] rounded-xl bg-amber-500/15 border-2 border-amber-500/60 pointer-events-none window-track-transition z-0 opacity-0 shadow-lg shadow-amber-500/10"></div>
+          </div>
+
+          <!-- Quick Metrics Ribbon -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-[var(--border,#334155)]">
+            <div class="p-3 rounded-xl bg-[var(--background,#0f172a)]/60 border border-[var(--border,#334155)]">
+              <span class="text-xs text-[var(--muted-foreground,#94a3b8)] block">慢指针 slow</span>
+              <span id="metricSlow" class="text-lg font-bold font-mono text-emerald-400">0</span>
+            </div>
+            <div class="p-3 rounded-xl bg-[var(--background,#0f172a)]/60 border border-[var(--border,#334155)]">
+              <span class="text-xs text-[var(--muted-foreground,#94a3b8)] block">快指针 fast</span>
+              <span id="metricFast" class="text-lg font-bold font-mono text-blue-400">0</span>
+            </div>
+            <div class="p-3 rounded-xl bg-[var(--background,#0f172a)]/60 border border-[var(--border,#334155)]">
+              <span class="text-xs text-[var(--muted-foreground,#94a3b8)] block">当前窗口长度</span>
+              <span id="metricCurrentLen" class="text-lg font-bold font-mono text-amber-400">0</span>
+            </div>
+            <div class="p-3 rounded-xl bg-[var(--background,#0f172a)]/60 border border-[var(--border,#334155)]">
+              <span class="text-xs text-[var(--muted-foreground,#94a3b8)] block">历史最大 max_len</span>
+              <span id="metricMaxLen" class="text-lg font-bold font-mono text-purple-400">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hash Map Display (unordered_map<char, int> last) -->
+        <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-2xl p-5 shadow-md">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground,#94a3b8)]">哈希表状态 (last)</h2>
+              <code class="text-xs text-blue-400 font-mono">unordered_map&lt;char, int&gt;</code>
+            </div>
+            <span class="text-xs text-[var(--muted-foreground,#94a3b8)]">记录字符最后出现的索引位置</span>
+          </div>
+
+          <!-- Hash Table Grid -->
+          <div id="hashMapContainer" class="flex flex-wrap gap-2.5 min-h-[52px] items-center p-3 rounded-xl bg-[var(--background,#0f172a)]/60 border border-[var(--border,#334155)]">
+            <span class="text-xs text-[var(--muted-foreground,#94a3b8)] italic">哈希表为空</span>
+          </div>
+        </div>
+
+        <!-- Step Explanation Callout -->
+        <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-2xl p-5 shadow-md">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-[var(--foreground,#f8fafc)] flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              执行详情与推演步骤
+            </h3>
+            <span id="stepCounter" class="text-xs font-mono text-[var(--muted-foreground,#94a3b8)]">第 0 / 0 步</span>
+          </div>
+          <div id="explanationText" class="p-3.5 rounded-xl bg-[var(--background,#0f172a)] border border-[var(--border,#334155)] text-sm text-[var(--foreground,#f8fafc)] leading-relaxed font-sans min-h-[70px] flex items-center">
+            点击“自动播放”或“下一步”开始算法推演。
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right 1 Col: C++ Source Code Tracker -->
+      <div class="space-y-6">
+        <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-2xl p-5 shadow-md flex flex-col h-full">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground,#94a3b8)]">C++ 执行行追踪</h2>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">C++17</span>
+          </div>
+
+          <div class="font-mono text-xs rounded-xl bg-[var(--background,#0f172a)] border border-[var(--border,#334155)] p-3 overflow-x-auto leading-6 flex-1 select-none">
+            <div id="codeLine1" class="px-2 rounded transition-colors py-0.5 text-slate-400">1: <span class="text-purple-400">unordered_map</span>&lt;<span class="text-yellow-300">char</span>, <span class="text-yellow-300">int</span>&gt; last;</div>
+            <div id="codeLine2" class="px-2 rounded transition-colors py-0.5 text-slate-400">2: <span class="text-yellow-300">int</span> slow = <span class="text-emerald-400">0</span>, max_len = <span class="text-purple-400">0</span>;</div>
+            <div id="codeLine3" class="px-2 rounded transition-colors py-0.5 text-slate-400">3: <span class="text-purple-400">for</span> (<span class="text-yellow-300">int</span> fast = <span class="text-blue-400">0</span>; fast &lt; s.size(); fast++) {</div>
+            <div id="codeLine4" class="px-2 rounded transition-colors py-0.5 text-slate-400 pl-6">4:   <span class="text-purple-400">if</span> (last.count(s[fast])) {</div>
+            <div id="codeLine5" class="px-2 rounded transition-colors py-0.5 text-slate-400 pl-10">5:     slow = max(slow, last[s[fast]] + 1);</div>
+            <div id="codeLine6" class="px-2 rounded transition-colors py-0.5 text-slate-400 pl-6">6:   }</div>
+            <div id="codeLine7" class="px-2 rounded transition-colors py-0.5 text-slate-400 pl-6">7:   last[s[fast]] = fast;</div>
+            <div id="codeLine8" class="px-2 rounded transition-colors py-0.5 text-slate-400 pl-6">8:   max_len = max(max_len, fast - slow + 1);</div>
+            <div id="codeLine9" class="px-2 rounded transition-colors py-0.5 text-slate-400">9: }</div>
+            <div id="codeLine10" class="px-2 rounded transition-colors py-0.5 text-slate-400">10: <span class="text-purple-400">return</span> max_len;</div>
+          </div>
+
+          <!-- Key Insights Card -->
+          <div class="mt-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs space-y-2">
+            <h4 class="font-semibold text-blue-400 flex items-center gap-1.5">
+              <span>💡</span> 核心算法洞察
+            </h4>
+            <ul class="space-y-1.5 text-[var(--muted-foreground,#94a3b8)] leading-relaxed">
+              <li>• <b class="text-[var(--foreground,#f8fafc)]">为什么取 max？</b> 当重复字符的上一次出现位置在 <code class="text-emerald-400 font-mono">slow</code> 左侧时（如 <code class="text-amber-400 font-mono">"abba"</code> 的第二个 a），不能倒退 <code class="text-emerald-400 font-mono">slow</code>。</li>
+              <li>• <b class="text-[var(--foreground,#f8fafc)]">O(N) 无需逐个弹出：</b> 传统双指针需要不断 <code class="font-mono">erase</code> 字符直到去重，哈希表记录下标可实现一次性 <code class="text-emerald-400 font-mono">O(1)</code> 跃迁。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    let inputStr = "abcabcbb";
+    let steps = [];
+    let currentStepIdx = 0;
+    let timer = null;
+    let stepDelay = 900;
+
+    // Build timeline simulation steps for algorithm
+    function generateTimeline(s) {
+      const generatedSteps = [];
+      const last = {};
+      let slow = 0;
+      let max_len = 0;
+
+      // Initial State
+      generatedSteps.push({
+        codeLine: 2,
+        fast: -1,
+        slow: 0,
+        max_len: 0,
+        currentLen: 0,
+        currentChar: '',
+        lastMap: {},
+        action: 'init',
+        explanation: `初始化状态：慢指针 slow = 0，最大长度 max_len = 0，哈希表 last 为空。`
+      });
+
+      for (let fast = 0; fast < s.length; fast++) {
+        const c = s[fast];
+        const isDuplicate = c in last;
+        const prevIdx = isDuplicate ? last[c] : -1;
+
+        // Step 1: Examine if duplicate
+        let nextSlow = slow;
+        let slowChanged = false;
+        let jumpExplanation = '';
+
+        if (isDuplicate) {
+          const candidate = prevIdx + 1;
+          nextSlow = Math.max(slow, candidate);
+          slowChanged = (nextSlow !== slow);
+          if (slowChanged) {
+            jumpExplanation = `字符 '${c}' 曾在索引 ${prevIdx} 出现（在当前窗口内）。slow 直接跃迁到 ${prevIdx} + 1 = ${nextSlow}。`;
+          } else {
+            jumpExplanation = `字符 '${c}' 曾在索引 ${prevIdx} 出现，但已在 slow (${slow}) 左侧被滑出窗口。根据 max(slow, last+1)，slow 保持 ${slow}。`;
+          }
+        } else {
+          jumpExplanation = `字符 '${c}' 从未出现过，无需移动 slow 指针。`;
+        }
+
+        generatedSteps.push({
+          codeLine: 4,
+          fast: fast,
+          slow: slow,
+          max_len: max_len,
+          currentLen: fast - slow + 1,
+          currentChar: c,
+          lastMap: { ...last },
+          action: 'check',
+          duplicateFound: isDuplicate,
+          prevIdx: prevIdx,
+          explanation: `fast 移至索引 ${fast} (字符 '${c}')。检查哈希表：last.count('${c}') = ${isDuplicate ? 1 : 0}。${jumpExplanation}`
+        });
+
+        if (isDuplicate) {
+          slow = nextSlow;
+          generatedSteps.push({
+            codeLine: 5,
+            fast: fast,
+            slow: slow,
+            max_len: max_len,
+            currentLen: fast - slow + 1,
+            currentChar: c,
+            lastMap: { ...last },
+            action: 'move_slow',
+            duplicateFound: true,
+            prevIdx: prevIdx,
+            slowChanged: slowChanged,
+            explanation: `执行 slow = max(slow, last['${c}'] + 1) -> slow = ${slow}。${slowChanged ? `窗口左边界更新为 ${slow}。` : `slow 保持不变。`}`
+          });
+        }
+
+        // Step 2: Update hash map
+        last[c] = fast;
+        generatedSteps.push({
+          codeLine: 7,
+          fast: fast,
+          slow: slow,
+          max_len: max_len,
+          currentLen: fast - slow + 1,
+          currentChar: c,
+          lastMap: { ...last },
+          action: 'update_map',
+          updatedChar: c,
+          updatedIdx: fast,
+          explanation: `更新哈希表：last['${c}'] = ${fast}。记录字符 '${c}' 最新出现的下标。`
+        });
+
+        // Step 3: Update max_len
+        const windowLen = fast - slow + 1;
+        const prevMax = max_len;
+        max_len = Math.max(max_len, windowLen);
+        const maxUpdated = (max_len > prevMax);
+
+        generatedSteps.push({
+          codeLine: 8,
+          fast: fast,
+          slow: slow,
+          max_len: max_len,
+          currentLen: windowLen,
+          currentChar: c,
+          lastMap: { ...last },
+          action: 'update_maxlen',
+          maxUpdated: maxUpdated,
+          subStr: s.slice(slow, fast + 1),
+          explanation: `计算当前窗口 [${slow}, ${fast}] 长度 = ${fast} - ${slow} + 1 = ${windowLen}。${maxUpdated ? `发现更长无重复子串 "${s.slice(slow, fast + 1)}"，max_len 更新为 ${max_len}！` : `当前长度未超过历史最大值 ${max_len}。`}`
+        });
+      }
+
+      // Final Step
+      generatedSteps.push({
+        codeLine: 10,
+        fast: s.length - 1,
+        slow: slow,
+        max_len: max_len,
+        currentLen: 0,
+        currentChar: '',
+        lastMap: { ...last },
+        action: 'finish',
+        explanation: `遍历结束！返回最终最长无重复子串长度 max_len = ${max_len}。`
+      });
+
+      return generatedSteps;
+    }
+
+    // Render String Grid HTML
+    function initStringGrid(s) {
+      const container = document.getElementById('stringCellsContainer');
+      container.innerHTML = '';
+
+      for (let i = 0; i < s.length; i++) {
+        const cell = document.createElement('div');
+        cell.id = `cell-${i}`;
+        cell.className = 'flex flex-col items-center gap-1.5 transition-all duration-200';
+        cell.innerHTML = `
+          <!-- Index -->
+          <span class="text-[11px] font-mono text-[var(--muted-foreground,#94a3b8)]">${i}</span>
+
+          <!-- Character Card -->
+          <div id="card-${i}" class="w-12 h-12 rounded-xl bg-[var(--card,#1e293b)] border-2 border-[var(--border,#334155)] flex items-center justify-center font-mono text-lg font-bold text-[var(--foreground,#f8fafc)] shadow-sm transition-all duration-200">
+            ${s[i]}
+          </div>
+
+          <!-- Pointer Indicators Area -->
+          <div class="h-10 flex flex-col items-center justify-start text-[10px] font-mono font-bold">
+            <span id="ptr-slow-${i}" class="text-emerald-400 opacity-0 transition-opacity flex flex-col items-center">
+              ▲<span class="text-[9px]">slow</span>
+            </span>
+            <span id="ptr-fast-${i}" class="text-blue-400 opacity-0 transition-opacity flex flex-col items-center -mt-1">
+              ▲<span class="text-[9px]">fast</span>
+            </span>
+          </div>
+        `;
+        container.appendChild(cell);
+      }
+    }
+
+    // Render Step State
+    function renderStep(idx) {
+      if (idx < 0 || idx >= steps.length) return;
+      const step = steps[idx];
+
+      // Update counters & metrics
+      document.getElementById('stepCounter').innerText = `第 ${idx + 1} / ${steps.length} 步`;
+      document.getElementById('metricSlow').innerText = step.slow;
+      document.getElementById('metricFast').innerText = step.fast >= 0 ? step.fast : '-';
+      document.getElementById('metricCurrentLen').innerText = step.currentLen;
+      document.getElementById('metricMaxLen').innerText = step.max_len;
+      document.getElementById('explanationText').innerText = step.explanation;
+
+      // Update Code Highlighting
+      for (let i = 1; i <= 10; i++) {
+        const line = document.getElementById(`codeLine${i}`);
+        if (line) {
+          if (i === step.codeLine) {
+            line.classList.add('code-line-active');
+            line.classList.remove('text-slate-400');
+            line.classList.add('text-white', 'font-semibold');
+          } else {
+            line.classList.remove('code-line-active');
+            line.classList.add('text-slate-400');
+            line.classList.remove('text-white', 'font-semibold');
+          }
+        }
+      }
+
+      // Update String Cells & Pointers
+      for (let i = 0; i < inputStr.length; i++) {
+        const card = document.getElementById(`card-${i}`);
+        const ptrSlow = document.getElementById(`ptr-slow-${i}`);
+        const ptrFast = document.getElementById(`ptr-fast-${i}`);
+
+        if (!card) continue;
+
+        // Reset styling
+        card.className = 'w-12 h-12 rounded-xl border-2 flex items-center justify-center font-mono text-lg font-bold shadow-sm transition-all duration-200 ';
+
+        // Fast pointer status
+        if (i === step.fast && step.action !== 'finish') {
+          ptrFast.style.opacity = '1';
+          card.classList.add('border-blue-500', 'bg-blue-500/20', 'text-blue-300', 'scale-105');
+        } else {
+          ptrFast.style.opacity = '0';
+        }
+
+        // Slow pointer status
+        if (i === step.slow && step.action !== 'finish') {
+          ptrSlow.style.opacity = '1';
+        } else {
+          ptrSlow.style.opacity = '0';
+        }
+
+        // Window inclusion styling
+        if (step.fast >= 0 && i >= step.slow && i <= step.fast && step.action !== 'finish') {
+          if (i !== step.fast) {
+            card.classList.add('border-amber-500/60', 'bg-amber-500/10', 'text-amber-200');
+          }
+        } else if (i < step.slow) {
+          // Out of window (left)
+          card.classList.add('border-[var(--border,#334155)]/50', 'bg-[var(--card,#1e293b)]/30', 'text-slate-500');
+        } else {
+          // Untouched
+          card.classList.add('border-[var(--border,#334155)]', 'bg-[var(--card,#1e293b)]', 'text-[var(--foreground,#f8fafc)]');
+        }
+
+        // Duplicate conflict highlight
+        if (step.action === 'check' && step.duplicateFound && i === step.prevIdx) {
+          card.classList.add('border-rose-500', 'bg-rose-500/30', 'text-rose-300', 'animate-pop');
+        }
+      }
+
+      // Update Window Highlight Box
+      const highlightBox = document.getElementById('windowHighlightBox');
+      if (step.fast >= 0 && step.slow <= step.fast && step.action !== 'finish') {
+        const slowCell = document.getElementById(`cell-${step.slow}`);
+        const fastCell = document.getElementById(`cell-${step.fast}`);
+        const container = document.getElementById('stringCellsContainer');
+        if (slowCell && fastCell && container) {
+          const leftPos = slowCell.offsetLeft + container.offsetLeft - 4;
+          const totalWidth = (fastCell.offsetLeft + fastCell.offsetWidth) - slowCell.offsetLeft + 8;
+          highlightBox.style.left = `${leftPos}px`;
+          highlightBox.style.width = `${totalWidth}px`;
+          highlightBox.style.opacity = '1';
+        }
+      } else {
+        highlightBox.style.opacity = '0';
+      }
+
+      // Update Hash Map UI
+      renderHashMap(step.lastMap, step.updatedChar, step.slow, step.fast);
+
+      // Disable/Enable buttons
+      document.getElementById('btnPrev').disabled = (idx === 0);
+      document.getElementById('btnNext').disabled = (idx === steps.length - 1);
+    }
+
+    // Render Hash Map
+    function renderHashMap(mapObj, activeChar, currentSlow, currentFast) {
+      const container = document.getElementById('hashMapContainer');
+      const keys = Object.keys(mapObj);
+
+      if (keys.length === 0) {
+        container.innerHTML = '<span class="text-xs text-[var(--muted-foreground,#94a3b8)] italic">哈希表为空</span>';
+        return;
+      }
+
+      container.innerHTML = '';
+      keys.forEach(k => {
+        const val = mapObj[k];
+        const isInsideWindow = (val >= currentSlow && val <= currentFast);
+        const isActive = (k === activeChar);
+
+        const badge = document.createElement('div');
+        badge.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all duration-200 ${
+          isActive
+            ? 'bg-blue-600/30 border-blue-400 text-blue-200 scale-105 shadow-md shadow-blue-500/20'
+            : isInsideWindow
+              ? 'bg-[var(--card,#1e293b)] border-amber-500/40 text-amber-300'
+              : 'bg-[var(--card,#1e293b)]/40 border-[var(--border,#334155)]/60 text-slate-500'
+        }`;
+
+        badge.innerHTML = `
+          <span class="font-bold text-sm ${isActive ? 'text-white' : ''}">'${k}'</span>
+          <span class="text-slate-500">→</span>
+          <span class="font-semibold px-1.5 py-0.5 rounded bg-[var(--background,#0f172a)]">${val}</span>
+        `;
+        container.appendChild(badge);
+      });
+    }
+
+    // Controls
+    function nextStep() {
+      if (currentStepIdx < steps.length - 1) {
+        currentStepIdx++;
+        renderStep(currentStepIdx);
+      } else {
+        pause();
+      }
+    }
+
+    function prevStep() {
+      if (currentStepIdx > 0) {
+        currentStepIdx--;
+        renderStep(currentStepIdx);
+      }
+    }
+
+    function resetTimeline() {
+      pause();
+      currentStepIdx = 0;
+      renderStep(0);
+    }
+
+    function play() {
+      if (currentStepIdx >= steps.length - 1) {
+        currentStepIdx = 0;
+      }
+      timer = setInterval(() => {
+        if (currentStepIdx < steps.length - 1) {
+          nextStep();
+        } else {
+          pause();
+        }
+      }, stepDelay);
+
+      document.getElementById('playIcon').innerText = '⏸';
+      document.getElementById('playText').innerText = '暂停';
+      document.getElementById('btnPlay').classList.replace('bg-blue-600', 'bg-amber-600');
+      document.getElementById('btnPlay').classList.replace('hover:bg-blue-500', 'hover:bg-amber-500');
+    }
+
+    function pause() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      document.getElementById('playIcon').innerText = '▶';
+      document.getElementById('playText').innerText = '自动播放';
+      document.getElementById('btnPlay').classList.replace('bg-amber-600', 'bg-blue-600');
+      document.getElementById('btnPlay').classList.replace('hover:bg-amber-500', 'hover:bg-blue-500');
+    }
+
+    function togglePlay() {
+      if (timer) {
+        pause();
+      } else {
+        play();
+      }
+    }
+
+    function changeSpeed(val) {
+      stepDelay = parseInt(val, 10);
+      if (timer) {
+        pause();
+        play();
+      }
+    }
+
+    function applyInput() {
+      pause();
+      const val = document.getElementById('strInput').value.trim();
+      if (!val) return;
+      inputStr = val;
+      initStringGrid(inputStr);
+      steps = generateTimeline(inputStr);
+      currentStepIdx = 0;
+      renderStep(0);
+    }
+
+    function setPreset(str) {
+      document.getElementById('strInput').value = str;
+      applyInput();
+    }
+
+    // Startup
+    window.addEventListener('DOMContentLoaded', () => {
+      initStringGrid(inputStr);
+      steps = generateTimeline(inputStr);
+      renderStep(0);
+    });
+  </script>
+</body>
+</html>

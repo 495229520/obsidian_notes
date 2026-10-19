@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LRU 缓存 (LRUCache) · 零基础秒懂级算法动画</title>
+<style>
+:root {
+  --paper: #F6F5F0;
+  --panel: #FFFFFF;
+  --ink: #2C2B28;
+  --muted: #5C5A54;
+  --faint: #8E8C84;
+  --line: #D3D0C7;
+  --grid: #E6E4DC;
+  --blue: #1660A7;
+  --bluebg: #E8F2FC;
+  --green: #0E7057;
+  --greenbg: #E2F5EF;
+  --brown: #9E5B0A;
+  --brownbg: #FBF0DD;
+  --danger: #BA3726;
+  --dangerbg: #FCE8E5;
+  --purple: #693CA0;
+  --purplebg: #F1E9FA;
+  --gray: #ECEAE3;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ease: cubic-bezier(.34, .02, .2, 1);
+  --dur: 400ms;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--paper); color: var(--ink); }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 20px 24px 36px;
+  text-wrap: pretty;
+}
+.wrap { max-width: 1220px; margin: 0 auto; }
+
+/* Header */
+header {
+  margin-bottom: 16px;
+}
+header h1 {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+header .tag {
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--brownbg);
+  color: var(--brown);
+  border: 1px solid var(--brown);
+}
+header p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* 3-Second Mental Model Card (核心直觉卡) */
+.intuition-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+@media (max-width: 900px) { .intuition-grid { grid-template-columns: 1fr; } }
+.intuition-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 2px rgba(40,35,25,.03);
+}
+.intuition-card .ic-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.intuition-card p {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.intuition-card code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--gray);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--ink);
+}
+
+/* Tabs */
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: all .15s var(--ease);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.tab:hover { border-color: var(--muted); }
+.tab .t { font-weight: 600; color: var(--ink); }
+.tab .s { font-size: 10px; color: var(--faint); font-family: var(--mono); }
+.tab.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  box-shadow: 0 2px 6px rgba(44,43,40,.15);
+}
+.tab.on .t, .tab.on .s { color: var(--paper); }
+.tab.on .s { opacity: .8; }
+
+/* Main 2-Column Layout */
+.layout {
+  display: grid;
+  grid-template-columns: 690px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1120px) { .layout { grid-template-columns: 1fr; } }
+
+/* Visual Stage */
+.viz-panel {
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(40,35,25,.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Capacity Indicator */
+.cap-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 7px;
+  background: var(--paper);
+  border: 1px solid var(--grid);
+  font-size: 12px;
+}
+.cap-banner .cap-left { display: flex; align-items: center; gap: 8px; }
+.cap-pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bluebg);
+  color: var(--blue);
+  border: 1px solid var(--blue);
+}
+.slots { display: flex; gap: 5px; }
+.cap-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  transition: all var(--dur) var(--ease);
+}
+.cap-dot.filled { background: var(--blue); border-color: var(--blue); }
+.cap-dot.danger { background: var(--danger); border-color: var(--danger); }
+
+/* Stage Wrapper */
+.stage-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-height: 290px;
+  padding-top: 4px;
+}
+.wire-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 10;
+}
+.wire-svg path.wire {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  opacity: 0.15;
+  transition: opacity .3s var(--ease), stroke-width .3s var(--ease), stroke .3s var(--ease);
+}
+.wire-svg path.wire.on-blue { opacity: 1; stroke: var(--blue); stroke-width: 2.8; }
+.wire-svg path.wire.on-green { opacity: 1; stroke: var(--green); stroke-width: 2.8; }
+.wire-svg path.wire.on-danger { opacity: 1; stroke: var(--danger); stroke-width: 2.8; }
+.wire-svg path.arrow {
+  fill: var(--line);
+  stroke: none;
+  opacity: 0.15;
+  transition: opacity .25s var(--ease), fill .25s var(--ease);
+}
+.wire-svg path.arrow.on-blue { opacity: 1; fill: var(--blue); transition-delay: 150ms; }
+.wire-svg path.arrow.on-green { opacity: 1; fill: var(--green); transition-delay: 150ms; }
+.wire-svg path.arrow.on-danger { opacity: 1; fill: var(--danger); transition-delay: 150ms; }
+.wire-svg circle.port {
+  fill: var(--panel);
+  stroke: var(--line);
+  stroke-width: 1.5;
+  transition: stroke .25s var(--ease), fill .25s var(--ease);
+}
+.wire-svg circle.port.on-blue { stroke: var(--blue); fill: var(--bluebg); }
+.wire-svg circle.port.on-green { stroke: var(--green); fill: var(--greenbg); }
+.wire-svg circle.port.on-danger { stroke: var(--danger); fill: var(--dangerbg); }
+
+/* Hash Map Visual */
+.section-header {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.hash-map-box {
+  background: var(--paper);
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  padding: 10px 12px;
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 5;
+}
+.hash-card {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  box-shadow: 0 1px 2px rgba(40,35,25,.04);
+  transition: all var(--dur) var(--ease);
+}
+.hash-card .hk { font-weight: 700; color: var(--ink); }
+.hash-card .harrow { color: var(--faint); font-size: 10px; }
+.hash-card .hit { font-size: 10px; color: var(--muted); }
+.hash-card.active-blue {
+  border-color: var(--blue);
+  background: var(--bluebg);
+  color: var(--blue);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(22,96,167,.18);
+}
+.hash-card.active-green {
+  border-color: var(--green);
+  background: var(--greenbg);
+  color: var(--green);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(14,112,87,.18);
+}
+.hash-card.active-danger {
+  border-color: var(--danger);
+  background: var(--dangerbg);
+  color: var(--danger);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(186,55,38,.18);
+}
+
+/* Doubly Linked List Visual */
+.list-box {
+  background: var(--paper);
+  border: 1px solid var(--grid);
+  border-radius: 9px;
+  padding: 12px 14px;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow-x: auto;
+  z-index: 5;
+}
+.list-track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.terminal-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 65px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--faint);
+  text-align: center;
+  user-select: none;
+}
+.terminal-label b { font-size: 10.5px; color: var(--ink); }
+.list-nodes-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.lru-node-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all var(--dur) var(--ease);
+}
+.lru-node {
+  width: 106px;
+  border-radius: 9px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  box-shadow: 0 1px 3px rgba(40,35,25,.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all var(--dur) var(--ease);
+  position: relative;
+}
+.lru-node .n-head {
+  padding: 3px 6px;
+  background: var(--gray);
+  border-bottom: 1px solid var(--grid);
+  font-family: var(--mono);
+  font-size: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.lru-node .n-head b { color: var(--ink); }
+.lru-node .n-body {
+  padding: 6px 8px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+}
+.lru-node .n-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.lru-node .n-field .lbl {
+  font-size: 8.5px;
+  color: var(--faint);
+  font-weight: 400;
+}
+.lru-node .n-field .val {
+  font-size: 14px;
+  color: var(--ink);
+}
+.lru-node.hit {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(14,112,87,.2), 0 3px 10px rgba(14,112,87,.15);
+  transform: scale(1.04);
+}
+.lru-node.hit .n-head { background: var(--greenbg); color: var(--green); }
+.lru-node.hit .n-field .val { color: var(--green); }
+
+.lru-node.insert {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(22,96,167,.2), 0 3px 10px rgba(22,96,167,.15);
+  transform: scale(1.04);
+}
+.lru-node.insert .n-head { background: var(--bluebg); color: var(--blue); }
+.lru-node.insert .n-field .val { color: var(--blue); }
+
+.lru-node.evict {
+  border-color: var(--danger);
+  background: var(--dangerbg);
+  box-shadow: 0 0 0 3px rgba(186,55,38,.25);
+  opacity: .55;
+  transform: translateY(4px);
+}
+.lru-node.evict .n-head { background: var(--danger); color: #fff; }
+.lru-node.evict .n-field .val { color: var(--danger); }
+
+.node-sep {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+  user-select: none;
+}
+.empty-hint {
+  font-size: 12px;
+  color: var(--faint);
+  font-style: italic;
+  margin: auto;
+}
+
+/* Operation Callout Ribbon */
+.op-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--paper);
+  border: 1px solid var(--grid);
+  font-size: 12.5px;
+}
+.op-callout .cmd {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.op-callout .res {
+  font-family: var(--mono);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11.5px;
+}
+.res.success { background: var(--greenbg); color: var(--green); border: 1px solid var(--green); }
+.res.miss { background: var(--dangerbg); color: var(--danger); border: 1px solid var(--danger); }
+.res.neutral { background: var(--bluebg); color: var(--blue); border: 1px solid var(--blue); }
+
+/* Right Column */
+.right-col { display: flex; flex-direction: column; gap: 14px; }
+
+/* Explanation Card */
+.desc-card {
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  border-radius: 12px;
+  padding: 16px 18px;
+  min-height: 180px;
+  box-shadow: 0 1px 3px rgba(40,35,25,.04);
+}
+.desc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.desc-head .st { font-size: 15px; font-weight: 700; }
+.chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.chip.c0 { color: var(--muted); border-color: var(--line); background: var(--gray); }
+.chip.cb { color: var(--blue); border-color: var(--blue); background: var(--bluebg); }
+.chip.cg { color: var(--green); border-color: var(--green); background: var(--greenbg); }
+.chip.cd { color: var(--danger); border-color: var(--danger); background: var(--dangerbg); }
+.chip.cp { color: var(--purple); border-color: var(--purple); background: var(--purplebg); }
+
+.act-chip {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.act-chip span.bullet { color: var(--blue); }
+.desc-body { margin-top: 8px; font-size: 13px; color: var(--muted); line-height: 1.55; }
+.desc-body b { color: var(--ink); }
+.desc-body code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--gray);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--ink);
+}
+
+/* Micro-Step Indicator (大白话阶段提示) */
+.micro-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 8px;
+  background: var(--paper);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.micro-steps .step-pill {
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gray);
+  color: var(--ink);
+}
+.micro-steps .step-pill.active {
+  background: var(--blue);
+  color: #fff;
+}
+
+/* Code Panel (Zero Scrolling, Sentinel Highlighter) */
+.code-card {
+  background: #23221F;
+  border-radius: 10px;
+  padding: 10px 0;
+  box-shadow: 0 2px 8px rgba(35,34,31,.2);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.52;
+  color: #D4D1C7;
+}
+.code-header {
+  padding: 0 12px 6px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  font-size: 10.5px;
+  color: #8A8679;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.code-lines { display: flex; flex-direction: column; padding-top: 4px; }
+.cl {
+  padding: 2px 12px;
+  transition: background .18s var(--ease), color .18s var(--ease);
+  white-space: pre;
+}
+.cl[class*="hl-"] { color: #F7F5EC; font-weight: 600; }
+.cl[class*="hl-"] .cmt { color: #CCC8BA; }
+.cl.hl-blue { background: rgba(45, 115, 195, .55); box-shadow: inset 4px 0 0 #7FB1E8; }
+.cl.hl-green { background: rgba(25, 135, 95, .55); box-shadow: inset 4px 0 0 #68E2B2; }
+.cl.hl-danger { background: rgba(185, 55, 40, .55); box-shadow: inset 4px 0 0 #F89B9B; }
+.cl .cmt { color: #7F7B70; }
+.cl .kw { color: #E5A952; }
+.cl .fn { color: #64AEE5; }
+.cl .num { color: #A1D4A3; }
+
+/* Interactive Try Box (自由交互体验) */
+.try-box {
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+}
+.try-box h4 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.try-inputs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.try-input {
+  width: 54px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+.try-btn {
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all .15s var(--ease);
+}
+.try-btn.btn-get {
+  background: var(--greenbg);
+  color: var(--green);
+  border-color: var(--green);
+}
+.try-btn.btn-get:hover { background: var(--green); color: #fff; }
+.try-btn.btn-put {
+  background: var(--bluebg);
+  color: var(--blue);
+  border-color: var(--blue);
+}
+.try-btn.btn-put:hover { background: var(--blue); color: #fff; }
+
+/* Controls */
+.controls {
+  margin-top: 18px;
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(40,35,25,.03);
+}
+.btn {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 13px;
+  cursor: pointer;
+  transition: background .15s var(--ease), transform .1s var(--ease);
+}
+.btn:hover:not(:disabled) { background: var(--gray); border-color: var(--muted); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); min-width: 82px; }
+.dots { display: flex; gap: 5px; margin: 0 auto; flex-wrap: wrap; }
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: all .2s var(--ease);
+}
+.dot:hover { border-color: var(--muted); transform: scale(1.2); }
+.dot.done { background: var(--line); border-color: var(--line); }
+.dot.now { background: var(--ink); border-color: var(--ink); transform: scale(1.3); }
+.readout { font-family: var(--mono); font-size: 11.5px; color: var(--muted); min-width: 48px; text-align: center; }
+.speed-select {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>
+      LRU 缓存 (LRUCache) · 算法与结构可视化
+      <span class="tag">LeetCode 146</span>
+    </h1>
+    <p>最近最少使用淘汰算法 · 用「双向链表」记录排队次序，用「哈希表」实现 O(1) 秒级定位。</p>
+  </header>
+
+  <!-- 3-Second Mental Model -->
+  <div class="intuition-grid">
+    <div class="intuition-card">
+      <div class="ic-title" style="color:var(--blue);">
+        <span>① 双向链表 cache</span>
+      </div>
+      <p>负责<b>排队计时</b>。最常用的放最左边（表头 <code>MRU</code>），最久没用的被挤到最右边（表尾 <code>LRU</code>）。超容时直接扔掉表尾。</p>
+    </div>
+    <div class="intuition-card">
+      <div class="ic-title" style="color:var(--green);">
+        <span>② 哈希表 hash</span>
+      </div>
+      <p>负责<b>瞬移定位</b>。单纯链表找数需要遍历 $O(N)$，哈希表存 <code>key → 节点迭代器</code>，直接连线直达节点，实现 $O(1)$ 查找。</p>
+    </div>
+    <div class="intuition-card">
+      <div class="ic-title" style="color:var(--brown);">
+        <span>③ pair&lt;key, value&gt;</span>
+      </div>
+      <p>为什么链表节点还要存 key？淘汰表尾时需要执行 <code>hash.erase(old_key)</code>，节点必须记住自己的 key 才能反向清理哈希表！</p>
+    </div>
+  </div>
+
+  <!-- Scenario Tabs -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- Main Layout -->
+  <div class="layout">
+
+    <!-- Left Column: Visual Stage -->
+    <section class="viz-panel" id="vizPanel">
+
+      <!-- Capacity Ribbon -->
+      <div class="cap-banner">
+        <div class="cap-left">
+          <span>容量状态：</span>
+          <span class="cap-pill" id="capPill">capacity = 2</span>
+          <span style="color:var(--muted);font-size:11.5px;" id="sizeReadout">当前存储：0 个</span>
+        </div>
+        <div class="slots" id="capDots"></div>
+      </div>
+
+      <!-- Stage with SVG Wires -->
+      <div class="stage-wrap" id="stageWrap">
+        <svg class="wire-svg" id="wireSvg"></svg>
+
+        <!-- 1. Hash Map Container -->
+        <div>
+          <div class="section-header">
+            <span>哈希表 · unordered_map&lt;int, list::iterator&gt; hash</span>
+            <span style="font-size:10px;color:var(--faint);">key 映射到链表节点指针</span>
+          </div>
+          <div class="hash-map-box" id="hashMapContainer">
+            <span class="empty-hint" id="hashEmptyHint">哈希表为空</span>
+          </div>
+        </div>
+
+        <!-- 2. Doubly Linked List Container -->
+        <div>
+          <div class="section-header">
+            <span>双向链表 · list&lt;pair&lt;int, int&gt;&gt; cache</span>
+            <span style="font-size:10px;color:var(--faint);">左侧最常访问 ⇄ 右侧最久未用</span>
+          </div>
+          <div class="list-box">
+            <div class="list-track">
+              <div class="terminal-label">
+                <b>[ MRU ]</b>
+                <span>最常使用</span>
+                <span style="font-size:8.5px;color:var(--blue);">front()</span>
+              </div>
+              <div class="list-nodes-container" id="listContainer">
+                <span class="empty-hint" id="listEmptyHint">链表为空</span>
+              </div>
+              <div class="terminal-label">
+                <b>[ LRU ]</b>
+                <span>最久未用</span>
+                <span style="font-size:8.5px;color:var(--danger);">back()</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Operation Callout -->
+      <div class="op-callout">
+        <div>
+          <span style="color:var(--faint);font-size:11px;font-family:var(--mono);margin-right:4px;">当前调用:</span>
+          <span class="cmd" id="cmdText">LRUCache cache(2);</span>
+        </div>
+        <span class="res neutral" id="resBadge">初始化</span>
+      </div>
+
+    </section>
+
+    <!-- Right Column: Explanations & Code -->
+    <section class="right-col">
+
+      <!-- Step Description Card -->
+      <div class="desc-card">
+        <div class="desc-head">
+          <span class="st" id="stepTitle">步骤 0 · 初始化</span>
+          <span class="chip c0" id="stepChip">Init</span>
+        </div>
+
+        <!-- Action chip -->
+        <div class="act-chip" id="stepAct">
+          <span class="bullet">▸</span>
+          <span id="actText">创建容量为 2 的 LRUCache 对象</span>
+        </div>
+
+        <!-- Step Phase Badge -->
+        <div class="micro-steps" id="microStepsBox">
+          <span class="step-pill active" id="phase1">1. 定位/检查</span>
+          <span>→</span>
+          <span class="step-pill" id="phase2">2. 调整顺序</span>
+          <span>→</span>
+          <span class="step-pill" id="phase3">3. 同步索引/容量</span>
+        </div>
+
+        <div class="desc-body" id="stepDesc">
+          初始化 LRU 缓存。双向链表为空，哈希表为空，最大容量上限为 2。
+        </div>
+      </div>
+
+      <!-- Compliant Code Panel -->
+      <div class="code-card">
+        <div class="code-header">
+          <span id="codeFuncTitle">LRUCache 核心执行跟踪</span>
+          <span style="color:#7A776B;">C++17 源码对齐</span>
+        </div>
+        <div class="code-lines" id="codeLines"></div>
+      </div>
+
+      <!-- Free Play Interactive Sandbox -->
+      <div class="try-box">
+        <h4>⚡ 动手试一试（直接点击触发当前缓存动作）</h4>
+        <div class="try-inputs">
+          <button class="try-btn btn-get" onclick="userGet(1)">get(1)</button>
+          <button class="try-btn btn-get" onclick="userGet(2)">get(2)</button>
+          <button class="try-btn btn-get" onclick="userGet(3)">get(3)</button>
+          <button class="try-btn btn-put" onclick="userPut(1, 10)">put(1, 10)</button>
+          <button class="try-btn btn-put" onclick="userPut(2, 20)">put(2, 20)</button>
+          <button class="try-btn btn-put" onclick="userPut(3, 30)">put(3, 30)</button>
+          <button class="try-btn btn-put" onclick="userPut(4, 40)">put(4, 40)</button>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <!-- Playback Controls -->
+  <div class="controls">
+    <button class="btn" id="btnPrev">‹ 上一步</button>
+    <button class="btn primary" id="btnPlay">▶ 播放</button>
+    <button class="btn" id="btnNext">下一步 ›</button>
+    <div class="dots" id="dots"></div>
+    <span class="readout" id="readout">0 / 0</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+      <span style="font-size:11.5px;color:var(--muted);">速度:</span>
+      <select class="speed-select" id="speedSelect">
+        <option value="1800">0.6x (超慢)</option>
+        <option value="1100" selected>1.0x (正常)</option>
+        <option value="650">1.8x (快进)</option>
+      </select>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/**
+ * LRU Cache Visualizer Engine
+ * Enhanced based on claude-design craft rules and humanizer-zh clarity guidelines.
+ */
+
+const CODE_SNIPPETS = {
+  get: [
+    { line: 1, text: "int get(int key) {", indent: 0 },
+    { line: 2, text: "if (!hash.count(key)) return -1; // 1. 查哈希", indent: 2 },
+    { line: 3, text: "auto it = hash[key]; int val = it->second; // 2. 读值", indent: 2 },
+    { line: 4, text: "cache.erase(it); // 3. 移出旧位置", indent: 2 },
+    { line: 5, text: "cache.push_front({key, val}); // 4. 插入头部", indent: 2 },
+    { line: 6, text: "hash[key] = cache.begin(); // 5. 更新迭代器", indent: 2 },
+    { line: 7, text: "return val; // 6. 返回结果", indent: 2 },
+    { line: 8, text: "}", indent: 0 }
+  ],
+  put: [
+    { line: 1, text: "void put(int key, int value) {", indent: 0 },
+    { line: 2, text: "if (hash.count(key)) cache.erase(hash[key]); // 1. 删旧", indent: 2 },
+    { line: 3, text: "cache.push_front({key, value}); // 2. 插到最前", indent: 2 },
+    { line: 4, text: "hash[key] = cache.begin(); // 3. 记录新位置", indent: 2 },
+    { line: 5, text: "if (cache.size() > capacity) { // 4. 超容判断", indent: 2 },
+    { line: 6, text: "    int old_key = cache.back().first; // 5. 抓尾部淘汰者", indent: 2 },
+    { line: 7, text: "    hash.erase(old_key); cache.pop_back(); // 6. 双向删除", indent: 2 },
+    { line: 8, text: "}", indent: 2 },
+    { line: 9, text: "}", indent: 0 }
+  ],
+  init: [
+    { line: 1, text: "class LRUCache {", indent: 0 },
+    { line: 2, text: "    list<pair<int, int>> cache; // 双向链表记录时序", indent: 0 },
+    { line: 3, text: "    unordered_map<int, list<...>::iterator> hash; // 哈希表存指针", indent: 0 },
+    { line: 4, text: "    int capacity;", indent: 0 },
+    { line: 5, text: "public:", indent: 0 },
+    { line: 6, text: "    LRUCache(int cap) : capacity(cap) {}", indent: 0 },
+    { line: 7, text: "};", indent: 0 }
+  ]
+};
+
+const SCENARIOS = [
+  {
+    id: "lc146",
+    title: "1. 官方经典示例 (带微步推演)",
+    sub: "put(1,1) put(2,2) get(1) put(3,3)...",
+    capacity: 2,
+    steps: [
+      {
+        title: "第 1 步 · 初始化缓存容量",
+        chip: "初始化", chipC: "c0",
+        cmd: "LRUCache cache(2);", res: "capacity = 2", resType: "neutral",
+        act: "建立空缓存：双向链表与哈希表初始化完成",
+        phase: 1,
+        desc: "设定缓存最大容量为 2。此时链表和哈希表均为空。",
+        codeMode: "init", hlLine: 6, hlColor: "hl-blue",
+        items: [], activeKey: null, activeType: null
+      },
+      {
+        title: "第 2 步 · 存入键值对 put(1, 1)",
+        chip: "put 插入", chipC: "cb",
+        cmd: "cache.put(1, 1);", res: "新增 {1, 1}", resType: "neutral",
+        act: "键 1 不存在：在链表表头插入节点 {1, 1}，哈希表建立指向它的索引卡",
+        phase: 2,
+        desc: "① <code>hash.count(1)</code> 检查为不存在；<br>② 执行 <code>cache.push_front({1, 1})</code> 放入表头；<br>③ <code>hash[1] = cache.begin()</code> 记录该节点指针。当前元素 1/2，未超容量。",
+        codeMode: "put", hlLine: 3, hlColor: "hl-blue",
+        items: [{k:1, v:1}], activeKey: 1, activeType: "insert"
+      },
+      {
+        title: "第 3 步 · 存入键值对 put(2, 2)",
+        chip: "put 插入", chipC: "cb",
+        cmd: "cache.put(2, 2);", res: "缓存已满 (2/2)", resType: "neutral",
+        act: "键 2 不存在：头插 {2, 2}，旧节点 {1, 1} 被自动挤向右侧",
+        phase: 2,
+        desc: "① 头插新节点 <code>{2, 2}</code>；<br>② 当前链表为 <code>[2] ⇄ [1]</code>；<br>③ 节点 2 是最新使用的（MRU），节点 1 变成了最久未使用的（LRU）；<br>④ 缓存占用 2/2，刚好达到容量上限。",
+        codeMode: "put", hlLine: 3, hlColor: "hl-blue",
+        items: [{k:2, v:2}, {k:1, v:1}], activeKey: 2, activeType: "insert"
+      },
+      {
+        title: "第 4 步 · 读取 get(1) 命中并刷新热度",
+        chip: "get 命中", chipC: "cg",
+        cmd: "cache.get(1);", res: "返回 1 (命中)", resType: "success",
+        act: "哈希直达节点 1：取出值 1，并将节点从队伍后方抽出来插到最前面！",
+        phase: 2,
+        desc: "① 哈希表查到键 1，取出 <code>val = 1</code>；<br>② <b>为什么不能只读不挪？</b> 如果不挪，键 1 就会一直呆在尾部被冤枉淘汰！<br>③ 执行 <code>cache.erase(it)</code> 拔出节点，再 <code>cache.push_front()</code> 拍到表头；<br>④ 链表顺序反转为 <code>[1] ⇄ [2]</code>，节点 1 重回最热地位！",
+        codeMode: "get", hlLine: 5, hlColor: "hl-green",
+        items: [{k:1, v:1}, {k:2, v:2}], activeKey: 1, activeType: "hit"
+      },
+      {
+        title: "第 5 步 · 写入 put(3, 3) 触发容量淘汰！",
+        chip: "put 淘汰", chipC: "cd",
+        cmd: "cache.put(3, 3);", res: "淘汰旧键 2", resType: "miss",
+        act: "头插 {3, 3} 导致容量超限(3 > 2)：锁定最右侧尾部节点 {2, 2} 彻底驱逐！",
+        phase: 3,
+        desc: "① 表头插入 <code>{3, 3}</code>，此时容量超限（3 个节点）；<br>② 读取尾部 <code>cache.back().first</code> 抓出倒霉蛋的键 <code>old_key = 2</code>；<br>③ 执行 <code>hash.erase(2)</code> 撕毁哈希卡片，执行 <code>cache.pop_back()</code> 踢出链表；<br>④ <b>这就是 pair 存 key 的用处</b>：没有 key 就无法通知哈希表同步删除！",
+        codeMode: "put", hlLine: 7, hlColor: "hl-danger",
+        items: [{k:3, v:3}, {k:1, v:1}], activeKey: 3, activeType: "insert"
+      },
+      {
+        title: "第 6 步 · 查询 get(2) 未命中",
+        chip: "get 未命中", chipC: "cd",
+        cmd: "cache.get(2);", res: "返回 -1 (未找到)", resType: "miss",
+        act: "查询 key 2：哈希表中已无此键，直接返回 -1",
+        phase: 1,
+        desc: "<code>hash.count(2) == 0</code>。因为键 2 已经在上一步被淘汰出局，链表和哈希表均无该记录，直接返回 -1，链表无变化。",
+        codeMode: "get", hlLine: 2, hlColor: "hl-danger",
+        items: [{k:3, v:3}, {k:1, v:1}], activeKey: null, activeType: null
+      },
+      {
+        title: "第 7 步 · 写入 put(4, 4) 再次淘汰！",
+        chip: "put 淘汰", chipC: "cd",
+        cmd: "cache.put(4, 4);", res: "淘汰旧键 1", resType: "miss",
+        act: "头插 {4, 4}：当前尾部是第 4 步用过的 {1, 1}，淘汰键 1！",
+        phase: 3,
+        desc: "头插 <code>{4, 4}</code>，大小再次为 3。尾部此时是节点 1，调用 <code>hash.erase(1)</code> 与 <code>pop_back()</code> 抹除。链表现在变成 <code>[4] ⇄ [3]</code>。",
+        codeMode: "put", hlLine: 7, hlColor: "hl-danger",
+        items: [{k:4, v:4}, {k:3, v:3}], activeKey: 4, activeType: "insert"
+      },
+      {
+        title: "第 8 步 · 查询 get(1) 验证淘汰",
+        chip: "get 未命中", chipC: "cd",
+        cmd: "cache.get(1);", res: "返回 -1", resType: "miss",
+        act: "键 1 刚被淘汰，查询返回 -1",
+        phase: 1,
+        desc: "<code>hash.count(1)</code> 为假，直接返回 -1。",
+        codeMode: "get", hlLine: 2, hlColor: "hl-danger",
+        items: [{k:4, v:4}, {k:3, v:3}], activeKey: null, activeType: null
+      },
+      {
+        title: "第 9 步 · 查询 get(3) 命中",
+        chip: "get 命中", chipC: "cg",
+        cmd: "cache.get(3);", res: "返回 3", resType: "success",
+        act: "查询 key 3 命中：返回 3 并将 {3, 3} 提至表头",
+        phase: 2,
+        desc: "节点 <code>{3, 3}</code> 挪到最前，链表顺序变为 <code>[3] ⇄ [4]</code>。",
+        codeMode: "get", hlLine: 5, hlColor: "hl-green",
+        items: [{k:3, v:3}, {k:4, v:4}], activeKey: 3, activeType: "hit"
+      },
+      {
+        title: "第 10 步 · 查询 get(4) 命中",
+        chip: "get 命中", chipC: "cg",
+        cmd: "cache.get(4);", res: "返回 4", resType: "success",
+        act: "查询 key 4 命中：返回 4 并将 {4, 4} 提至表头",
+        phase: 2,
+        desc: "节点 <code>{4, 4}</code> 再次挪到表头，链表顺序重回 <code>[4] ⇄ [3]</code>。全流程推演完毕！",
+        codeMode: "get", hlLine: 5, hlColor: "hl-green",
+        items: [{k:4, v:4}, {k:3, v:3}], activeKey: 4, activeType: "hit"
+      }
+    ]
+  },
+  {
+    id: "update",
+    title: "2. 已存在键覆盖更新 (put 改写旧值)",
+    sub: "put(1,10) put(2,20) put(1,99) 不淘汰",
+    capacity: 2,
+    steps: [
+      {
+        title: "初始状态",
+        chip: "初始化", chipC: "c0",
+        cmd: "LRUCache cache(2);", res: "capacity = 2", resType: "neutral",
+        act: "初始化容量为 2 的缓存，演示更新已存在 key",
+        phase: 1,
+        desc: "重点演示代码中的 <code>if (hash.count(key)) cache.erase(...)</code> 是如何工作的。",
+        codeMode: "init", hlLine: 6, hlColor: "hl-blue",
+        items: [], activeKey: null, activeType: null
+      },
+      {
+        title: "写入 put(1, 10)",
+        chip: "put 插入", chipC: "cb",
+        cmd: "cache.put(1, 10);", res: "插入 {1, 10}", resType: "neutral",
+        act: "正常头插 {1, 10}",
+        phase: 2,
+        desc: "键 1 记录到哈希表。",
+        codeMode: "put", hlLine: 3, hlColor: "hl-blue",
+        items: [{k:1, v:10}], activeKey: 1, activeType: "insert"
+      },
+      {
+        title: "写入 put(2, 20)",
+        chip: "put 插入", chipC: "cb",
+        cmd: "cache.put(2, 20);", res: "插入 {2, 20}", resType: "neutral",
+        act: "头插 {2, 20}，链表当前为 [2] ⇄ [1]",
+        phase: 2,
+        desc: "当前尾部是键 1，头部是键 2。",
+        codeMode: "put", hlLine: 3, hlColor: "hl-blue",
+        items: [{k:2, v:20}, {k:1, v:10}], activeKey: 2, activeType: "insert"
+      },
+      {
+        title: "关键步 · put(1, 99) 覆盖旧值",
+        chip: "覆盖更新", chipC: "cp",
+        cmd: "cache.put(1, 99);", res: "值更新为 99", resType: "success",
+        act: "发现 key 1 已存在：先删除尾部旧节点，再向头部插入 {1, 99}！",
+        phase: 2,
+        desc: "① <code>hash.count(1) == true</code>，命中分支 <code>cache.erase(hash[key])</code> 先删掉旧的；<br>② 再头插新值 <code>{1, 99}</code>；<br>③ <b>因为一删一插，元素总数仍是 2</b>，所以绝不会误触发超容淘汰！",
+        codeMode: "put", hlLine: 2, hlColor: "hl-green",
+        items: [{k:1, v:99}, {k:2, v:20}], activeKey: 1, activeType: "hit"
+      },
+      {
+        title: "验证 get(1)",
+        chip: "验证", chipC: "cg",
+        cmd: "cache.get(1);", res: "返回 99", resType: "success",
+        act: "查询 key 1 成功返回最新值 99",
+        phase: 2,
+        desc: "验证成功！此时键 1 是最新使用的，尾部依然是安全的键 2。",
+        codeMode: "get", hlLine: 7, hlColor: "hl-green",
+        items: [{k:1, v:99}, {k:2, v:20}], activeKey: 1, activeType: "hit"
+      }
+    ]
+  },
+  {
+    id: "cap1",
+    title: "3. 极限边界 (capacity = 1)",
+    sub: "put(1,10) put(2,20) 瞬间驱逐",
+    capacity: 1,
+    steps: [
+      {
+        title: "初始化 capacity = 1",
+        chip: "Init", chipC: "c0",
+        cmd: "LRUCache cache(1);", res: "capacity = 1", resType: "neutral",
+        act: "极限测试：容量仅为 1 的迷你缓存",
+        phase: 1,
+        desc: "当容量只有 1 时，只要有新键加入，原有唯一的旧键必定被立即赶走。",
+        codeMode: "init", hlLine: 6, hlColor: "hl-blue",
+        items: [], activeKey: null, activeType: null
+      },
+      {
+        title: "写入 put(1, 100)",
+        chip: "put 插入", chipC: "cb",
+        cmd: "cache.put(1, 100);", res: "满容 (1/1)", resType: "neutral",
+        act: "插入 {1, 100}，独自占满全部容量",
+        phase: 2,
+        desc: "链表中只有单个节点，头尾都是它自己。",
+        codeMode: "put", hlLine: 3, hlColor: "hl-blue",
+        items: [{k:1, v:100}], activeKey: 1, activeType: "insert"
+      },
+      {
+        title: "写入 put(2, 200) 瞬时淘汰旧键 1",
+        chip: "put 淘汰", chipC: "cd",
+        cmd: "cache.put(2, 200);", res: "淘汰旧键 1", resType: "miss",
+        act: "头插 2 导致容量 2 > 1：尾部节点 1 瞬间被驱逐！",
+        phase: 3,
+        desc: "超容淘汰生效，节点 1 彻底离开，缓存内只剩下最新的 2。",
+        codeMode: "put", hlLine: 7, hlColor: "hl-danger",
+        items: [{k:2, v:200}], activeKey: 2, activeType: "insert"
+      },
+      {
+        title: "查询 get(1) 确认离开",
+        chip: "get 未命中", chipC: "cd",
+        cmd: "cache.get(1);", res: "返回 -1", resType: "miss",
+        act: "1 已不在缓存中，成功返回 -1",
+        phase: 1,
+        desc: "单节点容量边界逻辑验证通过。",
+        codeMode: "get", hlLine: 2, hlColor: "hl-danger",
+        items: [{k:2, v:200}], activeKey: null, activeType: null
+      }
+    ]
+  }
+];
+
+let curSceneIdx = 0;
+let curStepIdx = 0;
+let playTimer = null;
+let playDelay = 1100;
+
+// Interactive Sandbox state
+let sandboxItems = [{k:1, v:10}, {k:2, v:20}];
+let sandboxCap = 2;
+
+function highlightCpp(code) {
+  const m = code.match(/^(.*?)(\/\/.*)?$/);
+  let c = m[1]; const cmt = m[2] || '';
+  c = c
+    .replace(/\b(class|public|int|void|auto|return|if)\b/g, '<span class="kw">$1</span>')
+    .replace(/\b(count|erase|push_front|pop_back|begin|back)\b/g, '<span class="fn">$1</span>')
+    .replace(/\b(-?\d+)\b/g, '<span class="num">$1</span>');
+  return c + (cmt ? '<span class="cmt">' + cmt + '</span>' : '');
+}
+
+function buildCodePanel(mode) {
+  const container = document.getElementById('codeLines');
+  container.innerHTML = '';
+  const lines = CODE_SNIPPETS[mode] || CODE_SNIPPETS.init;
+  lines.forEach((l, idx) => {
+    const row = document.createElement('div');
+    row.id = `code-line-${idx + 1}`;
+    row.className = 'cl';
+    row.innerHTML = highlightCpp(l.text);
+    container.appendChild(row);
+  });
+}
+
+function highlightCodeLine(lineNum, colorCls) {
+  document.querySelectorAll('.cl').forEach(el => el.className = 'cl');
+  if (lineNum > 0) {
+    const target = document.getElementById(`code-line-${lineNum}`);
+    if (target) target.className = `cl ${colorCls || 'hl-blue'}`;
+  }
+}
+
+function initTabs() {
+  const container = document.getElementById('tabs');
+  container.innerHTML = '';
+  SCENARIOS.forEach((sc, idx) => {
+    const btn = document.createElement('button');
+    btn.className = `tab ${idx === curSceneIdx ? 'on' : ''}`;
+    btn.innerHTML = `<span class="t">${sc.title}</span><span class="s">${sc.sub}</span>`;
+    btn.onclick = () => switchScene(idx);
+    container.appendChild(btn);
+  });
+}
+
+function switchScene(idx) {
+  pause();
+  curSceneIdx = idx;
+  curStepIdx = 0;
+  initTabs();
+  initDots();
+  const sc = SCENARIOS[curSceneIdx];
+  document.getElementById('capPill').innerText = `capacity = ${sc.capacity}`;
+  const dotsBox = document.getElementById('capDots');
+  dotsBox.innerHTML = '';
+  for (let i = 0; i < sc.capacity; i++) {
+    const d = document.createElement('div');
+    d.id = `cdot-${i}`;
+    d.className = 'cap-dot';
+    dotsBox.appendChild(d);
+  }
+  buildCodePanel(sc.steps[0].codeMode);
+  renderStep(0);
+}
+
+function initDots() {
+  const container = document.getElementById('dots');
+  container.innerHTML = '';
+  const steps = SCENARIOS[curSceneIdx].steps;
+  steps.forEach((_, idx) => {
+    const dot = document.createElement('button');
+    dot.className = 'dot';
+    dot.onclick = () => jumpStep(idx);
+    container.appendChild(dot);
+  });
+}
+
+function mutateStage(step, sc) {
+  const hashBox = document.getElementById('hashMapContainer');
+  const listBox = document.getElementById('listContainer');
+  const hashEmpty = document.getElementById('hashEmptyHint');
+  const listEmpty = document.getElementById('listEmptyHint');
+  const items = step.items || [];
+
+  // 1. Capacity dots
+  for (let i = 0; i < sc.capacity; i++) {
+    const d = document.getElementById(`cdot-${i}`);
+    if (d) {
+      if (i < items.length) {
+        d.className = (items.length >= sc.capacity) ? 'cap-dot danger' : 'cap-dot filled';
+      } else {
+        d.className = 'cap-dot';
+      }
+    }
+  }
+  document.getElementById('sizeReadout').innerText = `当前存储：${items.length} / ${sc.capacity} 个`;
+
+  // 2. Hash Map Cards
+  if (items.length === 0) {
+    hashEmpty.style.display = 'block';
+    hashBox.querySelectorAll('.hash-card').forEach(el => el.remove());
+  } else {
+    hashEmpty.style.display = 'none';
+    const activeKeys = new Set(items.map(it => it.k));
+    hashBox.querySelectorAll('.hash-card').forEach(el => {
+      if (!activeKeys.has(parseInt(el.dataset.key, 10))) el.remove();
+    });
+
+    items.forEach(it => {
+      let card = document.getElementById(`hcard-${it.k}`);
+      if (!card) {
+        card = document.createElement('div');
+        card.id = `hcard-${it.k}`;
+        card.dataset.key = it.k;
+        card.className = 'hash-card';
+        card.innerHTML = `<span class="hk">Key: ${it.k}</span><span class="harrow">→</span><span class="hit">指针it</span>`;
+        hashBox.appendChild(card);
+      }
+      card.className = 'hash-card';
+      if (it.k === step.activeKey) {
+        if (step.activeType === 'hit') card.classList.add('active-green');
+        else if (step.activeType === 'danger') card.classList.add('active-danger');
+        else card.classList.add('active-blue');
+      }
+    });
+  }
+
+  // 3. Doubly Linked List Nodes
+  if (items.length === 0) {
+    listEmpty.style.display = 'block';
+    listBox.querySelectorAll('.lru-node-wrap').forEach(el => el.remove());
+  } else {
+    listEmpty.style.display = 'none';
+    const activeKeys = new Set(items.map(it => it.k));
+    listBox.querySelectorAll('.lru-node-wrap').forEach(el => {
+      if (!activeKeys.has(parseInt(el.dataset.key, 10))) el.remove();
+    });
+
+    items.forEach((it, idx) => {
+      let wrap = document.getElementById(`nwrap-${it.k}`);
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.id = `nwrap-${it.k}`;
+        wrap.dataset.key = it.k;
+        wrap.className = 'lru-node-wrap';
+        wrap.innerHTML = `
+          <div class="lru-node" id="node-${it.k}">
+            <div class="n-head">
+              <span>节点</span>
+              <b>#${it.k}</b>
+            </div>
+            <div class="n-body">
+              <div class="n-field">
+                <span class="lbl">first(key)</span>
+                <span class="val">${it.k}</span>
+              </div>
+              <div class="n-field">
+                <span class="lbl">second(val)</span>
+                <span class="val" id="nval-${it.k}">${it.v}</span>
+              </div>
+            </div>
+          </div>
+          ${idx < items.length - 1 ? '<span class="node-sep">⇄</span>' : ''}
+        `;
+        listBox.appendChild(wrap);
+      } else {
+        document.getElementById(`nval-${it.k}`).innerText = it.v;
+        const sep = wrap.querySelector('.node-sep');
+        if (idx === items.length - 1 && sep) sep.remove();
+        else if (idx < items.length - 1 && !sep) {
+          const s = document.createElement('span');
+          s.className = 'node-sep';
+          s.innerText = '⇄';
+          wrap.appendChild(s);
+        }
+        listBox.appendChild(wrap);
+      }
+
+      const node = document.getElementById(`node-${it.k}`);
+      node.className = 'lru-node';
+      if (it.k === step.activeKey) {
+        if (step.activeType === 'hit') node.classList.add('hit');
+        else if (step.activeType === 'insert') node.classList.add('insert');
+      }
+    });
+  }
+
+  // 4. Update SVG Connectors
+  requestAnimationFrame(() => updateSvgConnectors(items, step.activeKey, step.activeType));
+}
+
+function updateSvgConnectors(items, activeKey, activeType) {
+  const svg = document.getElementById('wireSvg');
+  const stage = document.getElementById('stageWrap');
+  const stageRect = stage.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${stageRect.width} ${stageRect.height}`);
+
+  const activeKeys = new Set(items.map(it => it.k));
+  svg.querySelectorAll('.wire-group').forEach(g => {
+    if (!activeKeys.has(parseInt(g.dataset.key, 10))) g.remove();
+  });
+
+  items.forEach(it => {
+    const hCard = document.getElementById(`hcard-${it.k}`);
+    const lNode = document.getElementById(`node-${it.k}`);
+    if (!hCard || !lNode) return;
+
+    const hRect = hCard.getBoundingClientRect();
+    const lRect = lNode.getBoundingClientRect();
+
+    const x1 = (hRect.left + hRect.right) / 2 - stageRect.left;
+    const y1 = hRect.bottom - stageRect.top;
+    const x2 = (lRect.left + lRect.right) / 2 - stageRect.left;
+    const y2 = lRect.top - stageRect.top;
+
+    let group = document.getElementById(`wgroup-${it.k}`);
+    if (!group) {
+      group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      group.id = `wgroup-${it.k}`;
+      group.dataset.key = it.k;
+      group.className.baseVal = 'wire-group';
+      group.innerHTML = `
+        <circle class="port" id="port-${it.k}" r="3" />
+        <path class="wire" id="wire-${it.k}" />
+        <path class="arrow" id="arrow-${it.k}" />
+      `;
+      svg.appendChild(group);
+    }
+
+    const dy = (y2 - y1) * 0.55;
+    const pathD = `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2 - 6}`;
+    const aw = 7, ah = 4;
+    const arrowD = `M ${x2} ${y2} L ${x2 - ah} ${y2 - aw} L ${x2 + ah} ${y2 - aw} Z`;
+
+    const circle = document.getElementById(`port-${it.k}`);
+    const wire = document.getElementById(`wire-${it.k}`);
+    const arrow = document.getElementById(`arrow-${it.k}`);
+
+    circle.setAttribute('cx', x1);
+    circle.setAttribute('cy', y1);
+    wire.setAttribute('d', pathD);
+    arrow.setAttribute('d', arrowD);
+
+    const isActive = (it.k === activeKey);
+    let colorMode = 'on-blue';
+    if (activeType === 'hit') colorMode = 'on-green';
+    else if (activeType === 'danger') colorMode = 'on-danger';
+
+    if (isActive) {
+      wire.className.baseVal = `wire ${colorMode}`;
+      arrow.className.baseVal = `arrow ${colorMode}`;
+      circle.className.baseVal = `port ${colorMode}`;
+    } else {
+      wire.className.baseVal = 'wire';
+      arrow.className.baseVal = 'arrow';
+      circle.className.baseVal = 'port';
+    }
+  });
+}
+
+function renderStep(idx) {
+  const sc = SCENARIOS[curSceneIdx];
+  if (idx < 0 || idx >= sc.steps.length) return;
+  curStepIdx = idx;
+  const step = sc.steps[idx];
+
+  document.getElementById('stepTitle').innerText = step.title;
+  document.getElementById('stepChip').innerText = step.chip;
+  document.getElementById('stepChip').className = `chip ${step.chipC}`;
+  document.getElementById('actText').innerText = step.act;
+  document.getElementById('stepDesc').innerHTML = step.desc;
+
+  document.getElementById('cmdText').innerText = step.cmd;
+  const badge = document.getElementById('resBadge');
+  badge.innerText = step.res;
+  badge.className = `res ${step.resType}`;
+
+  document.getElementById('readout').innerText = `${idx + 1} / ${sc.steps.length}`;
+
+  // Update micro-step pill
+  const p1 = document.getElementById('phase1');
+  const p2 = document.getElementById('phase2');
+  const p3 = document.getElementById('phase3');
+  p1.className = 'step-pill'; p2.className = 'step-pill'; p3.className = 'step-pill';
+  if (step.phase === 1) p1.classList.add('active');
+  else if (step.phase === 2) p2.classList.add('active');
+  else if (step.phase === 3) p3.classList.add('active');
+
+  // Update dots
+  document.querySelectorAll('.dot').forEach((d, i) => {
+    d.className = 'dot';
+    if (i < idx) d.classList.add('done');
+    else if (i === idx) d.classList.add('now');
+  });
+
+  // Code Panel
+  buildCodePanel(step.codeMode);
+  highlightCodeLine(step.hlLine, step.hlColor);
+  document.getElementById('codeFuncTitle').innerText =
+    (step.codeMode === 'get') ? 'int get(int key) 流程' :
+    (step.codeMode === 'put') ? 'void put(int key, int val) 流程' : 'LRUCache 构造';
+
+  // Stage Mutation
+  mutateStage(step, sc);
+
+  document.getElementById('btnPrev').disabled = (idx === 0);
+  document.getElementById('btnNext').disabled = (idx === sc.steps.length - 1);
+}
+
+function nextStep() {
+  const sc = SCENARIOS[curSceneIdx];
+  if (curStepIdx < sc.steps.length - 1) renderStep(curStepIdx + 1);
+  else pause();
+}
+
+function prevStep() {
+  if (curStepIdx > 0) renderStep(curStepIdx - 1);
+}
+
+function jumpStep(idx) {
+  pause();
+  renderStep(idx);
+}
+
+function play() {
+  const sc = SCENARIOS[curSceneIdx];
+  if (curStepIdx >= sc.steps.length - 1) curStepIdx = 0;
+  playTimer = setInterval(() => {
+    if (curStepIdx < sc.steps.length - 1) nextStep();
+    else pause();
+  }, playDelay);
+  document.getElementById('btnPlay').innerText = '⏸ 暂停';
+}
+
+function pause() {
+  if (playTimer) {
+    clearInterval(playTimer);
+    playTimer = null;
+  }
+  document.getElementById('btnPlay').innerText = '▶ 播放';
+}
+
+function togglePlay() {
+  if (playTimer) pause();
+  else play();
+}
+
+// User Interactive Sandbox logic
+function userGet(k) {
+  pause();
+  const sc = SCENARIOS[curSceneIdx];
+  const curItems = sc.steps[curStepIdx].items;
+  const found = curItems.find(it => it.k === k);
+
+  if (!found) {
+    // miss
+    sc.steps.push({
+      title: `自定义调用 · get(${k}) 未命中`,
+      chip: "未命中", chipC: "cd",
+      cmd: `cache.get(${k});`, res: "返回 -1", resType: "miss",
+      act: `查表不存在 key ${k}，直接返回 -1`,
+      phase: 1,
+      desc: `执行 <code>if (!hash.count(${k})) return -1;</code>。由于缓存中无该键，直接返回 -1，链表结构不改变。`,
+      codeMode: "get", hlLine: 2, hlColor: "hl-danger",
+      items: [...curItems], activeKey: null, activeType: null
+    });
+  } else {
+    // hit, move to front
+    const newItems = [found, ...curItems.filter(it => it.k !== k)];
+    sc.steps.push({
+      title: `自定义调用 · get(${k}) 命中！`,
+      chip: "命中置顶", chipC: "cg",
+      cmd: `cache.get(${k});`, res: `返回 ${found.v}`, resType: "success",
+      act: `命中 key ${k}：返回 ${found.v} 并将节点抽离拔出、插入到最左侧表头(MRU)`,
+      phase: 2,
+      desc: `查哈希找到节点，执行 <code>cache.erase(it)</code> 并 <code>cache.push_front()</code> 移到最前，更新 <code>hash[${k}]</code>。`,
+      codeMode: "get", hlLine: 5, hlColor: "hl-green",
+      items: newItems, activeKey: k, activeType: "hit"
+    });
+  }
+  initDots();
+  renderStep(sc.steps.length - 1);
+}
+
+function userPut(k, v) {
+  pause();
+  const sc = SCENARIOS[curSceneIdx];
+  const curItems = sc.steps[curStepIdx].items;
+  const existing = curItems.find(it => it.k === k);
+
+  let newItems = [];
+  if (existing) {
+    newItems = [{k, v}, ...curItems.filter(it => it.k !== k)];
+    sc.steps.push({
+      title: `自定义调用 · put(${k}, ${v}) 更新已有键`,
+      chip: "覆盖更新", chipC: "cp",
+      cmd: `cache.put(${k}, ${v});`, res: `更新值 -> ${v}`, resType: "success",
+      act: `键 ${k} 已存在：先删旧节点，再在表头插入新值 {${k}, ${v}}`,
+      phase: 2,
+      desc: `执行 <code>cache.erase(hash[${k}])</code> 移除旧节点，再 <code>push_front()</code>。元素总数不变，不触发淘汰。`,
+      codeMode: "put", hlLine: 2, hlColor: "hl-green",
+      items: newItems, activeKey: k, activeType: "hit"
+    });
+  } else {
+    newItems = [{k, v}, ...curItems];
+    if (newItems.length > sc.capacity) {
+      const evicted = newItems.pop();
+      sc.steps.push({
+        title: `自定义调用 · put(${k}, ${v}) 触发淘汰！`,
+        chip: "超容淘汰", chipC: "cd",
+        cmd: `cache.put(${k}, ${v});`, res: `淘汰尾部 key ${evicted.k}`, resType: "miss",
+        act: `容量超标 (${newItems.length + 1} > ${sc.capacity})：头插 {${k}, ${v}}，淘汰尾部 {${evicted.k}, ${evicted.v}}`,
+        phase: 3,
+        desc: `尾部最久未用节点 <code>{${evicted.k}, ${evicted.v}}</code> 被删除，调用 <code>hash.erase(${evicted.k})</code> 与 <code>pop_back()</code>。`,
+        codeMode: "put", hlLine: 7, hlColor: "hl-danger",
+        items: newItems, activeKey: k, activeType: "insert"
+      });
+    } else {
+      sc.steps.push({
+        title: `自定义调用 · put(${k}, ${v}) 正常插入`,
+        chip: "头插新键", chipC: "cb",
+        cmd: `cache.put(${k}, ${v});`, res: `插入成功`, resType: "neutral",
+        act: `头插 {${k}, ${v}}，哈希表建卡登记`,
+        phase: 2,
+        desc: `当前容量未超限，正常存入表头。`,
+        codeMode: "put", hlLine: 3, hlColor: "hl-blue",
+        items: newItems, activeKey: k, activeType: "insert"
+      });
+    }
+  }
+  initDots();
+  renderStep(sc.steps.length - 1);
+}
+
+// Keyboard
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') { nextStep(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { prevStep(); e.preventDefault(); }
+  else if (e.key === ' ') { togglePlay(); e.preventDefault(); }
+});
+
+window.addEventListener('resize', () => {
+  const sc = SCENARIOS[curSceneIdx];
+  if (sc && sc.steps[curStepIdx]) {
+    updateSvgConnectors(sc.steps[curStepIdx].items, sc.steps[curStepIdx].activeKey, sc.steps[curStepIdx].activeType);
+  }
+});
+
+document.getElementById('speedSelect').addEventListener('change', e => {
+  playDelay = parseInt(e.target.value, 10);
+  if (playTimer) { pause(); play(); }
+});
+
+document.getElementById('btnPrev').addEventListener('click', prevStep);
+document.getElementById('btnNext').addEventListener('click', nextStep);
+document.getElementById('btnPlay').addEventListener('click', togglePlay);
+
+window.addEventListener('DOMContentLoaded', () => {
+  switchScene(0);
+});
+</script>
+</body>
+</html>

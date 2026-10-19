@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" font-family="Noto Sans CJK SC,Microsoft YaHei,PingFang SC,sans-serif">
+<title>异步代码里的等待：是谁等，等到哪一道边界？</title>
+<desc>因果顺序示意 · 不按时间比例 · 上：直接 CUDA/NCCL；下：PyTorch 诊断实验</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker></defs>
+<rect x="0" y="0" width="1240" height="700" rx="0" fill="#F5F4ED" stroke="none" stroke-width="1.3"/>
+<text x="48" y="47" font-size="22" fill="#2B2A26" text-anchor="start" font-weight="700">异步代码里的等待：是谁等，等到哪一道边界？</text>
+<text x="48" y="77" font-size="14" fill="#6B675C" text-anchor="start" font-weight="400">因果顺序示意 · 不按时间比例 · 上：直接 CUDA/NCCL；下：PyTorch 诊断实验</text>
+<rect x="48" y="104" width="1144" height="313" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="66" y="130" font-size="15" fill="#2B2A26" text-anchor="start" font-weight="700">A · 事件把生产、通信与消费连接起来</text>
+<text x="162" y="163" font-size="14" fill="#2B2A26" text-anchor="middle" font-weight="700">CPU 提交线程</text>
+<line x1="162" y1="173" x2="162" y2="400" stroke="#D8D5C8" stroke-width="1.5" stroke-dasharray="4 4"/>
+<text x="569" y="163" font-size="14" fill="#2B2A26" text-anchor="middle" font-weight="700">compute stream</text>
+<line x1="569" y1="173" x2="569" y2="400" stroke="#D8D5C8" stroke-width="1.5" stroke-dasharray="4 4"/>
+<text x="1014" y="163" font-size="14" fill="#2B2A26" text-anchor="middle" font-weight="700">comm stream</text>
+<line x1="1014" y1="173" x2="1014" y2="400" stroke="#D8D5C8" stroke-width="1.5" stroke-dasharray="4 4"/>
+<rect x="555" y="174" width="28" height="57" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="600" y="188" font-size="13" fill="#24473F" text-anchor="start" font-weight="400">生产 grad</text>
+<line x1="166" y1="192" x2="564" y2="192" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="350" y="186" font-size="12.5" fill="#2B2A26" text-anchor="middle" font-weight="400">cudaEventRecord(produced)</text>
+<line x1="166" y1="224" x2="1009" y2="224" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="773" y="217" font-size="12.5" fill="#2B2A26" text-anchor="middle" font-weight="400">cudaStreamWaitEvent(produced)</text>
+<rect x="1001" y="231" width="26" height="29" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3" stroke-dasharray="3 2"/>
+<text x="1040" y="250" font-size="13" fill="#6B4E28" text-anchor="start" font-weight="400">等输入</text>
+<line x1="166" y1="266" x2="1009" y2="266" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="785" y="259" font-size="13" fill="#2B2A26" text-anchor="middle" font-weight="400">ncclAllReduce()</text>
+<rect x="1001" y="272" width="26" height="84" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="1040" y="298" font-size="13" fill="#2C4460" text-anchor="start" font-weight="400">运行 / 等对端</text>
+<line x1="166" y1="310" x2="1009" y2="310" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="785" y="303" font-size="12.5" fill="#2B2A26" text-anchor="middle" font-weight="400">cudaEventRecord(reduced)</text>
+<rect x="555" y="266" width="28" height="60" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="600" y="293" font-size="13" fill="#24473F" text-anchor="start" font-weight="400">独立工作</text>
+<line x1="166" y1="340" x2="564" y2="340" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="350" y="333" font-size="12.5" fill="#2B2A26" text-anchor="middle" font-weight="400">cudaStreamWaitEvent(reduced)</text>
+<rect x="555" y="345" width="28" height="16" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3" stroke-dasharray="3 2"/>
+<line x1="999" y1="361" x2="587" y2="361" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="788" y="382" font-size="13" fill="#2C4460" text-anchor="middle" font-weight="400">reduced 完成 → 解除消费依赖</text>
+<rect x="555" y="367" width="28" height="27" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="600" y="390" font-size="13" fill="#4A3F68" text-anchor="start" font-weight="400">消费 grad</text>
+<rect x="48" y="431" width="1144" height="193" rx="7" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="66" y="459" font-size="15" fill="#2B2A26" text-anchor="start" font-weight="700">B · Work 连接内部 NCCL 与当前 stream；最后才同步 host</text>
+<rect x="66" y="485" width="204" height="76" rx="7" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="168" y="516.5" font-size="15" fill="#24473F" text-anchor="middle" font-weight="700">fill_(x)</text>
+<text x="168" y="539.5" font-size="14" fill="#24473F" text-anchor="middle" font-weight="400">当前 compute</text>
+<rect x="295" y="485" width="252" height="76" rx="7" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="421" y="516.5" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="700">all_reduce(async_op=True)</text>
+<text x="421" y="539.5" font-size="14" fill="#2C4460" text-anchor="middle" font-weight="400">内部 NCCL 路径</text>
+<rect x="575" y="485" width="301" height="76" rx="7" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="725.5" y="516.5" font-size="15" fill="#4A3F68" text-anchor="middle" font-weight="700">独立 GEMM → work.wait()</text>
+<text x="725.5" y="539.5" font-size="14" fill="#4A3F68" text-anchor="middle" font-weight="400">等待结果，再 mul_(x)</text>
+<rect x="904" y="485" width="268" height="76" rx="7" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="1038" y="516.5" font-size="15" fill="#6B4E28" text-anchor="middle" font-weight="700">end.synchronize()</text>
+<text x="1038" y="539.5" font-size="14" fill="#6B4E28" text-anchor="middle" font-weight="400">Host 诊断边界</text>
+<line x1="273" y1="523" x2="290" y2="523" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="550" y1="523" x2="570" y2="523" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="879" y1="523" x2="899" y2="523" stroke="#5A564B" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="70" y="592" font-size="13" fill="#6B675C" text-anchor="start" font-weight="400">serial：先 wait 再 GEMM</text>
+<text x="448" y="592" font-size="13" fill="#6B675C" text-anchor="start" font-weight="400">overlap：先独立 GEMM，再 wait</text>
+<text x="887" y="592" font-size="13" fill="#733428" text-anchor="start" font-weight="400">NVTX 结束 ≠ GPU 完成</text>
+<line x1="48" y1="639" x2="1192" y2="639" stroke="#D8D5C8" stroke-width="1.5"/>
+<text x="48" y="668" font-size="13" fill="#6B675C" text-anchor="start" font-weight="400">所有缓冲与 event 由外层持有；CPU 返回不允许提前复用显存。PyTorch 用户当前 stream 不等于内部 NCCL stream。</text>
+</svg>

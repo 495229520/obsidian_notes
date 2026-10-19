@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>std::deque 内存布局与中控 Map 扩容机制</title>
+  <desc>展示 std::deque 的分段连续存储结构、双端队列中控 Map 指针数组的扩容过程、旧节点居中迁移原理以及与 vector 相比的零数据拷贝优势。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2F6B5E"/>
+    </marker>
+  </defs>
+
+  <!-- 背景底色 -->
+  <rect x="0" y="0" width="1240" height="660" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部主标题与副标题 -->
+  <text x="48" y="50" font-size="22" font-weight="700" fill="#2B2A26">std::deque 内存布局与中控 Map 扩容机制</text>
+  <text x="48" y="77" font-size="13" fill="#6B675C">分段连续架构：数据驻留在独立缓冲区中，Map 扩容仅拷贝指针并居中对齐，无需搬迁数据元素</text>
+
+  <!-- ============ Panel A：扩容前状态 ============ -->
+  <text x="48" y="104" font-size="14" font-weight="700" fill="#4A473F">A · 扩容前：中控 Map 槽位占满，双端无空闲挂载点</text>
+  <rect x="48" y="114" width="556" height="376" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Panel A 内部：Map 结构 -->
+  <text x="70" y="140" font-size="12" font-weight="700" fill="#4A473F">中控器 Map（指针数组，容量 = 2）</text>
+
+  <!-- Map 槽位 0 -->
+  <rect x="70" y="156" width="160" height="76" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="82" y="179" font-size="12" font-weight="700" fill="#2C4460">map[0]</text>
+  <text x="82" y="199" font-size="10.5" fill="#2C4460">指向 Buffer 0</text>
+  <text x="82" y="218" font-size="10" fill="#733428">首端边界 · 无法向前插入</text>
+
+  <!-- Map 槽位 1 -->
+  <rect x="70" y="246" width="160" height="76" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="82" y="269" font-size="12" font-weight="700" fill="#2C4460">map[1]</text>
+  <text x="82" y="289" font-size="10.5" fill="#2C4460">指向 Buffer 1</text>
+  <text x="82" y="308" font-size="10" fill="#733428">尾端边界 · 无法向后插入</text>
+
+  <!-- 指针连线 -->
+  <path d="M230,194 L294,194" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <path d="M230,284 L294,284" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+
+  <!-- Panel A 内部：缓冲区 Buffers -->
+  <text x="302" y="140" font-size="12" font-weight="700" fill="#4A473F">数据缓冲区 Buffer（独立连续内存块）</text>
+
+  <!-- Buffer 0 -->
+  <rect x="302" y="156" width="280" height="76" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="314" y="174" font-size="10.5" font-weight="700" fill="#4A473F">Buffer 0（已存满）</text>
+  <rect x="314" y="184" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="342" y="206" font-size="10" fill="#6B4E28" text-anchor="middle">elem 0</text>
+  <rect x="378" y="184" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="406" y="206" font-size="10" fill="#6B4E28" text-anchor="middle">elem 1</text>
+  <rect x="442" y="184" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="470" y="206" font-size="10" fill="#6B4E28" text-anchor="middle">elem 2</text>
+  <rect x="506" y="184" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="534" y="206" font-size="10" fill="#6B4E28" text-anchor="middle">elem 3</text>
+
+  <!-- Buffer 1 -->
+  <rect x="302" y="246" width="280" height="76" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="314" y="264" font-size="10.5" font-weight="700" fill="#4A473F">Buffer 1（已存满）</text>
+  <rect x="314" y="274" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="342" y="296" font-size="10" fill="#6B4E28" text-anchor="middle">elem 4</text>
+  <rect x="378" y="274" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="406" y="296" font-size="10" fill="#6B4E28" text-anchor="middle">elem 5</text>
+  <rect x="442" y="274" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="470" y="296" font-size="10" fill="#6B4E28" text-anchor="middle">elem 6</text>
+  <rect x="506" y="274" width="56" height="36" rx="4" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1"/>
+  <text x="534" y="296" font-size="10" fill="#6B4E28" text-anchor="middle">elem 7</text>
+
+  <!-- 瓶颈告警提示框 -->
+  <rect x="70" y="342" width="512" height="60" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.3"/>
+  <text x="86" y="366" font-size="11.5" font-weight="700" fill="#733428">扩容触发瓶颈：双端均无可用指针槽位</text>
+  <text x="86" y="387" font-size="10.5" fill="#733428">push_front / push_back 挂载新块时须重分配 Map</text>
+
+  <!-- 迭代器边界提示 -->
+  <text x="72" y="426" font-size="10.5" fill="#4A473F">start 迭代器指向 elem 0，finish 指向 elem 7 之后</text>
+  <text x="72" y="445" font-size="10.5" fill="#6B675C">固定大小缓冲区（通常为 512B / sizeof(T)）</text>
+
+  <!-- 步骤衔接箭头 -->
+  <path d="M604,302 L634,302" fill="none" stroke="#A64B3C" stroke-width="2.2" marker-end="url(#arr)"/>
+  <text x="619" y="290" font-size="11" font-weight="700" fill="#A64B3C" text-anchor="middle">扩容</text>
+
+  <!-- ============ Panel B：扩容后状态 ============ -->
+  <text x="636" y="104" font-size="14" font-weight="700" fill="#4A473F">B · 扩容后：新 Map 数组倍增，旧节点居中并双向预留</text>
+  <rect x="636" y="114" width="556" height="376" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- Panel B 内部：新 Map 结构 -->
+  <text x="658" y="140" font-size="12" font-weight="700" fill="#4A473F">新中控 Map（容量 = 6，倍增扩容）</text>
+
+  <!-- 新 Map 槽位 0：前端预留 -->
+  <rect x="658" y="156" width="164" height="42" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="670" y="177" font-size="10.5" fill="#5F5E5A">new_map[0] · 预留空槽</text>
+  <text x="670" y="191" font-size="9.5" fill="#8A8574">供 push_front 扩展使用</text>
+
+  <!-- 新 Map 槽位 1：旧节点 0 居中 -->
+  <rect x="658" y="204" width="164" height="48" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="670" y="224" font-size="11" font-weight="700" fill="#2C4460">new_map[1]（原 node 0）</text>
+  <text x="670" y="242" font-size="10" fill="#2C4460">拷贝指针 · 指向原 Buffer 0</text>
+
+  <!-- 新 Map 槽位 2：旧节点 1 居中 -->
+  <rect x="658" y="258" width="164" height="48" rx="5" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="670" y="278" font-size="11" font-weight="700" fill="#2C4460">new_map[2]（原 node 1）</text>
+  <text x="670" y="296" font-size="10" fill="#2C4460">拷贝指针 · 指向原 Buffer 1</text>
+
+  <!-- 新 Map 槽位 3：新挂载的节点 -->
+  <rect x="658" y="312" width="164" height="48" rx="5" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="670" y="332" font-size="11" font-weight="700" fill="#24473F">new_map[3]（新挂载节点）</text>
+  <text x="670" y="350" font-size="10" fill="#24473F">分配新内存 · 指向 Buffer 2</text>
+
+  <!-- 新 Map 槽位 4..5：后端预留 -->
+  <rect x="658" y="366" width="164" height="42" rx="5" fill="#F1EFE8" stroke="#9B968A" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="670" y="387" font-size="10.5" fill="#5F5E5A">new_map[4..5] · 预留空槽</text>
+  <text x="670" y="401" font-size="9.5" fill="#8A8574">供 push_back 扩展使用</text>
+
+  <!-- 连线指向 Buffer -->
+  <path d="M822,228 L896,204" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <path d="M822,282 L896,282" fill="none" stroke="#3D5A80" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <path d="M822,336 L896,358" fill="none" stroke="#2F6B5E" stroke-width="1.8" marker-end="url(#arr-green)"/>
+
+  <!-- Panel B 内部：缓冲区状态（零搬迁） -->
+  <text x="904" y="140" font-size="12" font-weight="700" fill="#4A473F">物理缓冲区（数据完全未移动）</text>
+
+  <!-- 原 Buffer 0：位置未动 -->
+  <rect x="904" y="174" width="268" height="60" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="916" y="194" font-size="10.5" font-weight="700" fill="#4A473F">Buffer 0（物理地址不变）</text>
+  <text x="916" y="216" font-size="10" fill="#6B675C">已存元素：[elem 0, elem 1, elem 2, elem 3]</text>
+
+  <!-- 原 Buffer 1：位置未动 -->
+  <rect x="904" y="252" width="268" height="60" rx="6" fill="#F1EFE8" stroke="#9B968A" stroke-width="1.2"/>
+  <text x="916" y="272" font-size="10.5" font-weight="700" fill="#4A473F">Buffer 1（物理地址不变）</text>
+  <text x="916" y="294" font-size="10" fill="#6B675C">已存元素：[elem 4, elem 5, elem 6, elem 7]</text>
+
+  <!-- 新 Buffer 2：新分配 -->
+  <rect x="904" y="330" width="268" height="60" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+  <text x="916" y="350" font-size="10.5" font-weight="700" fill="#24473F">新分配 Buffer 2（挂载成功）</text>
+  <text x="916" y="372" font-size="10" fill="#24473F">写入新元素：[elem 8 ...]</text>
+
+  <!-- 居中优势横条 -->
+  <rect x="658" y="420" width="514" height="52" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+  <text x="674" y="442" font-size="11.5" font-weight="700" fill="#24473F">居中偏移：index = (new_size - old_size) / 2</text>
+  <text x="674" y="461" font-size="10.5" fill="#24473F">头尾对称预留空槽，支持后续双向常数时间追加</text>
+
+  <!-- ============ Panel C：底层核心机制对比 ============ -->
+  <!-- 卡片 1 -->
+  <rect x="48" y="508" width="358" height="124" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="68" y="534" font-size="12.5" font-weight="700" fill="#2C4460">1. 两级寻址与 O(1) 随机访问</text>
+  <text x="68" y="558" font-size="10.5" fill="#4A473F">定位中控：node = map[i / buf_size]</text>
+  <text x="68" y="579" font-size="10.5" fill="#4A473F">定位元素：elem = node[i % buf_size]</text>
+  <text x="68" y="600" font-size="10" fill="#6B675C">两次指针解引用，无搜索分支，保持下标连续感知</text>
+
+  <!-- 卡片 2 -->
+  <rect x="441" y="508" width="358" height="124" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="461" y="534" font-size="12.5" font-weight="700" fill="#24473F">2. 零数据搬迁（对比 vector）</text>
+  <text x="461" y="558" font-size="10.5" fill="#4A473F">Map 扩容仅复制指针数组（仅数个节点指针）</text>
+  <text x="461" y="579" font-size="10.5" fill="#4A473F">已有 Buffer 物理地址不变，不移动任何已有元素</text>
+  <text x="461" y="600" font-size="10" fill="#6B675C">无大块连续内存强制要求，杜绝连续空间分配失败</text>
+
+  <!-- 卡片 3 -->
+  <rect x="834" y="508" width="358" height="124" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="854" y="534" font-size="12.5" font-weight="700" fill="#6B4E28">3. 迭代器失效与引用有效性</text>
+  <text x="854" y="558" font-size="10.5" fill="#4A473F">Map 重分配导致所有迭代器失效（中控指针变动）</text>
+  <text x="854" y="579" font-size="10.5" fill="#4A473F">Buffer 原地保留，已有元素的引用与指针依然有效</text>
+  <text x="854" y="600" font-size="10" fill="#6B675C">首尾 push/pop 不触发内部搬移，优于 vector</text>
+</svg>

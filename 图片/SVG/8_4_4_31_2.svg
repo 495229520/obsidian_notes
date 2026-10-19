@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" role="img" aria-labelledby="title desc" font-family="Noto Sans CJK SC, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif">
+<title id="title">NBX 的三条返回路径：立即完成、错误指针、异步 request</title>
+<desc id="desc">顶部将NBX分为null、错误指针、request三路，底部用条带展示异步路径中的request、buffer和callback状态必须持续存活。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker></defs>
+<rect x="0" y="0" width="1240" height="720" fill="rgb(245, 244, 237)"/>
+<text x="48" y="46" font-size="22" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="title">NBX 的三条返回路径：立即完成、错误指针、异步 request</text>
+<text x="48" y="76" font-size="13" fill="#6B675C" text-anchor="start" font-weight="400" data-role="subtitle">设置 callback 不代表每次都会调用；请求状态与数据 buffer 是不同的生命周期</text>
+<line x1="48" y1="96" x2="1192" y2="96" stroke="#D8D5C8" stroke-width="1"/>
+<rect x="397" y="120" width="446" height="63" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<text x="620.0" y="145.75" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="700" data-role="body">ucp_tag_send_nbx(...)</text>
+<text x="620.0" y="167.75" font-size="15" fill="#2C4460" text-anchor="middle" font-weight="400" data-role="body">默认允许立即完成</text>
+<rect x="70" y="252" width="338" height="74" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+<text x="239.0" y="283.25" font-size="15" fill="#24473F" text-anchor="middle" font-weight="700" data-role="body">nullptr</text>
+<text x="239.0" y="305.25" font-size="15" fill="#24473F" text-anchor="middle" font-weight="400" data-role="body">立即完成</text>
+<rect x="450" y="252" width="338" height="74" rx="8" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+<text x="619.0" y="283.25" font-size="15" fill="#733428" text-anchor="middle" font-weight="700" data-role="body">UCS_PTR_IS_ERR(ret)</text>
+<text x="619.0" y="305.25" font-size="15" fill="#733428" text-anchor="middle" font-weight="400" data-role="body">立即失败</text>
+<rect x="830" y="252" width="338" height="74" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+<text x="999.0" y="283.25" font-size="15" fill="#4A3F68" text-anchor="middle" font-weight="700" data-role="body">有效 request</text>
+<text x="999.0" y="305.25" font-size="15" fill="#4A3F68" text-anchor="middle" font-weight="400" data-role="body">非立即完成</text>
+<polyline points="620,185 620,215 239,215 239,249" fill="none" stroke="#5A564B" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arr)"/>
+<line x1="620" y1="217" x2="620" y2="249" stroke="#5A564B" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="620,215 999,215 999,249" fill="none" stroke="#5A564B" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="239" y="364" font-size="13" fill="#24473F" text-anchor="middle" font-weight="700" data-role="body">直接处理成功</text>
+<text x="239" y="388" font-size="13" fill="#24473F" text-anchor="middle" font-weight="400" data-role="body">不等回调 · 不 free 空指针</text>
+<text x="619" y="364" font-size="13" fill="#733428" text-anchor="middle" font-weight="700" data-role="body">UCS_PTR_STATUS(ret)</text>
+<text x="619" y="388" font-size="13" fill="#733428" text-anchor="middle" font-weight="400" data-role="body">不是可解引用的请求对象</text>
+<text x="999" y="364" font-size="13" fill="#4A3F68" text-anchor="middle" font-weight="700" data-role="body">progress → 完成 / 错误</text>
+<text x="999" y="388" font-size="13" fill="#4A3F68" text-anchor="middle" font-weight="400" data-role="body">然后只释放一次 request</text>
+<text x="70" y="447" font-size="15" fill="#4A473F" text-anchor="start" font-weight="700" data-role="section">普通 request 分支：拥有者必须覆盖整个在途区间</text>
+<text x="288" y="477" font-size="12" fill="#6B675C" text-anchor="middle" font-weight="400" data-role="body">提交</text>
+<text x="969" y="477" font-size="12" fill="#6B675C" text-anchor="middle" font-weight="400" data-role="body">完成</text>
+<text x="1125" y="477" font-size="12" fill="#6B675C" text-anchor="middle" font-weight="400" data-role="body">归还 request</text>
+<text x="76" y="516" font-size="13" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="body">request 句柄</text>
+<rect x="288" y="493" width="852" height="31" rx="4" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.2"/>
+<text x="714.0" y="515" font-size="12" fill="#4A3F68" text-anchor="middle" font-weight="400" data-role="body">保持有效，不得提前销毁</text>
+<text x="76" y="562" font-size="13" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="body">数据 buffer</text>
+<rect x="288" y="539" width="693" height="31" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+<text x="634.5" y="561" font-size="12" fill="#24473F" text-anchor="middle" font-weight="400" data-role="body">保持有效，不得提前销毁</text>
+<text x="76" y="608" font-size="13" fill="#2B2A26" text-anchor="start" font-weight="700" data-role="body">callback 状态</text>
+<rect x="288" y="585" width="693" height="31" rx="4" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.2"/>
+<text x="634.5" y="607" font-size="12" fill="#2C4460" text-anchor="middle" font-weight="400" data-role="body">保持有效，不得提前销毁</text>
+<line x1="969" y1="485" x2="969" y2="620" stroke="#6B675C" stroke-width="1.6" stroke-dasharray="6 4"/>
+<line x1="48" y1="650" x2="1192" y2="650" stroke="#D8D5C8" stroke-width="1"/>
+<text x="48" y="676" font-size="12" fill="#6B675C" text-anchor="start" font-weight="400" data-role="footer">user_data 指向栈变量时，提交函数不能在该状态仍被回调使用时返回。</text>
+<text x="48" y="697" font-size="12" fill="#6B675C" text-anchor="start" font-weight="400" data-role="footer">ucp_request_free ≠ cancel；buffer 在途引用仍须管理。</text>
+</svg>

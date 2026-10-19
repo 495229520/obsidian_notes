@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 680" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+  <title>std::deque 二维分段结构与 map[row][col] 寻址模型</title>
+  <desc>解释为什么 deque 被称为动态二维数组，对比物理连续二维数组与分段缓冲区的差异，并可视化逻辑下标到二维行列表的映射机制。</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D5A80"/>
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A3A"/>
+    </marker>
+  </defs>
+
+  <!-- 全图背景 -->
+  <rect x="0" y="0" width="1240" height="680" fill="rgb(245, 244, 237)"/>
+
+  <!-- 顶部主标题与副标题 -->
+  <text x="48" y="48" font-size="22" font-weight="700" fill="#2B2A26">为什么称 deque 为「二维数组」？结构与寻址模型</text>
+  <text x="48" y="74" font-size="13" fill="#6B675C">本质是「指针数组 + 分段连续缓冲区」：语法与访问类似二维数组，物理上解耦以支持两端低成本伸缩</text>
+
+  <!-- ============ Panel A：对比物理二维数组与分段二维结构 ============ -->
+  <text x="48" y="102" font-size="14" font-weight="700" fill="#4A473F">A · 结构形态对比：真实连续二维数组 vs deque 分段二维结构</text>
+  <rect x="48" y="112" width="1144" height="206" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 左侧：真实物理二维数组 -->
+  <text x="70" y="136" font-size="12.5" font-weight="700" fill="#733428">传统二维数组 T arr[3][4]（物理全连续）</text>
+
+  <rect x="70" y="150" width="460" height="96" rx="6" fill="#F0E0DB" stroke="#A64B3C" stroke-width="1.2"/>
+  <text x="84" y="172" font-size="11" font-weight="700" fill="#733428">物理内存：开辟单块连续大内存空间</text>
+
+  <!-- 连续网格示意 -->
+  <g transform="translate(84, 184)">
+    <!-- Row 0 -->
+    <rect x="0" y="0" width="104" height="24" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="52" y="16" font-size="10" fill="#4A473F" text-anchor="middle">行 0: [0][0..3]</text>
+    <!-- Row 1 -->
+    <rect x="104" y="0" width="104" height="24" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="156" y="16" font-size="10" fill="#4A473F" text-anchor="middle">行 1: [1][0..3]</text>
+    <!-- Row 2 -->
+    <rect x="208" y="0" width="104" height="24" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="260" y="16" font-size="10" fill="#4A473F" text-anchor="middle">行 2: [2][0..3]</text>
+    <rect x="312" y="0" width="120" height="24" fill="#F0E0DB" stroke="#A64B3C" stroke-dasharray="3 2"/>
+    <text x="372" y="16" font-size="9.5" fill="#733428" text-anchor="middle">首尾无空槽</text>
+  </g>
+  <text x="84" y="234" font-size="10" fill="#733428">痛点：行间紧密贴合，头部无法无损插入；扩容需整体搬移</text>
+
+  <!-- 中间分割竖线 -->
+  <line x1="550" y1="130" x2="550" y2="300" stroke="#D8D5C8" stroke-width="1.2" stroke-dasharray="4 3"/>
+
+  <!-- 右侧：deque 的分段连续二维结构 -->
+  <text x="574" y="136" font-size="12.5" font-weight="700" fill="#2C4460">deque 分段架构（中控指针数组 + 独立 Buffer）</text>
+
+  <!-- 第一维：中控 Map -->
+  <rect x="574" y="150" width="136" height="152" rx="6" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.4"/>
+  <text x="586" y="172" font-size="11.5" font-weight="700" fill="#2C4460">维 1: Map 指针</text>
+  <text x="586" y="188" font-size="10" fill="#2C4460">T** 行指针数组</text>
+
+  <rect x="584" y="198" width="116" height="26" rx="4" fill="#FBFBF6" stroke="#3D5A80"/>
+  <text x="592" y="215" font-size="10" fill="#2C4460">map[0] → 行 0</text>
+
+  <rect x="584" y="230" width="116" height="26" rx="4" fill="#FBFBF6" stroke="#3D5A80"/>
+  <text x="592" y="247" font-size="10" fill="#2C4460">map[1] → 行 1</text>
+
+  <rect x="584" y="262" width="116" height="26" rx="4" fill="#FBFBF6" stroke="#3D5A80"/>
+  <text x="592" y="279" font-size="10" fill="#2C4460">map[2] → 行 2</text>
+
+  <!-- 指针连线 -->
+  <path d="M700,211 L746,175" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <path d="M700,243 L746,225" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <path d="M700,275 L746,275" fill="none" stroke="#3D5A80" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+  <!-- 第二维：各独立 Buffer -->
+  <text x="754" y="146" font-size="11.5" font-weight="700" fill="#24473F">维 2: 独立 Buffers（物理内存分散在堆上）</text>
+
+  <!-- Buffer 0 格子 -->
+  <g transform="translate(754, 156)">
+    <rect x="0" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="42" y="18" font-size="10" font-weight="700" fill="#24473F" text-anchor="middle">e[0][0]</text>
+    <text x="42" y="31" font-size="9.5" fill="#5F5E5A" text-anchor="middle">首列</text>
+    <rect x="88" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="130" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[0][1]</text>
+    <rect x="176" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="218" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[0][2]</text>
+    <rect x="264" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="306" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[0][3]</text>
+    <text x="360" y="24" font-size="10" fill="#6B675C">0x1000</text>
+  </g>
+
+  <!-- Buffer 1 格子 -->
+  <g transform="translate(754, 206)">
+    <rect x="0" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="42" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[1][0]</text>
+    <rect x="88" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="130" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[1][1]</text>
+    <rect x="176" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="218" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[1][2]</text>
+    <rect x="264" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="306" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[1][3]</text>
+    <text x="360" y="24" font-size="10" fill="#6B675C">0x4800</text>
+  </g>
+
+  <!-- Buffer 2 格子 -->
+  <g transform="translate(754, 256)">
+    <rect x="0" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="42" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[2][0]</text>
+    <rect x="88" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="130" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[2][1]</text>
+    <rect x="176" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="218" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[2][2]</text>
+    <rect x="264" y="0" width="84" height="38" rx="4" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.2"/>
+    <text x="306" y="23" font-size="10" fill="#24473F" text-anchor="middle">e[2][3]</text>
+    <text x="360" y="24" font-size="10" fill="#6B675C">0x2400</text>
+  </g>
+
+  <!-- ============ Panel B：寻址过程与二维坐标转换 ============ -->
+  <text x="48" y="340" font-size="14" font-weight="700" fill="#4A473F">B · 坐标换算：一维逻辑下标如何秒解为 map[row][col]？</text>
+  <rect x="48" y="350" width="1144" height="170" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+
+  <!-- 逻辑视图 -->
+  <text x="70" y="374" font-size="12" font-weight="700" fill="#4A473F">用户视角（逻辑连续）</text>
+  <g transform="translate(70, 386)">
+    <rect x="0" y="0" width="38" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="19" y="21" font-size="10.5" fill="#4A473F" text-anchor="middle">q[0]</text>
+    <rect x="44" y="0" width="38" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="63" y="21" font-size="10.5" fill="#4A473F" text-anchor="middle">q[1]</text>
+    <rect x="88" y="0" width="38" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="107" y="21" font-size="10.5" fill="#4A473F" text-anchor="middle">q[2]</text>
+    <rect x="132" y="0" width="38" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="151" y="21" font-size="10.5" fill="#4A473F" text-anchor="middle">q[3]</text>
+    <rect x="176" y="0" width="38" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="195" y="21" font-size="10.5" fill="#4A473F" text-anchor="middle">q[4]</text>
+    <!-- 高亮 q[5] -->
+    <rect x="220" y="0" width="46" height="34" rx="4" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.8"/>
+    <text x="243" y="21" font-size="11" font-weight="700" fill="#6B4E28" text-anchor="middle">q[5]</text>
+    <rect x="272" y="0" width="38" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="291" y="21" font-size="10.5" fill="#4A473F" text-anchor="middle">q[6]</text>
+    <rect x="316" y="0" width="38" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="335" y="21" font-size="10.5" fill="#4A473F" text-anchor="middle">q[7]</text>
+    <rect x="360" y="0" width="46" height="34" rx="4" fill="#F1EFE8" stroke="#9B968A"/>
+    <text x="383" y="21" font-size="10" fill="#5F5E5A" text-anchor="middle">...</text>
+  </g>
+  <text x="70" y="442" font-size="10.5" fill="#6B675C">设 BUF_SIZE = 4，定位 q[5]</text>
+
+  <!-- 箭头转换到公式 -->
+  <path d="M486,403 L526,403" fill="none" stroke="#8A6A3A" stroke-width="2" marker-end="url(#arr-amber)"/>
+  <text x="506" y="395" font-size="10" font-weight="700" fill="#8A6A3A" text-anchor="middle">计算</text>
+
+  <!-- 寻址公式卡片 -->
+  <rect x="532" y="368" width="320" height="136" rx="6" fill="#F3E8D3" stroke="#8A6A3A" stroke-width="1.4"/>
+  <text x="546" y="392" font-size="12" font-weight="700" fill="#6B4E28">O(1) 二维坐标换算公式</text>
+  <text x="546" y="416" font-size="11" fill="#6B4E28">① 行号 row = index / BUF_SIZE</text>
+  <text x="562" y="434" font-size="10.5" fill="#8A6A3A">5 / 4 = 1 → 命中第 1 行指针 map[1]</text>
+  <text x="546" y="458" font-size="11" fill="#6B4E28">② 列号 col = index % BUF_SIZE</text>
+  <text x="562" y="476" font-size="10.5" fill="#8A6A3A">5 % 4 = 1 → 命中该行第 1 列</text>
+  <text x="546" y="496" font-size="10.5" font-weight="700" fill="#6B4E28">语法等价：*(map[row] + col) 即 map[row][col]</text>
+
+  <!-- 箭头引向物理结果 -->
+  <path d="M856,436 L896,436" fill="none" stroke="#2F6B5E" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 最终寻址结果面板 -->
+  <rect x="900" y="368" width="272" height="136" rx="6" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.4"/>
+  <text x="914" y="392" font-size="12" font-weight="700" fill="#24473F">物理两级解引用落地</text>
+  <text x="914" y="418" font-size="10.5" fill="#24473F">第 1 步：读 map[1] 得到 Buffer 1 基址</text>
+  <text x="914" y="442" font-size="10.5" fill="#24473F">第 2 步：加上偏移 1 取出目标元素</text>
+  <text x="914" y="470" font-size="11" font-weight="700" fill="#24473F">目标：Buffer 1[1]（即 e[1][1]）</text>
+  <text x="914" y="492" font-size="10" fill="#5F5E5A">常数时间，无任何循环或链表遍历</text>
+
+  <!-- ============ Panel C：为什么采用二维分段？ ============ -->
+  <rect x="48" y="534" width="362" height="124" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="66" y="558" font-size="12" font-weight="700" fill="#733428">对比 vector（一维连续）</text>
+  <text x="66" y="580" font-size="10.5" fill="#4A473F">必须单块物理全连续</text>
+  <text x="66" y="600" font-size="10" fill="#6B675C">头部 push_front 耗时 O(n)，需全量后移</text>
+  <text x="66" y="620" font-size="10" fill="#6B675C">扩容需找更大连续块，容易内存碎片化</text>
+
+  <rect x="439" y="534" width="362" height="124" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="457" y="558" font-size="12" font-weight="700" fill="#6B4E28">对比 list（双向离散链表）</text>
+  <text x="457" y="580" font-size="10.5" fill="#4A473F">节点物理极度分散</text>
+  <text x="457" y="600" font-size="10" fill="#6B675C">每个节点附加双指针，内存额外开销大</text>
+  <text x="457" y="620" font-size="10" fill="#6B675C">无法算术计算位置，随机访问退化为 O(n)</text>
+
+  <rect x="830" y="534" width="362" height="124" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.2"/>
+  <text x="848" y="558" font-size="12" font-weight="700" fill="#24473F">deque 二维折中的精髓</text>
+  <text x="848" y="580" font-size="10.5" fill="#24473F">两级指针映射实现伪一维连续</text>
+  <text x="848" y="600" font-size="10" fill="#4A473F">双端插入只需增加新行，零数据搬迁</text>
+  <text x="848" y="620" font-size="10" fill="#4A473F">保留两次解引用的 O(1) 随机访问性能</text>
+</svg>

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="PingFang SC,Hiragino Sans GB,Microsoft YaHei,sans-serif">
+<rect width="1240" height="680" fill="rgb(245, 244, 237)"/>
+<title>删除器的存储位置与调用时机</title>
+<desc>左侧是 unique_ptr 持有资源指针与删除器，右侧两个 shared_ptr 共享含有删除器的控制块。下方比较 reset、release、移动及最后一个强所有者退出的行为。</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5A564B"/></marker></defs>
+<text x="48" y="47" font-size="22" fill="#2B2A26" font-weight="700">删除器存在哪里，什么时候被调用</text>
+<text x="48" y="77" font-size="14" fill="#6B675C" font-weight="400">自定义删除器的常见实现模型 · 所有权决定时机，删除器执行释放动作</text>
+<rect x="48" y="102" width="540" height="306" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<rect x="612" y="102" width="580" height="306" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<text x="68" y="131" font-size="16" fill="#4A473F" font-weight="700">A · unique_ptr&lt;T, D&gt;：一个所有者</text>
+<rect x="70" y="153" width="225" height="100" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="86" y="179" font-size="16" fill="#2C4460" font-weight="700">unique_ptr 对象</text>
+<text x="86" y="208" font-size="15" fill="#4A473F" font-weight="400">资源指针 ptr</text>
+<text x="86" y="234" font-size="15" fill="#4A473F" font-weight="400">删除器对象 D</text>
+<rect x="387" y="174" width="172" height="55" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="413" y="207" font-size="15" fill="#24473F" font-weight="400">受管理的资源</text>
+<path d="M295,201 H383" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<text x="308" y="186" font-size="13" fill="#4A473F" font-weight="400">拥有</text>
+<text x="70" y="281" font-size="15" fill="#6B4E28" font-weight="400">非空析构 / reset()</text>
+<path d="M222,287 V305" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="70" y="308" width="225" height="53" rx="8" fill="#EFE7DA" stroke="#8A6A3A" stroke-width="1.3"/>
+<text x="85" y="340" font-size="15" fill="#6B4E28" font-weight="400">get_deleter()(旧指针)</text>
+<path d="M295,334 H383" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="387" y="308" width="172" height="53" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="402" y="340" font-size="15" fill="#24473F" font-weight="400">执行资源清理</text>
+<text x="70" y="390" font-size="14" fill="#6B675C" font-weight="400">D 影响指针类型；空 D 的存储通常可压缩</text>
+<text x="632" y="131" font-size="16" fill="#4A473F" font-weight="700">B · shared_ptr&lt;T&gt;：共享控制块</text>
+<rect x="632" y="153" width="150" height="49" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="649" y="183" font-size="15" fill="#2C4460" font-weight="400">所有者 first</text>
+<rect x="632" y="229" width="150" height="49" rx="8" fill="#E3EAF4" stroke="#3D5A80" stroke-width="1.3"/>
+<text x="649" y="259" font-size="15" fill="#2C4460" font-weight="400">所有者 second</text>
+<rect x="860" y="153" width="310" height="125" rx="8" fill="#EDEAF3" stroke="#6B5B95" stroke-width="1.3"/>
+<text x="880" y="180" font-size="16" fill="#4A3F6B" font-weight="700">共享控制块</text>
+<text x="880" y="207" font-size="15" fill="#4A473F" font-weight="400">强 / 弱引用计数</text>
+<text x="880" y="232" font-size="15" fill="#4A473F" font-weight="400">删除器 + 资源管理信息</text>
+<text x="880" y="256" font-size="14" fill="#4A473F" font-weight="400">D 不进入 shared_ptr&lt;T&gt; 类型</text>
+<path d="M782,177 H856" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<path d="M782,253 H826 V218 H856" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<text x="635" y="312" font-size="14" fill="#4A473F" font-weight="400">强所有者：2 → 1</text>
+<text x="635" y="336" font-size="14" fill="#6B675C" font-weight="400">资源继续存活</text>
+<path d="M1015,278 V311" fill="none" stroke="#5A564B" stroke-width="1.7" marker-end="url(#arr)"/>
+<rect x="860" y="314" width="310" height="47" rx="8" fill="#DCE9E3" stroke="#2F6B5E" stroke-width="1.3"/>
+<text x="880" y="343" font-size="15" fill="#24473F" font-weight="400">1 → 0：调用删除器</text>
+<text x="632" y="390" font-size="14" fill="#6B675C" font-weight="400">弱引用可保留控制块；资源已完成清理</text>
+<text x="48" y="444" font-size="16" fill="#4A473F" font-weight="700">C · 操作与结果</text>
+<rect x="48" y="462" width="1144" height="138" rx="8" fill="#FBFBF6" stroke="#D8D5C8" stroke-width="1.3"/>
+<path d="M48,507 H1192 M48,552 H1192 M326,462 V600 M700,462 V600" fill="none" stroke="#D8D5C8"/>
+<text x="68" y="490" font-size="14" fill="#4A473F" font-weight="700">所有权操作</text>
+<text x="346" y="490" font-size="14" fill="#4A473F" font-weight="700">资源是否清理</text>
+<text x="720" y="490" font-size="14" fill="#4A473F" font-weight="700">操作后由谁负责</text>
+<text x="68" y="535" font-size="14" fill="#4A473F" font-weight="400">unique_ptr::reset()</text>
+<text x="346" y="535" font-size="14" fill="#4A473F" font-weight="400">非空旧资源：调用删除器</text>
+<text x="720" y="535" font-size="14" fill="#4A473F" font-weight="400">当前所有者变为空</text>
+<text x="68" y="580" font-size="14" fill="#4A473F" font-weight="400">unique_ptr::release()</text>
+<text x="346" y="580" font-size="14" fill="#A64B3C" font-weight="400">不清理</text>
+<text x="720" y="580" font-size="14" fill="#4A473F" font-weight="400">调用者必须安排接管</text>
+<text x="48" y="628" font-size="14" fill="#6B675C" font-weight="400">移动构造：资源与删除器一起转交，原所有者变为空。</text>
+<text x="48" y="653" font-size="14" fill="#6B675C" font-weight="400">空指针边界：unique_ptr 跳过清理；shared_ptr(nullptr, D) 最后仍调用 D(nullptr)。</text>
+</svg>
