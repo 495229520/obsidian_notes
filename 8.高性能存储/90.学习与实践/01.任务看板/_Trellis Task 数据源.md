@@ -29,7 +29,7 @@ cssclasses:
 	- [ ] 验收清单 · 记录今天三个卡点和明日第一步
 	状态：进行中；负责人：melene；优先级：P1；文档：[[8.高性能存储/90.学习与实践/01.任务看板/Trellis详情/08-21-linux-leetcode-day2#PRD|PRD]] · [[8.高性能存储/90.学习与实践/01.任务看板/Trellis详情/08-21-linux-leetcode-day2#Task JSON|Task JSON]]
 	摘要：2026-08-26：已独立完成力扣 143、148；已完成 6.5–6.10 与 1–6 章题目回顾，下一步复习 7.1–7.4.2 并完成 2。
-- [ ] [[16.AI编译器/90.学习与实践/09-30-npu-compiler-study#PRD|AI编译器与NPU编译优化学习（现在开始）]] · 阶段：Phase 2 · 执行 · 执行清单：0/33 ⏫ #trellis #trellis/source/generated #trellis/status/in-progress #trellis/priority/p1 #trellis/assignee/melene ➕ 2026-09-30
+- [ ] [[16.AI编译器/90.学习与实践/09-30-npu-compiler-study#PRD|AI编译器与NPU编译优化学习（现在开始）]] · 阶段：Phase 2 · 执行 · 执行清单：5/42 ⏫ #trellis #trellis/source/generated #trellis/status/in-progress #trellis/priority/p1 #trellis/assignee/melene ➕ 2026-09-30
 	- [x] Workflow · Phase 1 规划
 	- [ ] Workflow · Phase 2 执行（当前）
 	- [ ] Workflow · Phase 3 收尾（待开始）
@@ -42,6 +42,7 @@ cssclasses:
 	- [ ] 执行清单 · L6：TPU转换与功能验证 · 0/3
 	- [ ] 执行清单 · L7：工业改动 · 0/4
 	- [ ] 执行清单 · 发布、简历与投递 · 0/4
+	- [ ] 执行清单 · Day 1 学习记录（2026-10-19续学） · 5/9
 	状态：进行中；负责人：melene；优先级：P1；类型：study；范围：ai-compiler-npu；文档：[[16.AI编译器/90.学习与实践/09-30-npu-compiler-study#PRD|PRD]] · [[16.AI编译器/90.学习与实践/09-30-npu-compiler-study#设计|设计]] · [[16.AI编译器/90.学习与实践/09-30-npu-compiler-study#实施计划|实施计划]] · [[16.AI编译器/90.学习与实践/09-30-npu-compiler-study#Task JSON|Task JSON]]
 	摘要：2026-10-18启动：第一周用Mac学习编译流程、IR/SSA与MLIR入门教程；第二周做矩阵参考、测试和重写/lowering阅读。LLVM构建与独立MLIR工程后移到第三周起，主构建机为9700X＋48GB＋WSL2 Ubuntu，PC已购2TB固态，待环境验证后推进；项目A/B按验收继续。
 

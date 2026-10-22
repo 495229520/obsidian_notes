@@ -20,7 +20,7 @@ cssclasses:
 - 优先级：P1
 - 负责人：melene
 - 创建时间：2026-09-19
-- Trellis Task：`09-19-interview-top200-cpp-linux-mfms`
+- Trellis Task：`.trellis/tasks/09-19-interview-top200-cpp-linux-mfms`
 
 ## 摘要
 
@@ -28,7 +28,7 @@ cssclasses:
 
 ## PRD
 
-来源：`prd.md`（对应任务目录中的需求记录）
+来源：`.trellis/tasks/09-19-interview-top200-cpp-linux-mfms/prd.md`
 
 # 面试准备：11月10日截止
 
@@ -62,7 +62,7 @@ cssclasses:
 
 ## 设计
 
-来源：`design.md`（对应任务目录中的设计记录）
+来源：`.trellis/tasks/09-19-interview-top200-cpp-linux-mfms/design.md`
 
 # 执行方式与取舍
 
@@ -159,7 +159,7 @@ MFMS材料按版本和状态分开：旧版C++/Qt可用于讲已发生的工程�
 
 ## 实施计划
 
-来源：`implement.md`（对应任务目录中的实施记录）
+来源：`.trellis/tasks/09-19-interview-top200-cpp-linux-mfms/implement.md`
 
 # 每日进度
 
@@ -1269,7 +1269,7 @@ Day 11—13原来的6个STL补充入口已合并进下面的STL条目；C++基�
 
 ## Task JSON
 
-来源：`task.json`（对应任务目录中的任务状态）
+来源：`.trellis/tasks/09-19-interview-top200-cpp-linux-mfms/task.json`
 
 ```json
 {
