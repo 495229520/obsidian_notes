@@ -137,3 +137,4 @@ App 端到端 ≈ RPC 延迟 + 几毫秒（7 层 Qt 排队信号是进程内亚�
 - 下位机 `DbConfig.h` 有故意保留的本地库指向改动，`git pull` 前先 `git stash`、拉后 `git stash pop`；构建**不要加 `--symlink-install`**。
 - 本地未提交待定夺：`compose.yaml` 的 `127.0.0.1:3306:3306` 端口映射、优化后的 `bal.bash`。
 - 下位机 git 远端 URL 曾内嵌明文 PAT（已多次泄露/失效），建议换 SSH deploy key。
+

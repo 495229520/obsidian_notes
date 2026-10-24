@@ -52,15 +52,15 @@ max = max(a[0], a[1], ..., a[n - 1]);
 
 ## 2. 必做实现
 
-| 版本 | 目标 | 重点观察 |
-|---|---|---|
-| CPU reference | 正确性基准 | 与 CUDA 输出比较 |
-| naive reduce | 每个 block 输出一个 partial sum | 全局访存和边界处理 |
-| shared memory reduce | block 内用 shared memory 汇总 | `__syncthreads()` 与 shared memory |
-| warp shuffle reduce | warp 内用 shuffle 汇总 | 减少 shared memory 和同步 |
-| multi-pass reduce | 多次 kernel 把 partial sum 汇总成最终结果 | kernel launch 和中间 buffer |
-| reduce max | 把 sum 模式推广到 max | 初值和边界处理 |
-| row-wise reduce | 为 RMSNorm / Softmax 做准备 | 一行一个 block 或多个 warp |
+| 版本                   | 目标                              | 重点观察                              |
+| -------------------- | ------------------------------- | --------------------------------- |
+| CPU reference        | 正确性基准                           | 与 CUDA 输出比较                       |
+| naive reduce         | 每个 block 输出一个 partial sum       | 全局访存和边界处理                         |
+| shared memory reduce | block 内用 shared memory 汇总       | `__syncthreads()` 与 shared memory |
+| warp shuffle reduce  | warp 内用 shuffle 汇总              | 减少 shared memory 和同步              |
+| multi-pass reduce    | 多次 kernel 把 partial sum 汇总成最终结果 | kernel launch 和中间 buffer          |
+| reduce max           | 把 sum 模式推广到 max                 | 初值和边界处理                           |
+| row-wise reduce      | 为 RMSNorm / Softmax 做准备         | 一行一个 block 或多个 warp               |
 
 ---
 
