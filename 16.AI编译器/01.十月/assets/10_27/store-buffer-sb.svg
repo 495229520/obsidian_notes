@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="792" height="320" viewBox="-16 -16 792 320" role="img" aria-label="核心 0 写 x=1 后读 y，核心 1 写 y=1 后读 x。写入仍在各自存储缓冲区，读取从本核 L1 缓存取得旧值 0，因此 r1 与 r2 可以同时为 0。使用 seq_cst 时，x86 将 store 生成为 xchg 来阻止该结果">
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'Noto Sans SC', Arial, sans-serif; font-size: 12.5px; }
+    .mono, .mono text { font-family: 'JetBrains Mono', Consolas, 'Microsoft YaHei', 'Noto Sans SC', monospace; }
+    .sm { font-size: 11px; }
+    .lg { font-size: 14px; font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #4F7FAF; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .box-dash { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .box-acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.4; }
+    .box-blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.2; }
+    .region { fill: none; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 5 4; }
+    .cell-hi { fill: #F5DDD1; stroke: #B0AEA5; stroke-width: 1.2; }
+    .sel { fill: #F5DDD1; stroke: #D97757; stroke-width: 2.2; }
+    .st { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.3; }
+    .st-acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .ring { fill: none; stroke: #D97757; stroke-width: 1.2; }
+    .ln { stroke: #141413; stroke-width: 1.3; fill: none; }
+    .ln-dash { stroke: #141413; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.6; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.4; fill: none; }
+    .ln-blue-dash { stroke: #4F7FAF; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; }
+    .head { fill: #141413; }
+    .head-acc { fill: #D97757; }
+    .head-blue { fill: #4F7FAF; }
+  </style>
+  <rect x="-16" y="-16" width="792" height="320" rx="14" fill="#F0EEE6"/>
+  <defs>
+    <marker id="sbA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker><marker id="sbAAcc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head-acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="sbABlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect class="region" x="0" y="0" width="340" height="190" rx="10"/>
+  <text x="14" y="22" class="lg">核心 0（线程 1）</text>
+  <rect class="box" x="14" y="38" width="156" height="72" rx="6"/>
+  <text x="26" y="62" class="mono sm">① x.store(1);</text>
+  <text x="26" y="92" class="mono sm">② r1 = y.load();</text>
+  <rect class="box-acc" x="200" y="38" width="126" height="46" rx="6"/>
+  <text x="263" y="56" text-anchor="middle" class="sm">存储缓冲区</text>
+  <text x="263" y="75" text-anchor="middle" class="mono">x = 1</text>
+  <rect class="box" x="200" y="124" width="126" height="52" rx="6"/>
+  <text x="263" y="144" text-anchor="middle" class="sm">L1 缓存</text>
+  <text x="263" y="164" text-anchor="middle" class="mono sm">y = 0（旧值）</text>
+  <line class="ln" x1="170" y1="58" x2="198" y2="58" marker-end="url(#sbA)"/>
+  <polyline class="ln" points="170,88 184,88 184,150 198,150" marker-end="url(#sbA)"/>
+  <text x="180" y="124" text-anchor="end" class="sm">读取</text>
+  <line class="ln-dash" x1="263" y1="84" x2="263" y2="122" marker-end="url(#sbA)"/>
+  <text x="270" y="108" class="sm muted">稍后</text>
+  <line class="ln-muted" x1="263" y1="176" x2="263" y2="208"/>
+  <rect class="region" x="420" y="0" width="340" height="190" rx="10"/>
+  <text x="434" y="22" class="lg">核心 1（线程 2）</text>
+  <rect class="box" x="434" y="38" width="156" height="72" rx="6"/>
+  <text x="446" y="62" class="mono sm">① y.store(1);</text>
+  <text x="446" y="92" class="mono sm">② r2 = x.load();</text>
+  <rect class="box-acc" x="620" y="38" width="126" height="46" rx="6"/>
+  <text x="683" y="56" text-anchor="middle" class="sm">存储缓冲区</text>
+  <text x="683" y="75" text-anchor="middle" class="mono">y = 1</text>
+  <rect class="box" x="620" y="124" width="126" height="52" rx="6"/>
+  <text x="683" y="144" text-anchor="middle" class="sm">L1 缓存</text>
+  <text x="683" y="164" text-anchor="middle" class="mono sm">x = 0（旧值）</text>
+  <line class="ln" x1="590" y1="58" x2="618" y2="58" marker-end="url(#sbA)"/>
+  <polyline class="ln" points="590,88 604,88 604,150 618,150" marker-end="url(#sbA)"/>
+  <text x="600" y="124" text-anchor="end" class="sm">读取</text>
+  <line class="ln-dash" x1="683" y1="84" x2="683" y2="122" marker-end="url(#sbA)"/>
+  <text x="690" y="108" class="sm muted">稍后</text>
+  <line class="ln-muted" x1="683" y1="176" x2="683" y2="208"/>
+  <rect class="box-blue" x="0" y="210" width="760" height="38" rx="6"/>
+  <text x="380" y="234" text-anchor="middle">缓存一致性（MESI）· 内存：x = 0, y = 0</text>
+  <text x="0" y="274" class="sm">r1 = 0, r2 = 0：读取时，对方写入仍在其缓冲区 = Store→Load 重排序</text>
+  <text x="0" y="292" class="sm acc-t">解决：均用 seq_cst → x86 用 xchg 实现 store，排空缓冲区后再执行后续 load</text>
+</svg>

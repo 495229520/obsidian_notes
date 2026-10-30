@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430" width="900" height="430" role="img" aria-label="线程 A 持锁期间，自旋等待的 B 占用 CPU 反复检查，锁释放后立即获取；阻塞等待的 B 在休眠期间将核心交给其他线程，但唤醒后还需经历调度延迟才能获取锁">
+  <style>
+    .t { font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', sans-serif; fill: #141413; }
+    .h { font-size: 17px; font-weight: 700; }
+    .b { font-size: 14px; font-weight: 600; }
+    .c { font-size: 12px; }
+    .s { font-size: 12px; fill: #5E5D59; }
+    .tag { font-size: 12px; font-weight: 600; fill: #C15F3C; }
+  </style>
+  <defs>
+    <pattern id="spin" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="#F5DDD3"/>
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#E8B9A6" stroke-width="3"/>
+    </pattern>
+  </defs>
+  <rect width="900" height="430" fill="rgb(245, 244, 237)"/>
+  <text class="t h" x="36" y="40">等待同一把锁的两种方式</text>
+  <text class="t s" x="36" y="60">横轴为时间。线程 A 持锁期间，线程 B 请求同一把锁。</text>
+
+  <!-- release line -->
+  <line x1="520" y1="78" x2="520" y2="352" stroke="#C15F3C" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="t tag" x="526" y="90">A 释放锁</text>
+
+  <!-- thread A -->
+  <text class="t b" x="36" y="125">线程 A</text>
+  <rect x="160" y="104" width="360" height="32" rx="6" fill="#F0EEE6" stroke="#B0AEA5"/>
+  <text class="t c" x="340" y="125" text-anchor="middle">持锁 · 执行临界区</text>
+  <rect x="520" y="104" width="340" height="32" rx="6" fill="#FFFFFF" stroke="#E0DDD3"/>
+  <text class="t c s" x="690" y="125" text-anchor="middle">锁外操作</text>
+
+  <!-- spin panel -->
+  <rect x="16" y="152" width="868" height="96" rx="12" fill="#F0EEE6" fill-opacity="0.5"/>
+  <text class="t b" x="36" y="186">B · 自旋等待</text>
+  <rect x="200" y="166" width="320" height="34" rx="6" fill="url(#spin)" stroke="#D97757" stroke-width="1.5"/>
+  <text class="t c" x="360" y="188" text-anchor="middle">反复检查锁状态 · 持续占用 CPU</text>
+  <rect x="520" y="166" width="340" height="34" rx="6" fill="#E3E8D9" stroke="#788C5D" stroke-width="1.5"/>
+  <text class="t c" x="690" y="188" text-anchor="middle">立即获取 → 进入临界区</text>
+  <text class="t s" x="200" y="226">能及时发现锁已释放，但等待期间该核心无法处理其他工作。</text>
+
+  <!-- block panel -->
+  <rect x="16" y="258" width="868" height="96" rx="12" fill="#F0EEE6" fill-opacity="0.5"/>
+  <text class="t b" x="36" y="292">B · 阻塞等待</text>
+  <rect x="200" y="272" width="40" height="34" rx="6" fill="#F5DDD3" stroke="#D97757"/>
+  <text class="t c" x="220" y="294" text-anchor="middle">失败</text>
+  <rect x="240" y="272" width="280" height="34" rx="6" fill="#FFFFFF" stroke="#B0AEA5" stroke-dasharray="4 3"/>
+  <text class="t c" x="380" y="294" text-anchor="middle">休眠 · 核心供其他线程使用</text>
+  <rect x="520" y="272" width="96" height="34" rx="6" fill="#DCE7F2" stroke="#6A9BCC" stroke-width="1.5"/>
+  <text class="t c" x="568" y="294" text-anchor="middle">唤醒与调度</text>
+  <rect x="616" y="272" width="244" height="34" rx="6" fill="#E3E8D9" stroke="#788C5D" stroke-width="1.5"/>
+  <text class="t c" x="738" y="294" text-anchor="middle">重试 → 获取锁 → 进入临界区</text>
+  <text class="t s" x="200" y="332">等待时让出 CPU，但锁释放后到重新执行之间存在延迟。</text>
+
+  <!-- takeaway -->
+  <text class="t tag" x="36" y="386">判断依据</text>
+  <text class="t s" x="110" y="386">等待时间短于休眠与唤醒成本，且持锁线程持续运行时，自旋可能更有利。</text>
+  <text class="t s" x="110" y="406">等待时间长、难以预测，或锁内需要等待 I/O 时，阻塞通常更合适。最终用测量验证。</text>
+</svg>
