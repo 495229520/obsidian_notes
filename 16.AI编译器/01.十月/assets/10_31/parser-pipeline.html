@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>从 Token 到语义分析</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;600;700&display=swap">
+<style>
+/* 布局：上方为阶段与播放控制，其下是说明、输入和各阶段面板。配色与学习笔记一致。 */
+:root {
+  --bg: #F0EEE6; --paper: #FAF9F5; --ink: #141413; --muted: #6F6D66; --line: #B0AEA5; --dead: #E6E3D9;
+  --acc: #D97757; --on-acc: #141413; --acc-t: #A04A29; --acc-f: #F5DDD1;
+  --blue: #4F7FAF; --blue-t: #3D6A97; --blue-f: #DCE7F2;
+  --green: #5E8A5A; --green-f: #E0EBDB;
+  --sans: Pretendard, 'Noto Sans SC', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', D2Coding, ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1E1D1A; --paper: #2A2925; --ink: #F0EEE6; --muted: #A8A69C; --line: #55534C; --dead: #33322D;
+    --acc: #E08A6C; --on-acc: #141413; --acc-t: #F0A78C; --acc-f: #4B2E22;
+    --blue: #7FA9D3; --blue-t: #A5C4E3; --blue-f: #253648;
+    --green: #8DB888; --green-f: #2A3A28;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1E1D1A; --paper: #2A2925; --ink: #F0EEE6; --muted: #A8A69C; --line: #55534C; --dead: #33322D;
+  --acc: #E08A6C; --on-acc: #141413; --acc-t: #F0A78C; --acc-f: #4B2E22;
+  --blue: #7FA9D3; --blue-t: #A5C4E3; --blue-f: #253648;
+  --green: #8DB888; --green-f: #2A3A28;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 var(--sans); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+[hidden] { display: none !important; }
+button, select, input, textarea { font: inherit; color: inherit; }
+code { font-family: var(--mono); font-size: .92em; background: var(--dead); padding: 0 .3em; border-radius: 3px; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.shell { max-width: 1240px; margin: 0 auto; padding-block: 16px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 12px; }
+.shell > * { min-width: 0; }
+.top h1 { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 700; text-wrap: balance; }
+.top p { margin: 2px 0 0; color: var(--muted); max-width: 76ch; }
+.pipe { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: stretch; }
+.pipe li { display: flex; align-items: center; gap: 4px; }
+.pipe .st { padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); font-size: 13px; white-space: nowrap; }
+.pipe .st small { display: block; font-size: 11px; color: var(--muted); line-height: 1.2; }
+.pipe .st.done { background: var(--blue-f); border-color: var(--blue); }
+.pipe .st.on { background: var(--acc-f); border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); font-weight: 600; }
+.pipe .st.bad { background: var(--acc-f); border-color: var(--acc); border-style: dashed; color: var(--acc-t); }
+.pipe .st.off { color: var(--muted); border-style: dashed; }
+.pipe .ar { color: var(--muted); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+.btns { display: flex; gap: 4px; }
+.btns button { padding: 5px 11px; background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.btns button:hover { background: var(--dead); }
+.btns button:disabled { opacity: .45; cursor: default; }
+.btns .primary { min-width: 88px; background: var(--acc); border-color: var(--acc); color: var(--on-acc); font-weight: 600; }
+.scrub { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.scrub input { flex: 1; min-width: 0; accent-color: var(--acc); }
+.scrub span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.speed { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.speed select { padding: 3px 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; }
+.inputrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: start; }
+.inputrow .ctl { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; }
+.inputrow label { color: var(--muted); }
+.inputrow select { padding: 4px 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; min-width: 0; max-width: 100%; }
+.inputrow textarea { width: 100%; min-height: 58px; padding: 6px 9px; font-family: var(--mono); font-size: 13px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; resize: vertical; }
+.inputrow button { padding: 5px 12px; background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.inputrow button:hover { background: var(--dead); }
+.msg { color: var(--acc-t); font-size: 13px; }
+.cap { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-height: 104px; }
+.cap-ch { font-size: 12px; color: var(--acc-t); font-weight: 600; }
+.cap h2 { margin: 1px 0 4px; font-size: 17px; line-height: 1.35; font-weight: 700; text-wrap: balance; }
+.cap p { margin: 0; max-width: 92ch; }
+.grid { display: grid; gap: 12px; align-items: start; }
+.grid > * { min-width: 0; }
+.g-parse { grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 5fr); }
+.g-sema { grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); }
+.wide { grid-column: 1 / -1; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.panel h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.panel h3 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.panel h3 + h3, .sub { margin-top: 12px; }
+.scroll { overflow-x: auto; }
+.srcv { font-family: var(--mono); font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.srcv .tk { border-radius: 3px; padding: 1px 0; }
+.srcv .tk.used { color: var(--muted); }
+.srcv .tk.now { background: var(--acc-f); box-shadow: 0 0 0 1.5px var(--acc); color: var(--ink); }
+.srcv .tk.bad { background: var(--acc); color: var(--on-acc); }
+.srcv .tk.hl { background: var(--blue-f); box-shadow: 0 0 0 1.5px var(--blue); }
+.toks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.tok { display: inline-grid; text-align: center; border: 1px solid var(--line); border-radius: 5px; background: var(--paper); padding: 1px 7px; min-width: 36px; }
+.tok b { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+.tok i { font-style: normal; font-size: 10.5px; color: var(--muted); font-family: var(--mono); }
+.tok.used { background: transparent; border-style: dashed; color: var(--muted); }
+.tok.now { background: var(--acc-f); border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+.tok.bad { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
+.tok.bad i { color: var(--on-acc); }
+.stk { width: 100%; border-collapse: separate; border-spacing: 0 3px; font-size: 13px; }
+.stk th { font-size: 11px; color: var(--muted); font-weight: 400; text-align: left; padding: 0 6px; }
+.stk td { padding: 3px 6px; background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-family: var(--mono); }
+.stk td:first-child { border-left: 1px solid var(--line); border-radius: 5px 0 0 5px; background: var(--blue-f); color: var(--blue-t); font-weight: 600; text-align: center; width: 44px; }
+.stk td:last-child { border-right: 1px solid var(--line); border-radius: 0 5px 5px 0; font-size: 12px; overflow-wrap: anywhere; }
+.stk td.sym { text-align: center; width: 48px; }
+.stk tr.top td { border-color: var(--acc); }
+.stk tr.new td:not(:first-child) { background: var(--acc-f); }
+.stk tr.bot td { color: var(--muted); }
+.note { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.row { display: flex; flex-wrap: wrap; gap: 4px; }
+.ac { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; background: var(--paper); white-space: nowrap; }
+.ac.s { background: var(--blue-f); border-color: var(--blue); }
+.ac.r { background: var(--acc-f); border-color: var(--acc); }
+.ac.a { background: var(--green-f); border-color: var(--green); }
+.ac.g { background: var(--dead); }
+.ac.hit { box-shadow: 0 0 0 2px var(--ink); font-weight: 600; }
+.ac.miss { background: var(--acc); color: var(--on-acc); border-color: var(--acc); font-weight: 600; }
+.items { font-family: var(--mono); font-size: 12.5px; display: grid; gap: 1px; margin-top: 4px; }
+.items div { padding: 1px 6px; border-radius: 4px; }
+.items div.done { background: var(--acc-f); }
+.sem { margin-top: 10px; border: 1px solid var(--acc); border-radius: 8px; padding: 8px 10px; background: var(--paper); }
+.sem .rl { font-family: var(--mono); font-weight: 600; }
+.sem .cd { font-family: var(--mono); font-size: 12.5px; color: var(--acc-t); margin: 2px 0 6px; }
+.sem table { border-collapse: collapse; font-size: 12.5px; }
+.sem td { padding: 1px 8px 1px 0; vertical-align: top; }
+.sem td:first-child { font-family: var(--mono); color: var(--muted); }
+.sem td.v { font-family: var(--mono); overflow-wrap: anywhere; }
+.sem .res { margin-top: 6px; font-weight: 600; }
+.ast { display: block; margin: 0 auto; max-width: none; }
+.ast .e { stroke: var(--line); stroke-width: 1.3; fill: none; }
+.ast .n rect { fill: var(--paper); stroke: var(--line); stroke-width: 1.2; }
+.ast .n.st rect { fill: var(--dead); }
+.ast .n.ex rect { fill: var(--blue-f); stroke: var(--blue); }
+.ast .n.new rect { fill: var(--acc-f); stroke: var(--acc); stroke-width: 2.2; }
+.ast .n.cur rect { fill: var(--acc-f); stroke: var(--acc); stroke-width: 2.4; }
+.ast .n.bad rect { stroke: var(--acc); stroke-dasharray: 4 3; stroke-width: 2; }
+.ast .n.dim { opacity: .45; }
+.ast text { fill: var(--ink); font: 12px var(--mono); text-anchor: middle; }
+.ast text.id { fill: var(--muted); font: 10px var(--sans); text-anchor: start; }
+.ast text.ty { fill: var(--blue-t); font: 600 11px var(--mono); }
+.ast text.ty.err { fill: var(--acc-t); }
+.ast .ptr { stroke: var(--acc); stroke-width: 1.4; stroke-dasharray: 3 3; fill: none; }
+.ast text.pl { fill: var(--acc-t); font: 10.5px var(--mono); }
+.sym { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sym th, .sym td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--dead); }
+.sym th { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+.sym td { font-family: var(--mono); }
+.sym tr.new td { background: var(--blue-f); }
+.sym tr.hit td { background: var(--acc-f); }
+.diag { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.diag li { font-size: 13px; padding: 4px 8px; border-radius: 5px; background: var(--acc-f); border: 1px solid var(--acc); }
+.diag li.new { box-shadow: inset 0 0 0 1px var(--acc); font-weight: 600; }
+.ok { font-size: 13px; color: var(--green); font-weight: 600; }
+.order { display: flex; flex-wrap: wrap; gap: 3px; }
+.order span { font-family: var(--mono); font-size: 11.5px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--line); }
+.order span.done { background: var(--blue-f); border-color: var(--blue); }
+.order span.cur { background: var(--acc-f); border-color: var(--acc); font-weight: 600; }
+.stat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--paper); }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+.ref { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.ref summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.ref table { border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+.ref td { padding: 2px 10px 2px 0; font-family: var(--mono); vertical-align: top; }
+.ref td.k { color: var(--muted); }
+.ref td.a { color: var(--acc-t); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.foot { font-size: 12px; color: var(--muted); max-width: 92ch; }
+.foot p { margin: 0 0 4px; }
+@keyframes pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes rise { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+.stk tr.new, .diag li.new, .sym tr.new { animation: rise .4s ease-out; }
+#stage[data-dir="b"] * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 980px) {
+  .g-parse { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .g-parse .astp { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .g-parse, .g-sema { grid-template-columns: minmax(0, 1fr); }
+  .inputrow { grid-template-columns: minmax(0, 1fr); }
+  .cap { min-height: 136px; }
+  .stat b { font-size: 18px; }
+  .btns button { padding: 5px 8px; }
+  .btns .primary { min-width: 72px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <h1>从 Token 到语义分析</h1>
+    <p>表驱动的 SLR(1) 分析器通过包含状态、符号和值的栈读取词法分析器生成的 Token 流，在归约时执行语义动作，构建 AST。完成的 AST 交给语义分析器，进行名称解析和类型检查。</p>
+  </header>
+  <ol class="pipe" id="pipe" aria-label="编译器阶段"></ol>
+  <div class="bar" role="group" aria-label="播放控制">
+    <div class="btns">
+      <button type="button" id="b-first" title="回到开头 (Home)">开头</button>
+      <button type="button" id="b-prev" title="上一步 (←)">上一步</button>
+      <button type="button" id="b-play" class="primary" aria-pressed="false" title="播放或暂停 (Space)">播放</button>
+      <button type="button" id="b-next" title="下一步 (→)">下一步</button>
+    </div>
+    <div class="scrub">
+      <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="跳转步骤">
+      <span id="pos">1 / 1</span>
+    </div>
+    <label class="speed">速度
+      <select id="speed">
+        <option value="0.6">慢速</option>
+        <option value="1" selected>正常</option>
+        <option value="1.6">快速</option>
+        <option value="2.5">很快</option>
+      </select>
+    </label>
+  </div>
+  <form class="inputrow" id="input-form">
+    <div>
+      <label for="input-text" class="sr">程序</label>
+      <textarea id="input-text" spellcheck="false" autocomplete="off" rows="2"></textarea>
+    </div>
+    <div class="ctl">
+      <label for="input-preset">示例</label>
+      <select id="input-preset"></select>
+      <button type="submit">运行此程序</button>
+      <span class="msg" id="input-msg" role="status"></span>
+    </div>
+  </form>
+  <section class="cap" aria-live="polite">
+    <div class="cap-ch" id="cap-ch"></div>
+    <h2 id="cap-h"></h2>
+    <p id="cap-p"></p>
+  </section>
+  <main id="stage" data-dir="b"></main>
+  <details class="ref" id="ref"></details>
+  <footer class="foot">
+    <p>文法：P → P St | St, St → let id = E ; | id = E ;, E → E + T | T, T → T * F | F, F → ( E ) | num | id | true | false。该文法没有 SLR(1) 冲突，共有 26 个状态。状态编号由分析表生成器分配。</p>
+    <p>本语言的规则：名称须先用 let 声明再使用，不允许重复声明。+ 和 * 的两个操作数都必须是 int。赋值时，右侧类型必须与变量声明的类型一致。</p>
+    <p>键盘：Space 播放或暂停，← → 前后移动一步，Home 和 End 跳到开头和结尾。</p>
+  </footer>
+  <noscript><p>本页面使用 JavaScript 绘制演示，请启用脚本。</p></noscript>
+</div>
+<script type="application/json" id="pp-data">{"terms":["let","id","=",";","+","*","(",")","num","true","false","$"],"nts":["P","St","E","T","F"],"rules":[["S'",["P"],"","accept"],["P",["P","St"],"$1.body.push($2); $$ = $1;","append"],["P",["St"],"$$ = Program([$1]);","program"],["St",["let","id","=","E",";"],"$$ = Let($2, $4);","let"],["St",["id","=","E",";"],"$$ = Assign($1, $3);","assign"],["E",["E","+","T"],"$$ = Binary('+', $1, $3);","bin"],["E",["T"],"$$ = $1;  (默认动作)","pass"],["T",["T","*","F"],"$$ = Binary('*', $1, $3);","bin"],["T",["F"],"$$ = $1;  (默认动作)","pass"],["F",["(","E",")"],"$$ = $2;  (不保留括号)","paren"],["F",["num"],"$$ = IntLit($1);","int"],["F",["id"],"$$ = Name($1);","name"],["F",["true"],"$$ = BoolLit(true);","bool"],["F",["false"],"$$ = BoolLit(false);","bool"]],"action":{"0,id":"s4","0,let":"s3","1,$":"acc","1,id":"s4","1,let":"s3","2,id":"r2","2,$":"r2","2,let":"r2","3,id":"s6","4,=":"s7","5,id":"r1","5,$":"r1","5,let":"r1","6,=":"s8","7,(":"s13","7,id":"s12","7,true":"s15","7,false":"s16","7,num":"s14","8,(":"s13","8,id":"s12","8,true":"s15","8,false":"s16","8,num":"s14","9,+":"s19","9,;":"s18","10,;":"r6","10,+":"r6","10,)":"r6","10,*":"s20","11,)":"r8","11,;":"r8","11,+":"r8","11,*":"r8","12,)":"r11","12,;":"r11","12,+":"r11","12,*":"r11","13,(":"s13","13,id":"s12","13,true":"s15","13,false":"s16","13,num":"s14","14,)":"r10","14,;":"r10","14,+":"r10","14,*":"r10","15,)":"r12","15,;":"r12","15,+":"r12","15,*":"r12","16,)":"r13","16,;":"r13","16,+":"r13","16,*":"r13","17,+":"s19","17,;":"s22","18,id":"r4","18,$":"r4","18,let":"r4","19,(":"s13","19,id":"s12","19,true":"s15","19,false":"s16","19,num":"s14","20,(":"s13","20,num":"s14","20,id":"s12","20,true":"s15","20,false":"s16","21,)":"s25","21,+":"s19","22,id":"r3","22,$":"r3","22,let":"r3","23,;":"r5","23,+":"r5","23,)":"r5","23,*":"s20","24,)":"r7","24,;":"r7","24,+":"r7","24,*":"r7","25,)":"r9","25,;":"r9","25,+":"r9","25,*":"r9"},"goto":{"0,P":1,"0,St":2,"1,St":5,"7,E":9,"7,T":10,"7,F":11,"8,E":17,"8,T":10,"8,F":11,"13,E":21,"13,T":10,"13,F":11,"19,T":23,"19,F":11,"20,F":24},"kernels":[["S' → · P"],["S' → P ·","P → P · St"],["P → St ·"],["St → let · id = E ;"],["St → id · = E ;"],["P → P St ·"],["St → let id · = E ;"],["St → id = · E ;"],["St → let id = · E ;"],["St → id = E · ;","E → E · + T"],["E → T ·","T → T · * F"],["T → F ·"],["F → id ·"],["F → ( · E )"],["F → num ·"],["F → true ·"],["F → false ·"],["St → let id = E · ;","E → E · + T"],["St → id = E ; ·"],["E → E + · T"],["T → T * · F"],["E → E · + T","F → ( E · )"],["St → let id = E ; ·"],["E → E + T ·","T → T · * F"],["T → T * F ·"],["F → ( E ) ·"]],"presets":[["let y = 4;\nlet x = 2 * (y + 3);","默认：通过"],["let x = 2 * (z + 3);","语义错误：名称未声明"],["let b = true;\nlet x = b + 1;","语义错误：类型不匹配"],["let y = 1;\ny = y * (y + 1);","赋值语句"],["let y = 1;\nlet y = 2;","语义错误：重复声明"],["let x = 2 * (y + );","语法错误"],["let x = 1 # 2;","词法错误"]],"maxTokens":40,"follow":{"P":["let","id","$"],"St":["let","id","$"],"E":[";","+",")"],"T":[";","+","*",")"],"F":[";","+","*",")"]}}</script>
+<script>
+(function () {
+  'use strict';
+  const D = JSON.parse(document.getElementById('pp-data').textContent);
+  const byId = function (id) { return document.getElementById(id); };
+  function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+  function esc(s) {
+    return String(s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('"').join('&quot;');
+  }
+  function code(s) { return '<code>' + esc(s) + '</code>'; }
+  function plainLen(html) {
+    let n = 0;
+    let inTag = false;
+    for (let i = 0; i < html.length; i++) {
+      const c = html.charAt(i);
+      if (c === '<') { inTag = true; } else if (c === '>') { inTag = false; } else if (!inTag) { n++; }
+    }
+    return n;
+  }
+
+  /* ---------- 词法分析器 ---------- */
+  const LETTERS = {};
+  const DIGITS = {};
+  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'.split('').forEach(function (c) { LETTERS[c] = true; });
+  '0123456789'.split('').forEach(function (c) { DIGITS[c] = true; });
+  const PUNCT = { '=': true, '+': true, '*': true, '(': true, ')': true, ';': true };
+  const KEYWORDS = { 'let': true, 'true': true, 'false': true };
+
+  function lex(src) {
+    const toks = [];
+    const n = src.length;
+    let i = 0;
+    let line = 1;
+    let col = 1;
+    while (i < n) {
+      const c = src.charAt(i);
+      if (c === '\n') { i += 1; line += 1; col = 1; continue; }
+      if (c === ' ' || c === '\t' || c === '\r') { i += 1; col += 1; continue; }
+      const st = i;
+      const sl = line;
+      const sc = col;
+      let k = '';
+      let w = '';
+      if (has(LETTERS, c)) {
+        while (i < n && (has(LETTERS, src.charAt(i)) || has(DIGITS, src.charAt(i)))) { i += 1; }
+        w = src.slice(st, i);
+        k = has(KEYWORDS, w) ? w : 'id';
+      } else if (has(DIGITS, c)) {
+        while (i < n && has(DIGITS, src.charAt(i))) { i += 1; }
+        k = 'num';
+        w = src.slice(st, i);
+        if (w.length > 9) { return { tokens: toks, error: { msg: sl + ':' + sc + ' 处的数字 ' + w + ' 过长（最多 9 位）', line: sl, col: sc, start: st, end: i } }; }
+      } else if (has(PUNCT, c)) {
+        i += 1;
+        k = c;
+        w = c;
+      } else {
+        return { tokens: toks, error: { msg: sl + ':' + sc + " 处的 '" + c + "' 不是本语言的 Token", line: sl, col: sc, start: st, end: st + 1 } };
+      }
+      col += i - st;
+      toks.push({ k: k, text: w, line: sl, col: sc, start: st, end: i });
+      if (toks.length > D.maxTokens) { return { tokens: toks, error: { msg: '最多接受 ' + D.maxTokens + ' 个 Token', line: sl, col: sc, start: st, end: i } }; }
+    }
+    toks.push({ k: '$', text: '', line: line, col: col, start: n, end: n });
+    return { tokens: toks, error: null };
+  }
+
+  /* ---------- 表驱动的 SLR(1) 分析器与语义动作 ---------- */
+  function label(nd) {
+    const k = nd.kind;
+    if (k === 'Program') { return '程序'; }
+    if (k === 'Let') { return '声明 ' + nd.name; }
+    if (k === 'Assign') { return '赋值 ' + nd.name; }
+    if (k === 'Binary') { return '二元运算 ' + nd.op; }
+    if (k === 'Name') { return '名称 ' + nd.name; }
+    if (k === 'Int') { return '整数 ' + nd.value; }
+    return '布尔 ' + nd.value;
+  }
+
+  function parse(toks) {
+    const nodes = [];
+    function mk(kind, kids, tok, name, op, value) {
+      const nd = { id: nodes.length + 1, kind: kind, kids: kids.slice(), tok: tok, name: name, op: op, value: value };
+      nd.label = label(nd);
+      nodes.push(nd);
+      return nd.id;
+    }
+    function vtext(e) {
+      if (e.node) { return '#' + e.node + ' ' + nodes[e.node - 1].label; }
+      if (e.sym === 'id') { return '"' + toks[e.tok].text + '"'; }
+      if (e.sym === 'num') { return toks[e.tok].text; }
+      return '—';
+    }
+    const stack = [{ st: 0, sym: '⊥', node: 0, tok: -1 }];
+    const steps = [];
+    let p = 0;
+    function snap(d) {
+      d.stack = stack.map(function (e) { return [e.st, e.sym, e.sym === '⊥' ? '' : vtext(e)]; });
+      d.onStack = stack.map(function (e) { return e.node; });
+      d.count = nodes.length;
+      const prog = nodes.filter(function (x) { return x.kind === 'Program'; });
+      d.prog = prog.length ? prog[0].kids.slice() : [];
+      steps.push(d);
+    }
+    while (true) {
+      const s = stack[stack.length - 1].st;
+      const a = toks[p].k;
+      const key = s + ',' + a;
+      if (!has(D.action, key)) {
+        const exp = D.terms.filter(function (t) { return has(D.action, s + ',' + t); });
+        snap({ act: 'error', state: s, la: p, expected: exp });
+        return { steps: steps, nodes: nodes, status: 'error', root: 0 };
+      }
+      const act = D.action[key];
+      if (act.charAt(0) === 's') {
+        const to = Number(act.slice(1));
+        stack.push({ st: to, sym: a, node: 0, tok: p });
+        p += 1;
+        snap({ act: 'shift', state: s, la: p - 1, to: to });
+      } else if (act === 'acc') {
+        snap({ act: 'accept', state: s, la: p });
+        return { steps: steps, nodes: nodes, status: 'ok', root: stack[stack.length - 1].node };
+      } else {
+        const r = Number(act.slice(1));
+        const rule = D.rules[r];
+        const lhs = rule[0];
+        const m = rule[1].length;
+        const kind = rule[3];
+        const vals = stack.slice(stack.length - m);
+        const popped = vals.map(function (e) { return [e.st, e.sym, vtext(e)]; });
+        for (let q = 0; q < m; q++) { stack.pop(); }
+        let node = 0;
+        let made = 0;
+        if (kind === 'append') { node = vals[0].node; nodes[node - 1].kids.push(vals[1].node); nodes[node - 1].label = label(nodes[node - 1]); }
+        else if (kind === 'program') { node = mk('Program', [vals[0].node], -1, '', '', ''); made = node; }
+        else if (kind === 'let') { node = mk('Let', [vals[3].node], vals[1].tok, toks[vals[1].tok].text, '', ''); made = node; }
+        else if (kind === 'assign') { node = mk('Assign', [vals[2].node], vals[0].tok, toks[vals[0].tok].text, '', ''); made = node; }
+        else if (kind === 'bin') { node = mk('Binary', [vals[0].node, vals[2].node], vals[1].tok, '', vals[1].sym, ''); made = node; }
+        else if (kind === 'pass') { node = vals[0].node; }
+        else if (kind === 'paren') { node = vals[1].node; }
+        else if (kind === 'int') { node = mk('Int', [], vals[0].tok, '', '', toks[vals[0].tok].text); made = node; }
+        else if (kind === 'name') { node = mk('Name', [], vals[0].tok, toks[vals[0].tok].text, '', ''); made = node; }
+        else { node = mk('Bool', [], vals[0].tok, '', '', vals[0].sym); made = node; }
+        const base = stack[stack.length - 1].st;
+        const j = D.goto[base + ',' + lhs];
+        stack.push({ st: j, sym: lhs, node: node, tok: -1 });
+        snap({ act: 'reduce', state: s, la: p, rule: r, popped: popped, base: base, to: j, made: made });
+      }
+    }
+  }
+
+  /* ---------- 语义分析器：后序遍历、符号表、类型 ---------- */
+  function analyze(nodes, root, toks) {
+    const types = {};
+    const sym = [];
+    const diags = [];
+    const events = [];
+    function pos(nd) {
+      if (nd.tok < 0) { return ''; }
+      const t = toks[nd.tok];
+      return t.line + ':' + t.col;
+    }
+    function find(name) {
+      const hit = sym.filter(function (e) { return e.name === name; });
+      return hit.length ? hit[0] : null;
+    }
+    function ev(nd, msg, ok) {
+      events.push({ node: nd.id, msg: msg, ok: ok, types: Object.assign({}, types), sym: sym.map(function (e) { return [e.name, e.type, e.at, e.node]; }), diags: diags.slice() });
+    }
+    function visit(i) {
+      const nd = nodes[i - 1];
+      const k = nd.kind;
+      nd.kids.forEach(function (c) { visit(c); });
+      if (k === 'Int') { types[i] = 'int'; ev(nd, '整数字面量：int', true); }
+      else if (k === 'Bool') { types[i] = 'bool'; ev(nd, '布尔字面量：bool', true); }
+      else if (k === 'Name') {
+        const e = find(nd.name);
+        if (e) { types[i] = e.type; ev(nd, "'" + nd.name + "' 已在符号表中找到，类型：" + e.type + ' (' + e.at + ' 处声明)', true); }
+        else { types[i] = 'error'; diags.push(pos(nd) + " 未声明的名称 '" + nd.name + "'"); ev(nd, "'" + nd.name + "' 不在符号表中", false); }
+      } else if (k === 'Binary') {
+        const lt = types[nd.kids[0]];
+        const rt = types[nd.kids[1]];
+        if (lt === 'error' || rt === 'error') { types[i] = 'error'; ev(nd, '操作数已有错误，不再重复报错', false); }
+        else if (lt === 'int' && rt === 'int') { types[i] = 'int'; ev(nd, 'int ' + nd.op + ' int → int', true); }
+        else { types[i] = 'error'; diags.push(pos(nd) + " '" + nd.op + "' 的操作数必须是 int (" + lt + ' ' + nd.op + ' ' + rt + ')'); ev(nd, lt + ' ' + nd.op + ' ' + rt + ': 类型不匹配', false); }
+      } else if (k === 'Let') {
+        const t = types[nd.kids[0]];
+        const e = find(nd.name);
+        if (e) { diags.push(pos(nd) + " 已声明的名称 '" + nd.name + "' (" + e.at + ' 处声明)'); ev(nd, "'" + nd.name + "' 已存在", false); }
+        else { sym.push({ name: nd.name, type: t, at: pos(nd), node: i }); ev(nd, "向符号表加入 '" + nd.name + "': " + t, true); }
+      } else if (k === 'Assign') {
+        const t = types[nd.kids[0]];
+        const e = find(nd.name);
+        if (!e) { diags.push(pos(nd) + " 未声明的名称 '" + nd.name + "'"); ev(nd, "赋值目标 '" + nd.name + "' 不在符号表中", false); }
+        else if (t !== 'error' && e.type !== 'error' && t !== e.type) { diags.push(pos(nd) + ' 赋值类型不匹配： ' + nd.name + ': ' + e.type + ' ← ' + t); ev(nd, nd.name + ' 的声明类型为 ' + e.type + '，收到 ' + t + ' 类型的值', false); }
+        else { ev(nd, "'" + nd.name + "' (" + e.type + ') 的赋值：类型匹配', true); }
+      } else {
+        ev(nd, '已检查全部 ' + nd.kids.length + ' 条语句', diags.length === 0);
+      }
+    }
+    visit(root);
+    return { events: events, diags: diags, sym: sym, types: types };
+  }
+
+  /* ---------- 生成演示帧 ---------- */
+  const STAGES = [['源代码', '字符'], ['词法分析器', '字符 → Token'], ['Token 流', 'yylex'], ['语法分析器', '栈 · 分析表'], ['AST', '语义动作'], ['语义分析器', '名称 · 类型'], ['IR 生成', '下一阶段']];
+  function ruleText(r) { const x = D.rules[r]; return x[0] + ' → ' + (x[1].length ? x[1].join(' ') : 'ε'); }
+  function tokName(t) { return t.k === '$' ? '$ (输入结束)' : t.k === t.text ? t.k : t.k + ' "' + t.text + '"'; }
+
+  function build(src) {
+    const L = lex(src);
+    const ctx = { src: src, toks: L.tokens, lexErr: L.error, P: null, S: null };
+    const frames = [];
+    const ntok = L.tokens.length - (L.error ? 0 : 1);
+    if (L.error) {
+      frames.push({ ph: 'lex', stage: 1, h: '词法分析：将字符组合成 Token', p: '从左到右读取源代码，每次识别当前可匹配的最长 Token。生成 ' + ntok + ' 个 Token 后停止。' });
+      frames.push({ ph: 'lexerr', stage: 1, h: '词法错误：无法进入语法分析', p: esc(L.error.msg) + '。词法分析停止后，Token 流中断，语法分析和语义分析都不会执行。' });
+      return { ctx: ctx, frames: frames };
+    }
+    frames.push({ ph: 'lex', stage: 2, h: '词法分析器: 字符 ' + src.length + ' 个 → Token ' + ntok + ' 个', p: '每个 Token 都带有种类、文本和源代码位置（行:列）。空白和换行在此被跳过，末尾添加输入结束标记 ' + code('$') + '。分析器在需要向前看 Token 时才逐个读取，而非一次接收整个流。这就是 Bison 生成的分析器调用 ' + code('yylex()') + ' 的方式。' });
+    const P = parse(L.tokens);
+    ctx.P = P;
+    frames.push({ ph: 'pinit', stage: 3, h: '开始语法分析：栈中为 ⟨0, ⊥⟩', p: '栈底只有初始状态 0。状态 0 的核心项是 ' + code("S' → · P") + '。读取第一个向前看 Token ' + code(L.tokens[0].k) + '，查询 ' + code('ACTION[0, ' + L.tokens[0].k + ']') + '。决策只依赖栈顶状态和向前看 Token。' });
+    let reductions = 0;
+    P.steps.forEach(function (s, i) {
+      const t = L.tokens[s.la];
+      let h = '';
+      let p = '';
+      if (s.act === 'shift') {
+        h = '移进 ' + tokName(t);
+        p = code('ACTION[' + s.state + ', ' + t.k + '] = s' + s.to) + '。将 Token 以 ⟨' + s.to + ', ' + t.k + '⟩ 入栈。';
+        if (t.k === 'id' || t.k === 'num') { p += ' 值字段保存词法分析器提供的文本 ' + code(t.k === 'id' ? '"' + t.text + '"' : t.text) + '，对应 Bison 中的 ' + code('yylval') + '。'; }
+        else { p += ' 此 Token 仅用于语法判断，不携带语义值。'; }
+      } else if (s.act === 'reduce') {
+        reductions += 1;
+        const rule = D.rules[s.rule];
+        h = '归约 ' + ruleText(s.rule);
+        p = code('ACTION[' + s.state + ', ' + t.k + '] = r' + s.rule) + '。弹出产生式右部对应的 ' + rule[1].length + ' 个栈项，执行语义动作 ' + code(rule[2]) + '。';
+        if (s.made) { p += '生成新节点 ' + code('#' + s.made + ' ' + P.nodes[s.made - 1].label) + '。'; }
+        else if (rule[3] === 'append') { p += '向程序（Program）节点追加一条语句。'; }
+        else { p += '不创建新节点，直接传递子节点。因此，语法分析树中的某些节点不会保留在 AST 中。'; }
+        p += '弹栈后露出状态 ' + s.base + '，查询 ' + code('GOTO[' + s.base + ', ' + rule[0] + '] = ' + s.to) + '.';
+      } else if (s.act === 'accept') {
+        h = '接受：AST 构建完成';
+        p = code('ACTION[' + s.state + ', $] = acc') + '。栈底之上只剩 ⟨' + s.stack[1][0] + ', P, ' + s.stack[1][2] + '⟩，其中的值指向 AST 根节点。';
+      } else {
+        h = '语法错误: ACTION[' + s.state + ', ' + t.k + '] 为空';
+        p = t.line + ':' + t.col + ' 处的 ' + code(t.k === '$' ? '$' : t.text) + ' 前停止。该状态允许出现的 Token 为 ' + code('{ ' + s.expected.join(', ') + ' }') + '。错误 Token 不入栈。';
+      }
+      frames.push({ ph: 'parse', stage: s.act === 'accept' ? 4 : 3, i: i, h: h, p: p, bad: s.act === 'error' });
+    });
+    if (P.status !== 'ok') {
+      frames.push({ ph: 'perr', stage: 3, h: 'AST 未完成：不进入语义分析', p: '语法有误时，AST 无法构建完成。实际编译器会报告错误，并可能根据错误恢复规则继续分析后续语句。本页面在第一个错误处停止。' });
+      return { ctx: ctx, frames: frames };
+    }
+    const S = analyze(P.nodes, P.root, L.tokens);
+    ctx.S = S;
+    ctx.stat = { tree: ntok + reductions, ast: P.nodes.length, red: reductions, tok: ntok };
+    frames.push({ ph: 'handoff', stage: 5, h: '将 AST 交给语义分析器', p: '分析器读取了 ' + ntok + ' 个 Token，执行了 ' + reductions + ' 次归约。语法分析树本应有 ' + (ntok + reductions) + ' 个节点，而 AST 只有 ' + P.nodes.length + ' 个节点。括号、分号以及 ' + code('E → T') + ' 这样的单分支推导都没有保留。语义分析器从子节点开始后序遍历，解析名称并标注类型。' });
+    S.events.forEach(function (e, i) {
+      const nd = P.nodes[e.node - 1];
+      frames.push({ ph: 'sema', stage: 5, i: i, h: '#' + nd.id + ' ' + nd.label + (e.ok ? '' : ': 错误'), p: esc(e.msg) + '。' + (nd.kind === 'Name' && e.ok ? ' 将名称关联到对应声明的过程称为名称解析。' : '') + (nd.kind === 'Let' && e.ok ? ' 后续语句可以使用这个名称。' : ''), bad: !e.ok });
+    });
+    if (S.diags.length === 0) {
+      frames.push({ ph: 'done', stage: 6, h: '通过：带类型的 AST 和符号表进入下一阶段', p: '没有语义错误。所有表达式都已标注类型，所有名称都已关联到声明。这些结果将作为 IR 生成的输入；使用 MLIR 时，可据此构建 dialect 中的操作。' });
+    } else {
+      frames.push({ ph: 'done', stage: 5, h: '语义错误 ' + S.diags.length + ' 个：语法正确，语义有误', p: '语法分析器接受了这段输入，但名称是否已声明、类型是否匹配都依赖上下文，通常交给语义分析器检查（第 9 讲）。存在错误时，不进入 IR 生成阶段。', bad: true });
+    }
+    return { ctx: ctx, frames: frames };
+  }
+
+  /* ---------- 绘制 ---------- */
+  function pipeHtml(f) {
+    let s = '';
+    STAGES.forEach(function (st, i) {
+      let c = 'st';
+      if (i < f.stage) { c += ' done'; }
+      if (i === f.stage) { c += f.bad || f.ph === 'lexerr' || f.ph === 'perr' ? ' bad' : ' on'; }
+      if (i > f.stage) { c += ' off'; }
+      if (i > 0) { s += '<li class="ar" aria-hidden="true">→</li>'; }
+      s += '<li><span class="' + c + '">' + esc(st[0]) + '<small>' + esc(st[1]) + '</small></span></li>';
+    });
+    return s;
+  }
+
+  function srcHtml(ctx, cur, used, bad, hl) {
+    const toks = ctx.toks;
+    let s = '<pre class="srcv">';
+    let at = 0;
+    toks.forEach(function (t, i) {
+      if (t.k === '$') { return; }
+      s += esc(ctx.src.slice(at, t.start));
+      let c = 'tk';
+      if (i < used) { c += ' used'; }
+      if (i === cur) { c += bad ? ' bad' : ' now'; }
+      if (hl && hl.indexOf(i) >= 0) { c += ' hl'; }
+      s += '<span class="' + c + '">' + esc(ctx.src.slice(t.start, t.end)) + '</span>';
+      at = t.end;
+    });
+    if (ctx.lexErr) {
+      s += esc(ctx.src.slice(at, ctx.lexErr.start)) + '<span class="tk bad">' + esc(ctx.src.slice(ctx.lexErr.start, ctx.lexErr.end)) + '</span>' + esc(ctx.src.slice(ctx.lexErr.end));
+    } else {
+      s += esc(ctx.src.slice(at));
+    }
+    return s + '</pre>';
+  }
+
+  function toksHtml(ctx, cur, used, bad) {
+    let s = '<div class="toks">';
+    ctx.toks.forEach(function (t, i) {
+      let c = 'tok';
+      if (i < used) { c += ' used'; }
+      if (i === cur) { c += bad ? ' bad' : ' now'; }
+      const pos = t.k === '$' ? '结束' : t.line + ':' + t.col;
+      s += '<span class="' + c + '"><b>' + esc(t.k) + '</b><i>' + esc(t.k === 'id' || t.k === 'num' ? t.text : pos) + '</i></span>';
+    });
+    return s + '</div>';
+  }
+
+  function inputPanel(ctx, cur, used, bad) {
+    return '<section class="panel wide"><h3>源代码与 Token 流 <small>橙色为向前看 Token，虚线为已读 Token</small></h3>' + srcHtml(ctx, cur, used, bad, null) + toksHtml(ctx, cur, used, bad) + '</section>';
+  }
+
+  function stackHtml(step) {
+    let s = '<table class="stk"><thead><tr><th>状态</th><th>符号</th><th>值</th></tr></thead><tbody>';
+    const n = step.stack.length;
+    for (let i = n - 1; i >= 0; i--) {
+      const e = step.stack[i];
+      let c = '';
+      if (i === n - 1) { c = 'top'; if (step.act === 'shift' || step.act === 'reduce') { c += ' new'; } }
+      if (i === 0) { c += ' bot'; }
+      s += '<tr class="' + c + '"><td>' + esc(e[0]) + '</td><td class="sym">' + esc(e[1]) + '</td><td>' + esc(e[2] || '栈底') + '</td></tr>';
+    }
+    return s + '</tbody></table>';
+  }
+
+  function rowChips(state, used, miss) {
+    let s = '<div class="row">';
+    let any = false;
+    D.terms.forEach(function (t) {
+      const key = state + ',' + t;
+      if (!has(D.action, key)) { return; }
+      any = true;
+      const a = D.action[key];
+      const c = a === 'acc' ? 'a' : a.charAt(0);
+      s += '<span class="ac ' + c + (t === used ? ' hit' : '') + '">' + esc(t) + ' → ' + esc(a) + '</span>';
+    });
+    if (miss) { s += '<span class="ac miss">' + esc(miss) + ' → 空白</span>'; }
+    return s + '</div>' + (any ? '' : '<p class="note">空行</p>');
+  }
+  function gotoChips(state, used) {
+    let s = '<div class="row">';
+    D.nts.forEach(function (x) {
+      const key = state + ',' + x;
+      if (!has(D.goto, key)) { return; }
+      s += '<span class="ac g' + (x === used ? ' hit' : '') + '">' + esc(x) + ' → ' + D.goto[key] + '</span>';
+    });
+    return s + '</div>';
+  }
+
+  function lookupPanel(ctx, step) {
+    const t = ctx.toks[step.la];
+    let s = '<section class="panel"><h3>查表 <small>状态 ' + step.state + ' 的 ACTION 行，空白项表示错误</small></h3>';
+    s += rowChips(step.state, step.act === 'error' ? '' : t.k, step.act === 'error' ? t.k : '');
+    s += '<h3 class="sub">状态 ' + step.state + ' 的核心项</h3><div class="items">';
+    D.kernels[step.state].forEach(function (it) { s += '<div' + (it.charAt(it.length - 1) === '·' ? ' class="done"' : '') + '>' + esc(it) + '</div>'; });
+    s += '</div>';
+    if (step.act === 'reduce') {
+      const rule = D.rules[step.rule];
+      s += '<h3 class="sub">GOTO 表中状态 ' + step.base + ' 的行 <small>弹栈后露出的状态</small></h3>' + gotoChips(step.base, rule[0]);
+      s += '<div class="sem"><div class="rl">r' + step.rule + ': ' + esc(ruleText(step.rule)) + '</div><div class="cd">' + esc(rule[2]) + '</div><table><tbody>';
+      step.popped.forEach(function (e, i) { s += '<tr><td>$' + (i + 1) + '</td><td>' + esc(e[1]) + '</td><td class="v">' + esc(e[2]) + '</td></tr>'; });
+      s += '</tbody></table><div class="res">$$ = ' + esc(step.stack[step.stack.length - 1][2]) + '</div></div>';
+    }
+    return s + '</section>';
+  }
+
+  /* AST：从左向右排列各棵树。 */
+  const LEVEL = 54;
+  function nodeW(lbl) { return Math.max(44, Array.from(lbl).reduce(function (w, c) { return w + (c.charCodeAt(0) > 255 ? 14 : 7.4); }, 18)); }
+  function layoutForest(roots, kidsOf, labelOf) {
+    const pos = {};
+    let cursor = 12;
+    let maxD = 0;
+    function walk(id, d) {
+      if (d > maxD) { maxD = d; }
+      const kids = kidsOf(id);
+      if (!kids.length) {
+        const w = nodeW(labelOf(id));
+        pos[id] = { x: cursor + w / 2, y: 28 + d * LEVEL };
+        cursor += w + 14;
+      } else {
+        kids.forEach(function (k) { walk(k, d + 1); });
+        const a = pos[kids[0]].x;
+        const b = pos[kids[kids.length - 1]].x;
+        let x = (a + b) / 2;
+        const w = nodeW(labelOf(id));
+        if (x - w / 2 < 6) { x = 6 + w / 2; }
+        pos[id] = { x: x, y: 28 + d * LEVEL };
+        if (x + w / 2 + 14 > cursor) { cursor = x + w / 2 + 14; }
+      }
+    }
+    roots.forEach(function (r) { walk(r, 0); cursor += 10; });
+    return { pos: pos, w: Math.max(cursor, 120), h: 64 + maxD * LEVEL };
+  }
+
+  function astSvg(nodes, roots, kidsOf, clsOf, typeOf) {
+    if (!roots.length) { return '<p class="note">尚无节点，首次归约时生成。</p>'; }
+    const labelOf = function (id) { return nodes[id - 1].label; };
+    const lay = layoutForest(roots, kidsOf, labelOf);
+    let edges = '';
+    let boxes = '';
+    function draw(id) {
+      const p = lay.pos[id];
+      kidsOf(id).forEach(function (k) {
+        const q = lay.pos[k];
+        edges += '<line class="e" x1="' + p.x + '" y1="' + (p.y + 12) + '" x2="' + q.x + '" y2="' + (q.y - 12) + '"></line>';
+        draw(k);
+      });
+      const w = nodeW(labelOf(id));
+      const ty = typeOf ? typeOf(id) : '';
+      boxes += '<g class="n ' + clsOf(id) + '"><rect x="' + (p.x - w / 2) + '" y="' + (p.y - 12) + '" width="' + w + '" height="24" rx="5"></rect>' +
+        '<text x="' + p.x + '" y="' + (p.y + 4.5) + '">' + esc(labelOf(id)) + '</text>' +
+        '<text class="id" x="' + (p.x - w / 2) + '" y="' + (p.y - 15) + '">#' + id + '</text>' +
+        (ty ? '<text class="ty' + (ty === 'error' ? ' err' : '') + '" x="' + p.x + '" y="' + (p.y + 26) + '">: ' + esc(ty) + '</text>' : '') + '</g>';
+    }
+    roots.forEach(draw);
+    return '<div class="scroll"><svg class="ast" width="' + lay.w + '" height="' + lay.h + '" viewBox="0 0 ' + lay.w + ' ' + lay.h + '" role="img" aria-label="抽象语法树">' + edges + boxes + '</svg></div>';
+  }
+  function kindClass(nd) {
+    if (nd.kind === 'Program' || nd.kind === 'Let' || nd.kind === 'Assign') { return 'st'; }
+    if (nd.kind === 'Binary') { return 'ex'; }
+    return '';
+  }
+
+  function parseAst(ctx, step) {
+    const P = ctx.P;
+    const progId = P.nodes.filter(function (x) { return x.kind === 'Program'; }).map(function (x) { return x.id; });
+    const kidsOf = function (id) { return progId.length && id === progId[0] ? step.prog : P.nodes[id - 1].kids; };
+    const roots = step.onStack.filter(function (x) { return x > 0; });
+    const clsOf = function (id) { return kindClass(P.nodes[id - 1]) + (step.act === 'reduce' && id === step.made ? ' new' : ''); };
+    return '<section class="panel astp"><h3>AST <small>栈中语义值指向的树。节点数：' + step.count + '</small></h3>' + astSvg(P.nodes, roots, kidsOf, clsOf, null) + '</section>';
+  }
+
+  function renderParse(ctx, f) {
+    const step = ctx.P.steps[f.i];
+    const used = step.act === 'shift' ? step.la + 1 : step.la;
+    const cur = step.act === 'shift' ? step.la + 1 : step.la;
+    return '<div class="grid g-parse">' + inputPanel(ctx, cur, used, step.act === 'error') +
+      '<section class="panel"><h3>状态与语义值栈 <small>栈顶在上方</small></h3>' + stackHtml(step) + '<p class="note">语法判断只查看状态字段，语义动作使用值字段。</p></section>' +
+      lookupPanel(ctx, step) + parseAst(ctx, step) + '</div>';
+  }
+
+  function postorder(nodes, root) {
+    const out = [];
+    function walk(i) { nodes[i - 1].kids.forEach(walk); out.push(i); }
+    walk(root);
+    return out;
+  }
+
+  function renderSema(ctx, f) {
+    const P = ctx.P;
+    const S = ctx.S;
+    const e = f.ph === 'sema' ? S.events[f.i] : (f.ph === 'done' ? S.events[S.events.length - 1] : null);
+    const types = e ? e.types : {};
+    const cur = f.ph === 'sema' ? e.node : 0;
+    const kidsOf = function (id) { return P.nodes[id - 1].kids; };
+    const clsOf = function (id) {
+      let c = kindClass(P.nodes[id - 1]);
+      if (id === cur) { c += ' cur'; }
+      if (has(types, String(id)) && types[id] === 'error') { c += ' bad'; }
+      if (f.ph === 'sema' && !has(types, String(id)) && id !== cur && P.nodes[id - 1].kind !== 'Program' && P.nodes[id - 1].kind !== 'Let' && P.nodes[id - 1].kind !== 'Assign') { c += ' dim'; }
+      return c;
+    };
+    const typeOf = function (id) { return has(types, String(id)) ? types[id] : ''; };
+    let left = '<section class="panel"><h3>标注类型的 AST <small>蓝色文字为标注的类型</small></h3>' + astSvg(P.nodes, [P.root], kidsOf, clsOf, typeOf);
+    const order = postorder(P.nodes, P.root);
+    left += '<h3 class="sub">访问顺序（后序遍历）</h3><div class="order">';
+    const doneUpto = f.ph === 'sema' ? f.i : (f.ph === 'done' ? order.length : -1);
+    order.forEach(function (id, k) { left += '<span class="' + (k < doneUpto ? 'done' : k === doneUpto && f.ph === 'sema' ? 'cur' : '') + '">#' + id + '</span>'; });
+    left += '</div></section>';
+    const sym = e ? e.sym : [];
+    const prevSym = f.ph === 'sema' && f.i > 0 ? S.events[f.i - 1].sym.length : 0;
+    let right = '<section class="panel"><h3>符号表 <small>全局作用域</small></h3>';
+    if (!sym.length) { right += '<p class="note">当前为空，处理 let 声明时填入。</p>'; }
+    else {
+      right += '<table class="sym"><thead><tr><th>名称</th><th>类型</th><th>声明</th></tr></thead><tbody>';
+      const curNode = f.ph === 'sema' ? P.nodes[cur - 1] : null;
+      sym.forEach(function (r, k) {
+        let c = '';
+        if (f.ph === 'sema' && k >= prevSym) { c = 'new'; }
+        if (curNode && (curNode.kind === 'Name' || curNode.kind === 'Assign' || curNode.kind === 'Let') && curNode.name === r[0] && c === '') { c = 'hit'; }
+        right += '<tr class="' + c + '"><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2]) + ' (#' + r[3] + ')</td></tr>';
+      });
+      right += '</tbody></table>';
+    }
+    const diags = e ? e.diags : [];
+    const prevD = f.ph === 'sema' && f.i > 0 ? S.events[f.i - 1].diags.length : 0;
+    right += '<h3 class="sub">诊断</h3>';
+    if (!diags.length) { right += f.ph === 'done' ? '<p class="ok">无错误</p>' : '<p class="note">暂无。</p>'; }
+    else {
+      right += '<ul class="diag">';
+      diags.forEach(function (d, k) { right += '<li' + (f.ph === 'sema' && k >= prevD ? ' class="new"' : '') + '>' + esc(d) + '</li>'; });
+      right += '</ul>';
+    }
+    right += '</section>';
+    let top = '';
+    if (f.ph === 'handoff' || f.ph === 'done') {
+      top = '<section class="panel wide"><div class="stat"><div><b>' + ctx.stat.tok + '</b><span>Token 数（不含结束标记）</span></div><div><b>' + ctx.stat.tree + '</b><span>语法分析树节点数（Token 数 + 归约次数 ' + ctx.stat.red + ')</span></div><div><b>' + ctx.stat.ast + '</b><span>AST 节点数</span></div></div></section>';
+    }
+    const hl = [];
+    if (f.ph === 'sema' && P.nodes[cur - 1].tok >= 0) { hl.push(P.nodes[cur - 1].tok); }
+    const srcp = '<section class="panel wide"><h3>源代码 <small>蓝色标出当前节点在源代码中的位置</small></h3>' + srcHtml(ctx, -1, 0, false, hl) + '</section>';
+    return '<div class="grid g-sema">' + srcp + top + left + right + '</div>';
+  }
+
+  function renderFrame(ctx, f) {
+    if (f.ph === 'lex' || f.ph === 'lexerr') {
+      const bad = f.ph === 'lexerr';
+      return '<div class="grid g-sema"><section class="panel wide"><h3>源代码 <small>' + (bad ? '在橙色字符处停止' : '词法分析器跳过空白，识别 Token 边界') + '</small></h3>' + srcHtml(ctx, -1, 0, false, null) + '</section>' +
+        '<section class="panel wide"><h3>Token 流 <small>上方是种类；下方为名称或数字的文本，其余显示行:列</small></h3>' + toksHtml(ctx, -1, 0, false) + (bad ? '<p class="note">' + esc(ctx.lexErr.msg) + '</p>' : '') + '</section></div>';
+    }
+    if (f.ph === 'pinit') {
+      const fake = { act: 'init', state: 0, la: 0, stack: [[0, '⊥', '']], onStack: [0], count: 0, prog: [] };
+      return '<div class="grid g-parse">' + inputPanel(ctx, 0, 0, false) + '<section class="panel"><h3>状态与语义值栈</h3>' + stackHtml(fake) + '</section>' + lookupPanel(ctx, fake) + '<section class="panel astp"><h3>AST</h3><p class="note">尚无节点，首次归约时生成。</p></section></div>';
+    }
+    if (f.ph === 'parse') { return renderParse(ctx, f); }
+    if (f.ph === 'perr') { return renderParse(ctx, { i: ctx.P.steps.length - 1 }); }
+    return renderSema(ctx, f);
+  }
+
+  function refHtml() {
+    let s = '<summary>文法与语义动作（规则数：' + (D.rules.length - 1) + '）</summary><div class="scroll"><table><tbody>';
+    D.rules.forEach(function (r, i) {
+      if (i === 0) { return; }
+      s += '<tr><td class="k">r' + i + '</td><td>' + esc(ruleText(i)) + '</td><td class="a">' + esc(r[2]) + '</td></tr>';
+    });
+    return s + '</tbody></table></div>';
+  }
+
+  /* ---------- 播放 ---------- */
+  const state = { frames: [], ctx: null, idx: 0, playing: false, timer: null, speed: 1 };
+  const stage = byId('stage');
+  function show(i, forward) {
+    const n = state.frames.length;
+    state.idx = Math.max(0, Math.min(n - 1, i));
+    const f = state.frames[state.idx];
+    stage.setAttribute('data-dir', forward ? 'f' : 'b');
+    stage.innerHTML = renderFrame(state.ctx, f);
+    byId('pipe').innerHTML = pipeHtml(f);
+    byId('cap-ch').textContent = STAGES[f.stage][0] + ' 阶段';
+    byId('cap-h').textContent = f.h;
+    byId('cap-p').innerHTML = f.p;
+    byId('scrub').value = String(state.idx);
+    byId('pos').textContent = (state.idx + 1) + ' / ' + n;
+    byId('b-prev').disabled = state.idx === 0;
+    byId('b-next').disabled = state.idx === n - 1;
+  }
+  function duration(f) { return Math.min(14000, 1600 + (plainLen(f.h) + plainLen(f.p)) * 50) / state.speed; }
+  function schedule() {
+    state.timer = setTimeout(function () {
+      if (!state.playing) { return; }
+      if (state.idx >= state.frames.length - 1) { stop(); return; }
+      show(state.idx + 1, true);
+      schedule();
+    }, duration(state.frames[state.idx]));
+  }
+  function play() {
+    if (state.idx >= state.frames.length - 1) { show(0, false); }
+    state.playing = true;
+    byId('b-play').textContent = '暂停';
+    byId('b-play').setAttribute('aria-pressed', 'true');
+    schedule();
+  }
+  function stop() {
+    state.playing = false;
+    if (state.timer !== null) { clearTimeout(state.timer); state.timer = null; }
+    byId('b-play').textContent = state.idx >= state.frames.length - 1 ? '从头播放' : '播放';
+    byId('b-play').setAttribute('aria-pressed', 'false');
+  }
+  function step(d) { stop(); show(state.idx + d, d > 0); stop(); }
+  function load(src) {
+    if (src.length > 400) { byId('input-msg').textContent = '最多输入 400 个字符。'; return false; }
+    byId('input-msg').textContent = '';
+    stop();
+    const b = build(src);
+    state.ctx = b.ctx;
+    state.frames = b.frames;
+    byId('scrub').max = String(b.frames.length - 1);
+    show(0, false);
+    stop();
+    return true;
+  }
+  function wire() {
+    byId('b-first').addEventListener('click', function () { stop(); show(0, false); stop(); });
+    byId('b-prev').addEventListener('click', function () { step(-1); });
+    byId('b-next').addEventListener('click', function () { step(1); });
+    byId('b-play').addEventListener('click', function () { if (state.playing) { stop(); } else { play(); } });
+    byId('scrub').addEventListener('input', function () { stop(); show(Number(byId('scrub').value), false); stop(); });
+    byId('speed').addEventListener('change', function () { state.speed = Number(byId('speed').value); });
+    const preset = byId('input-preset');
+    let opts = '';
+    D.presets.forEach(function (p, i) { opts += '<option value="' + i + '">' + esc(p[1]) + '</option>'; });
+    preset.innerHTML = opts;
+    preset.addEventListener('change', function () {
+      const p = D.presets[Number(preset.value)];
+      byId('input-text').value = p[0];
+      load(p[0]);
+    });
+    byId('input-form').addEventListener('submit', function (e) { e.preventDefault(); load(byId('input-text').value); });
+    document.addEventListener('keydown', function (e) {
+      const tag = e.target && e.target.tagName ? e.target.tagName : '';
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') { return; }
+      if (e.key === ' ') {
+        if (tag === 'BUTTON') { return; }
+        e.preventDefault();
+        if (state.playing) { stop(); } else { play(); }
+      } else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+      else if (e.key === 'Home') { e.preventDefault(); stop(); show(0, false); stop(); }
+      else if (e.key === 'End') { e.preventDefault(); stop(); show(state.frames.length - 1, false); stop(); }
+    });
+  }
+  byId('ref').innerHTML = refHtml();
+  wire();
+  byId('input-text').value = D.presets[0][0];
+  load(D.presets[0][0]);
+  /*TEST_HOOK*/
+})();
+</script>
+</body>
+</html>

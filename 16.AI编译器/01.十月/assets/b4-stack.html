@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B4 的栈动画</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f3eb;color:#202e30;font:17px/1.6 system-ui,sans-serif}main{max-width:760px;margin:5vh auto;padding:24px}h1{font-size:clamp(26px,5vw,42px);margin:0}p{margin:8px 0 20px}.board{background:#fffef9;border:1px solid #cacabe;border-radius:16px;padding:22px}header,.controls{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}header{border-bottom:1px solid #dddcd2;padding-bottom:12px}.panels{display:grid;grid-template-columns:1fr 1fr;gap:16px}h2{font-size:16px;color:#556562}#stack{height:258px;display:flex;flex-direction:column-reverse;justify-content:flex-start;gap:4px;border-bottom:3px solid #516561;padding:0 5px 4px}.cell{border-radius:6px;background:#d9ece5;text-align:center;padding:5px;font:bold 19px/1.6 monospace}.fresh{animation:enter .45s ease-out;background:#a8dfcc}@keyframes enter{from{transform:translateY(-14px);opacity:.15}}#input{display:flex;gap:4px;flex-wrap:wrap}code,#input span{font-family:monospace}#input span{padding:2px 7px;background:#eeeee7;border-radius:4px}#input span:first-child{background:#ffdcaa;outline:1px solid #ba7427}#note{min-height:3.3em;margin:16px 0 10px}button{cursor:pointer;font:inherit;border:1px solid #899891;background:white;border-radius:7px;padding:6px 13px}button.primary{background:#205d50;color:white}button:disabled{opacity:.4;cursor:default}#choice{padding:12px 0}#choice button{margin:0 5px 5px 0}small{color:#53645e}
+</style>
+<main><h1>B4 为什么有两种走法？</h1><p>文法 <code>S → S a S | b</code>　输入 <code>b a b a b $</code></p>
+<section class="board"><header><strong id="action"></strong><small id="state"></small></header>
+<div class="panels"><section><h2>符号栈 · 栈顶在上</h2><div id="stack"></div></section>
+<section><h2>剩余输入</h2><div id="input"></div><small>橙色是下一个要看的符号。<br>$ 表示输入结束。</small></section></div>
+<p id="note" aria-live="polite"></p><div id="choice" hidden><button data-path="left">先归约 S a S</button><button data-path="right">先移进 a</button></div>
+<div class="controls"><button id="back">上一步</button><button id="play" class="primary">播放</button><button id="next">下一步</button><button id="reset">重来</button></div></section></main>
+<script>
+const el=id=>document.getElementById(id);
+const tokens=['b','a','b','a','b','$'];
+const prefix=['start','shift','leaf','shift','shift','leaf'];
+const branches={left:['reduce','shift','shift','leaf','reduce','accept'],right:['shift','shift','leaf','reduce','reduce','accept']};
+let step=0,path='',timer=null;
+function snapshot(){
+  const ops=prefix.concat(branches[path]||[]), stack=[];
+  let pos=0, action='',note='',fresh=0;
+  for(const op of ops.slice(0,step+1)){
+    fresh=0;
+    if(op==='start'){action='准备';note='栈是空的。先把第一个 b 从输入移到栈顶。'}
+    if(op==='shift'){const t=tokens[pos++];stack.push(t);action='移进 '+t;note='读入 '+t+'，把它压到栈顶。输入向前走一格。';fresh=1}
+    if(op==='leaf'){stack.pop();stack.push('S[b]');action='归约 b → S';note='栈顶的 b 符合产生式 S → b。用一个 S 替换它，输入位置不动。';fresh=1}
+    if(op==='reduce'){
+      const [l,,r]=stack.splice(-3);
+      const expr='('+l.slice(2,-1)+' a '+r.slice(2,-1)+')';
+      stack.push('S['+expr+']');action='归约 S a S → S';note='取下栈顶三个符号 S、a、S，压回一个 S。它代表 '+expr+'。输入位置不动。';fresh=1
+    }
+    if(op==='accept'){action='接受';note='输入只剩 $。栈里的 S 代表 '+stack[0].slice(2,-1)+'。'}
+  }
+  return {stack,pos,action,note,fresh,last:step===ops.length-1};
+}
+function pause(){clearInterval(timer);timer=null}
+function render(){
+  const s=snapshot(),fork=step===prefix.length-1,done=s.action==='接受';
+  if(fork||done)pause();
+  el('stack').replaceChildren(...s.stack.map((v,i)=>{const d=document.createElement('div');d.className='cell'+(s.fresh&&i===s.stack.length-1?' fresh':'');d.textContent=v.startsWith('S[')?'S':v;return d}));
+  el('input').replaceChildren(...tokens.slice(s.pos).map(v=>{const d=document.createElement('span');d.textContent=v;return d}));
+  el('action').textContent=fork?'B4 · 下一个符号是 a':s.action;
+  el('state').textContent=step<prefix.length?'第 '+(step+1)+' 步':(path==='left'?'先归约':'先移进')+' · 第 '+(step+1)+' 步';
+  el('note').textContent=fork?'第二个 b 刚归约成 S。现在栈顶三个符号能合成 S，输入里的第二个 a 也能移进。选一种走法。':s.note;
+  el('choice').hidden=!fork;el('back').disabled=!step;el('next').disabled=fork||done;el('play').disabled=fork||done;el('play').textContent=timer?'暂停':'播放';
+}
+function advance(){step++;render()}
+el('play').onclick=()=>{if(timer)pause();else timer=setInterval(advance,1700);render()};
+el('next').onclick=()=>{pause();advance()};
+el('back').onclick=()=>{pause();step--;if(step<prefix.length)path='';render()};
+el('reset').onclick=()=>{pause();path='';step=0;render()};
+document.querySelectorAll('[data-path]').forEach(btn=>btn.onclick=()=>{path=btn.dataset.path;advance()});
+render();
+</script>
+</html>
