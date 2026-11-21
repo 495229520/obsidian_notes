@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="992" height="470" viewBox="-16 -16 992 470" role="img" aria-label="슬라이드 60–78의 큰 예제. 한 기본 블록 a := x ** 2, b := 3, c := x, d := c * c, e := b * 2, f := a + d, g := e * f에 지역 최적화를 차례로 적용한다. 대수적 단순화로 x ** 2가 x * x, b * 2가 b &lt;&lt; 1이 되고, 복사 전파로 c와 b가 x와 3으로 바뀌고, 상수 폴딩으로 e := 6, 공통 부분식 제거로 d := a, 복사 전파로 f := a + a와 g := 6 * f가 된다. 죽은 코드 제거 뒤 a := x * x, f := a + a, g := 6 * f가 남고, a + a를 2 * a로, g를 12 * a로 바꾼 뒤 다시 죽은 코드를 지우면 a := x * x, g := 12 * a가 최종형이다. 각 단계마다 무작위 x 500개로 g가 같음을 확인했고, gcc 13.3 -O2도 x * x에 12를 곱하는 코드를 낸다">
+  <style>
+    text { fill: #141413; font-family: Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace; }
+    .sm { font-size: 11px; }
+    .lg { font-size: 14px; font-weight: 600; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 2; stroke-dasharray: 5 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.3; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; } .h-acc { fill: #D97757; } .h-blue { fill: #4F7FAF; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+  </style>
+  <rect x="-16" y="-16" width="992" height="470" rx="14" fill="#F0EEE6"/>
+  <defs><marker id="opt-local-chain-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker><marker id="opt-local-chain-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="opt-local-chain-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="box" x="0" y="0" width="180" height="178" rx="8"/>
+  <text class="sm b" x="10" y="20" xml:space="preserve">① 초기</text>
+  <text class="sm muted" x="172" y="20" text-anchor="end" xml:space="preserve">60</text>
+  <text class="mono sm" x="14" y="46" xml:space="preserve">a := x ** 2</text>
+  <text class="mono sm" x="14" y="64" xml:space="preserve">b := 3</text>
+  <text class="mono sm" x="14" y="82" xml:space="preserve">c := x</text>
+  <text class="mono sm" x="14" y="100" xml:space="preserve">d := c * c</text>
+  <text class="mono sm" x="14" y="118" xml:space="preserve">e := b * 2</text>
+  <text class="mono sm" x="14" y="136" xml:space="preserve">f := a + d</text>
+  <text class="mono sm" x="14" y="154" xml:space="preserve">g := e * f</text>
+  <line class="ln" x1="181" y1="89.0" x2="194" y2="89.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="box" x="195" y="0" width="180" height="178" rx="8"/>
+  <text class="sm b" x="205" y="20" xml:space="preserve">② 대수적 단순화</text>
+  <text class="sm muted" x="367" y="20" text-anchor="end" xml:space="preserve">62</text>
+  <text class="mono sm b acc-t" x="209" y="46" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="209" y="64" xml:space="preserve">b := 3</text>
+  <text class="mono sm" x="209" y="82" xml:space="preserve">c := x</text>
+  <text class="mono sm" x="209" y="100" xml:space="preserve">d := c * c</text>
+  <text class="mono sm b acc-t" x="209" y="118" xml:space="preserve">e := b &lt;&lt; 1</text>
+  <text class="mono sm" x="209" y="136" xml:space="preserve">f := a + d</text>
+  <text class="mono sm" x="209" y="154" xml:space="preserve">g := e * f</text>
+  <line class="ln" x1="376" y1="89.0" x2="389" y2="89.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="box" x="390" y="0" width="180" height="178" rx="8"/>
+  <text class="sm b" x="400" y="20" xml:space="preserve">③ 복사 전파</text>
+  <text class="sm muted" x="562" y="20" text-anchor="end" xml:space="preserve">64</text>
+  <text class="mono sm" x="404" y="46" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="404" y="64" xml:space="preserve">b := 3</text>
+  <text class="mono sm" x="404" y="82" xml:space="preserve">c := x</text>
+  <text class="mono sm b acc-t" x="404" y="100" xml:space="preserve">d := x * x</text>
+  <text class="mono sm b acc-t" x="404" y="118" xml:space="preserve">e := 3 &lt;&lt; 1</text>
+  <text class="mono sm" x="404" y="136" xml:space="preserve">f := a + d</text>
+  <text class="mono sm" x="404" y="154" xml:space="preserve">g := e * f</text>
+  <line class="ln" x1="571" y1="89.0" x2="584" y2="89.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="box" x="585" y="0" width="180" height="178" rx="8"/>
+  <text class="sm b" x="595" y="20" xml:space="preserve">④ 상수 폴딩</text>
+  <text class="sm muted" x="757" y="20" text-anchor="end" xml:space="preserve">66</text>
+  <text class="mono sm" x="599" y="46" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="599" y="64" xml:space="preserve">b := 3</text>
+  <text class="mono sm" x="599" y="82" xml:space="preserve">c := x</text>
+  <text class="mono sm" x="599" y="100" xml:space="preserve">d := x * x</text>
+  <text class="mono sm b acc-t" x="599" y="118" xml:space="preserve">e := 6</text>
+  <text class="mono sm" x="599" y="136" xml:space="preserve">f := a + d</text>
+  <text class="mono sm" x="599" y="154" xml:space="preserve">g := e * f</text>
+  <line class="ln" x1="766" y1="89.0" x2="779" y2="89.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="box" x="780" y="0" width="180" height="178" rx="8"/>
+  <text class="sm b" x="790" y="20" xml:space="preserve">⑤ 공통 부분식 제거</text>
+  <text class="sm muted" x="952" y="20" text-anchor="end" xml:space="preserve">68</text>
+  <text class="mono sm" x="794" y="46" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="794" y="64" xml:space="preserve">b := 3</text>
+  <text class="mono sm" x="794" y="82" xml:space="preserve">c := x</text>
+  <text class="mono sm b acc-t" x="794" y="100" xml:space="preserve">d := a</text>
+  <text class="mono sm" x="794" y="118" xml:space="preserve">e := 6</text>
+  <text class="mono sm" x="794" y="136" xml:space="preserve">f := a + d</text>
+  <text class="mono sm" x="794" y="154" xml:space="preserve">g := e * f</text>
+  <rect class="box" x="0" y="212" width="180" height="178" rx="8"/>
+  <text class="sm b" x="10" y="232" xml:space="preserve">⑥ 복사 전파</text>
+  <text class="sm muted" x="172" y="232" text-anchor="end" xml:space="preserve">70</text>
+  <text class="mono sm" x="14" y="258" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="14" y="276" xml:space="preserve">b := 3</text>
+  <text class="mono sm" x="14" y="294" xml:space="preserve">c := x</text>
+  <text class="mono sm" x="14" y="312" xml:space="preserve">d := a</text>
+  <text class="mono sm" x="14" y="330" xml:space="preserve">e := 6</text>
+  <text class="mono sm b acc-t" x="14" y="348" xml:space="preserve">f := a + a</text>
+  <text class="mono sm b acc-t" x="14" y="366" xml:space="preserve">g := 6 * f</text>
+  <line class="ln" x1="181" y1="301.0" x2="194" y2="301.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="box" x="195" y="212" width="180" height="178" rx="8"/>
+  <text class="sm b" x="205" y="232" xml:space="preserve">⑦ 죽은 코드 제거</text>
+  <text class="sm muted" x="367" y="232" text-anchor="end" xml:space="preserve">72</text>
+  <text class="mono sm" x="209" y="258" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="209" y="276" xml:space="preserve">f := a + a</text>
+  <text class="mono sm" x="209" y="294" xml:space="preserve">g := 6 * f</text>
+  <line class="ln" x1="376" y1="301.0" x2="389" y2="301.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="box" x="390" y="212" width="180" height="178" rx="8"/>
+  <text class="sm b" x="400" y="232" xml:space="preserve">⑧ a + a → 2 * a</text>
+  <text class="sm muted" x="562" y="232" text-anchor="end" xml:space="preserve">74</text>
+  <text class="mono sm" x="404" y="258" xml:space="preserve">a := x * x</text>
+  <text class="mono sm b acc-t" x="404" y="276" xml:space="preserve">f := 2 * a</text>
+  <text class="mono sm" x="404" y="294" xml:space="preserve">g := 6 * f</text>
+  <line class="ln" x1="571" y1="301.0" x2="584" y2="301.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="box" x="585" y="212" width="180" height="178" rx="8"/>
+  <text class="sm b" x="595" y="232" xml:space="preserve">⑨ 대입 후 재결합</text>
+  <text class="sm muted" x="757" y="232" text-anchor="end" xml:space="preserve">76</text>
+  <text class="mono sm" x="599" y="258" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="599" y="276" xml:space="preserve">f := 2 * a</text>
+  <text class="mono sm b acc-t" x="599" y="294" xml:space="preserve">g := 12 * a</text>
+  <line class="ln" x1="766" y1="301.0" x2="779" y2="301.0" marker-end="url(#opt-local-chain-a)"/>
+  <rect class="acc" x="780" y="212" width="180" height="178" rx="8"/>
+  <text class="sm b acc-t" x="790" y="232" xml:space="preserve">⑩ 죽은 코드 제거</text>
+  <text class="sm muted" x="952" y="232" text-anchor="end" xml:space="preserve">77</text>
+  <text class="mono sm" x="794" y="258" xml:space="preserve">a := x * x</text>
+  <text class="mono sm" x="794" y="276" xml:space="preserve">g := 12 * a</text>
+  <polyline class="ln" points="870.0,179 870.0,192 90.0,192 90.0,210" marker-end="url(#opt-local-chain-a)"/>
+  <text class="sm" x="0" y="418" xml:space="preserve">주황 줄 = 직전 단계에서 바뀐 줄. 모든 단계에서 무작위 x 500개로 g가 같음을 확인했다. 슬라이드는 ⑧–⑩을 "지금의 컴파일러 대부분은 못 찾는다"고 했다.</text>
+  <text class="sm" x="0" y="436" xml:space="preserve">gcc 13.3 -O2 (x86-64) 출력: <tspan class="mono b">imul edi, edi</tspan> · <tspan class="mono b">lea eax, [rdi+rdi*2]</tspan> · <tspan class="mono b">sal eax, 2</tspan><tspan class="b blue-t">  →  (x·x)·3·4 = 12·a, 최종형까지 간다</tspan></text>
+</svg>

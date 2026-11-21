@@ -1,0 +1,3539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>运行时组织与代码生成：从栈帧到动态分派</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap">
+<style>
+/*
+ * Design System: Claude Warm Paper
+ * - Palette: --bg (#F0EEE6), --paper (#FAF9F5), --ink (#141413), --muted (#6F6D66),
+ *   --line (#B0AEA5), --dead (#E6E3D9), --acc (#D97757), --blue (#4F7FAF)
+ * - Typography: Noto Sans SC + JetBrains Mono
+ * - Motion: cubic-bezier(.4, 0, .2, 1), 420ms, persistent-DOM mutation per chapter
+ */
+:root {
+  --bg: #F0EEE6;
+  --paper: #FAF9F5;
+  --ink: #141413;
+  --muted: #6F6D66;
+  --line: #B0AEA5;
+  --dead: #E6E3D9;
+  --acc: #D97757;
+  --on-acc: #141413;
+  --acc-t: #A04A29;
+  --acc-f: #F5DDD1;
+  --blue: #4F7FAF;
+  --blue-t: #3D6A97;
+  --blue-f: #DCE7F2;
+  --code-bg: #262522;
+  --code-ink: #EAE6DC;
+  --code-cmt: #949085;
+  --code-kw: #E8A67D;
+  --code-num: #D9A06B;
+  --code-str: #A5C392;
+  --code-reg: #8FB7DF;
+  --sans: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --mono: 'JetBrains Mono', D2Coding, ui-monospace, Menlo, Consolas, monospace;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --dur: 420ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1E1D1A;
+    --paper: #2A2925;
+    --ink: #F0EEE6;
+    --muted: #A8A69C;
+    --line: #55534C;
+    --dead: #33322D;
+    --acc: #E08A6C;
+    --on-acc: #141413;
+    --acc-t: #F0A78C;
+    --acc-f: #4B2E22;
+    --blue: #7FA9D3;
+    --blue-t: #A5C4E3;
+    --blue-f: #253648;
+    --code-bg: #171613;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1E1D1A;
+  --paper: #2A2925;
+  --ink: #F0EEE6;
+  --muted: #A8A69C;
+  --line: #55534C;
+  --dead: #33322D;
+  --acc: #E08A6C;
+  --on-acc: #141413;
+  --acc-t: #F0A78C;
+  --acc-f: #4B2E22;
+  --blue: #7FA9D3;
+  --blue-t: #A5C4E3;
+  --blue-f: #253648;
+  --code-bg: #171613;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.6 var(--sans);
+  text-wrap: pretty;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+}
+[hidden] { display: none !important; }
+button, select, input { font: inherit; color: inherit; }
+code {
+  font-family: var(--mono);
+  font-size: .92em;
+  background: var(--dead);
+  padding: 0 .32em;
+  border-radius: 4px;
+}
+kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 5px;
+  background: var(--paper);
+}
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-block: 16px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 12px;
+}
+.shell > * { min-width: 0; }
+
+/* Header */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+.top-main { min-width: 0; flex: 1 1 540px; }
+.top h1 {
+  margin: 0;
+  font-size: clamp(20px, 2.4vw, 24px);
+  line-height: 1.3;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.top p { margin: 3px 0 0; color: var(--muted); max-width: 78ch; }
+.top-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pill-btn {
+  padding: 4px 11px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--ink);
+  transition: background .18s var(--ease), border-color .18s var(--ease);
+}
+.pill-btn:hover { background: var(--dead); border-color: var(--muted); }
+
+/* Acts strip */
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.acts .act {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  cursor: pointer;
+  transition: background .25s var(--ease), border-color .25s var(--ease), color .25s var(--ease);
+}
+.acts .act:hover { background: var(--dead); }
+.acts .act.on {
+  background: var(--acc-f);
+  border-color: var(--acc);
+  color: var(--acc-t);
+  font-weight: 600;
+}
+
+/* Chapter rail */
+.rail {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+.ch-btn {
+  display: grid;
+  text-align: left;
+  padding: 6px 9px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+  min-width: 0;
+  transition: background .22s var(--ease), border-color .22s var(--ease), transform .14s var(--ease);
+}
+.ch-btn:hover { background: var(--dead); }
+.ch-btn:active { transform: scale(.985); }
+.ch-btn b { font-weight: 600; line-height: 1.3; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-btn span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-btn.done { background: var(--blue-f); border-color: var(--blue); }
+.ch-btn[aria-current="step"] {
+  background: var(--acc-f);
+  border-color: var(--acc);
+  box-shadow: inset 0 0 0 1px var(--acc);
+}
+
+/* Playback bar */
+.bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 8;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.btns { display: flex; gap: 4px; }
+.btns button {
+  padding: 5px 11px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s var(--ease), transform .1s var(--ease);
+}
+.btns button:hover:not(:disabled) { background: var(--dead); }
+.btns button:active:not(:disabled) { transform: scale(.97); }
+.btns button:disabled { opacity: .42; cursor: default; }
+.btns .primary {
+  min-width: 88px;
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--on-acc);
+  font-weight: 600;
+}
+.btns .primary:hover:not(:disabled) { background: var(--acc); filter: brightness(1.07); }
+.scrub { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.scrub input { flex: 1; min-width: 0; accent-color: var(--acc); cursor: pointer; }
+.scrub span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.speed { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.speed select { padding: 3px 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; }
+
+/* Evolution turn strip */
+.turn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: stretch;
+}
+.turn > div {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.turn span { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+.turn .t-q { border-color: var(--acc); background: var(--acc-f); }
+.turn .t-q span { color: var(--acc-t); }
+.turn .t-a { border-color: var(--blue); background: var(--blue-f); }
+.turn .t-a span { color: var(--blue-t); }
+.turn > .t-arrow { background: none; border: 0; padding: 0; align-self: center; color: var(--muted); font-size: 16px; }
+.turn > .t-e { grid-column: 1 / -1; background: none; border: 0; padding: 0 2px; font-size: 12px; color: var(--muted); }
+
+/* Caption box */
+.cap-row { display: flex; gap: 12px; }
+.cap-row > * { flex: 1; min-width: 0; }
+.cap {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-height: 108px;
+}
+.cap-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.cap-ch { font-size: 12px; color: var(--acc-t); font-weight: 600; }
+.cap-act {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 5px;
+  background: var(--dead);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.cap h2 { margin: 3px 0 4px; font-size: 17px; line-height: 1.35; font-weight: 700; text-wrap: balance; }
+.cap p { margin: 0; max-width: 96ch; }
+
+/* Interactive input row */
+.inputrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.inputrow label { color: var(--muted); }
+.inputrow select, .inputrow input {
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  min-width: 0;
+}
+.inputrow input { flex: 1 1 180px; max-width: 280px; font-family: var(--mono); }
+.inputrow button {
+  padding: 4px 12px;
+  background: var(--acc-f);
+  border: 1px solid var(--acc);
+  color: var(--acc-t);
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.inputrow button:hover { filter: brightness(1.04); }
+.msg { color: var(--acc-t); font-size: 12.5px; }
+
+/* Shared panels & grids */
+.grid { display: grid; gap: 12px; align-items: stretch; }
+.grid > * { min-width: 0; }
+.g2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.g3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+.g-12 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); }
+.g-wire { grid-template-columns: minmax(270px, .92fr) 84px minmax(310px, 1.15fr); gap: 0; align-items: stretch; }
+.g-disp { grid-template-columns: minmax(250px, .9fr) minmax(0, 1.4fr); }
+.wide { grid-column: 1 / -1; }
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.panel h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.panel h3 > span { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.panel h3 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.note-box {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.note-box b { color: var(--ink); }
+
+/* Toggle pills inside scenes */
+.seg-toggle { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.seg-toggle button {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .2s var(--ease), border-color .2s var(--ease);
+}
+.seg-toggle button.on {
+  background: var(--acc-f);
+  border-color: var(--acc);
+  color: var(--acc-t);
+  font-weight: 600;
+}
+.seg-toggle button.on-b {
+  background: var(--blue-f);
+  border-color: var(--blue);
+  color: var(--blue-t);
+  font-weight: 600;
+}
+
+/* Code Panels (strict code-panels.md spec) */
+.codebox {
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 12px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.cl {
+  padding: 2px 14px;
+  white-space: pre;
+  color: var(--code-ink);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.cl .cmt { color: var(--code-cmt); }
+.cl .kw { color: var(--code-kw); }
+.cl .num { color: var(--code-num); }
+.cl .str { color: var(--code-str); }
+.cl .reg { color: var(--code-reg); }
+.cl[class*="hl-"] { color: #F7F4EA; }
+.cl[class*="hl-"] .cmt { color: #D4CFC2; }
+.cl.hl-acc { background: rgba(217, 119, 87, .52); box-shadow: inset 4px 0 0 #F4A98E; }
+.cl.hl-blue { background: rgba(79, 127, 175, .52); box-shadow: inset 4px 0 0 #8FC0EF; }
+.cl.hl-dim { opacity: .45; }
+
+/* Connector SVG (strict connector-arrows.md spec) */
+.wire-col { position: relative; min-height: 220px; }
+.wire-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 4;
+}
+.wire-svg path:not(.arrow) {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: .12;
+  transition: opacity var(--dur) var(--ease), stroke var(--dur) var(--ease), stroke-width var(--dur) var(--ease), stroke-dashoffset 520ms var(--ease);
+}
+.wire-svg.has-on path:not(.arrow):not(.on) { opacity: 0; }
+.wire-svg path.on:not(.arrow) { opacity: 1; stroke-width: 3; }
+.wire-svg path.on.acc:not(.arrow) { stroke: var(--acc); }
+.wire-svg path.on.blue:not(.arrow) { stroke: var(--blue); }
+.wire-svg path.dash:not(.arrow) { stroke-dasharray: 5 4; }
+.wire-svg .arrow {
+  fill: var(--line);
+  stroke: none;
+  stroke-width: 0;
+  opacity: .12;
+  transition: opacity var(--dur) var(--ease), fill var(--dur) var(--ease);
+}
+.wire-svg.has-on .arrow:not(.on) { opacity: 0; }
+.wire-svg .arrow.on { opacity: 1; transition-delay: 200ms; }
+.wire-svg .arrow.on.acc { fill: var(--acc); }
+.wire-svg .arrow.on.blue { fill: var(--blue); }
+.wire-svg circle {
+  fill: var(--paper);
+  stroke: var(--line);
+  stroke-width: 2;
+  opacity: .15;
+  transition: opacity var(--dur) var(--ease), stroke var(--dur) var(--ease), fill var(--dur) var(--ease);
+}
+.wire-svg.has-on circle:not(.on) { opacity: 0; }
+.wire-svg circle.on { opacity: 1; }
+.wire-svg circle.on.acc { stroke: var(--acc); fill: var(--acc-f); }
+.wire-svg circle.on.blue { stroke: var(--blue); fill: var(--blue-f); }
+
+/* Chapter 1: Pipeline & 3 Pillars */
+.pipe-wrap { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.pnode {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: var(--bg);
+  text-align: center;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.pnode b { display: block; font-size: 13px; }
+.pnode small { display: block; font-size: 11.5px; color: var(--muted); }
+.pnode.front { border-color: var(--blue); background: var(--blue-f); }
+.pnode.back { border-color: var(--acc); background: var(--acc-f); transform: translateY(-2px); }
+.pillar {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: var(--bg);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.pillar + .pillar { margin-top: 8px; }
+.pillar h4 { margin: 0 0 2px; font-size: 13.5px; }
+.pillar p { margin: 0; font-size: 12.5px; color: var(--muted); }
+.pillar.on { background: var(--acc-f); border-color: var(--acc); transform: translateX(3px); }
+.pillar.on-b { background: var(--blue-f); border-color: var(--blue); transform: translateX(3px); }
+.pillar.dim { opacity: .48; }
+
+/* Chapter 2: Call Stack with sliding FP / SP on right rail */
+.stack-stage {
+  position: relative;
+  padding-right: 76px;
+  display: grid;
+  gap: 8px;
+}
+.ptr-rail {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 70px;
+  pointer-events: none;
+}
+.ptr-badge {
+  position: absolute;
+  left: 4px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  transition: top var(--dur) var(--ease), opacity 300ms var(--ease);
+}
+.mips-ptr-left .ptr-badge { left: auto; right: 4px; }
+.mips-ptr-right .ptr-badge { left: 4px; right: auto; }
+.ptr-badge.fp { background: var(--blue-f); border: 1.5px solid var(--blue); color: var(--blue-t); }
+.ptr-badge.sp { background: var(--acc-f); border: 1.5px solid var(--acc); color: var(--acc-t); }
+.ar-card {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 11px;
+  background: var(--bg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.ar-card.hidden { opacity: 0; transform: translateY(-6px); }
+.stack-stage .ar-card.hidden { transform: none; }
+.ar-card.active { background: var(--acc-f); border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+.ar-card.wait { background: var(--blue-f); border-color: var(--blue); }
+.ar-card.reclaimed {
+  background: var(--dead);
+  border-style: dashed;
+  border-color: var(--line);
+  opacity: .72;
+}
+.ar-card .ar-t { font-family: var(--mono); font-weight: 700; font-size: 13px; }
+.ar-card .ar-v { font-family: var(--mono); font-size: 12.5px; padding: 2px 7px; border-radius: 4px; background: var(--paper); border: 1px solid var(--line); }
+.ar-card .ar-s { font-size: 12px; color: var(--muted); }
+.stack-stage .ar-card.active {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.frame-slots {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
+.frame-slot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.frame-slot + .frame-slot { border-top: 0; }
+.frame-slot:first-child { border-radius: 5px 5px 0 0; }
+
+.frame-slot[hidden] { display: none; }
+.frame-anchor { color: var(--blue-t); }
+.frame-boundary {
+  border-top: 2px solid var(--acc);
+  padding-top: 3px;
+  color: var(--acc-t);
+}
+.frame-legend {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Chapter 3: Memory Map & Scope/LIFO */
+.boot-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.bstep {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  text-align: center;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.bstep.on { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); font-weight: 700; }
+.bstep.done { background: var(--blue-f); border-color: var(--blue); }
+.vas-box {
+  position: relative;
+  height: 332px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.mblk {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  border-radius: 6px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  transition: top var(--dur) var(--ease), height var(--dur) var(--ease), opacity var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.mblk.code { background: var(--blue-f); border-color: var(--blue); }
+.mblk.stat { background: var(--paper); border-color: var(--line); }
+.mblk.heap { background: var(--acc-f); border-color: var(--acc); }
+.mblk.mmap { background: var(--dead); border-style: dashed; }
+.mblk.free { background: transparent; border-style: dotted; color: var(--muted); }
+.mblk.stack { background: var(--blue-f); border-color: var(--blue); }
+.mblk.hot { box-shadow: inset 0 0 0 2px var(--acc); }
+.mblk.dim { opacity: .42; }
+.mblk b { font-family: var(--mono); }
+.mblk small { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.tl-row { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+.tl-track { height: 24px; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; position: relative; overflow: visible; }
+.tl-bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left var(--dur) var(--ease), width var(--dur) var(--ease), opacity var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.tl-bar.acc { background: var(--acc-f); border: 1px solid var(--acc); color: var(--acc-t); }
+.tl-bar.blue { background: var(--blue-f); border: 1px solid var(--blue); color: var(--blue-t); }
+.lifo-card {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 10px;
+  background: var(--bg);
+  margin-top: 6px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.lifo-card.on { background: var(--acc-f); border-color: var(--acc); }
+.lifo-card.on-b { background: var(--blue-f); border-color: var(--blue); }
+
+/* Chapter 4: Word Alignment */
+.word-grid-wrap { position: relative; padding-top: 8px; padding-bottom: 24px; overflow-x: auto; }
+.word-grid { display: grid; grid-template-columns: repeat(4, minmax(156px, 1fr)); gap: 8px; min-width: 660px; position: relative; }
+.word-box { border: 1.5px solid var(--line); border-radius: 7px; padding: 6px; background: var(--bg); }
+.word-hdr { font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 22px; }
+.byte-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.bcell {
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  position: relative;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.bcell small { position: absolute; bottom: -20px; font-size: 10px; color: var(--muted); font-weight: 400; }
+.bcell.acc { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); }
+.bcell.blue { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); }
+.bcell.pad {
+  background: repeating-linear-gradient(-45deg, var(--dead), var(--dead) 4px, var(--paper) 4px, var(--paper) 8px);
+  border-style: dashed;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+.bus-win {
+  position: absolute;
+  top: 40px;
+  height: 52px;
+  opacity: 0;
+  border-radius: 7px;
+  border: 2.5px solid var(--acc);
+  background: rgba(217, 119, 87, .12);
+  pointer-events: none;
+  transition: left var(--dur) var(--ease), top var(--dur) var(--ease), height var(--dur) var(--ease), width var(--dur) var(--ease), opacity 260ms var(--ease), border-color var(--dur) var(--ease);
+}
+.bus-win.blue { border-color: var(--blue); background: rgba(79, 127, 175, .12); }
+.bus-win span {
+  position: absolute;
+  top: -19px;
+  left: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--acc-t);
+  white-space: nowrap;
+}
+.bus-win.blue span { color: var(--blue-t); }
+
+/* Registers & Instructions & Stacks (Ch 5 - Ch 10) */
+.reg-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 7px; margin-bottom: 8px; }
+.reg-card {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: var(--bg);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform 220ms var(--ease);
+}
+.reg-card.acc { background: var(--acc-f); border-color: var(--acc); transform: translateY(-2px); }
+.reg-card.blue { background: var(--blue-f); border-color: var(--blue); transform: translateY(-2px); }
+.reg-card.bad { background: var(--acc-f); border: 2px dashed var(--acc); }
+.reg-card small { display: block; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.reg-card b { font-family: var(--mono); font-size: 15px; }
+
+.prog-list { position: relative; display: grid; gap: 3px; padding-left: 22px; }
+.prog-pc {
+  position: absolute;
+  left: 0;
+  width: 18px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--acc-t);
+  transition: top 320ms var(--ease), opacity 220ms var(--ease);
+  pointer-events: none;
+}
+.inst-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg);
+  transition: background 280ms var(--ease), border-color 280ms var(--ease), opacity 280ms var(--ease);
+}
+.inst-row.on { background: var(--acc-f); border-color: var(--acc); font-weight: 600; }
+.inst-row.on-b { background: var(--blue-f); border-color: var(--blue); font-weight: 600; }
+.inst-row.ct { border-left: 3px solid var(--acc); color: var(--acc-t); background: var(--paper); font-weight: 600; }
+.inst-row.rt { border-left: 3px solid var(--blue); }
+.inst-row.done { opacity: .65; }
+.inst-tag { font-family: var(--sans); font-size: 10.5px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.inst-tag.ct { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); }
+.inst-tag.rt { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); }
+
+.mips-stack-wrap {
+  position: relative;
+  padding-left: 88px;
+  padding-right: 92px;
+}
+.mips-ptr-left, .mips-ptr-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+.mips-ptr-left { left: 0; width: 82px; }
+.mips-ptr-right { right: 0; width: 86px; }
+.mips-stack { display: grid; gap: 4px; }
+.mslot {
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0 10px;
+  background: var(--paper);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.mslot.free { background: var(--bg); border-style: dashed; color: var(--muted); }
+.mslot.acc { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); font-weight: 700; }
+.mslot.blue { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); font-weight: 600; }
+.mslot.dead { background: var(--dead); opacity: .6; }
+.mslot.bad { background: var(--acc-f); border: 2px dashed var(--acc); color: var(--acc-t); font-weight: 700; }
+.mslot .maddr { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+/* Pure stack machine vertical tower */
+.vm-stack-box {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+  min-height: 220px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.vm-cell {
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 14px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.vm-cell.base { background: var(--dead); border-style: dashed; color: var(--muted); font-weight: 600; font-size: 12.5px; }
+.vm-cell.acc { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); }
+.vm-cell.blue { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); }
+.vm-cell.empty { opacity: 0; height: 0; border-width: 0; overflow: hidden; margin: 0; padding: 0; }
+
+/* Meter / Benchmark bars */
+.meter { display: grid; gap: 8px; }
+.mrow { display: grid; grid-template-columns: 112px minmax(0, 1fr) 74px; gap: 8px; align-items: center; font-size: 12.5px; }
+.mbar { height: 15px; background: var(--dead); border-radius: 4px; overflow: hidden; }
+.mbar i { display: block; height: 100%; border-radius: 4px; transition: width 560ms var(--ease); }
+.mbar i.blue { background: var(--blue); }
+.mbar i.acc { background: var(--acc); }
+
+/* AST SVG & NT badges */
+.ast-svg { display: block; width: 100%; height: auto; margin: 0 auto; }
+.ast-svg line { stroke: var(--line); stroke-width: 1.5; transition: stroke var(--dur) var(--ease); }
+.ast-svg line.on { stroke: var(--acc); stroke-width: 2.3; }
+.ast-svg rect { fill: var(--paper); stroke: var(--line); stroke-width: 1.4; transition: fill var(--dur) var(--ease), stroke var(--dur) var(--ease); }
+.ast-svg .on rect { fill: var(--acc-f); stroke: var(--acc); stroke-width: 2; }
+.ast-svg .done rect { fill: var(--blue-f); stroke: var(--blue); }
+.ast-svg text { fill: var(--ink); font: 600 12.5px var(--mono); text-anchor: middle; }
+.ast-svg .nt-badge { fill: var(--acc-t); font: 700 11px var(--mono); text-anchor: start; transition: opacity var(--dur) var(--ease); }
+
+/* OOP Object Memory & Dispatch */
+.obj-wrap { position: relative; overflow-x: auto; padding-top: 24px; padding-bottom: 8px; }
+.obj-ruler { display: grid; grid-template-columns: 46px repeat(6, minmax(64px, 1fr)); gap: 4px; min-width: 470px; margin-bottom: 4px; font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: center; }
+.obj-row { display: grid; grid-template-columns: 46px repeat(6, minmax(64px, 1fr)); gap: 4px; min-width: 470px; margin-bottom: 8px; align-items: center; transition: opacity var(--dur) var(--ease); }
+.obj-lbl { font-family: var(--mono); font-weight: 700; text-align: center; }
+.ofield {
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.ofield.acc { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); }
+.ofield.blue { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); }
+.ofield.pad { background: var(--dead); border-style: dashed; color: var(--muted); font-size: 10.5px; }
+.ofield.none { opacity: 0; pointer-events: none; }
+.align-band {
+  position: absolute;
+  top: 20px;
+  bottom: 4px;
+  border: 2px dashed var(--acc);
+  border-radius: 7px;
+  background: rgba(217, 119, 87, .07);
+  pointer-events: none;
+  transition: left var(--dur) var(--ease), width var(--dur) var(--ease), opacity 300ms var(--ease);
+}
+
+.disp-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(190px, 1.1fr) 68px minmax(150px, .95fr) 68px minmax(145px, .9fr);
+  gap: 10px 0;
+  align-items: center;
+}
+.dbox {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.dbox.on { background: var(--acc-f); border-color: var(--acc); }
+.dbox.on-b { background: var(--blue-f); border-color: var(--blue); }
+.dbox.dim { opacity: .45; }
+.dbox-row { display: flex; gap: 4px; margin-top: 4px; }
+.dslot {
+  flex: 1;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  text-align: center;
+  font-size: 11.5px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.dslot.hot { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); font-weight: 700; }
+.dslot.hot-b { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); font-weight: 700; }
+
+/* sumto trace */
+#s9-source { margin-bottom: 12px; overflow-x: auto; }
+.s9-controls { align-items: center; margin-bottom: 8px; }
+.s9-controls span, .s9-legend { font-size: 12px; color: var(--muted); }
+.s9-controls button:disabled { opacity: .45; cursor: default; }
+.s9-step { min-height: 68px; margin-bottom: 8px; }
+.s9-step p { margin: 2px 0 0; overflow-wrap: anywhere; }
+.s9-legend { margin: 0 0 6px; }
+#s9-page-code, #s9-code { position: relative; max-height: 222px; overflow: auto; }
+.s9-row { display: grid; grid-template-columns: 51px minmax(0, 1fr); gap: 5px; align-items: center; }
+.s9-pointer { text-align: right; font: 700 11px var(--mono); white-space: nowrap; }
+.s9-pointer.at-fp { color: var(--blue-t); }
+.s9-pointer.at-sp:not(.at-fp) { color: var(--acc-t); }
+.s9-row .mslot { min-height: 28px; height: auto; gap: 6px; padding: 2px 7px; }
+.s9-row .maddr { white-space: nowrap; }
+.s9-row .s9-access { outline: 2px solid var(--blue); outline-offset: -2px; opacity: 1; }
+.s9-full { margin-top: 8px; }
+.s9-full summary { cursor: pointer; font-size: 13px; }
+.s9-full .codebox { margin-top: 8px; }
+
+#s10-fib { display: grid; gap: 12px; }
+#s10-fib .mslot { justify-content: space-between; gap: 8px; height: auto; min-height: 36px; }
+#s10-fib summary { cursor: pointer; font-weight: 600; }
+#s10-fib details[open] .seg-toggle { margin-top: 12px; flex-wrap: wrap; }
+#s10-fib .ast-svg { max-width: 460px; }
+.s10-reg { margin: 10px 0 0; }
+.s10-summary { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.s10-source .codebox { padding-block: 6px; overflow-x: auto; }
+.s10-source .cl { padding-block: 0; }
+.s10-source mark {
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--acc-f);
+  color: var(--acc-t);
+  font-weight: 700;
+}
+.s10-source mark .num { color: inherit; }
+.s10-stack {
+  display: grid;
+  position: relative;
+  gap: 4px;
+  padding-left: 48px;
+  margin-bottom: 10px;
+}
+.s10-stack .mslot { height: 32px; min-height: 0; margin: 0; }
+.s10-stack .maddr { white-space: nowrap; }
+.s10-stack .reserved { border-style: dashed; color: var(--muted); }
+.s10-stack .sp-row { outline: 1px solid var(--blue); outline-offset: -1px; }
+.s10-sp {
+  position: absolute;
+  top: calc(var(--slot-row, 0) * 36px + 16px);
+  left: 0;
+  transform: translateY(-50%);
+  color: var(--blue-t);
+  font: 700 12px var(--mono);
+  transition: top var(--dur) var(--ease);
+}
+.s10-asm .codebox { overflow-x: auto; }
+.s10-nt-table { width: 100%; border-collapse: collapse; text-align: left; }
+.s10-nt-table th, .s10-nt-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.s10-nt-table tr[aria-current="step"] { background: var(--acc-f); color: var(--acc-t); }
+
+.foot { font-size: 12px; color: var(--muted); max-width: 96ch; }
+.foot p { margin: 0 0 4px; }
+
+@media (max-width: 1080px) {
+  .rail { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .g-wire, .g-disp, .g-12 { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .wire-col { display: none; }
+}
+@media (max-width: 900px) {
+  .cap-row { flex-direction: column; }
+  .g2, .g3 { grid-template-columns: minmax(0, 1fr); }
+  .turn { grid-template-columns: minmax(0, 1fr); }
+  .turn > .t-arrow { display: none; }
+  .pipe-wrap, .boot-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .disp-board { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+@media (max-width: 560px) {
+  .rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .btns button { padding: 5px 8px; font-size: 13px; }
+  .btns .primary { min-width: 72px; }
+  .mips-stack-wrap { padding-left: 62px; padding-right: 64px; }
+  .mips-ptr-left { width: 58px; }
+  .mips-ptr-right { width: 60px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="top-main">
+      <h1>运行时组织与代码生成：从栈帧到动态分派</h1>
+      <p>对应学习日记 11_02 与 11_03（CS143 第 11–12 讲）。沿着“静态源码如何映射到动态内存”与“带累加器的 MIPS 栈机如何编译表达式、函数调用与面向对象方法”，逐步演进到编译期优化。</p>
+    </div>
+    <div class="top-actions">
+      <a class="pill-btn" href="obsidian://open?vault=C%2B%2B&file=16.AI%E7%BC%96%E8%AF%91%E5%99%A8%2F%E5%AD%A6%E4%B9%A0%E6%97%A5%E8%AE%B0%2F0.2%E5%8D%81%E4%B8%80%E6%9C%88%2F11_02">11_02 笔记</a>
+      <a class="pill-btn" href="obsidian://open?vault=C%2B%2B&file=16.AI%E7%BC%96%E8%AF%91%E5%99%A8%2F%E5%AD%A6%E4%B9%A0%E6%97%A5%E8%AE%B0%2F0.2%E5%8D%81%E4%B8%80%E6%9C%88%2F11_03">11_03 笔记</a>
+      <button type="button" class="pill-btn" id="btn-theme">深色 / 浅色</button>
+    </div>
+  </header>
+
+  <div class="acts" id="acts" aria-label="三个阶段"></div>
+  <nav class="rail" id="rail" aria-label="章节列表"></nav>
+
+  <div class="bar" role="group" aria-label="播放控制">
+    <div class="btns">
+      <button type="button" id="b-first" title="回到起点（Home）">起点</button>
+      <button type="button" id="b-prev" title="上一步（←）">上一步</button>
+      <button type="button" id="b-play" class="primary" aria-pressed="false" title="播放或暂停（空格）">播放</button>
+      <button type="button" id="b-next" title="下一步（→）">下一步</button>
+    </div>
+    <div class="scrub">
+      <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="切换步骤">
+      <span id="pos">1 / 1</span>
+    </div>
+    <label class="speed">速度
+      <select id="speed">
+        <option value="0.6">0.6x 慢速</option>
+        <option value="1" selected>1x 正常</option>
+        <option value="1.6">1.6x 快速</option>
+        <option value="2.5">2.5x 很快</option>
+      </select>
+    </label>
+  </div>
+
+  <section class="turn" id="turn" aria-label="本章的问题演进"></section>
+
+  <div class="cap-row">
+    <section class="cap" aria-live="polite">
+      <div class="cap-top">
+        <span class="cap-ch" id="cap-ch"></span>
+        <span class="cap-act" id="cap-act"></span>
+      </div>
+      <h2 id="cap-h"></h2>
+      <p id="cap-p"></p>
+    </section>
+    <section class="panel s10-source" id="s10-source-panel" hidden>
+      <h3><span id="s10-source-title">sumto 源码</span> <small id="s10-source-context"></small></h3>
+      <div id="s10-source-body"></div>
+      <div id="s10-fib-source" hidden></div>
+    </section>
+  </div>
+
+  <form class="inputrow" id="input-form" hidden>
+    <label for="input-preset">预设表达式</label>
+    <select id="input-preset"></select>
+    <label for="input-text">或自定义算式</label>
+    <input type="text" id="input-text" autocomplete="off" spellcheck="false" placeholder="例如 7 + (5 + 3)">
+    <button type="submit">运行演示</button>
+    <span class="msg" id="input-msg" role="status"></span>
+  </form>
+
+  <main id="stage"></main>
+
+  <footer class="foot">
+    <p>第 1–5 章对应 <code>11_02.md</code>（运行时组织、静态与动态对应、ELF 启动与四区布局、对齐填充、纯栈式机器不变性）；第 6–12 章对应 <code>11_03.md</code>（带累加器的 MIPS 栈机、<code>$t1</code> 覆盖反例、逆序压参与极简 AR、<code>sumto(2)</code> 全追踪、<code>NT(e)</code> 固定临时槽、面向对象内存布局与分派表动态分派）。</p>
+    <p>快捷键：<kbd>空格</kbd> 播放/暂停，<kbd>←</kbd> <kbd>→</kbd> 前后单步，<kbd>Home</kbd> <kbd>End</kbd> 跳至起点/终点。</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const byId = id => document.getElementById(id);
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const code = s => '<code>' + esc(s) + '</code>';
+
+  /* Sentinel-safe syntax highlighter (code-panels.md spec) */
+  function highlightLine(raw, lang) {
+    const cmtRe = lang === 'asm' ? /^(.*?)(#.*)?$/ : /^(.*?)(\/\/.*)?$/;
+    const m = raw.match(cmtRe);
+    let body = m ? m[1] : raw;
+    const cmt = m && m[2] ? m[2] : '';
+    const strs = [];
+    body = body.replace(/"[^"]*"/g, s => {
+      strs.push(s);
+      return '\u0001' + String.fromCharCode(65 + strs.length - 1) + '\u0001';
+    });
+    body = esc(body);
+    if (lang === 'asm') {
+      body = body
+        .replace(/\b(li|lw|sw|addiu|add|sub|move|beq|b|jal|jalr|jr|movq|jmp|push|pushq|pop|call|ret|cgen)\b/g, '<span class="kw">$1</span>')
+        .replace(/(\$[a-z0-9]+|%[a-z0-9]+)/g, '<span class="reg">$1</span>')
+        .replace(/\b(-?\d+)\b/g, '<span class="num">$1</span>');
+    } else {
+      body = body
+        .replace(/\b(int|char|void|if|else|return|class|public|virtual|override|new|delete|static)\b/g, '<span class="kw">$1</span>')
+        .replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
+    }
+    body = body.replace(/\u0001([A-Z])\u0001/g, (_, ch) => '<span class="str">' + esc(strs[ch.charCodeAt(0) - 65]) + '</span>');
+    return body + (cmt ? '<span class="cmt">' + esc(cmt) + '</span>' : '');
+  }
+
+  function buildCodeBox(idPrefix, lines, lang) {
+    return '<div class="codebox" id="' + idPrefix + '">' +
+      lines.map((ln, i) => '<div class="cl" id="' + idPrefix + '-l' + i + '">' + (ln === '' ? ' ' : highlightLine(ln, lang)) + '</div>').join('') +
+      '</div>';
+  }
+
+  function paintCodeLines(idPrefix, total, accLines, blueLines, dimOthers) {
+    const accSet = new Set(accLines || []);
+    const blueSet = new Set(blueLines || []);
+    for (let i = 0; i < total; i++) {
+      const el = byId(idPrefix + '-l' + i);
+      if (!el) continue;
+      let cls = 'cl';
+      if (accSet.has(i)) cls += ' hl-acc';
+      else if (blueSet.has(i)) cls += ' hl-blue';
+      else if (dimOthers && (accSet.size || blueSet.size)) cls += ' hl-dim';
+      el.className = cls;
+    }
+  }
+
+  /* Connector SVG helper (connector-arrows.md spec) */
+  function drawInPath(path) {
+    if (!path || !path.getTotalLength) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const L = path.getTotalLength();
+    if (!L) return;
+    path.style.transition = 'none';
+    path.style.strokeDasharray = String(L);
+    path.style.strokeDashoffset = String(L);
+    void path.getBoundingClientRect();
+    path.style.transition = '';
+    path.style.strokeDashoffset = '0';
+    clearTimeout(path._drawTimer);
+    path._drawTimer = setTimeout(() => {
+      path.style.strokeDasharray = '';
+      path.style.strokeDashoffset = '';
+    }, 560);
+  }
+
+  /* Arithmetic Expression Parser (+, -, integers, parens; max 7 operands) */
+  function parseExpr(src) {
+    const tokens = [];
+    let i = 0;
+    while (i < src.length) {
+      const ch = src[i];
+      if (ch === ' ' || ch === '\t') { i++; continue; }
+      if (ch === '+' || ch === '-' || ch === '(' || ch === ')') { tokens.push({ t: ch, v: ch }); i++; continue; }
+      if (ch >= '0' && ch <= '9') {
+        let j = i;
+        while (j < src.length && src[j] >= '0' && src[j] <= '9') j++;
+        tokens.push({ t: 'int', v: Number(src.slice(i, j)) });
+        i = j;
+        continue;
+      }
+      return { error: '存在非法字符 "' + ch + '"，请只使用整数、+、-、括号。' };
+    }
+    if (!tokens.length) return { error: '请输入表达式，例如 7 + (5 + 3)。' };
+    let pos = 0, leaves = 0;
+    function parseAdd() {
+      let node = parseAtom();
+      while (pos < tokens.length && (tokens[pos].t === '+' || tokens[pos].t === '-')) {
+        const op = tokens[pos++].t;
+        const right = parseAtom();
+        node = { kind: 'bin', op, left: node, right, label: '(' + node.label + ' ' + op + ' ' + right.label + ')' };
+      }
+      return node;
+    }
+    function parseAtom() {
+      if (pos >= tokens.length) throw new Error('表达式不完整');
+      const tk = tokens[pos++];
+      if (tk.t === 'int') {
+        leaves++;
+        if (leaves > 7) throw new Error('为保持画面清晰，操作数请不超过 7 个。');
+        return { kind: 'int', val: tk.v, label: String(tk.v) };
+      }
+      if (tk.t === '(') {
+        const inner = parseAdd();
+        if (pos >= tokens.length || tokens[pos].t !== ')') throw new Error('括号不匹配');
+        pos++;
+        inner.parens = true;
+        return inner;
+      }
+      throw new Error('意外的符号 "' + tk.v + '"');
+    }
+    try {
+      const ast = parseAdd();
+      if (pos < tokens.length) throw new Error('末尾有多余符号 "' + tokens[pos].v + '"');
+      return { ast };
+    } catch (err) {
+      return { error: err.message };
+    }
+  }
+
+  function evalAst(n) {
+    if (n.kind === 'int') return n.val;
+    const a = evalAst(n.left), b = evalAst(n.right);
+    return n.op === '+' ? a + b : a - b;
+  }
+
+  /* =====================================================================
+     Dynamic Frame Generators for Chapter 5 (Pure Stack VM) & Chapter 7 (MIPS)
+     ===================================================================== */
+  function buildStackVMFrames(exprStr) {
+    const parsed = parseExpr(exprStr);
+    const ast = parsed.ast || parseExpr('7 + (5 + 3)').ast;
+    const instrs = [];
+    function compile(n, tag) {
+      if (n.kind === 'int') {
+        instrs.push({ op: 'push', arg: n.val, text: 'push ' + n.val, tag });
+        return;
+      }
+      const subTag = n.label;
+      compile(n.left, subTag);
+      compile(n.right, subTag);
+      instrs.push({ op: n.op === '+' ? 'add' : 'sub', text: n.op === '+' ? 'add' : 'sub', tag: subTag, desc: n.left.label + ' ' + n.op + ' ' + n.right.label });
+    }
+    compile(ast, ast.label);
+
+    const frames = [];
+    const stack = [];
+    frames.push({
+      act: '初始状态 · 栈底已有原有内容 S',
+      h: '执行表达式 ' + exprStr + ' 前的纯栈状态',
+      p: '在纯栈式机器里，指令不需要寄存器编号，默认从栈顶取操作数并把结果压回栈顶。底部虚线框 <code>S</code> 代表此前已经存好的栈内容，后续所有子表达式都绝不能破坏它。',
+      pc: -1,
+      stack: stack.slice(),
+      instrs,
+      expr: exprStr,
+      result: null,
+      invariant: 'S 完整保留 · 等待压入操作数'
+    });
+
+    instrs.forEach((ins, idx) => {
+      if (ins.op === 'push') {
+        stack.push(ins.arg);
+        frames.push({
+          act: 'PC=' + idx + ' · ' + ins.text,
+          h: '压入整数 ' + ins.arg + ' 到栈顶',
+          p: '执行 <code>' + ins.text + '</code>，将常量 ' + code(ins.arg) + ' 压入栈顶，下方的 <code>S</code> 与先前压入的中间结果丝毫未动。',
+          pc: idx,
+          stack: stack.slice(),
+          instrs,
+          expr: exprStr,
+          result: null,
+          highlightTop: 1,
+          invariant: '正在为子表达式 ' + ins.tag + ' 准备操作数'
+        });
+      } else {
+        const b = stack.pop();
+        const a = stack.pop();
+        const r = ins.op === 'add' ? a + b : a - b;
+        stack.push(r);
+        const isLast = idx === instrs.length - 1;
+        frames.push({
+          act: 'PC=' + idx + ' · ' + ins.text + ' (' + a + ' ' + ins.op.replace('add', '+').replace('sub', '-') + ' ' + b + ' = ' + r + ')',
+          h: '弹出栈顶两数并压回结果 ' + r,
+          p: '<code>' + ins.text + '</code> 弹出栈顶两个操作数 <code>' + a + '</code> 和 <code>' + b + '</code>，计算得 <code>' + r + '</code> 并重新压回栈顶。' + (isLast ? '整条表达式计算完毕：<code>S</code> 原封不动，栈顶只多出一个最终结果 <code>' + r + '</code>！' : '子表达式求值结束，它对下层栈的影响仅仅是在栈顶多留了一个结果 <code>' + r + '</code>。'),
+          pc: idx,
+          stack: stack.slice(),
+          instrs,
+          expr: exprStr,
+          result: isLast ? r : null,
+          highlightTop: 1,
+          reduced: true,
+          invariant: isLast ? '不变性达成：S 完整保留，栈顶多出结果 ' + r : '子表达式完成：下方栈不受影响，栈顶留结果 ' + r
+        });
+      }
+    });
+
+    frames.push({
+      act: '架构对比 · 0 操作数 vs 3 操作数',
+      h: '栈式机器指令紧凑，但真实 JIT 最终会转回寄存器',
+      p: '栈式机器的 <code>add</code> 无需写操作数位置（0 操作数指令），像 JVM 字节码与 WebAssembly 因此体积更紧凑；但计算已驻留寄存器的 <code>a + b</code> 时，寄存器机器只需 1 条 <code>add r1, r2, r3</code>，栈式机器却要重新压栈共 3 条。HotSpot C2 与 V8 TurboFan 在后端都会把栈式字节码转为 SSA 并分配物理寄存器。',
+      pc: instrs.length - 1,
+      stack: stack.slice(),
+      instrs,
+      expr: exprStr,
+      result: stack[stack.length - 1],
+      compareMode: true,
+      invariant: '代码紧凑性（栈机） ⇄ 执行访存开销（寄存器机）'
+    });
+
+    return frames;
+  }
+
+  function buildCgenAddFrames(exprStr) {
+    const parsed = parseExpr(exprStr);
+    const ast = parsed.ast || parseExpr('1 + (2 + 3)').ast;
+
+    /* Compile both: (A) Stack-safe cgen, (B) Buggy $t1-only cgen */
+    const lines = [];
+    const safeOps = [];
+    const buggyOps = [];
+
+    function emitSafe(n, depth) {
+      const pad = '  '.repeat(depth);
+      if (n.kind === 'int') {
+        lines.push({ type: 'ct', text: pad + 'cgen(' + n.val + ')' });
+        const idx = lines.length;
+        lines.push({ type: 'rt', text: 'li    $a0 ' + n.val });
+        safeOps.push({ line: idx, kind: 'li', val: n.val, note: '常量 ' + n.val + ' 装入累加器 $a0' });
+        return;
+      }
+      lines.push({ type: 'ct', text: pad + 'cgen(' + n.label + ')' });
+      emitSafe(n.left, depth + 1);
+      const lSw = lines.length;
+      lines.push({ type: 'rt', text: 'sw    $a0 0($sp)' });
+      safeOps.push({ line: lSw, kind: 'sw', note: '把左子树值写入 $sp 指向的空槽位' });
+      const lSubSp = lines.length;
+      lines.push({ type: 'rt', text: 'addiu $sp $sp -4' });
+      safeOps.push({ line: lSubSp, kind: 'sp-', note: '$sp 下移 4 字节，保护左值进入 4($sp)' });
+      emitSafe(n.right, depth + 1);
+      const lLw = lines.length;
+      lines.push({ type: 'rt', text: 'lw    $t1 4($sp)' });
+      safeOps.push({ line: lLw, kind: 'lw', note: '从栈顶 4($sp) 取回外层左值到 $t1' });
+      const lOp = lines.length;
+      const opAsm = n.op === '+' ? 'add   $a0 $t1 $a0' : 'sub   $a0 $t1 $a0';
+      lines.push({ type: 'rt', text: opAsm });
+      safeOps.push({ line: lOp, kind: n.op === '+' ? 'add' : 'sub', note: '用 $t1 ' + n.op + ' $a0 算出结果写回 $a0' });
+      const lAddSp = lines.length;
+      lines.push({ type: 'rt', text: 'addiu $sp $sp 4' });
+      safeOps.push({ line: lAddSp, kind: 'sp+', note: '$sp 弹回 4 字节，恢复入口约定' });
+    }
+    emitSafe(ast, 0);
+
+    /* Buggy $t1 simulation synced by milestones */
+    function runBuggy(n, st) {
+      if (n.kind === 'int') {
+        st.a0 = n.val;
+        st.trace.push({ asm: 'li $a0 ' + n.val, a0: st.a0, t1: st.t1, clobber: false });
+        return;
+      }
+      runBuggy(n.left, st);
+      const clobber = st.t1 !== '—' && st.held > 0;
+      const lost = st.t1;
+      st.t1 = st.a0;
+      st.held++;
+      st.trace.push({ asm: 'move $t1 $a0', a0: st.a0, t1: st.t1, clobber, lost });
+      runBuggy(n.right, st);
+      st.a0 = n.op === '+' ? (st.t1 + st.a0) : (st.t1 - st.a0);
+      st.held = Math.max(0, st.held - 1);
+      st.trace.push({ asm: (n.op === '+' ? 'add' : 'sub') + ' $a0 $t1 $a0', a0: st.a0, t1: st.t1, clobber: false });
+    }
+    const bState = { a0: '—', t1: '—', held: 0, trace: [] };
+    runBuggy(ast, bState);
+
+    /* Execute safeOps to create step frames */
+    const frames = [];
+    let a0 = '—', t1 = '?', sp = 0; // relative to S: 0, -4, -8...
+    const mem = new Map();
+    let maxDepth = 0;
+    safeOps.forEach(op => { if (op.kind === 'sp-') maxDepth += 4; });
+    const slotCount = Math.max(3, Math.ceil(maxDepth / 4) + 2);
+
+    frames.push({
+      act: '进入表达式 · $sp = S',
+      h: '编译期展开 ' + exprStr + '，准备运行期执行',
+      p: '左侧红色/橙色标记的是编译期递归调用的 <code>cgen(...)</code> 展开结构；蓝色标记的是实际生成并写进目标文件的 MIPS 运行期指令。右侧对照“把左值直接放 <code>$t1</code>”的偷懒方案。',
+      expr: exprStr,
+      lines,
+      lineIdx: -1,
+      a0, t1, sp: 0,
+      mem: [],
+      slotCount,
+      buggy: { a0: '—', t1: '—', asm: '准备开始', clobber: false, everClobbered: false },
+      expected: evalAst(ast)
+    });
+
+    let bCursor = 0;
+    let everClobbered = false;
+    let lastBuggy = { a0: '—', t1: '—', asm: '等待中', clobber: false };
+
+    safeOps.forEach(op => {
+      if (op.kind === 'li') {
+        a0 = op.val;
+        if (bCursor < bState.trace.length) { lastBuggy = bState.trace[bCursor++]; }
+      } else if (op.kind === 'sw') {
+        mem.set(sp, a0);
+        if (bCursor < bState.trace.length && bState.trace[bCursor].asm.startsWith('move')) {
+          lastBuggy = bState.trace[bCursor++];
+          if (lastBuggy.clobber) everClobbered = true;
+        }
+      } else if (op.kind === 'sp-') {
+        sp -= 4;
+      } else if (op.kind === 'lw') {
+        t1 = mem.get(sp + 4);
+      } else if (op.kind === 'add' || op.kind === 'sub') {
+        a0 = op.kind === 'add' ? (t1 + a0) : (t1 - a0);
+        if (bCursor < bState.trace.length) { lastBuggy = bState.trace[bCursor++]; }
+      } else if (op.kind === 'sp+') {
+        sp += 4;
+      }
+
+      const memSnap = [];
+      for (let k = 0; k < slotCount; k++) {
+        const off = -k * 4;
+        const hasVal = mem.has(off);
+        const live = off > sp;
+        memSnap.push({
+          off,
+          label: off === 0 ? 'S' : 'S' + off,
+          val: hasVal ? mem.get(off) : null,
+          live
+        });
+      }
+
+      const clobberMsg = lastBuggy.clobber
+        ? ' 反例警报：右侧用 <code>move $t1 $a0</code> 直接把 <code>' + lastBuggy.lost + '</code> 覆盖成了 <code>' + lastBuggy.t1 + '</code>！'
+        : '';
+
+      frames.push({
+        act: lines[op.line].text,
+        h: op.note,
+        p: (op.kind === 'sp+' && sp === 0
+            ? '释放内层槽位后 <code>$sp</code> 回到 <code>S</code>；物理槽里虽然还残余旧数，但逻辑上它已成为下一个空闲槽位。'
+            : op.note + '。') + clobberMsg,
+        expr: exprStr,
+        lines,
+        lineIdx: op.line,
+        a0, t1, sp,
+        mem: memSnap,
+        slotCount,
+        changed: op.kind,
+        buggy: Object.assign({}, lastBuggy, { everClobbered }),
+        expected: evalAst(ast)
+      });
+    });
+
+    const lastF = frames[frames.length - 1];
+    const buggyFinal = bState.a0;
+    const wrong = buggyFinal !== lastF.expected;
+    frames.push({
+      act: '求值结束 · 栈法=' + lastF.a0 + ' vs $t1法=' + buggyFinal,
+      h: wrong ? '嵌套加法揭穿陷阱：$t1 方案算出 ' + buggyFinal + ' 而非 ' + lastF.expected : '左侧先嵌套时侥幸正确，但向右嵌套必然覆盖 $t1',
+      p: wrong
+        ? '栈方式每次嵌套都在更低地址开辟新槽位，所有外层左值安然无恙，最终 <code>$a0 = ' + lastF.expected + '</code> 且 <code>$sp</code> 复原。只用单个 <code>$t1</code> 会在内层求值时冲掉外层左值，算成错误答案 <code>' + buggyFinal + '</code>！'
+        : '像 <code>(1 + 2) + 3</code> 这种左侧嵌套不会同时保留两个左值，所以 <code>$t1</code> 没被覆盖；换回 <code>1 + (2 + 3)</code> 或 <code>3 + (7 + 5)</code> 就会立刻出错（分别算出 <code>7</code> 和 <code>19</code>）。',
+      expr: exprStr,
+      lines,
+      lineIdx: lines.length - 1,
+      a0: lastF.a0,
+      t1: lastF.t1,
+      sp: 0,
+      mem: lastF.mem,
+      slotCount,
+      buggy: Object.assign({}, lastF.buggy, { finalWrong: wrong }),
+      expected: lastF.expected,
+      done: true
+    });
+
+    return frames;
+  }
+
+  /* =====================================================================
+     Chapter Definitions & Persistent Scene Controllers
+     ===================================================================== */
+  const ACTS = [
+    [0, 4, '阶段 1 · 11_02 运行时组织与栈式机器'],
+    [5, 8, '阶段 2 · 11_03 MIPS 累加器与调用序列'],
+    [9, 11, '阶段 3 · 11_03 临时槽优化与面向对象']
+  ];
+
+  /* Scene 1: Intro & 3 Pillars */
+  const sceneIntro = {
+    codeLines: [
+      'int sum(int n) {',
+      '    int x = n;       // 源码中只有一处 x 声明',
+      '    if (n == 0)',
+      '        return 0;',
+      '    int y = sum(n - 1); // 调用别人时，自己的 x 要留着',
+      '    return x + y;    // 执行时该读哪一份 x？',
+      '}'
+    ],
+    mount(root) {
+      root.innerHTML =
+        '<div class="grid g2">' +
+          '<section class="panel wide"><h3>编译器前后端阶段划分 <small>前端只负责“守规矩”，后端需要运行时托底</small></h3>' +
+            '<div class="pipe-wrap" id="s1-pipe">' +
+              '<div class="pnode" id="s1-p0"><b>1. 词法分析</b><small>前端 · 切分 Token</small></div>' +
+              '<div class="pnode" id="s1-p1"><b>2. 语法分析</b><small>前端 · 构建 AST</small></div>' +
+              '<div class="pnode" id="s1-p2"><b>3. 语义分析</b><small>前端 · 检查类型</small></div>' +
+              '<div class="pnode" id="s1-p3"><b>4. 后端优化</b><small>后端 · IR 与精简</small></div>' +
+              '<div class="pnode" id="s1-p4"><b>5. 代码生成</b><small>后端 + 运行时机制</small></div>' +
+            '</div>' +
+          '</section>' +
+          '<section class="panel"><h3>示例源码：递归 sum(2) <small>11_02 §一.2.1</small></h3>' +
+            buildCodeBox('s1-code', this.codeLines, 'cpp') +
+            '<div class="note-box" id="s1-note"></div>' +
+          '</section>' +
+          '<section class="panel"><h3>运行时组织要解决的三件事 <small>互相交叉支撑可执行程序</small></h3>' +
+            '<div class="pillar" id="s1-pil0"><h4>① 运行时资源管理（Management）</h4><p>寄存器和栈空间什么时候给谁用？调用 <code>sum(1)</code> 前，<code>sum(2)</code> 的 <code>x=2</code> 必须保留，返回后撤销栈帧（仅回退指针，不清零）。</p></div>' +
+            '<div class="pillar" id="s1-pil1"><h4>② 静态结构与动态实例对应</h4><p>源码里只有一个 <code>sum</code> 与一处 <code>int x</code>，但跑 <code>sum(2)</code> 时同时存在 <code>x=2, 1, 0</code> 三份数据，需通过“当前帧基址 + 固定偏移”区分。</p></div>' +
+            '<div class="pillar" id="s1-pil2"><h4>③ 存储组织（Storage Organization）</h4><p>机器码（代码区）、全局/<code>static</code> 变量（静态区）、参数与局部变量（栈）、<code>new</code> 动态对象（堆）各有不同的存活时间与位置。</p></div>' +
+          '</section>' +
+        '</div>';
+    },
+    patch(f) {
+      for (let i = 0; i < 5; i++) {
+        const el = byId('s1-p' + i);
+        el.className = 'pnode' + (f.front && i < 3 ? ' front' : '') + (f.back && i >= 3 ? ' back' : '');
+      }
+      for (let i = 0; i < 3; i++) {
+        const el = byId('s1-pil' + i);
+        el.className = 'pillar' + (f.pil === i ? ' on' : f.pil === 'all' ? ' on-b' : f.pil !== null ? ' dim' : '');
+      }
+      paintCodeLines('s1-code', this.codeLines.length, f.accLines, f.blueLines, true);
+      byId('s1-note').innerHTML = f.note;
+    }
+  };
+
+  /* Scene 2: Static vs Dynamic + Recursive Stack Frames */
+  const sceneFrames = {
+    codeLines: [
+      'int sum(int n) {',
+      '    int x = n;          // 静态：唯一一处 x 声明',
+      '    if (n == 0) return 0;',
+      '    int y = sum(n - 1); // 压栈等待内层返回',
+      '    return x + y;       // load [FP - 4]（固定偏移）',
+      '}',
+      '// main: int ans = sum(2);'
+    ],
+    wireMeta: [
+      { id: 'w2', frame: 's2-f1', cls: 'blue', label: 'x=2' },
+      { id: 'w1', frame: 's2-f2', cls: 'blue', label: 'x=1' },
+      { id: 'w0', frame: 's2-f3', cls: 'acc', label: 'x=0' }
+    ],
+    litWires: new Set(),
+    mount(root) {
+      this.litWires = new Set();
+      root.innerHTML =
+        '<div class="panel">' +
+          '<div class="grid g-wire">' +
+            '<div>' +
+              '<h3>静态源码与唯一指令 <small>1 份代码</small></h3>' +
+              buildCodeBox('s2-code', this.codeLines, 'cpp') +
+              '<div class="note-box"><b>实测 gcc 13.3 -O0：</b>帧指针 <code>rbp</code> 每次递减 <code>48</code> 字节（<code>...140 → ...110 → ...0e0</code>），<code>n</code> 在 <code>rbp-20</code>，<code>x</code> 在 <code>rbp-8</code>。开启 <code>-O2</code> 后递归会被改写为循环。</div>' +
+            '</div>' +
+            '<div class="wire-col" id="s2-wirecol"><svg class="wire-svg" id="s2-svg"></svg></div>' +
+            '<div>' +
+              '<h3>动态调用栈（向下是低地址） <small id="s2-alive">存活 x：0 份</small></h3>' +
+              '<div class="stack-stage" id="s2-stage">' +
+                '<div class="ptr-rail"><div class="ptr-badge fp" id="s2-fp">← FP</div><div class="ptr-badge sp" id="s2-sp">← SP</div></div>' +
+                '<div class="ar-card wait" id="s2-f0"><div><div class="ar-t">main</div><div class="ar-s" id="s2-s0">调用 sum(2)</div></div><span class="ar-v" id="s2-v0">ans=?</span></div>' +
+                '<div class="ar-card hidden" id="s2-f1"><div><div class="ar-t">sum(2)</div><div class="ar-s" id="s2-s1">等待 sum(1)</div></div><span class="ar-v" id="s2-v1">x=2</span></div>' +
+                '<div class="ar-card hidden" id="s2-f2"><div><div class="ar-t">sum(1)</div><div class="ar-s" id="s2-s2">等待 sum(0)</div></div><span class="ar-v" id="s2-v2">x=1</span></div>' +
+                '<div class="ar-card hidden" id="s2-f3"><div><div class="ar-t">sum(0)</div><div class="ar-s" id="s2-s3">基例返回 0</div></div><span class="ar-v" id="s2-v3">x=0</span></div>' +
+                '<div class="frame-slots" id="s2-slots" hidden>' +
+                  '<div class="frame-slot frame-anchor" id="s2-frame-base"><code>FP</code><span>当前栈帧的基址</span></div>' +
+                  '<div class="frame-slot" id="s2-frame-local"><code>[FP − 4]</code><span id="s2-frame-x"></span></div>' +
+                  '<div class="frame-boundary" id="s2-stack-edge">当前栈顶边界</div>' +
+                '</div>' +
+              '</div>' +
+              '<p class="frame-legend"><b>FP（帧指针）</b>用于按固定偏移访问本帧的变量。<b>SP（栈指针）</b>标记栈顶边界。进入新调用时 SP 向低地址移动，返回时 SP 回退，FP 恢复为调用者的帧基址。栈槽使用示意偏移。</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      const svg = byId('s2-svg');
+      svg.innerHTML = this.wireMeta.map(w =>
+        '<circle id="s2-c-' + w.id + '" r="4"></circle>' +
+        '<path id="s2-p-' + w.id + '" class="dash ' + w.cls + '"></path>' +
+        '<path id="s2-a-' + w.id + '" class="arrow ' + w.cls + '"></path>'
+      ).join('');
+      this.layoutWires();
+    },
+    layoutWires() {
+      const base = byId('s2-frame-base');
+      const edge = byId('s2-stack-edge');
+      const fpBadge = byId('s2-fp');
+      const spBadge = byId('s2-sp');
+      fpBadge.style.top = (base.offsetTop + (base.offsetHeight - fpBadge.offsetHeight) / 2) + 'px';
+      spBadge.style.top = (edge.offsetTop - spBadge.offsetHeight / 2) + 'px';
+      const col = byId('s2-wirecol');
+      const svg = byId('s2-svg');
+      const decl = byId('s2-code-l1');
+      if (!col || !svg || !decl) return;
+      const cr = col.getBoundingClientRect();
+      if (cr.width < 10) return;
+      const W = cr.width, H = cr.height;
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      const dr = decl.getBoundingClientRect();
+      const y1 = dr.top + dr.height / 2 - cr.top;
+      const x1 = 0;
+      this.wireMeta.forEach((w, idx) => {
+        const target = byId(w.frame);
+        const tr = target.getBoundingClientRect();
+        const tipX = tr.left - cr.left;
+        const x2 = tipX - 8;
+        const y2 = tr.top + tr.height / 2 - cr.top;
+        const c = byId('s2-c-' + w.id);
+        const p = byId('s2-p-' + w.id);
+        const a = byId('s2-a-' + w.id);
+        const spread = (idx - 1) * 5;
+        c.setAttribute('cx', String(x1 + 2));
+        c.setAttribute('cy', String(y1 + spread));
+        p.setAttribute('d', `M ${x1 + 2} ${y1 + spread} C ${W * 0.45} ${y1 + spread}, ${W * 0.55} ${y2}, ${x2} ${y2}`);
+        a.setAttribute('d', `M ${tipX} ${y2} L ${tipX - 9} ${y2 - 5} L ${tipX - 9} ${y2 + 5} Z`);
+      });
+    },
+    patch(f) {
+      paintCodeLines('s2-code', this.codeLines.length, f.accLines, f.blueLines, true);
+      byId('s2-alive').textContent = f.aliveLabel;
+      for (let i = 0; i < 4; i++) {
+        const card = byId('s2-f' + i);
+        const st = f.frames[i];
+        card.className = 'ar-card ' + st.cls;
+        byId('s2-s' + i).textContent = st.sub;
+        byId('s2-v' + i).textContent = st.val;
+      }
+      const fpCard = byId('s2-f' + f.fpIdx);
+      const slots = byId('s2-slots');
+      fpCard.appendChild(slots);
+      slots.hidden = false;
+      byId('s2-frame-local').hidden = f.fpIdx === 0;
+      byId('s2-frame-x').textContent = f.frames[f.fpIdx].val.split(',')[0];
+
+      this.layoutWires();
+      const svg = byId('s2-svg');
+      const anyOn = f.wires.length > 0;
+      svg.classList.toggle('has-on', anyOn);
+      this.wireMeta.forEach(w => {
+        const on = f.wires.includes(w.id);
+        const cls = on ? 'on ' + (w.id === f.hotWire ? 'acc' : 'blue') : '';
+        const p = byId('s2-p-' + w.id);
+        const a = byId('s2-a-' + w.id);
+        const c = byId('s2-c-' + w.id);
+        p.setAttribute('class', 'dash ' + cls);
+        a.setAttribute('class', 'arrow ' + cls);
+        c.setAttribute('class', cls);
+        if (on && !this.litWires.has(w.id)) {
+          this.litWires.add(w.id);
+          drawInPath(p);
+        } else if (!on) {
+          this.litWires.delete(w.id);
+        }
+      });
+    }
+  };
+
+  /* Scene 3: OS Load, 4 Memory Regions, Scope vs Lifetime & LIFO */
+  const sceneMemory = {
+    convention: 'cs143', // 'cs143' (low top) or 'csapp' (high top)
+    mount(root, ctx) {
+      root.innerHTML =
+        '<div class="grid g2">' +
+          '<section class="panel">' +
+            '<h3>程序启动与内存四区 <div class="seg-toggle"><button type="button" id="s3-conv-low" class="on">CS143 低地址在上</button><button type="button" id="s3-conv-hi">CS:APP 高地址在上</button></div></h3>' +
+            '<div class="boot-strip">' +
+              '<div class="bstep" id="s3-b0">磁盘 ELF</div>' +
+              '<div class="bstep" id="s3-b1">虚存映射</div>' +
+              '<div class="bstep" id="s3-b2">_start</div>' +
+              '<div class="bstep" id="s3-b3">__libc_start</div>' +
+              '<div class="bstep" id="s3-b4">main()</div>' +
+            '</div>' +
+            '<div class="vas-box" id="s3-vas">' +
+              '<div class="mblk code" id="s3-m-code"><span><b>Code 区</b> (sum, main)</span><small id="s3-a-code">R E · 低地址</small></div>' +
+              '<div class="mblk stat" id="s3-m-stat"><span><b>Static 区</b> (全局 / static)</span><small id="s3-a-stat">RW · 固定大小</small></div>' +
+              '<div class="mblk heap" id="s3-m-heap"><span><b>Heap 堆</b> (new Bar)</span><small id="s3-a-heap">↓ 向高地址增长</small></div>' +
+              '<div class="mblk mmap" id="s3-m-mmap"><span><b>mmap 映射区</b> (.so / 大块1MB)</span><small>Linux 真实夹层</small></div>' +
+              '<div class="mblk free" id="s3-m-free"><span><b>空闲共享空间</b> (ASLR 存在空洞)</span><small>非连续映射</small></div>' +
+              '<div class="mblk stack" id="s3-m-stack"><span><b>Stack 栈</b> (ulimit -s 8MB)</span><small id="s3-a-stack">↑ 向低地址增长</small></div>' +
+            '</div>' +
+            '<div class="note-box" id="s3-conv-note"></div>' +
+          '</section>' +
+          '<section class="panel">' +
+            '<h3>作用域（编译期） vs 生命周期（运行期）</h3>' +
+            '<div class="tl-row"><code>栈变量 p</code><div class="tl-track"><div class="tl-bar blue" id="s3-tl-p">p (仅 make 内)</div></div></div>' +
+            '<div class="tl-row"><code>堆对象 Bar</code><div class="tl-track"><div class="tl-bar acc" id="s3-tl-bar">Bar (new → delete b)</div></div></div>' +
+            '<div class="tl-row"><code>static 局部</code><div class="tl-track"><div class="tl-bar blue" id="s3-tl-st">作用域局部，生命周期全程</div></div></div>' +
+            '<h3 style="margin-top:14px">单栈两条基本假设与边界 <small>11_02 §二.2</small></h3>' +
+            '<div class="lifo-card" id="s3-l0"><b>1. 顺序调用 &amp; 原路返回：</b><code>main → f1 → f2 → f3</code> 区间严格嵌套不交叉，LIFO 单栈天然适配。</div>' +
+            '<div class="lifo-card" id="s3-l1"><b>2. 异常栈展开（Unwinding）：</b><code>f3</code> 抛异常跳过正常返回点，但析构仍按 <code>~f3 → ~f2 → ~f1</code> 严格逆序执行，未打破 LIFO！</div>' +
+            '<div class="lifo-card" id="s3-l2"><b>3. 打破单栈的真正场景：</b>多线程/协程各自建栈；逃逸闭包与 <code>call/cc</code> 会重返已返回的栈帧，只能把活动记录搬上<strong>堆</strong>（栈帧堆化）。</div>' +
+          '</section>' +
+        '</div>';
+
+      byId('s3-conv-low').onclick = () => { this.convention = 'cs143'; ctx.repatch(); };
+      byId('s3-conv-hi').onclick = () => { this.convention = 'csapp'; ctx.repatch(); };
+    },
+    patch(f) {
+      const lowTop = this.convention === 'cs143';
+      byId('s3-conv-low').className = lowTop ? 'on' : '';
+      byId('s3-conv-hi').className = !lowTop ? 'on' : '';
+
+      for (let i = 0; i < 5; i++) {
+        byId('s3-b' + i).className = 'bstep' + (i === f.bootIdx ? ' on' : i < f.bootIdx ? ' done' : '');
+      }
+
+      /* Compute heights & vertical layout smoothly! Total height = 332px (top pad 6, bottom pad 6 -> 320px usable) */
+      const hCode = 46;
+      const hStat = 42;
+      const hHeap = f.heapH;
+      const hMmap = f.showMmap ? 34 : 0;
+      const hStack = f.stackH;
+      const hFree = Math.max(24, 304 - (hCode + hStat + hHeap + hMmap + hStack));
+
+      const order = lowTop
+        ? [
+            { id: 'code', h: hCode, a: 'R E · 低地址' },
+            { id: 'stat', h: hStat, a: 'RW · 静态数据' },
+            { id: 'heap', h: hHeap, a: '↓ 向高地址增长' },
+            { id: 'mmap', h: hMmap, a: '共享库/大块malloc' },
+            { id: 'free', h: hFree, a: 'ASLR 地址空洞' },
+            { id: 'stack', h: hStack, a: '↑ 向低地址增长' }
+          ]
+        : [
+            { id: 'stack', h: hStack, a: '↓ 向低地址增长 (高地址在上)' },
+            { id: 'free', h: hFree, a: 'ASLR 地址空洞' },
+            { id: 'mmap', h: hMmap, a: '共享库/大块malloc' },
+            { id: 'heap', h: hHeap, a: '↑ 向高地址增长' },
+            { id: 'stat', h: hStat, a: 'RW · 静态数据' },
+            { id: 'code', h: hCode, a: 'R E · 低地址' }
+          ];
+
+      let y = 8;
+      order.forEach(item => {
+        const el = byId('s3-m-' + item.id);
+        el.style.top = y + 'px';
+        el.style.height = Math.max(0, item.h - 4) + 'px';
+        el.style.opacity = item.h === 0 ? '0' : '1';
+        el.className = 'mblk ' + (item.id === 'code' ? 'code' : item.id === 'stat' ? 'stat' : item.id === 'heap' ? 'heap' : item.id === 'mmap' ? 'mmap' : item.id === 'free' ? 'free' : 'stack') +
+          (f.hotMem === item.id ? ' hot' : '') + (f.hotMem && f.hotMem !== item.id && item.id !== 'free' ? ' dim' : '');
+        const addrEl = byId('s3-a-' + item.id);
+        if (addrEl) addrEl.textContent = item.a;
+        y += item.h;
+      });
+
+      byId('s3-conv-note').innerHTML = lowTop
+        ? '<b>CS143 / OSTEP 惯例：</b>低地址画在上方（代码在顶），堆向下（高地址）长、栈向上（低地址）长。无论图纸怎么翻，物理规则恒为：<b>栈向低地址伸展、堆向高地址伸展</b>。'
+        : '<b>CS:APP / Linux 惯例：</b>高地址画在上方（内核与栈在顶），栈向下（低地址）长、堆向上（高地址）长。无论图纸怎么翻，物理规则恒为：<b>栈向低地址伸展、堆向高地址伸展</b>。';
+
+      const tlP = byId('s3-tl-p'), tlB = byId('s3-tl-bar'), tlS = byId('s3-tl-st');
+      tlP.style.left = '8%'; tlP.style.width = f.scopeStep >= 1 ? '34%' : '0%'; tlP.style.opacity = f.scopeStep >= 1 ? '1' : '0';
+      tlB.style.left = '14%'; tlB.style.width = f.scopeStep >= 2 ? '76%' : (f.scopeStep >= 1 ? '30%' : '0%'); tlB.style.opacity = f.scopeStep >= 1 ? '1' : '0';
+      tlS.style.left = '0%'; tlS.style.width = '100%';
+
+      for (let i = 0; i < 3; i++) {
+        byId('s3-l' + i).className = 'lifo-card' + (f.lifoIdx === i ? (i === 2 ? ' on' : ' on-b') : '');
+      }
+    }
+  };
+
+  /* Scene 4: Word Alignment & Struct Padding */
+  const sceneAlignment = {
+    mode: 'int4',
+    mount(root, ctx) {
+      root.innerHTML =
+        '<div class="panel">' +
+          '<h3>32 位字对齐与结构体填充 <div class="seg-toggle" id="s4-modes">' +
+            '<button type="button" data-m="int4">int @ 4 (对齐)</button>' +
+            '<button type="button" data-m="int6">int @ 6 (未对齐)</button>' +
+            '<button type="button" data-m="hello">"Hello" 字填充</button>' +
+            '<button type="button" data-m="s1">char[5] + int</button>' +
+            '<button type="button" data-m="s2">char[5] + char</button>' +
+          '</div></h3>' +
+          '<div class="word-grid-wrap" id="s4-wrap">' +
+            '<div class="word-grid" id="s4-grid">' +
+              [0, 1, 2, 3].map(w =>
+                '<div class="word-box"><div class="word-hdr"><span>Word ' + w + '</span><span>addr ' + (w * 4) + '..' + (w * 4 + 3) + '</span></div>' +
+                '<div class="byte-row">' +
+                [0, 1, 2, 3].map(b => {
+                  const idx = w * 4 + b;
+                  return '<div class="bcell" id="s4-b' + idx + '"><small>' + idx + '</small><span id="s4-t' + idx + '">·</span></div>';
+                }).join('') +
+                '</div></div>'
+              ).join('') +
+              '<div class="bus-win" id="s4-win1"><span id="s4-wl1">总线读取 #1</span></div>' +
+              '<div class="bus-win blue" id="s4-win2"><span id="s4-wl2">总线读取 #2</span></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="reg-row" style="margin-top:10px">' +
+            '<div class="reg-card" id="s4-m0"><small>总线读取次数</small><b id="s4-v0">—</b></div>' +
+            '<div class="reg-card" id="s4-m1"><small>结构体 / 占用字节</small><b id="s4-v1">—</b></div>' +
+            '<div class="reg-card" id="s4-m2"><small>下个成员对齐要求</small><b id="s4-v2">—</b></div>' +
+            '<div class="reg-card" id="s4-m3"><small>语言标准 / UBSan</small><b id="s4-v3">—</b></div>' +
+          '</div>' +
+        '</div>';
+
+      byId('s4-modes').querySelectorAll('button').forEach(btn => {
+        btn.onclick = () => { this.mode = btn.dataset.m; ctx.repatch({ forceMode: this.mode }); };
+      });
+    },
+    patch(f, _prev, override) {
+      const m = (override && override.forceMode) ? override.forceMode : f.mode;
+      this.mode = m;
+      byId('s4-modes').querySelectorAll('button').forEach(b => {
+        b.className = b.dataset.m === m ? 'on' : '';
+      });
+
+      const cfg = {
+        int4: {
+          cells: { 4: ['i0', 'blue'], 5: ['i1', 'blue'], 6: ['i2', 'blue'], 7: ['i3', 'blue'] },
+          wins: [[4, 7, '1 次总线读取 Word 1']],
+          v: ['1 次 (高速)', '4 字节 (addr 4..7)', 'alignof(int) = 4', '合规对齐访问']
+        },
+        int6: {
+          cells: { 6: ['i0', 'acc'], 7: ['i1', 'acc'], 8: ['i2', 'acc'], 9: ['i3', 'acc'] },
+          wins: [[4, 7, '读取 #1 (Word 1)'], [8, 11, '读取 #2 (Word 2)']],
+          v: ['2 次读 + 拼接', '4 字节 (跨边界 6..9)', 'alignof(int) = 4', 'C/C++ UB · UBSan 报错']
+        },
+        hello: {
+          cells: { 0: ['H', 'blue'], 1: ['e', 'blue'], 2: ['l', 'blue'], 3: ['l', 'blue'], 4: ['o', 'blue'], 5: ['pad', 'pad'], 6: ['pad', 'pad'], 7: ['pad', 'pad'] },
+          wins: [[0, 3, 'Word 0'], [4, 7, 'Word 1 (含 3B 填充)']],
+          v: ['按字对齐', '5B 字符 + 3B pad = 8B', '下个字从 addr 8 开始', '若含 \\0 则需 2B pad']
+        },
+        s1: {
+          cells: { 0: ['c0', 'blue'], 1: ['c1', 'blue'], 2: ['c2', 'blue'], 3: ['c3', 'blue'], 4: ['c4', 'blue'], 5: ['pad', 'pad'], 6: ['pad', 'pad'], 7: ['pad', 'pad'], 8: ['x0', 'acc'], 9: ['x1', 'acc'], 10: ['x2', 'acc'], 11: ['x3', 'acc'] },
+          wins: [[8, 11, 'x 从 offset 8 开始']],
+          v: ['int 1 次读取', 'sizeof = 12 (gcc 实测)', '后继 int → alignof = 4', 'offsetof(x) = 8']
+        },
+        s2: {
+          cells: { 0: ['c0', 'blue'], 1: ['c1', 'blue'], 2: ['c2', 'blue'], 3: ['c3', 'blue'], 4: ['c4', 'blue'], 5: ['y', 'acc'] },
+          wins: [[4, 7, 'Word 1 紧凑存放 c4 与 y']],
+          v: ['无需填充', 'sizeof = 6 (gcc 实测)', '后继 char → alignof = 1', 'offsetof(y) = 5 (0B 填充)']
+        }
+      }[m];
+
+      for (let i = 0; i < 16; i++) {
+        const cell = byId('s4-b' + i);
+        const txt = byId('s4-t' + i);
+        const entry = cfg.cells[i];
+        cell.className = 'bcell' + (entry ? ' ' + entry[1] : '');
+        txt.textContent = entry ? entry[0] : '·';
+      }
+
+      const grid = byId('s4-grid');
+      const gr = grid.getBoundingClientRect();
+      [1, 2].forEach((wi, idx) => {
+        const win = byId('s4-win' + wi);
+        const spec = cfg.wins[idx];
+        if (!spec) {
+          win.style.opacity = '0';
+          return;
+        }
+        const bA = byId('s4-b' + spec[0]).getBoundingClientRect();
+        const bB = byId('s4-b' + spec[1]).getBoundingClientRect();
+        win.style.left = (bA.left - gr.left - 3) + 'px';
+        win.style.top = (bA.top - gr.top - 4) + 'px';
+        win.style.height = (bA.height + 8) + 'px';
+        win.style.width = (bB.right - bA.left + 6) + 'px';
+        win.style.opacity = '1';
+        byId('s4-wl' + wi).textContent = spec[2];
+      });
+
+      cfg.v.forEach((val, idx) => {
+        byId('s4-v' + idx).textContent = val;
+        byId('s4-m' + idx).className = 'reg-card' + (m === 'int6' && (idx === 0 || idx === 3) ? ' bad' : idx === 1 ? ' acc' : '');
+      });
+    }
+  };
+
+  /* Scene 5: Pure Stack Machine & Recursive Invariant */
+  const sceneStackVM = {
+    mount(root, ctx) {
+      root.innerHTML =
+        '<div class="grid g3">' +
+          '<section class="panel"><h3>栈式机器指令序列 <small id="s5-expr-lbl"></small></h3>' +
+            '<div class="prog-list" id="s5-prog"><div class="prog-pc" id="s5-pc">▶</div><div id="s5-rows"></div></div>' +
+          '</section>' +
+          '<section class="panel"><h3>运行期栈变化 <small>顶部向上生长 · S 永不被改写</small></h3>' +
+            '<div class="vm-stack-box" id="s5-stack"></div>' +
+            '<div class="note-box" id="s5-inv"></div>' +
+          '</section>' +
+          '<section class="panel"><h3>栈式机器 vs 寄存器机器 <small>11_02 §六.3</small></h3>' +
+            '<div class="lifo-card on-b" id="s5-cmp0"><b>栈式机器（0 操作数指令）：</b><code>push 7; push 5; add</code>。<br>指令短小紧凑（如 JVM 字节码 / Wasm），但所有中间值都必须压栈弹出。</div>' +
+            '<div class="lifo-card" id="s5-cmp1"><b>寄存器机器（3 操作数指令）：</b><code>add r1, r2, r3</code>。<br>若 <code>a, b</code> 已在寄存器，只需 <b>1</b> 条指令；栈式机器需重压栈共 <b>3</b> 条。</div>' +
+            '<div class="note-box"><b>递归代码生成基石：</b>因为任意子表达式 <code>e</code> 算完后都只把结果留在栈顶且完整保留下方 <code>S</code>，所以 <code>e1 + e2</code> 可以无脑拼接成 <code>code(e1) + code(e2) + add</code>（已通过 2,000 条随机嵌套算式验证）。</div>' +
+          '</section>' +
+        '</div>';
+    },
+    patch(f) {
+      byId('s5-expr-lbl').textContent = f.expr;
+      const rowsEl = byId('s5-rows');
+      const sig = f.instrs.map(x => x.text).join('|');
+      if (rowsEl.dataset.sig !== sig) {
+        rowsEl.dataset.sig = sig;
+        rowsEl.innerHTML = f.instrs.map((ins, i) =>
+          '<div class="inst-row" id="s5-ir-' + i + '"><span>' + esc(ins.text) + '</span><span class="inst-tag">' + esc(ins.tag) + '</span></div>'
+        ).join('');
+      }
+      f.instrs.forEach((_, i) => {
+        const r = byId('s5-ir-' + i);
+        r.className = 'inst-row' + (i === f.pc ? ' on' : i < f.pc ? ' done' : '');
+      });
+      const pcEl = byId('s5-pc');
+      if (f.pc < 0) {
+        pcEl.style.opacity = '0';
+      } else {
+        const target = byId('s5-ir-' + f.pc);
+        pcEl.style.opacity = '1';
+        pcEl.style.top = (target ? target.offsetTop + 2 : 0) + 'px';
+      }
+
+      /* Persistent stack pool of 9 slots (bottom = S) */
+      const box = byId('s5-stack');
+      if (!box.dataset.built) {
+        box.dataset.built = '1';
+        let h = '<div class="vm-cell base" id="s5-st-base">S（进入表达式前的原有栈底）</div>';
+        for (let i = 0; i < 8; i++) h += '<div class="vm-cell empty" id="s5-st-' + i + '"></div>';
+        box.innerHTML = h;
+      }
+      for (let i = 0; i < 8; i++) {
+        const c = byId('s5-st-' + i);
+        if (i < f.stack.length) {
+          c.textContent = String(f.stack[i]);
+          const isTop = i === f.stack.length - 1;
+          c.className = 'vm-cell' + (isTop && f.highlightTop ? (f.reduced ? ' acc' : ' blue') : '');
+        } else {
+          c.className = 'vm-cell empty';
+          c.textContent = '';
+        }
+      }
+      byId('s5-inv').innerHTML = '<b>不变性检查：</b>' + esc(f.invariant);
+      byId('s5-cmp0').className = 'lifo-card ' + (f.compareMode ? 'on' : 'on-b');
+      byId('s5-cmp1').className = 'lifo-card ' + (f.compareMode ? 'on-b' : '');
+    }
+  };
+
+  /* Scene 6: MIPS Accumulator Stack Machine & $sp Convention */
+  const sceneMipsAcc = {
+    codeLines: [
+      '# 压栈正确顺序（先存值，后移指针）',
+      'sw    $a0 0($sp)    # ① 写入当前空槽',
+      'addiu $sp $sp -4    # ② $sp 下移，7 成为 4($sp)',
+      '',
+      '# 出栈顺序（先读 4($sp)，后恢复 $sp）',
+      'lw    $t1 4($sp)    # 读回当前栈顶',
+      'addiu $sp $sp 4     # 释放槽位',
+      '',
+      '# 编译期 vs 运行期（11_03 §一.3）',
+      'cgen(7) = li $a0 7  # 常量直接装入累加器 $a0'
+    ],
+    mount(root) {
+      root.innerHTML =
+        '<div class="grid g-12">' +
+          '<section class="panel"><h3>MIPS 三寄存器约定与指令模板 <small>11_03 §一.1–3</small></h3>' +
+            '<div class="reg-row">' +
+              '<div class="reg-card" id="s6-ra0"><small>$a0 (累加器)</small><b id="s6-va0">7</b></div>' +
+              '<div class="reg-card" id="s6-rsp"><small>$sp (下一空槽)</small><b id="s6-vsp">S</b></div>' +
+              '<div class="reg-card" id="s6-rt1"><small>$t1 (左操作数)</small><b id="s6-vt1">?</b></div>' +
+            '</div>' +
+            buildCodeBox('s6-code', this.codeLines, 'asm') +
+            '<div class="note-box" id="s6-note"></div>' +
+          '</section>' +
+          '<section class="panel"><h3>MIPS 内存栈（高地址在上 · 每格 4 字节） <small>真实栈顶在 4($sp)</small></h3>' +
+            '<div class="mips-stack-wrap" id="s6-swrap">' +
+              '<div class="mips-ptr-left">' +
+                '<div class="ptr-badge sp" id="s6-p-sp">$sp →</div>' +
+              '</div>' +
+              '<div class="mips-stack">' +
+                '<div class="mslot blue" id="s6-m0"><span>旧栈顶元素</span><span class="maddr">S + 4</span></div>' +
+                '<div class="mslot free" id="s6-m1"><span id="s6-m1t">(空闲槽位)</span><span class="maddr">S</span></div>' +
+                '<div class="mslot free" id="s6-m2"><span id="s6-m2t">(未分配)</span><span class="maddr">S − 4</span></div>' +
+                '<div class="mslot free" id="s6-m3"><span>(未分配)</span><span class="maddr">S − 8</span></div>' +
+              '</div>' +
+              '<div class="mips-ptr-right">' +
+                '<div class="ptr-badge fp" id="s6-p-top">← 4($sp) 栈顶</div>' +
+              '</div>' +
+            '</div>' +
+          '</section>' +
+        '</div>';
+    },
+    patch(f) {
+      paintCodeLines('s6-code', this.codeLines.length, f.accLines, f.blueLines, true);
+      byId('s6-va0').textContent = f.a0;
+      byId('s6-vsp').textContent = f.spLabel;
+      byId('s6-vt1').textContent = f.t1;
+      byId('s6-ra0').className = 'reg-card' + (f.hotReg === 'a0' ? ' acc' : '');
+      byId('s6-rsp').className = 'reg-card' + (f.hotReg === 'sp' ? (f.bad ? ' bad' : ' acc') : '');
+      byId('s6-rt1').className = 'reg-card' + (f.hotReg === 't1' ? ' blue' : '');
+
+      byId('s6-m1').className = 'mslot ' + f.m1Cls;
+      byId('s6-m1t').textContent = f.m1Txt;
+      byId('s6-m2').className = 'mslot ' + f.m2Cls;
+      byId('s6-m2t').textContent = f.m2Txt;
+
+      const spEl = byId('s6-p-sp');
+      const topEl = byId('s6-p-top');
+      const spTarget = byId('s6-m' + f.spSlot);
+      const topTarget = byId('s6-m' + f.topSlot);
+      spEl.style.top = (spTarget.offsetTop + 4) + 'px';
+      topEl.style.top = (topTarget.offsetTop + 4) + 'px';
+      topEl.style.opacity = f.hideTop ? '0' : '1';
+      byId('s6-note').innerHTML = f.note;
+    }
+  };
+
+  /* Scene 7: cgen(e1 + e2) & $t1 Clobber Counterexample */
+  const sceneCgenAdd = {
+    mount(root) {
+      root.innerHTML =
+        '<div class="grid g3">' +
+          '<section class="panel"><h3>编译期展开与运行期指令 <small>橙=编译期 蓝=运行期</small></h3>' +
+            '<div class="prog-list" id="s7-prog"><div class="prog-pc" id="s7-pc">▶</div><div id="s7-rows"></div></div>' +
+          '</section>' +
+          '<section class="panel"><h3>正确方案：MIPS 累加器 + 栈 <small>11_03 §一.4</small></h3>' +
+            '<div class="reg-row">' +
+              '<div class="reg-card" id="s7-ra0"><small>$a0</small><b id="s7-va0">—</b></div>' +
+              '<div class="reg-card" id="s7-rt1"><small>$t1</small><b id="s7-vt1">?</b></div>' +
+              '<div class="reg-card" id="s7-rsp"><small>$sp</small><b id="s7-vsp">S</b></div>' +
+            '</div>' +
+            '<div class="mips-stack-wrap">' +
+              '<div class="mips-ptr-left"><div class="ptr-badge sp" id="s7-psp">$sp →</div></div>' +
+              '<div class="mips-stack" id="s7-stack"></div>' +
+              '<div class="mips-ptr-right"><div class="ptr-badge fp" id="s7-ptop">← 4($sp)</div></div>' +
+            '</div>' +
+          '</section>' +
+          '<section class="panel"><h3><span>反例：直接暂存 <code>$t1</code>（<code>move $t1 $a0</code>）</span> <small>嵌套必覆盖</small></h3>' +
+            '<div class="reg-row">' +
+              '<div class="reg-card" id="s7-ba0"><small>反例 $a0</small><b id="s7-bva0">—</b></div>' +
+              '<div class="reg-card" id="s7-bt1"><small>反例 $t1</small><b id="s7-bvt1">—</b></div>' +
+            '</div>' +
+            '<div class="note-box" id="s7-bnote"></div>' +
+            '<div class="note-box" style="margin-top:8px"><b>顺便留意 <code>addiu</code>：</b><code>u</code> 只表示不触发有符号溢出异常，<code>-4</code> 仍正常做符号扩展，所以 <code>addiu $sp $sp -4</code> 能正确减 4。</div>' +
+          '</section>' +
+        '</div>';
+    },
+    patch(f) {
+      const rowsEl = byId('s7-rows');
+      const sig = f.lines.map(l => l.text).join('|');
+      if (rowsEl.dataset.sig !== sig) {
+        rowsEl.dataset.sig = sig;
+        rowsEl.innerHTML = f.lines.map((l, i) =>
+          '<div class="inst-row ' + l.type + '" id="s7-ln-' + i + '"><span>' + esc(l.text) + '</span>' +
+          '<span class="inst-tag ' + l.type + '">' + (l.type === 'ct' ? '编译期' : '运行期') + '</span></div>'
+        ).join('');
+      }
+      f.lines.forEach((l, i) => {
+        byId('s7-ln-' + i).className = 'inst-row ' + l.type + (i === f.lineIdx ? ' on' : '');
+      });
+      const pc = byId('s7-pc');
+      if (f.lineIdx < 0) pc.style.opacity = '0';
+      else {
+        pc.style.opacity = '1';
+        pc.style.top = (byId('s7-ln-' + f.lineIdx).offsetTop + 2) + 'px';
+      }
+
+      byId('s7-va0').textContent = String(f.a0);
+      byId('s7-vt1').textContent = String(f.t1);
+      byId('s7-vsp').textContent = f.sp === 0 ? 'S' : 'S' + f.sp;
+      byId('s7-ra0').className = 'reg-card' + (f.changed === 'li' || f.changed === 'add' || f.changed === 'sub' ? ' acc' : '');
+      byId('s7-rt1').className = 'reg-card' + (f.changed === 'lw' ? ' blue' : '');
+      byId('s7-rsp').className = 'reg-card' + (f.changed === 'sp-' || f.changed === 'sp+' ? ' acc' : '');
+
+      const stBox = byId('s7-stack');
+      if (stBox.dataset.cnt !== String(f.slotCount)) {
+        stBox.dataset.cnt = String(f.slotCount);
+        let h = '';
+        for (let k = 0; k < f.slotCount; k++) {
+          const off = -k * 4;
+          h += '<div class="mslot free" id="s7-ms-' + k + '"><span id="s7-mv-' + k + '">(空闲)</span><span class="maddr">' + (off === 0 ? 'S' : 'S' + off) + '</span></div>';
+        }
+        stBox.innerHTML = h;
+      }
+      for (let k = 0; k < f.slotCount; k++) {
+        const slotInfo = f.mem[k] || { off: -k * 4, val: null, live: false };
+        const el = byId('s7-ms-' + k);
+        const mv = byId('s7-mv-' + k);
+        if (slotInfo.val !== null && slotInfo.live) {
+          el.className = 'mslot acc';
+          mv.textContent = String(slotInfo.val);
+        } else if (slotInfo.val !== null && !slotInfo.live) {
+          el.className = 'mslot dead';
+          mv.textContent = slotInfo.val + ' (已释放)';
+        } else {
+          el.className = 'mslot free';
+          mv.textContent = '(空闲)';
+        }
+      }
+      const spIdx = Math.min(f.slotCount - 1, Math.max(0, Math.round(-f.sp / 4)));
+      const spEl = byId('s7-ms-' + spIdx);
+      byId('s7-psp').style.top = (spEl.offsetTop + 4) + 'px';
+      const topEl = byId('s7-ptop');
+      if (spIdx > 0) {
+        topEl.style.opacity = '1';
+        topEl.style.top = (byId('s7-ms-' + (spIdx - 1)).offsetTop + 4) + 'px';
+      } else {
+        topEl.style.opacity = '0';
+      }
+
+      /* Counterexample panel */
+      byId('s7-bva0').textContent = String(f.buggy.a0);
+      byId('s7-bvt1').textContent = String(f.buggy.t1);
+      byId('s7-bt1').className = 'reg-card' + (f.buggy.clobber || f.buggy.finalWrong ? ' bad' : f.buggy.everClobbered ? ' acc' : '');
+      byId('s7-ba0').className = 'reg-card' + (f.buggy.finalWrong ? ' bad' : '');
+      const bn = byId('s7-bnote');
+      if (f.buggy.clobber) {
+        bn.innerHTML = '<b style="color:var(--acc-t)">覆盖发生！</b> 执行 <code>' + esc(f.buggy.asm) + '</code>：内层左值 <code>' + f.buggy.t1 + '</code> 直接冲掉了外层等待中的 <code>' + f.buggy.lost + '</code>！';
+      } else if (f.done) {
+        bn.innerHTML = f.buggy.finalWrong
+          ? '<b style="color:var(--acc-t)">结果错误：</b>$t1 方案最终算出 <code>' + f.buggy.a0 + '</code>，而正确结果应为 <code>' + f.expected + '</code>！'
+          : '<b>当前指令：</b><code>' + esc(f.buggy.asm) + '</code> → 左嵌套算式未覆盖 <code>$t1</code>（换 <code>1 + (2 + 3)</code> 或 <code>3 + (7 + 5)</code> 即刻出错）。';
+      } else {
+        bn.innerHTML = '<b>同步执行：</b><code>' + esc(f.buggy.asm) + '</code>' + (f.buggy.everClobbered ? '（此前外层 <code>$t1</code> 已被冲毁）' : '');
+      }
+    }
+  };
+
+  /* Scene 8: Minimal AR, Reverse Argument Push & $fp Anchor */
+  const sceneArLayout = {
+    arity: 2,
+    mount(root, ctx) {
+      root.innerHTML =
+        '<div class="grid g-12">' +
+          '<section class="panel"><h3>极简 AR 取舍与逆序压参 <div class="seg-toggle"><button type="button" id="s8-a2" class="on">f(x, y) 2参</button><button type="button" id="s8-a3">g(x, y, z) 3参</button></div></h3>' +
+            '<div class="lifo-card on-b"><b>极简 AR 四条取舍（11_03 §二.1）：</b><br>• <b>返回值</b>不存入 AR → 永远留在累加器 <code>$a0</code><br>• <b>实参</b>按 <code>x_n, ..., x_1</code> <b>逆序压栈</b> → 无局部变量<br>• <b>控制链</b>由 <code>old fp</code> 兼任（栈规约保证 <code>$sp</code> 复原）<br>• <b>RA 与旧 $fp</b> 必须保留 → 支持嵌套调用与返回寻址</div>' +
+            '<div class="note-box"><b>为什么逆序压栈？</b><code>x1</code> 永远落在 <code>4($fp)</code>、<code>x2</code> 永远落在 <code>8($fp)</code>，无论共有几个参数都不变（C 语言 <code>cdecl</code> 支持 <code>printf(fmt, ...)</code> 变参的原理相同）。</div>' +
+            '<div class="note-box" id="s8-note"></div>' +
+          '</section>' +
+          '<section class="panel"><h3>调用序列建立的 AR 栈帧 <small>高地址在上 · $fp 指向栈顶 RA</small></h3>' +
+            '<div class="mips-stack-wrap" style="margin-top:8px">' +
+              '<div class="mips-ptr-left">' +
+                '<div class="ptr-badge fp" id="s8-pfp">$fp →</div>' +
+                '<div class="ptr-badge sp" id="s8-psp">$sp →</div>' +
+              '</div>' +
+              '<div class="mips-stack" id="s8-stack"></div>' +
+              '<div class="mips-ptr-right">' +
+                '<div class="ptr-badge fp" id="s8-px1" style="opacity:0">← 4($fp)</div>' +
+              '</div>' +
+            '</div>' +
+          '</section>' +
+        '</div>';
+
+      byId('s8-a2').onclick = () => { this.arity = 2; ctx.repatch(); };
+      byId('s8-a3').onclick = () => { this.arity = 3; ctx.repatch(); };
+    },
+    patch(f) {
+      const a3 = this.arity === 3;
+      byId('s8-a2').className = !a3 ? 'on' : '';
+      byId('s8-a3').className = a3 ? 'on' : '';
+
+      const slots = a3
+        ? [
+            { id: 'caller', name: '调用方帧（caller AR）', off: '16($fp)', minStep: 0, cls: 'dead' },
+            { id: 'oldfp', name: 'old fp（调用方旧 $fp）', off: '16($fp)', minStep: 1, cls: 'blue' },
+            { id: 'z', name: '实参 z（第 3 参，最先压）', off: '12($fp)', minStep: 2, cls: 'blue' },
+            { id: 'y', name: '实参 y（第 2 参）', off: '8($fp)', minStep: 2, cls: 'blue' },
+            { id: 'x', name: '实参 x（第 1 参，最后压）', off: '4($fp)', minStep: 3, cls: 'blue' },
+            { id: 'ra', name: 'RA（被调用方存 $ra）', off: '0($fp)', minStep: 5, cls: 'acc' },
+            { id: 'tmp', name: '求值中临时压栈', off: '-4($fp)', minStep: 6, cls: 'acc' },
+            { id: 'next', name: '(下一个空闲槽位)', off: '-8($fp)', minStep: 99, cls: 'free' }
+          ]
+        : [
+            { id: 'caller', name: '调用方帧（caller AR）', off: '12($fp)', minStep: 0, cls: 'dead' },
+            { id: 'oldfp', name: 'old fp（调用方旧 $fp）', off: '12($fp)', minStep: 1, cls: 'blue' },
+            { id: 'y', name: '实参 y（第 2 参，先压）', off: '8($fp)', minStep: 2, cls: 'blue' },
+            { id: 'x', name: '实参 x（第 1 参，后压）', off: '4($fp)', minStep: 3, cls: 'blue' },
+            { id: 'ra', name: 'RA（被调用方存 $ra）', off: '0($fp)', minStep: 5, cls: 'acc' },
+            { id: 'tmp', name: '求值中临时压栈', off: '-4($fp)', minStep: 6, cls: 'acc' },
+            { id: 'next', name: '(下一个空闲槽位)', off: '-8($fp)', minStep: 99, cls: 'free' }
+          ];
+
+      const box = byId('s8-stack');
+      box.innerHTML = slots.map((s, idx) => {
+        const filled = f.step >= s.minStep;
+        const cls = filled ? s.cls : 'free';
+        const showOff = f.step >= 4 ? s.off : '';
+        return '<div class="mslot ' + cls + '" id="s8-sl-' + s.id + '"><span>' + (filled ? s.name : '(空闲槽位)') + '</span><span class="maddr">' + showOff + '</span></div>';
+      }).join('');
+
+      const fpTargetId = f.step < 4 ? 'caller' : 'ra';
+      const spTargetId = f.step === 0 ? 'oldfp' : f.step === 1 ? (a3 ? 'z' : 'y') : f.step === 2 ? 'x' : f.step <= 4 ? 'ra' : f.step === 5 ? 'tmp' : 'next';
+      byId('s8-pfp').style.top = (byId('s8-sl-' + fpTargetId).offsetTop + 4) + 'px';
+      byId('s8-psp').style.top = (byId('s8-sl-' + spTargetId).offsetTop + 4) + 'px';
+      const px1 = byId('s8-px1');
+      px1.style.opacity = f.step >= 4 ? '1' : '0';
+      px1.style.top = (byId('s8-sl-x').offsetTop + 4) + 'px';
+
+      byId('s8-note').innerHTML = f.note;
+    }
+  };
+
+  /* Scene 9: instruction-by-instruction sumto(2) */
+  const SUMTO_SOURCE = [
+    'int sumto(int x) {',
+    '    if (x == 0) {',
+    '        return 0;',
+    '    } else {',
+    '        return x + sumto(x - 1);',
+    '    }',
+    '}',
+  ];
+  const SUMTO_ASM = [
+    'sumto_entry:',
+    '  move  $fp $sp',
+    '  sw    $ra 0($sp)      # 返回地址',
+    '  addiu $sp $sp -4',
+    'check_zero:',
+    '  lw    $a0 4($fp)',
+    '  sw    $a0 0($sp)      # 比较暂存',
+    '  addiu $sp $sp -4',
+    '  li    $a0 0',
+    '  lw    $t1 4($sp)',
+    '  addiu $sp $sp 4',
+    '  beq   $a0 $t1 true1',
+    'false1:',
+    '  lw    $a0 4($fp)',
+    '  sw    $a0 0($sp)      # 加法左操作数',
+    '  addiu $sp $sp -4',
+    'prepare_call:',
+    '  sw    $fp 0($sp)      # 旧 $fp',
+    '  addiu $sp $sp -4',
+    '  lw    $a0 4($fp)',
+    '  sw    $a0 0($sp)      # 减法暂存',
+    '  addiu $sp $sp -4',
+    '  li    $a0 1',
+    '  lw    $t1 4($sp)',
+    '  sub   $a0 $t1 $a0',
+    '  addiu $sp $sp 4',
+    '  sw    $a0 0($sp)      # 实参',
+    '  addiu $sp $sp -4',
+    '  jal   sumto_entry',
+    'after_call:',
+    '  lw    $t1 4($sp)',
+    '  add   $a0 $t1 $a0',
+    '  addiu $sp $sp 4',
+    '  b     endif1',
+    'true1:',
+    '  li    $a0 0',
+    'endif1:',
+    '  lw    $ra 4($sp)',
+    '  addiu $sp $sp 12',
+    '  lw    $fp 0($sp)',
+    '  jr    $ra',
+    '',
+    'main:',
+    '  sw    $fp 0($sp)      # 旧 $fp',
+    '  addiu $sp $sp -4',
+    '  li    $a0 2',
+    '  sw    $a0 0($sp)      # 实参',
+    '  addiu $sp $sp -4',
+    '  jal   sumto_entry',
+    'main_resume:',
+    '  # main 在这里接收 $a0，演示结束',
+  ];
+  const SUMTO_STACK_SLOTS = 13;
+
+  function sumtoAddress(offset) {
+    return offset === 0 ? 'S' : 'S−' + (-offset);
+  }
+
+  function sumtoRegisterValue(name, value) {
+    if (value === null) return '—';
+    return name === '$fp' || name === '$sp' ? sumtoAddress(value) : String(value);
+  }
+
+  function buildSumtoFrames() {
+    // 用同一份汇编生成代码面板和执行状态。栈地址以 main 入口的 S 为基准。
+    const sourceLineByLabel = {
+      sumto_entry: 0,
+      check_zero: 1,
+      false1: 4,
+      prepare_call: 4,
+      after_call: 4,
+      true1: 2,
+      endif1: 6,
+    };
+    const program = [];
+    const labels = new Map();
+    let sourceLine = null;
+    for (const source of SUMTO_ASM) {
+      const [operation, comment] = source.split('#');
+      const instruction = operation.trim();
+      if (instruction.endsWith(':')) {
+        const label = instruction.slice(0, -1);
+        labels.set(label, program.length);
+        sourceLine = sourceLineByLabel[label] ?? null;
+      } else if (instruction) {
+        program.push({ source, sourceLine, parts: instruction.split(/\s+/), usage: comment?.trim() });
+      }
+    }
+    const returnPoints = new Map(['after_call', 'main_resume'].map(label => [labels.get(label), label]));
+    const registers = { $a0: null, $t1: null, $ra: null, $fp: 0, $sp: 0 };
+    const stack = Array(SUMTO_STACK_SLOTS).fill(null);
+    let pc = labels.get('main');
+    let call = 'main';
+    const slotIndex = address => -address / 4;
+    const snapshot = (source, explanation, slot, sourceLocation) => ({
+      source, explanation, slot, call, sourceLocation, registers: { ...registers }, stack: stack.slice()
+    });
+
+    function execute() {
+      const { source, sourceLine, parts: [op, dst, left, right], usage } = program[pc++];
+      const sourceLocation = { line: sourceLine, call };
+      let explanation;
+      let slot;
+      switch (op) {
+        case 'sw':
+        case 'lw': {
+          const [offset, base] = left.split('(');
+          const address = registers[base.slice(0, -1)] + Number(offset);
+          slot = slotIndex(address);
+          const location = sumtoAddress(address);
+          if (op === 'sw') {
+            stack[slot] = { value: registers[dst], register: dst, usage, call };
+            explanation = '把 ' + dst + ' 中的 ' + sumtoRegisterValue(dst, registers[dst]) +
+              ' 写到 ' + location + '（' + usage + '）。$sp 保持在原位。';
+          } else {
+            const cell = stack[slot];
+            registers[dst] = cell.value;
+            explanation = '从 ' + left + '（' + location + '）读出' + cell.usage + '，' +
+              dst + ' = ' + sumtoRegisterValue(dst, cell.value) + '。$sp 保持在原位。';
+            if (dst === '$fp') explanation += '旧 $fp 的槽已回收，里面的值还能读到。';
+            if (dst === '$t1' && cell.usage === '加法左操作数') {
+              explanation += '递归返回值仍在 $a0。';
+            }
+          }
+          break;
+        }
+        case 'addiu': {
+          const oldSp = registers.$sp;
+          const delta = Number(right);
+          registers.$sp += delta;
+          for (let address = oldSp + 4; address <= registers.$sp; address += 4) {
+            const index = slotIndex(address);
+            stack[index] = { ...stack[index], released: true };
+          }
+          const change = delta < 0 ? '下移一格，指向下一个可写槽。'
+            : delta === 12 ? '上移三格，回收本层的返回地址、参数和旧 $fp。新 $sp 正好指向旧 $fp 那一格。'
+            : '上移一格，刚才用过的临时槽从此可以复用。';
+          explanation = '$sp 从 ' + sumtoAddress(oldSp) + ' 移到 ' + sumtoAddress(registers.$sp) + '，' + change;
+          break;
+        }
+        case 'move':
+          registers[dst] = registers[left];
+          explanation = call + ' 把当前 $sp 复制给 $fp，定在 ' + sumtoAddress(registers.$fp) +
+            '。下一条 sw 会在这里保存返回地址。';
+          break;
+        case 'li':
+          registers[dst] = Number(left);
+          explanation = '$a0 = ' + left + '。' + (call === 'sumto(0)' && pc === labels.get('endif1')
+            ? '这是基例的返回值，下面收尾时会一直保留。' : '栈不变。');
+          break;
+        case 'sub':
+        case 'add': {
+          const lhs = registers[left];
+          const rhs = registers[right];
+          registers[dst] = op === 'sub' ? lhs - rhs : lhs + rhs;
+          explanation = '$a0 = ' + lhs + (op === 'sub' ? ' − ' : ' + ') + rhs + ' = ' + registers[dst] +
+            (op === 'sub' ? '。这个结果会作为下一层的参数。' : '。这就是 ' + call + ' 的返回值。');
+          break;
+        }
+        case 'beq': {
+          const equal = registers[dst] === registers[left];
+          if (equal) pc = labels.get(right);
+          explanation = '$a0 中的 ' + registers[dst] + ' 与 $t1 中的 ' + registers[left] +
+            (equal ? ' 相等，跳到 true1。' : ' 不相等，继续执行 false1。');
+          break;
+        }
+        case 'jal':
+          registers.$ra = returnPoints.get(pc);
+          call = 'sumto(' + stack[slotIndex(registers.$sp + 4)].value + ')';
+          pc = labels.get(dst);
+          explanation = '$ra = ' + registers.$ra + '，跳到 ' + call +
+            ' 的入口。$fp 还是调用方的值，栈上还没写入本次的返回地址。';
+          break;
+        case 'b':
+          pc = labels.get(dst);
+          explanation = '跳过 true1，直接到 endif1。$a0 保留刚算完的结果。';
+          break;
+        case 'jr': {
+          const callee = call;
+          pc = labels.get(registers.$ra);
+          call = registers.$ra === 'main_resume' ? 'main' : stack[slotIndex(registers.$fp)].call;
+          explanation = callee + ' 返回到 ' + call + ' 的 ' + registers.$ra +
+            '，$a0 = ' + registers.$a0 + '。' + (call === 'main'
+              ? 'main 拿到最终结果。' : '接下来执行 jal 后面的 lw，继续上层的加法。');
+          break;
+        }
+      }
+      return snapshot(source, explanation, slot, sourceLocation);
+    }
+
+    const pages = [
+      ['main 调用 sumto(2)', '先传参数，再跳进函数', '从 main 的 $fp 和 $sp 都为 S 开始。main 先保存旧 $fp，再压入实参 2。看 jal 执行后哪些东西变了。', 'sumto(2)', 'sumto_entry'],
+      ['sumto(2) 建帧并判断', '4($fp) 取到参数 2', '先看 $fp 和返回地址怎么落位，再跟完 x == 0 的求值。比较时 $a0 放 0，$t1 放刚从栈里取回的 x。', 'sumto(2)', 'false1'],
+      ['保存加法左操作数 2', '外层的 2 要等递归返回', '进入 false1 后从参数槽再读一次 2，把它另存到 S−12。递归期间 $a0 会反复改写，返回后从这个槽取 2。', 'sumto(2)', 'prepare_call'],
+      ['调用并进入 sumto(1)', '先算出 2−1，再为下一层建帧', 'S−20 先暂存减法左边的 2。减法用完这格后，把结果 1 写回同一地址作实参。jal 和新一层的入口指令各走一步。', 'sumto(1)', 'check_zero'],
+      ['sumto(1) 判断并保存左操作数', '外层的 2 留在栈里，这一层另存 1', '比较时暂存的 1 用完就释放。进入 false1 后，S−28 又拿来存加法左操作数 1，等 sumto(0) 返回。', 'sumto(1)', 'prepare_call'],
+      ['进入 sumto(0) 并命中基例', '第三层有自己的 x、旧 $fp 和返回地址', '算出 1−1，入栈传 0。建帧后同一条 lw $a0 4($fp) 读到这层的 0，beq 跳到 true1，返回值留在 $a0。', 'sumto(0)', 'endif1'],
+      ['sumto(0) 返回 0', '先恢复返回地址和指针，再执行 jr', '四条退栈指令分别观察。$sp 从 S−44 移到 S−32，恢复 $fp 后，jr 才把执行位置交回 sumto(1)。', 'sumto(1)', 'after_call'],
+      ['sumto(1) 继续做加法', '从 4($sp) 取到等着相加的 1', '回到这一层时，$a0 已经是内层的返回值 0。沿着 4($sp) → S−28 → $t1，跟到 1 + 0 得出 1。', 'sumto(1)', 'endif1'],
+      ['sumto(1) 返回，sumto(2) 接着算', '先看返回后 $a0 = 1，再看 2 + 1 = 3', 'jr 刚执行完时，sumto(2) 才拿到 1。两次递归都回到同一条 lw，但这次 $sp 回到 S−16，4($sp) 取的是 S−12 的 2。', 'sumto(2)', 'endif1'],
+      ['sumto(2) 返回 main', '最后才从外层的帧里取回 main_resume', '上一页结束时 $ra 仍是 after_call。外层收尾的 lw 会读回 main_resume，最后 $fp 和 $sp 都回到 S，$a0 留着 3。', 'main', 'main_resume']
+    ];
+
+    return pages.map(([act, h, p, endCall, endLabel]) => {
+      const steps = [snapshot('', '本页起点。点「下条指令」，逐条看寄存器和栈的变化。', undefined, {
+        line: program[pc].sourceLine,
+        call,
+      })];
+      do {
+        steps.push(execute());
+      } while (call !== endCall || pc !== labels.get(endLabel));
+      return { act, h, p, steps };
+    });
+  }
+
+  const sceneSumto = {
+    mount(root) {
+      const registerNames = ['$a0', '$t1', '$ra', '$fp', '$sp'];
+      root.innerHTML =
+        '<div class="grid g-12">' +
+          '<section class="panel s9-trace">' +
+            '<h3>sumto 源码 <small id="s9-source-location"></small></h3>' +
+            buildCodeBox('s9-source', SUMTO_SOURCE, 'cpp') +
+            '<h3>逐条执行</h3>' +
+            '<div class="seg-toggle s9-controls">' +
+              '<button type="button" id="s9-prev">上条指令</button>' +
+              '<button type="button" class="on-b" id="s9-next">下条指令</button>' +
+              '<span id="s9-count"></span>' +
+            '</div>' +
+            '<div class="reg-row" aria-label="执行后的寄存器">' + registerNames.map(name =>
+              '<div class="reg-card" id="s9-reg-' + name.slice(1) + '"><small>' + name + '</small><b>—</b></div>'
+            ).join('') + '</div>' +
+            '<div class="note-box s9-step" aria-live="polite"><b id="s9-call"></b><p id="s9-note"></p></div>' +
+            '<div id="s9-instructions"></div>' +
+          '</section>' +
+          '<section class="panel s9-trace"><h3>执行后的栈 <small>高地址在上 · 每格 4 字节</small></h3>' +
+            '<p class="s9-legend">橙底是临时值，蓝底是调用记录，灰底是已经回收的槽。边框标亮本条指令读写的位置。</p>' +
+            '<div class="mips-stack">' + Array.from({ length: SUMTO_STACK_SLOTS }, (_, i) =>
+              '<div class="s9-row"><span class="s9-pointer" id="s9-p' + i + '"></span>' +
+                '<div class="mslot free" id="s9-s' + i + '"><span></span><span class="maddr">' +
+                  sumtoAddress(-4 * i) + '</span></div></div>'
+            ).join('') + '</div>' +
+          '</section>' +
+        '</div>' +
+        '<details class="panel s9-full"><summary>查看完整汇编</summary>' +
+          buildCodeBox('s9-code', SUMTO_ASM, 'asm') +
+        '</details>';
+
+      byId('s9-prev').onclick = () => { stop(); this.showStep(this.stepIndex - 1); };
+      byId('s9-next').onclick = () => { stop(); this.advance(); };
+    },
+    patch(frame) {
+      this.steps = frame.steps;
+      byId('s9-instructions').innerHTML = buildCodeBox(
+        's9-page-code', this.steps.slice(1).map(step => step.source), 'asm'
+      );
+      this.showStep(0);
+    },
+    advance() {
+      if (this.stepIndex + 1 === this.steps.length) return false;
+      this.showStep(this.stepIndex + 1);
+      return true;
+    },
+    showStep(index) {
+      this.stepIndex = index;
+      const step = this.steps[index];
+      const prior = this.steps[index - 1];
+      const total = this.steps.length - 1;
+      byId('s9-prev').disabled = index === 0;
+      byId('s9-next').disabled = index === total;
+      byId('s9-count').textContent = index + ' / ' + total + ' 条指令';
+      byId('s9-call').textContent = step.call;
+      byId('s9-note').textContent = step.explanation;
+      const { line: sourceLine, call: sourceCall } = step.sourceLocation;
+      const sourceLines = sourceLine === null ? [] : [sourceLine];
+      paintCodeLines('s9-source', SUMTO_SOURCE.length, index ? sourceLines : [], index ? [] : sourceLines, false);
+      byId('s9-source-location').textContent = sourceLine === null
+        ? sourceCall + ' · 调用方'
+        : sourceCall + (index ? ' · 刚执行' : ' · 接下来执行');
+
+      for (const [name, value] of Object.entries(step.registers)) {
+        const card = byId('s9-reg-' + name.slice(1));
+        card.lastElementChild.textContent = sumtoRegisterValue(name, value);
+        card.classList.toggle('acc', Boolean(prior && prior.registers[name] !== value));
+      }
+
+      step.stack.forEach((cell, i) => {
+        const el = byId('s9-s' + i);
+        const pointer = byId('s9-p' + i);
+        const atFp = step.registers.$fp === -4 * i;
+        const atSp = step.registers.$sp === -4 * i;
+        pointer.textContent = atFp && atSp ? 'FP / SP' : atFp ? 'FP' : atSp ? 'SP' : '';
+        pointer.classList.toggle('at-fp', atFp);
+        pointer.classList.toggle('at-sp', atSp);
+        el.className = 'mslot';
+        if (!cell) {
+          el.classList.add('free');
+          el.firstElementChild.textContent = '空槽';
+        } else {
+          const temporary = cell.usage.endsWith('暂存') || cell.usage === '加法左操作数';
+          el.classList.add(cell.released ? 'dead' : temporary ? 'acc' : 'blue');
+          el.firstElementChild.textContent = cell.usage + ' = ' + sumtoRegisterValue(cell.register, cell.value) +
+            (cell.usage === '返回地址' ? ' · ' + cell.call : '');
+        }
+        el.classList.toggle('s9-access', i === step.slot);
+      });
+
+      paintCodeLines('s9-page-code', total, index ? [index - 1] : [], index < total ? [index] : [], false);
+      const box = byId('s9-page-code');
+      const line = byId('s9-page-code-l' + Math.max(0, index - 1));
+      box.scrollTop = Math.max(0, line.offsetTop - box.clientHeight / 3);
+    }
+  };
+
+  /* Scene 10: Fixed Temporaries NT(e) & Slot Reuse */
+  const SUMTO_TEMP_OFFSETS = [0, -4, -8, -12, -16, -20];
+  const SUMTO_TEMP_VALUES = {
+    compare: ['比较左边 x = 2', 'acc'],
+    add: ['等着相加的 x = 2', 'acc'],
+    subtract: ['减法左边 x = 2', 'acc'],
+    oldFp: ['为子调用保存的旧 $fp', 'blue'],
+    argument: ['子调用的实参 1', 'blue'],
+  };
+  const SUMTO_TEMP_FRAMES = [
+    {
+      act: '建帧', h: '同一个 sumto(2)，两种分配临时空间的办法',
+      p: '两边都在 <code>0($fp)</code> 存返回地址。右边在入口多留两格（8 字节），此时格子里还没有临时值。',
+      sourceLine: 0, a0: '2（传入的实参）',
+      push: { sp: -4, slots: {}, asm: ['move  $fp, $sp', 'sw    $ra, 0($sp)', 'addiu $sp, $sp, -4'] },
+      fixed: { sp: -12, slots: {}, asm: ['move  $fp, $sp', 'sw    $ra, 0($sp)', 'addiu $sp, $sp, -12'] },
+    },
+    {
+      act: '比较 · 存入', h: '准备比较 x == 0，先把 2 存到第一格',
+      p: '两边都读出 <code>x = 2</code> 并保存。左边写完就把 <code>$sp</code> 移到下一空格，右边直接写预留的 <code>-4($fp)</code>。',
+      sourceLine: 1, a0: '2',
+      push: { sp: -8, slots: { '-4': 'compare' }, asm: ['lw    $a0, 4($fp)', 'sw    $a0, 0($sp)', 'addiu $sp, $sp, -4'] },
+      fixed: { sp: -12, slots: { '-4': 'compare' }, asm: ['lw    $a0, 4($fp)', 'sw    $a0, -4($fp)'] },
+    },
+    {
+      act: '比较 · 取出', h: '2 和 0 不相等，第一格可以给下一次暂存用',
+      p: '把 <code>0</code> 放进 <code>$a0</code>，从第一格取回 <code>2</code> 放进 <code>$t1</code>。左边把 <code>$sp</code> 加回去，右边的槽地址始终是 <code>-4($fp)</code>。',
+      sourceLine: 1, a0: '0',
+      push: { sp: -4, slots: {}, asm: ['li    $a0, 0', 'lw    $t1, 4($sp)', 'addiu $sp, $sp, 4', 'beq   $a0, $t1, true1'] },
+      fixed: { sp: -12, slots: {}, asm: ['li    $a0, 0', 'lw    $t1, -4($fp)', 'beq   $a0, $t1, true1'] },
+    },
+    {
+      act: '加法 · 留住左边', h: '开始算 2 + sumto(2 - 1)，把等着相加的 2 存起来',
+      p: '这次的 <code>2</code> 要等子调用回来才能取出。刚才比较用的第一格已经空闲，现在可以用来存它。',
+      sourceLine: 4, sourceFocus: 'x', a0: '2',
+      push: { sp: -8, slots: { '-4': 'add' }, asm: ['lw    $a0, 4($fp)', 'sw    $a0, 0($sp)', 'addiu $sp, $sp, -4'] },
+      fixed: { sp: -12, slots: { '-4': 'add' }, asm: ['lw    $a0, 4($fp)', 'sw    $a0, -4($fp)'] },
+    },
+    {
+      act: '调用准备 · 保存帧指针', h: '准备调用下一层，两边都要保存外层的 $fp',
+      p: '按本例的调用约定，先把外层的 <code>$fp</code> 写入下一空格。蓝色格是子调用的数据，右边此时也会移动 <code>$sp</code>。',
+      sourceLine: 4, sourceFocus: 'sumto(x - 1)', a0: '2',
+      push: { sp: -12, slots: { '-4': 'add', '-8': 'oldFp' }, asm: ['sw    $fp, 0($sp)', 'addiu $sp, $sp, -4'] },
+      fixed: { sp: -16, slots: { '-4': 'add', '-12': 'oldFp' }, asm: ['sw    $fp, 0($sp)', 'addiu $sp, $sp, -4'] },
+    },
+    {
+      act: '减法 · 两格同时占用', h: '计算实参 2 - 1，第二个 2 也要有地方放',
+      p: '两块橙色分别是等着相加的 <code>2</code> 和马上要做减法的 <code>2</code>。右边直接用预留的第二格 <code>-8($fp)</code>，所以这一步 <code>$sp</code> 停在原处。',
+      sourceLine: 4, sourceFocus: 'x - 1', a0: '2',
+      push: { sp: -16, slots: { '-4': 'add', '-8': 'oldFp', '-12': 'subtract' }, asm: ['lw    $a0, 4($fp)', 'sw    $a0, 0($sp)', 'addiu $sp, $sp, -4'] },
+      fixed: { sp: -16, slots: { '-4': 'add', '-8': 'subtract', '-12': 'oldFp' }, asm: ['lw    $a0, 4($fp)', 'sw    $a0, -8($fp)'] },
+    },
+    {
+      act: '减法 · 取出并计算', h: '算出实参 1，减法用过的格子空出来了',
+      p: '把减法的左操作数取回 <code>$t1</code>，执行 <code>2 - 1</code>。左边上移 <code>$sp</code> 回收临时槽，右边直接结束第二格的使用。加法左值还要留着。',
+      sourceLine: 4, sourceFocus: 'x - 1', a0: '1',
+      push: { sp: -12, slots: { '-4': 'add', '-8': 'oldFp' }, asm: ['li    $a0, 1', 'lw    $t1, 4($sp)', 'sub   $a0, $t1, $a0', 'addiu $sp, $sp, 4'] },
+      fixed: { sp: -16, slots: { '-4': 'add', '-12': 'oldFp' }, asm: ['li    $a0, 1', 'lw    $t1, -8($fp)', 'sub   $a0, $t1, $a0'] },
+    },
+    {
+      act: '传参 · 进入子调用', h: '把 1 压栈，执行 jal 进入 sumto(1)',
+      p: '画面停在 <code>jal</code> 刚执行完的时刻。下一层还没建立自己的栈帧。两边都把实参写到 <code>0($sp)</code>，然后下移 <code>$sp</code>。',
+      sourceLine: 4, sourceFocus: 'sumto(x - 1)', a0: '1（子调用的实参）',
+      push: { sp: -16, slots: { '-4': 'add', '-8': 'oldFp', '-12': 'argument' }, asm: ['sw    $a0, 0($sp)', 'addiu $sp, $sp, -4', 'jal   sumto_entry'] },
+      fixed: { sp: -20, slots: { '-4': 'add', '-12': 'oldFp', '-16': 'argument' }, asm: ['sw    $a0, 0($sp)', 'addiu $sp, $sp, -4', 'jal   sumto_entry'] },
+    },
+    {
+      act: '返回 · 恢复外层', h: 'sumto(1) 返回 1，外层存着的 2 还在',
+      p: '这里跳过子调用内部的指令，直接看返回后。外层的 <code>$fp</code> 已恢复，所以固定槽仍能用原来的 <code>-4($fp)</code> 找到加法左值。',
+      sourceLine: 4, sourceFocus: 'sumto(x - 1)', a0: '1（子调用的返回值）',
+      push: { sp: -8, slots: { '-4': 'add' }, asm: ['after_call:', '# 刚从子调用返回'] },
+      fixed: { sp: -12, slots: { '-4': 'add' }, asm: ['after_call:', '# 刚从子调用返回'] },
+    },
+    {
+      act: '加法 · 取出并计算', h: '两边都算出 2 + 1 = 3',
+      p: '取回第一格的 <code>2</code>，与 <code>$a0</code> 里的 <code>1</code> 相加。右边在三次临时值存取中共省掉六条调整 <code>$sp</code> 的指令，预留的两格等外层退帧时一并回收。',
+      sourceLine: 4, sourceFocus: 'x + sumto(x - 1)', a0: '3（外层返回值）',
+      push: { sp: -4, slots: {}, asm: ['lw    $t1, 4($sp)', 'add   $a0, $t1, $a0', 'addiu $sp, $sp, 4'] },
+      fixed: { sp: -12, slots: {}, asm: ['lw    $t1, -4($fp)', 'add   $a0, $t1, $a0'] },
+    },
+  ];
+
+  const SUMTO_NT_STEPS = [
+    {
+      act: '计算 NT · 从叶子开始',
+      h: '算 x - 1 时，只有左边的 x 需要暂存',
+      p: '按动画的模板，先算左边，再算右边。读左边的 <code>x</code> 时用 0 格。随后读右边的 <code>1</code> 时，要多留 1 格保存左边的 <code>x</code>。比较两个阶段的峰值，就得到 <code>max(0, 0 + 1) = 1</code>。',
+      sourceLine: 4, sourceFocus: 'x - 1',
+      ntRows: [
+        ['x、0、1', '读到的值直接放进 $a0。', '0'],
+        ['x - 1', '算左边用 0 格。算右边用 0 格，再加 1 格保存左边。', 'max(0, 0 + 1) = 1'],
+      ],
+    },
+    {
+      act: '计算 NT · 合并左右两边',
+      h: '算递归实参时，外层加法的 x 还要占一格',
+      p: '左边的 <code>x</code> 直接读入 <code>$a0</code>，需要 0 格。算右边调用的实参 <code>x - 1</code> 需要 1 格，此时左边的 <code>x</code> 还要保留，所以右边阶段一共用 2 格。',
+      sourceLine: 4, sourceFocus: 'x + sumto(x - 1)',
+      ntRows: [
+        ['sumto(x - 1)', '本层求实参 x - 1 需要 1 格。子调用执行时使用自己的栈帧。', 'NT(x - 1) = 1'],
+        ['x + sumto(x - 1)', '算左边用 0 格。算右边用 1 格，再加 1 格保存外层的 x。', 'max(0, 1 + 1) = 2'],
+      ],
+    },
+    {
+      act: '计算 NT · 取函数体的峰值',
+      h: '先判断，再走一个分支，整层预留两格',
+      p: '条件判断用完临时槽后，进入分支可以复用这格。编译器取三个阶段的最大值 <code>max(1, 0, 2) = 2</code>，生成的函数入口为每层调用预留 <code>2 × 4 = 8</code> 字节的临时空间。',
+      sourceLine: 0,
+      ntRows: [
+        ['x == 0', '按动画的比较模板，读 0 时留一格存 x。', '1'],
+        ['return 0', '把常量直接写进 $a0。', '0'],
+        ['sumto 函数体', '先判断，再进入其中一个分支。分支可以复用条件用过的槽。', 'max(1, 0, 2) = 2'],
+      ],
+    },
+  ];
+
+  function buildSumtoTempPanel(id, title, detail) {
+    return `<section class="panel"><h3>${title}<small>${detail}</small></h3>
+      <div class="s10-stack">
+        <span class="s10-sp" id="${id}-sp">$sp →</span>
+        ${SUMTO_TEMP_OFFSETS.map((offset, i) =>
+          `<div class="mslot" id="${id}-slot-${i}"><span></span><span class="maddr">${offset}($fp)</span></div>`
+        ).join('')}
+      </div>
+      <div class="s10-asm" id="${id}-asm"></div>
+    </section>`;
+  }
+
+  function paintSumtoTempPanel(id, state, reservedSlots) {
+    byId(id + '-sp').style.setProperty('--slot-row', SUMTO_TEMP_OFFSETS.indexOf(state.sp));
+    SUMTO_TEMP_OFFSETS.forEach((offset, i) => {
+      const cell = byId(id + '-slot-' + i);
+      const reserved = reservedSlots.includes(offset);
+      const empty = offset === state.sp ? '下一可写槽' : reserved ? '已预留，可复用' : '空闲';
+      const [label, color] = offset === 0
+        ? ['返回地址 · main_resume（$fp）', 'blue']
+        : SUMTO_TEMP_VALUES[state.slots[offset]] ?? [empty, reserved ? 'reserved' : 'free'];
+      cell.className = 'mslot ' + color + (offset === state.sp ? ' sp-row' : '');
+      cell.firstElementChild.textContent = label;
+    });
+    byId(id + '-asm').innerHTML = buildCodeBox(id + '-code', state.asm, 'asm');
+  }
+
+  const FIB_SOURCE = [
+  "int fib(int x) {",
+  "    if (x == 1) return 0;",
+  "    if (x == 2) return 1;",
+  "    return fib(x - 1) + fib(x - 2);",
+  "}"
+];
+
+  const FIB_TEMP_STEPS = [
+    {
+      act: "进入递归分支",
+      h: "跟住外层 fib(6)，看它怎样算出左右两项",
+      p: "两个基本条件都已检查完。现在要算 fib(5) + fib(4)。两格临时空间已在入口留好，之前比较条件用过的格子现在也可以再用。",
+      focus: "fib(x - 1) + fib(x - 2)",
+      a0: "暂未使用（进入递归表达式）",
+      asm: ["# 此处从两个条件判断之后开始","# 回顾入口：addiu $sp, $sp, -12"],
+      effect: "入口的 12 字节包含返回地址 4 字节和临时空间 8 字节。",
+      slots: [null,null],
+    },
+    {
+      act: "准备左边的实参",
+      h: "要算 6 − 1，把 6 留在 T0",
+      p: "减法的左边是 x，值为 6。下一条 li 要把右边的常量 1 写进 $a0，所以先把 6 存在 T0。",
+      focus: "x - 1",
+      a0: "1（减数）",
+      asm: ["lw    $a0, 4($fp)     # x = 6","sw    $a0, -8($fp)    # T0 留住 6","li    $a0, 1"],
+      effect: "写入 T0 后，$a0 可以用来装 1。",
+      slots: ["6 · 等着减 1",null],
+    },
+    {
+      act: "取回 6，算出实参",
+      h: "6 − 1 得到 5，T0 可以再用",
+      p: "把 T0 里的 6 读到 $t1，用它减去 $a0 里的 1。实参 5 已经在 $a0 里，后面不会再读 T0 里的这个 6。",
+      focus: "x - 1",
+      a0: "5（传给第一次递归的实参）",
+      asm: ["lw    $t1, -8($fp)    # 取回 6","sub   $a0, $t1, $a0   # 6 − 1 = 5"],
+      effect: "槽位的旧数据无需清零。只要那个值最后一次用完，这格就能覆盖。",
+      slots: [null,null],
+    },
+    {
+      act: "左边调用返回",
+      h: "fib(5) 返回 3，同一个 T0 现在改存 3",
+      p: "把实参 5 压栈并调用 fib，跳过子调用内部。回到外层时 $a0 = 3。右边求值也要用 $a0，于是把左边的结果 3 写回刚腾出的 T0。",
+      focus: "fib(x - 1)",
+      a0: "3（左项的返回值）",
+      asm: ["# 传入 5，调用 fib，返回时 $a0 = 3","sw    $a0, -8($fp)    # 同一地址改存 3"],
+      effect: "这个 3 要一直留到最后的加法。",
+      slots: ["3 · 等着做最后的加法",null],
+    },
+    {
+      act: "准备右边的实参",
+      h: "算 6 − 2 时，两格第一次同时占用",
+      p: "T0 里的 3 还要用。为了把常量 2 写进 $a0，这次把减法左边的 6 存到 T1。现在两个值都不能覆盖。",
+      focus: "x - 2",
+      a0: "2（减数）",
+      asm: ["lw    $a0, 4($fp)     # 再读 x = 6","sw    $a0, -4($fp)    # T1 留住 6","li    $a0, 2"],
+      effect: "此刻就是 NT = 2 对应的瞬间。T0 为外层加法留着 3，T1 为当前减法留着 6。",
+      slots: ["3 · 等着做最后的加法","6 · 等着减 2"],
+    },
+    {
+      act: "右边调用返回",
+      h: "T1 用完，T0 里的 3 跨过了第二次调用",
+      p: "从 T1 取回 6，算出实参 4，T1 就可复用。把 4 传给 fib，子调用在自己的栈帧里计算。回到这里时，$a0 带回右项 2。",
+      focus: "fib(x - 2)",
+      a0: "2（右项的返回值）",
+      asm: ["lw    $t1, -4($fp)    # 取回 6","sub   $a0, $t1, $a0   # 6 − 2 = 4","# 传入 4，调用 fib，返回时 $a0 = 2"],
+      effect: "右项已就绪，外层 T0 仍保存左项。",
+      slots: ["3 · 等着做最后的加法",null],
+    },
+    {
+      act: "合并两个返回值",
+      h: "从 T0 取回 3，加上 $a0 里的 2，得到 5",
+      p: "最后一次读取 T0，把左项 3 放进寄存器 $t1。执行加法后，$a0 保存 fib(6) 的返回值 5，外层的两个临时槽都可以复用。",
+      focus: "+",
+      a0: "5（fib(6) 的返回值）",
+      asm: ["lw    $t1, -8($fp)    # 左项 3","add   $a0, $t1, $a0   # 3 + 2 = 5"],
+      effect: "这些 sw、lw 都使用固定的 $fp 偏移。每次暂存和取回都省去了配套的 $sp 调整。",
+      slots: [null,null],
+    },
+  ];
+
+  const sceneTemps = {
+    astMode: 'fib',
+    mount(root, ctx) {
+      root.innerHTML =
+        '<div id="s10-sumto">' +
+          '<p class="s10-summary" id="s10-summary" aria-live="polite"></p>' +
+          '<div class="grid g2">' +
+            buildSumtoTempPanel('s10-push', '按需压栈', '相对外层 $fp 的地址') +
+            buildSumtoTempPanel('s10-fixed', '固定临时槽', '相对外层 $fp 的地址') +
+          '</div>' +
+        '</div>' +
+        '<section class="panel" id="s10-nt" hidden><h3>从子表达式算到整个函数 <small>NT 的单位是格</small></h3>' +
+          '<p class="s10-summary" id="s10-nt-rule"></p>' +
+          '<table class="s10-nt-table"><thead><tr><th scope="col">表达式</th><th scope="col">临时槽用在哪</th><th scope="col">峰值 NT</th></tr></thead>' +
+          '<tbody id="s10-nt-rows"></tbody></table>' +
+        '</section>' +
+        `<div id="s10-fib" hidden>
+          <div class="grid g2">
+            <section class="panel"><h3>外层 fib(6) 的临时槽 <small id="s10-occupancy"></small></h3>
+              <div class="mslot" id="s10-t0"><span></span><span class="maddr">T0 · -8($fp)</span></div>
+              <div class="mslot" id="s10-t1"><span></span><span class="maddr">T1 · -4($fp)</span></div>
+              <div class="note-box" id="s10-opnote"></div>
+            </section>
+            <section class="panel"><h3>这一步用到的指令</h3><div class="s10-asm" id="s10-fib-asm"></div>
+              <p class="s10-reg"><code>$a0</code> <span id="s10-fib-reg"></span></p></section>
+          </div>
+          <section class="panel" id="s10-stats" hidden><h3>同一套模板跑完整个 fib(15) <small>11_03 §四 · 模拟器记录</small></h3>
+            <table class="s10-nt-table"><thead><tr><th>指标</th><th>按需压栈</th><th>固定临时槽</th></tr></thead><tbody>
+            <tr><th>执行的 $sp 调整指令</th><td>12,940</td><td>4,876（少 8,064 条）</td></tr>
+            <tr><th>总执行指令</th><td>43,841</td><td>35,777（少 8,064 条）</td></tr>
+            <tr><th>生成的代码行数</th><td>54</td><td>44</td></tr></tbody></table>
+            <p>总指令数的差额恰好等于省下的 $sp 调整指令数。调用传参和进出栈帧仍会移动 $sp。</p>
+          </section>
+          <details class="panel"><summary>对照表达式树，查看编译期的 NT</summary>
+            <div class="seg-toggle"><button type="button" id="s10-m-fib">fib 递归加法</button><button type="button" id="s10-m-r">1 + (2 + 3)</button><button type="button" id="s10-m-l">(1 + 2) + 3</button></div>
+            <svg class="ast-svg" id="s10-ast" viewBox="0 0 345 185" aria-label="表达式树及各节点所需的临时槽数"></svg>
+            <p id="s10-tree-note"></p>
+          </details>
+        </div>`;
+
+      byId('s10-source-body').innerHTML = buildCodeBox('s10-source', SUMTO_SOURCE, 'cpp');
+      byId('s10-fib-source').innerHTML = buildCodeBox('fib-src', FIB_SOURCE, 'cpp');
+      byId('s10-m-fib').onclick = () => { this.astMode = 'fib'; ctx.repatch(); };
+      byId('s10-m-r').onclick = () => { this.astMode = 'right'; ctx.repatch(); };
+      byId('s10-m-l').onclick = () => { this.astMode = 'left'; ctx.repatch(); };
+    },
+    patch(f) {
+      const showSumto = Boolean(f.push);
+      const showNT = f.ntStep !== undefined;
+      byId('s10-sumto').hidden = !showSumto;
+      byId('s10-nt').hidden = !showNT;
+      byId('s10-fib').hidden = showSumto || showNT;
+      const fibView = f.fibStep !== undefined;
+      byId('s10-source-title').textContent = fibView ? 'fib 源码' : 'sumto 源码';
+      byId('s10-source-body').hidden = fibView;
+      byId('s10-fib-source').hidden = !fibView;
+      if (showSumto || showNT) {
+        byId('s10-source-context').textContent = showNT ? '编译期计算' : '外层 sumto(2)';
+        paintCodeLines('s10-source', SUMTO_SOURCE.length, [f.sourceLine], [], false);
+        const recursiveLine = SUMTO_SOURCE[4];
+        const focusStart = f.sourceFocus ? recursiveLine.indexOf(f.sourceFocus) : -1;
+        byId('s10-source-l4').innerHTML = focusStart < 0 ? highlightLine(recursiveLine, 'cpp')
+          : highlightLine(recursiveLine.slice(0, focusStart), 'cpp') +
+            '<mark>' + highlightLine(f.sourceFocus, 'cpp') + '</mark>' +
+            highlightLine(recursiveLine.slice(focusStart + f.sourceFocus.length), 'cpp');
+      }
+      if (showNT) {
+        byId('s10-nt-rule').innerHTML = f.ntStep < 2
+          ? '<code>NT(左 op 右) = max(NT(左), 1 + NT(右))</code>，按先左后右求值。'
+          : '<code>NT(函数体) = max(NT(条件), NT(真分支), NT(递归分支))</code>。';
+        const rows = SUMTO_NT_STEPS.slice(0, f.ntStep + 1).flatMap(step => step.ntRows);
+        byId('s10-nt-rows').innerHTML = rows.map(([expr, reason, slots], index) =>
+          `<tr${index === rows.length - 1 ? ' aria-current="step"' : ''}><th scope="row">${code(expr)}</th><td>${esc(reason)}</td><td>${code(slots)}</td></tr>`
+        ).join('');
+        return;
+      }
+      if (showSumto) {
+        const active = Object.values(f.push.slots).filter(slot => SUMTO_TEMP_VALUES[slot][1] === 'acc').length;
+        byId('s10-summary').textContent = '$a0 = ' + f.a0 + '　·　正在使用的临时槽 ' + active + ' 格';
+        paintSumtoTempPanel('s10-push', f.push, []);
+        paintSumtoTempPanel('s10-fixed', f.fixed, [-4, -8]);
+        return;
+      }
+      byId('s10-m-fib').className = this.astMode === 'fib' ? 'on' : '';
+      byId('s10-m-r').className = this.astMode === 'right' ? 'on' : '';
+      byId('s10-m-l').className = this.astMode === 'left' ? 'on' : '';
+
+      byId('s10-source-context').textContent = '跟踪外层调用 · x = 6';
+      paintCodeLines('fib-src', FIB_SOURCE.length, [3], [], false);
+      const line = FIB_SOURCE[3];
+      const start = line.indexOf(f.focus);
+      byId('fib-src-l3').innerHTML = highlightLine(line.slice(0, start), 'cpp') +
+        '<mark>' + highlightLine(f.focus, 'cpp') + '</mark>' + highlightLine(line.slice(start + f.focus.length), 'cpp');
+      byId('s10-occupancy').textContent = '占用 ' + f.slots.filter(Boolean).length + ' / 2 格';
+      f.slots.forEach((value, index) => {
+        const slot = byId('s10-t' + index);
+        slot.className = 'mslot ' + (value ? 'acc' : 'free');
+        slot.firstElementChild.textContent = value || '空闲，可复用';
+      });
+      byId('s10-opnote').textContent = f.effect;
+      byId('s10-fib-reg').textContent = f.a0;
+      byId('s10-fib-asm').innerHTML = buildCodeBox('fib-asm', f.asm, 'asm');
+      byId('s10-stats').hidden = f.fibStep !== FIB_TEMP_STEPS.length - 1;
+      byId('s10-tree-note').textContent = {
+        fib: '算 x − 2 时要暂存 x，同时保留左边调用的结果，两格同时占用。',
+        right: '算 2 + 3 时，外层的 1 和内层的 2 同时等待相加，需要两格。',
+        left: '1 + 2 用完第一格后，结果 3 可以占用同一格，等待与右边的 3 相加。峰值是一格。'
+      }[this.astMode];
+      const trees = {
+        fib: {
+          nodes: [
+            { x: 160, y: 28, w: 42, txt: '+', nt: 2, lvl: 2 },
+            { x: 85, y: 88, w: 72, txt: 'fib(x-1)', nt: 1, lvl: 1, p: 0 },
+            { x: 235, y: 88, w: 72, txt: 'fib(x-2)', nt: 1, lvl: 1, p: 0 },
+            { x: 85, y: 152, w: 56, txt: 'x - 1', nt: 1, lvl: 0, p: 1 },
+            { x: 235, y: 152, w: 56, txt: 'x - 2', nt: 1, lvl: 0, p: 2 }
+          ]
+        },
+        right: {
+          nodes: [
+            { x: 160, y: 28, w: 42, txt: '+', nt: 2, lvl: 2 },
+            { x: 85, y: 92, w: 38, txt: '1', nt: 0, lvl: 0, p: 0 },
+            { x: 235, y: 92, w: 42, txt: '+', nt: 1, lvl: 1, p: 0 },
+            { x: 190, y: 156, w: 38, txt: '2', nt: 0, lvl: 0, p: 2 },
+            { x: 280, y: 156, w: 38, txt: '3', nt: 0, lvl: 0, p: 2 }
+          ]
+        },
+        left: {
+          nodes: [
+            { x: 160, y: 28, w: 42, txt: '+', nt: 1, lvl: 2 },
+            { x: 85, y: 92, w: 42, txt: '+', nt: 1, lvl: 1, p: 0 },
+            { x: 235, y: 92, w: 38, txt: '3', nt: 0, lvl: 0, p: 0 },
+            { x: 40, y: 156, w: 38, txt: '1', nt: 0, lvl: 0, p: 1 },
+            { x: 130, y: 156, w: 38, txt: '2', nt: 0, lvl: 0, p: 1 }
+          ]
+        }
+      }[this.astMode];
+
+      const svg = byId('s10-ast');
+      let linesH = '', nodesH = '';
+      trees.nodes.forEach(n => {
+        if (n.p !== undefined) {
+          const pn = trees.nodes[n.p];
+          linesH += `<line x1="${pn.x}" y1="${pn.y + 14}" x2="${n.x}" y2="${n.y - 14}" class="on"></line>`;
+        }
+      });
+      trees.nodes.forEach(n => {
+        nodesH += `<g class="${n.lvl === 2 ? 'on' : 'done'}">` +
+          `<rect x="${n.x - n.w / 2}" y="${n.y - 14}" width="${n.w}" height="28" rx="6"></rect>` +
+          `<text x="${n.x}" y="${n.y + 4}">${esc(n.txt)}</text>` +
+          `<text class="nt-badge" x="${n.x + n.w / 2 + 4}" y="${n.y - 4}">NT=${n.nt}</text></g>`;
+      });
+      svg.innerHTML = linesH + nodesH;
+
+    }
+  };
+
+  /* Scene 11: Object Memory Layout & Prefix Invariance */
+  const sceneObjLayout = {
+    codeLines: [
+      'class A {',
+      'public: int a = 0, d = 1;',
+      '    virtual int f() { return a = a + d; }',
+      '};',
+      'class B : public A {',
+      'public: int b = 2;',
+      '    int f() override { return a; }',
+      '    virtual int g() { return a = a - b; }',
+      '};',
+      'class C : public A {',
+      'public: int c = 3;',
+      '    virtual int h() { return a = a * c; }',
+      '};'
+    ],
+    layoutMode: 'cool',
+    mount(root, ctx) {
+      root.innerHTML =
+        '<div class="grid g-12">' +
+          '<section class="panel"><h3>类继承关系与共同属性访问 <small>11_03 §五</small></h3>' +
+            buildCodeBox('s11-code', this.codeLines, 'cpp') +
+            '<div class="note-box">所有方法都通过 <code>self</code>（即 <code>this</code>）加固定偏移读写属性 <code>a</code>，因此 <code>a</code> 与 <code>d</code> 在 <code>A / B / C</code> 对象中的偏移必须完全一致。</div>' +
+          '</section>' +
+          '<section class="panel"><h3>对象内存布局对比 <div class="seg-toggle"><button type="button" id="s11-mcool" class="on">Cool 3字对象头</button><button type="button" id="s11-mgcc">g++ 13.3 实测 (x86-64)</button></div></h3>' +
+            '<div class="obj-wrap" id="s11-wrap">' +
+              '<div class="obj-ruler" id="s11-ruler"></div>' +
+              '<div class="obj-row" id="s11-rA"></div>' +
+              '<div class="obj-row" id="s11-rB"></div>' +
+              '<div class="obj-row" id="s11-rC"></div>' +
+              '<div class="align-band" id="s11-band"></div>' +
+            '</div>' +
+            '<div class="note-box" id="s11-note"></div>' +
+          '</section>' +
+        '</div>';
+
+      byId('s11-mcool').onclick = () => { this.layoutMode = 'cool'; ctx.repatch({ forceMode: 'cool' }); };
+      byId('s11-mgcc').onclick = () => { this.layoutMode = 'gcc'; ctx.repatch({ forceMode: 'gcc' }); };
+    },
+    patch(f, _prev, override) {
+      const m = (override && override.forceMode) ? override.forceMode : f.mode;
+      this.layoutMode = m;
+      byId('s11-mcool').className = m === 'cool' ? 'on' : '';
+      byId('s11-mgcc').className = m === 'gcc' ? 'on' : '';
+      paintCodeLines('s11-code', this.codeLines.length, f.accLines, f.blueLines, true);
+
+      const isGcc = m === 'gcc';
+      byId('s11-ruler').innerHTML = isGcc
+        ? '<span>类</span><span>0..7</span><span>8</span><span>12</span><span>16</span><span>20..23</span><span>sizeof</span>'
+        : '<span>类</span><span>0</span><span>4</span><span>8</span><span>12</span><span>16</span><span>20</span>';
+
+      const rows = isGcc
+        ? {
+            A: ['vptr (8B):blue', 'a:acc', 'd:acc', ':none', ':none', '16 B:pad'],
+            B: ['vptr (8B):blue', 'a:acc', 'd:acc', 'b:blue', '4B pad:pad', '24 B:pad'],
+            C: ['vptr (8B):blue', 'a:acc', 'd:acc', 'c:blue', '4B pad:pad', '24 B:pad']
+          }
+        : {
+            A: ['Atag:plain', 'size=5:plain', 'disp*:blue', 'a:acc', 'd:acc', ':none'],
+            B: ['Btag:plain', 'size=6:plain', 'disp*:blue', 'a:acc', 'd:acc', 'b:blue'],
+            C: ['Ctag:plain', 'size=6:plain', 'disp*:blue', 'a:acc', 'd:acc', 'c:blue']
+          };
+
+      ['A', 'B', 'C'].forEach((clsName, idx) => {
+        const row = byId('s11-r' + clsName);
+        row.style.opacity = f.showCount > idx ? '1' : '0.2';
+        row.innerHTML = '<span class="obj-lbl">' + clsName + '</span>' +
+          rows[clsName].map((spec, colIdx) => {
+            const [txt, cls] = spec.split(':');
+            return '<div class="ofield ' + cls + '" id="s11-' + clsName + '-' + colIdx + '">' + esc(txt) + '</div>';
+          }).join('');
+      });
+
+      const band = byId('s11-band');
+      const wrap = byId('s11-wrap').getBoundingClientRect();
+      if (f.bandCols && wrap.width > 10) {
+        const first = byId('s11-A-' + f.bandCols[0]).getBoundingClientRect();
+        const last = byId('s11-A-' + f.bandCols[1]).getBoundingClientRect();
+        band.style.opacity = '1';
+        band.style.left = (first.left - wrap.left - 3) + 'px';
+        band.style.width = (last.right - first.left + 6) + 'px';
+      } else {
+        band.style.opacity = '0';
+      }
+
+      byId('s11-note').innerHTML = isGcc
+        ? '<b>g++ 13.3 实测：</b><code>vptr@0</code>（8B）、<code>a@8</code>、<code>d@12</code>、<code>b/c@16</code>；因受 8 字节对齐约束，<code>B/C</code> 末尾填充 4 字节使 <code>sizeof = 24</code>。'
+        : '<b>Cool 对象布局：</b>开头 3 个字是对象头（<code>tag@0</code>, <code>size@4</code>, <code>disp*@8</code>），父类字段 <code>a@12, d@16</code> 居前，<code>b</code> 与 <code>c</code> 安全共用偏移 20（<code>B</code> 与 <code>C</code> 互不为子类）。';
+    }
+  };
+
+  /* Scene 12: Dispatch Tables & Dynamic Dispatch Execution */
+  const sceneDispatch = {
+    selectedType: 'B',
+    litWires: new Set(),
+    mount(root, ctx) {
+      this.litWires = new Set();
+      root.innerHTML =
+        '<div class="grid g-disp">' +
+          '<section class="panel"><h3>调用点代码（全程不变） <div class="seg-toggle"><button type="button" id="s12-tA">new A()</button><button type="button" id="s12-tB" class="on">new B()</button><button type="button" id="s12-tC">new C()</button></div></h3>' +
+            '<div class="codebox" id="s12-code">' +
+              '<div class="cl" id="s12-c0"><span class="kw">int</span> callf(A* p) { <span class="kw">return</span> p->f(); }</div>' +
+              '<div class="cl" id="s12-c1"><span class="cmt"># MIPS 固定调用序列（偏移由静态类型 A 定死）</span></div>' +
+              '<div class="cl" id="s12-c2">lw   <span class="reg">$t0</span> <span class="num">8</span>(<span class="reg">$a0</span>)   <span class="cmt"># ① 取出对象头中的 dispPtr</span></div>' +
+              '<div class="cl" id="s12-c3">lw   <span class="reg">$t0</span> <span class="num">0</span>(<span class="reg">$t0</span>)   <span class="cmt"># ② 取分派表第 0 槽地址</span></div>' +
+              '<div class="cl" id="s12-c4">jalr <span class="reg">$t0</span>          <span class="cmt"># ③ 传入 self=p 间接跳转</span></div>' +
+              '<div class="cl" id="s12-c5"><span class="cmt"># g++ -O2: movq (%rdi), %rax ; jmp *(%rax)</span></div>' +
+            '</div>' +
+            '<div class="note-box" id="s12-res"></div>' +
+          '</section>' +
+          '<section class="panel"><h3>堆对象 → 分派表 → 方法代码（点击切换 A / B / C）</h3>' +
+            '<div class="disp-board" id="s12-board">' +
+              '<svg class="wire-svg" id="s12-svg"></svg>' +
+              '<div style="grid-column:1;display:grid;gap:10px">' +
+                '<div class="dbox" id="s12-objA"><b>A 对象</b><div class="dbox-row"><span class="dslot">Atag</span><span class="dslot">5</span><span class="dslot" id="s12-dpA">disp*</span><span class="dslot">a=0</span><span class="dslot">d=1</span></div></div>' +
+                '<div class="dbox" id="s12-objB"><b>B 对象</b><div class="dbox-row"><span class="dslot">Btag</span><span class="dslot">6</span><span class="dslot" id="s12-dpB">disp*</span><span class="dslot">a=0</span><span class="dslot">d=1</span><span class="dslot">b=2</span></div></div>' +
+                '<div class="dbox" id="s12-objC"><b>C 对象</b><div class="dbox-row"><span class="dslot">Ctag</span><span class="dslot">6</span><span class="dslot" id="s12-dpC">disp*</span><span class="dslot">a=0</span><span class="dslot">d=1</span><span class="dslot">c=3</span></div></div>' +
+              '</div>' +
+              '<div></div>' +
+              '<div style="grid-column:3;display:grid;gap:10px">' +
+                '<div class="dbox" id="s12-tblA"><b>A 分派表</b><div class="dbox-row"><span class="dslot" id="s12-ta0">0: A::f</span></div></div>' +
+                '<div class="dbox" id="s12-tblB"><b>B 分派表</b><div class="dbox-row"><span class="dslot" id="s12-tb0">0: B::f</span><span class="dslot">4: B::g</span></div></div>' +
+                '<div class="dbox" id="s12-tblC"><b>C 分派表</b><div class="dbox-row"><span class="dslot" id="s12-tc0">0: A::f</span><span class="dslot">4: C::h</span></div></div>' +
+              '</div>' +
+              '<div></div>' +
+              '<div style="grid-column:5;display:grid;gap:10px">' +
+                '<div class="dbox" id="s12-fnAf"><b>A::f(self)</b><div style="font-size:11px;color:var(--muted)">return a + d → 1</div></div>' +
+                '<div class="dbox" id="s12-fnBf"><b>B::f(self)</b><div style="font-size:11px;color:var(--muted)">return a → 0</div></div>' +
+                '<div class="dbox" id="s12-fnGh"><b>B::g / C::h</b><div style="font-size:11px;color:var(--muted)">偏移 4 新方法</div></div>' +
+              '</div>' +
+            '</div>' +
+          '</section>' +
+        '</div>';
+
+      byId('s12-svg').innerHTML = ['A', 'B', 'C'].map(k =>
+        `<circle id="s12-cd${k}" r="4"></circle><path id="s12-pd${k}" class="blue"></path><path id="s12-ad${k}" class="arrow blue"></path>` +
+        `<circle id="s12-cm${k}" r="4"></circle><path id="s12-pm${k}" class="acc"></path><path id="s12-am${k}" class="arrow acc"></path>`
+      ).join('');
+
+      ['A', 'B', 'C'].forEach(t => {
+        byId('s12-t' + t).onclick = () => { this.selectedType = t; ctx.repatch({ forceType: t }); };
+      });
+    },
+    layoutWires() {
+      const board = byId('s12-board');
+      const svg = byId('s12-svg');
+      if (!board || !svg) return;
+      const br = board.getBoundingClientRect();
+      if (br.width < 10) return;
+      svg.setAttribute('viewBox', '0 0 ' + br.width + ' ' + br.height);
+
+      const mapFn = {
+        A: { tbl: 's12-tblA', slot: 's12-ta0', fn: 's12-fnAf', spread: -10 },
+        B: { tbl: 's12-tblB', slot: 's12-tb0', fn: 's12-fnBf', spread: 0 },
+        C: { tbl: 's12-tblC', slot: 's12-tc0', fn: 's12-fnAf', spread: 10 }
+      };
+
+      ['A', 'B', 'C'].forEach(k => {
+        const obj = byId('s12-obj' + k).getBoundingClientRect();
+        const tbl = byId(mapFn[k].tbl).getBoundingClientRect();
+        const sl = byId(mapFn[k].slot).getBoundingClientRect();
+        const fn = byId(mapFn[k].fn).getBoundingClientRect();
+
+        const x1 = obj.right - br.left;
+        const y1 = obj.top + obj.height / 2 - br.top;
+        const x2 = tbl.left - br.left;
+        const y2 = tbl.top + tbl.height / 2 - br.top;
+        const mx = (x1 + x2) / 2;
+        byId('s12-cd' + k).setAttribute('cx', String(x1));
+        byId('s12-cd' + k).setAttribute('cy', String(y1));
+        byId('s12-pd' + k).setAttribute('d', `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2 - 8} ${y2}`);
+        byId('s12-ad' + k).setAttribute('d', `M ${x2} ${y2} L ${x2 - 9} ${y2 - 5} L ${x2 - 9} ${y2 + 5} Z`);
+
+        const fx1 = tbl.right - br.left;
+        const fy1 = sl.top + sl.height / 2 - br.top;
+        const fx2 = fn.left - br.left;
+        const fy2 = fn.top + fn.height / 2 - br.top + mapFn[k].spread;
+        const fmx = (fx1 + fx2) / 2;
+        byId('s12-cm' + k).setAttribute('cx', String(fx1));
+        byId('s12-cm' + k).setAttribute('cy', String(fy1));
+        byId('s12-pm' + k).setAttribute('d', `M ${fx1} ${fy1} C ${fmx} ${fy1}, ${fmx} ${fy2}, ${fx2 - 8} ${fy2}`);
+        byId('s12-am' + k).setAttribute('d', `M ${fx2} ${fy2} L ${fx2 - 9} ${fy2 - 5} L ${fx2 - 9} ${fy2 + 5} Z`);
+      });
+    },
+    patch(f, _prev, override) {
+      const t = (override && override.forceType) ? override.forceType : (f.forceType || this.selectedType);
+      this.selectedType = t;
+      ['A', 'B', 'C'].forEach(k => { byId('s12-t' + k).className = k === t ? 'on' : ''; });
+      paintCodeLines('s12-code', 6, f.accLines, f.blueLines, true);
+
+      const targetFn = t === 'B' ? 'fnBf' : 'fnAf';
+      const retVal = t === 'B' ? '0' : '1';
+      const methodLabel = t === 'B' ? 'B::f' : 'A::f';
+
+      ['A', 'B', 'C'].forEach(k => {
+        const activeObj = f.overview || (k === t && f.stage >= 1);
+        byId('s12-obj' + k).className = 'dbox' + (k === t && !f.overview ? ' on-b' : activeObj ? '' : ' dim');
+        byId('s12-dp' + k).className = 'dslot' + (k === t && f.stage >= 2 ? ' hot-b' : '');
+        byId('s12-tbl' + k).className = 'dbox' + (k === t && f.stage >= 2 ? ' on' : f.overview ? '' : ' dim');
+        byId('s12-t' + k.toLowerCase() + '0').className = 'dslot' + (k === t && f.stage >= 3 ? ' hot' : '');
+      });
+      byId('s12-fnAf').className = 'dbox' + (targetFn === 'fnAf' && f.stage >= 4 ? ' on' : f.overview ? '' : ' dim');
+      byId('s12-fnBf').className = 'dbox' + (targetFn === 'fnBf' && f.stage >= 4 ? ' on' : f.overview ? '' : ' dim');
+      byId('s12-fnGh').className = 'dbox' + (f.overview ? '' : ' dim');
+
+      byId('s12-res').innerHTML = f.overview
+        ? '<b>三张分派表布局：</b><code>f</code> 在三张表里全都位于偏移 <code>0</code>；<code>B</code> 覆写后只把第 0 格替换成 <code>B::f</code>，<code>C</code> 未覆写所以仍指向 <code>A::f</code>。'
+        : `<b>当前选择 <code>new ${t}()</code>：</b>同一份机器码顺着 <code>disp*</code> → <code>${t} 分派表[0]</code> → 跳转到 <code>${methodLabel}</code>，返回值 <code>${retVal}</code>（g++ -O2 实测结果：<code>A→1, B→0, C→1</code>）。`;
+
+      this.layoutWires();
+      const svg = byId('s12-svg');
+      const showAll = f.overview;
+      const anyActive = showAll || f.stage >= 2;
+      svg.classList.toggle('has-on', anyActive);
+
+      ['A', 'B', 'C'].forEach(k => {
+        const onDisp = showAll || (k === t && f.stage >= 2);
+        const onMeth = showAll || (k === t && f.stage >= 3);
+        [
+          ['d' + k, onDisp, 'blue'],
+          ['m' + k, onMeth, 'acc']
+        ].forEach(([key, on, cls]) => {
+          const p = byId('s12-p' + key);
+          const a = byId('s12-a' + key);
+          const c = byId('s12-c' + key);
+          p.setAttribute('class', cls + (on ? ' on' : ''));
+          a.setAttribute('class', 'arrow ' + cls + (on ? ' on' : ''));
+          c.setAttribute('class', on ? 'on ' + cls : '');
+          if (on && !this.litWires.has(key)) {
+            this.litWires.add(key);
+            drawInPath(p);
+          } else if (!on) {
+            this.litWires.delete(key);
+          }
+        });
+      });
+    }
+  };
+
+  /* =====================================================================
+     Chapters & Frames Assembly
+     ===================================================================== */
+  const CHAPTERS = [
+    {
+      id: 'intro', t: '前后端交接', s: '11_02 §一.1–2', act: 0,
+      turn: ['前端只检查词法/语法/类型是否合规，不生成可执行机器状态', '引入运行时组织：管资源分配、建静动态映射、划分存储区域', '递归调用时，同名局部变量的几份拷贝如何互不打架？'],
+      era: '11_02 开篇：代码生成之前，必须先明确目标机器与运行时契约。',
+      scene: sceneIntro,
+      frames: () => [
+        { act: '全览 · 编译器前后端分界', h: '为什么学代码生成前要先讲运行时系统？', p: '只把语法树翻译成一条条指令还不够：函数调用参数往哪放、递归时多份局部变量如何隔离、动态内存谁来回收，必须靠一套预先约定的运行时机制托底。', front: true, back: true, pil: 'all', accLines: [], blueLines: [], note: '编译期安排布局规则，运行期指令按约定读写栈、寄存器和堆。' },
+        { act: '高亮前端 · 强制执行语言定义', h: '前端三阶段只管“程序合不合规矩”', p: '词法、语法、语义分析合称编译器前端（enforce language definition）。一旦通过语义检查，编译器就要接手运行期数据摆放与控制流跳转。', front: true, back: false, pil: null, accLines: [], blueLines: [0, 1, 2], note: '语义分析确认了 <code>x</code> 是 <code>int</code>，但它还没回答运行期 <code>x</code> 存在哪块内存。' },
+        { act: '支柱 ① · 运行时资源管理', h: '调用 sum(1) 时，sum(2) 的 x=2 不能被覆盖', p: '进入调用要分配栈帧与保存寄存器；返回时只需回退栈指针（不必把内存逐字节清零），让空间可被下次调用复用。', front: false, back: true, pil: 0, accLines: [4, 5], blueLines: [1], note: '没有独立的“运行时管理员”临时决定放哪，而是由编译器在编译期生成调整栈指针的指令。' },
+        { act: '支柱 ② · 静动态对应', h: '源码一处声明，运行期对应多份存活实例', p: '源码里只有一处 <code>int x = n;</code>，但执行到 <code>sum(0)</code> 时栈上有 <code>x=2, 1, 0</code> 三份拷贝。需要帧指针加固定偏移来区分。', front: false, back: true, pil: 1, accLines: [1, 5], blueLines: [], note: '作用域由编译期确定；“这次执行读哪一份 <code>x</code>”由当前帧指针决定。' },
+        { act: '支柱 ③ · 存储组织', h: '按保留时间把内容放进不同存储区域', p: '机器指令放代码区，全局变量放静态区，每次调用的局部变量放栈帧，<code>new</code> 创建且需跨函数存活的对象放堆。', front: false, back: true, pil: 2, accLines: [], blueLines: [0, 1, 4], note: '三件事相互交叉：栈属于存储组织，建/拆栈帧是资源管理，按当前帧找 <code>x</code> 是静动态对应。' }
+      ]
+    },
+    {
+      id: 'frames', t: '静动态与栈帧', s: '11_02 §一.2.1–2.3', act: 0,
+      turn: ['1 条机器指令 load [FP-4] 如何正确读出不同层的 x？', '每次调用压入独立栈帧，FP 保存当前调用的帧基址，SP 标出栈顶边界', '函数返回后内存清零吗？全局和堆对象能放进栈帧吗？'],
+      era: '实测 gcc 13.3 -O0：sum 的三层调用栈帧依次递减 48 字节，x 统一落在 rbp-8。',
+      scene: sceneFrames,
+      frames: () => [
+        { act: '入栈 · main 调用 sum(2)', h: '初始调用：main 压入 sum(2) 栈帧', p: '左侧源码自始至终只有一份 <code>sum</code> 机器码。<code>main</code> 发起调用后，<code>sum(2)</code> 获得自己的活动记录（栈帧），保存参数与局部变量 <code>x = 2</code>。', accLines: [6], blueLines: [1], aliveLabel: '存活 x：1 份', fpIdx: 1, wires: ['w2'], hotWire: 'w2', frames: [{ cls: 'wait', sub: '等待 sum(2)', val: 'ans=?' }, { cls: 'active', sub: '执行中', val: 'x=2' }, { cls: 'hidden', sub: '', val: '' }, { cls: 'hidden', sub: '', val: '' }] },
+        { act: '递归 · sum(2) → sum(1)', h: 'sum(2) 保留 x=2 并等待，压入 sum(1)', p: '<code>sum(2)</code> 执行到 <code>sum(n - 1)</code> 时挂起等待；新栈帧在更低地址展开，<code>x = 1</code> 写入新帧，不会覆盖外层的 <code>x = 2</code>。', accLines: [3], blueLines: [1], aliveLabel: '存活 x：2 份', fpIdx: 2, wires: ['w2', 'w1'], hotWire: 'w1', frames: [{ cls: 'wait', sub: '等待返回', val: 'ans=?' }, { cls: 'wait', sub: '保留 x=2，等 y', val: 'x=2, y=?' }, { cls: 'active', sub: '执行中', val: 'x=1' }, { cls: 'hidden', sub: '', val: '' }] },
+        { act: '最深层 · 进入 sum(0)', h: '3 份存活的 x 同屏并存，FP 指向 sum(0)', p: '执行到 <code>sum(0)</code> 时，源码一处声明映射出右侧三条虚线连着的三份实例（<code>2, 1, 0</code>）。当前 <code>FP</code> 指向 <code>sum(0)</code> 的帧基址，此时 <code>[FP - 4]</code> 对应本层的 <code>x = 0</code>。基例直接返回 0。', accLines: [1, 2], blueLines: [], aliveLabel: '存活 x：3 份', fpIdx: 3, wires: ['w2', 'w1', 'w0'], hotWire: 'w0', frames: [{ cls: 'wait', sub: '等待返回', val: 'ans=?' }, { cls: 'wait', sub: '等待 sum(1)', val: 'x=2, y=?' }, { cls: 'wait', sub: '等待 sum(0)', val: 'x=1, y=?' }, { cls: 'active', sub: '即将返回 0', val: 'x=0' }] },
+        { act: '回退 · sum(0) 返回 0', h: 'SP 回退并回收栈帧，FP 恢复为上一帧的基址', p: '<code>sum(0)</code> 返回 <code>0</code>，<code>FP</code> 切回 <code>sum(1)</code>，<code>SP</code> 向上回收。注意虚线画出的旧帧：内存<strong>并不会清零</strong>，<code>x=0</code> 仍留在那里，直到下次压栈将它覆盖。', accLines: [2, 4], blueLines: [], aliveLabel: '存活 x：2 份', fpIdx: 2, wires: ['w2', 'w1'], hotWire: 'w1', frames: [{ cls: 'wait', sub: '等待返回', val: 'ans=?' }, { cls: 'wait', sub: '等待 sum(1)', val: 'x=2, y=?' }, { cls: 'active', sub: '拿到 y=0，算 1+0', val: 'x=1, y=0' }, { cls: 'reclaimed', sub: '已回收（未清零）', val: '残留 x=0' }] },
+        { act: '回退 · sum(1) 返回 1', h: 'FP 回到 sum(2)，同一条指令读到 x = 2', p: '<code>sum(1)</code> 算出 <code>1 + 0 = 1</code> 并退栈，<code>FP</code> 切回 <code>sum(2)</code>，<code>load [FP - 4]</code> 现在取到 <code>x = 2</code>。', accLines: [4], blueLines: [], aliveLabel: '存活 x：1 份', fpIdx: 1, wires: ['w2'], hotWire: 'w2', frames: [{ cls: 'wait', sub: '等待 sum(2)', val: 'ans=?' }, { cls: 'active', sub: '拿到 y=1，算 2+1', val: 'x=2, y=1' }, { cls: 'reclaimed', sub: '已回收（未清零）', val: '残留 x=1' }, { cls: 'reclaimed', sub: '已回收（未清零）', val: '残留 x=0' }] },
+        { act: '结束 · sum(2) 返回 3', h: '调用链全部结束，ans = 3', p: '<code>sum(2)</code> 返回 <code>3</code> 给 <code>main</code>。三层栈帧按后进先出（LIFO）依次压入并依次回收。', accLines: [6], blueLines: [], aliveLabel: '存活 x：0 份', fpIdx: 0, wires: [], hotWire: '', frames: [{ cls: 'active', sub: '得到最终结果', val: 'ans=3' }, { cls: 'reclaimed', sub: '已回收', val: '残留 x=2' }, { cls: 'reclaimed', sub: '已回收', val: '残留 x=1' }, { cls: 'reclaimed', sub: '已回收', val: '残留 x=0' }] }
+      ]
+    },
+    {
+      id: 'memory', t: '启动与四区', s: '11_02 §一.3–二, §四', act: 0,
+      turn: ['全局变量与 new 对象在函数返回后仍要存活，不能放进栈帧', '划出 Code / Static / Heap / Stack 四区，堆栈从两端相向生长', '微观读写时，为什么数据起始地址还要对齐字边界？'],
+      era: '承接前两章单栈帧：范围扩大到整个进程虚拟地址空间。注意区分 make()（C++示例函数）与 mmap()（Linux虚拟映射系统调用）。',
+      scene: sceneMemory,
+      frames: () => [
+        { act: 'OS 启动 · ELF 映射与缺页装载', h: '虚拟映射先行，页表按需就绪；真实入口不是 main 而是 _start', p: '执行 <code>execve()</code> 时内核读取 ELF 程序头建立虚拟映射（仅记录访问规则与读写执行权限）。动态链接器加载共享库后跳至 <code>_start</code>（<code>0x10a0</code>），经 <code>__libc_start_main</code> 初始化再调用 <code>main()</code>。首次取指或访存时触发<b>缺页异常</b>，内核才将磁盘页读入物理内存并建立页表；越权访问则直接触发 <code>SIGSEGV</code>。', bootIdx: 2, heapH: 38, stackH: 48, showMmap: false, hotMem: 'code', scopeStep: 0, lifoIdx: -1 },
+        { act: '静态区 · 全局与 static 变量', h: '拥有固定地址的变量放进静态区（Static Area）', p: '带非零初值的全局变量 <code>count = 7</code> 存于 <code>.data</code>，零初始化存于 <code>.bss</code>；机器指令则放于只读的 <code>.text</code>。函数内的 <code>static</code> 局部变量生命周期贯穿全程、编译期就确定了固定地址，但名字作用域仍被严格限制在函数体内，多次调用不会重复新建。', bootIdx: 4, heapH: 38, stackH: 48, showMmap: false, hotMem: 'stat', scopeStep: 0, lifoIdx: -1 },
+        { act: '作用域 vs 生命周期 · make() 示例', h: '栈指针 p 随函数返回消亡，堆对象 Bar 活过返回交给 b', p: '执行 <code>Bar* p = new Bar();</code> 时，栈指针 <code>p</code>（属于 <code>make</code> 栈帧）保存着堆对象的地址。<code>make()</code> 返回时 <code>p</code> 生命周期结束，其保存的地址作为返回值交给 <code>main</code> 栈帧的 <code>b</code>，<code>Bar</code> 对象在堆上继续存活，直至 <code>delete b</code> 执行才显式销毁并释放。', bootIdx: 4, heapH: 64, stackH: 64, showMmap: false, hotMem: 'heap', scopeStep: 2, lifoIdx: -1 },
+        { act: '相向生长 · Linux 真实细节与 mmap', h: '堆栈相向生长共享空洞；四区是教学模型，真实存在 mmap 夹层', p: '堆向高地址、栈向低地址生长，中间留白按需分配。真实 Linux 中间还夹着 <code>mmap</code> 映射区（共享库、文件映射与大块内存）。分配器通常复用池化块，大块分配则走匿名 <code>mmap()</code>；因此从 C++ 视角看 <code>Bar</code> 是动态分配对象，从 Linux 底层看其地址可能来自传统堆，也可能来自匿名映射。', bootIdx: 4, heapH: 82, stackH: 76, showMmap: true, hotMem: 'stack', scopeStep: 2, lifoIdx: -1 },
+        { act: 'LIFO 边界 · 异常展开 vs 栈帧堆化', h: '异常展开依然严格遵守 LIFO，而 call/cc 会打破单栈模型', p: '在 <code>main→f1→f2→f3</code> 中抛异常虽跳过正常返回点，但析构函数仍严格按 <code>~f3 → ~f2 → ~f1</code> 逆序展开，依然遵守 LIFO 且由单栈支撑。唯有并发多栈、逃逸闭包以及能重返已返回栈帧的 <code>call/cc</code>，才需打破单栈并将活动记录搬上堆（Spaghetti Stack）。', bootIdx: 4, heapH: 72, stackH: 66, showMmap: true, hotMem: '', scopeStep: 2, lifoIdx: 1 }
+      ]
+    },
+    {
+      id: 'alignment', t: '字对齐与填充', s: '11_02 §五', act: 0,
+      turn: ['内存按字节寻址，但 CPU 内存总线按“字”（4B / 8B）对齐读取', '按后继成员的 alignof 补入填充字节（Padding），空间换速度', '内存布局就绪后，如何用极简指令模型驱动表达式求值？'],
+      era: '可在上方按钮直接切换 5 种实测内存布局（含 gcc 13.3 sizeof 与 UBSan 检查）。',
+      scene: sceneAlignment,
+      frames: () => [
+        { act: '对齐访问 · int @ 4', h: '起始地址能被字长整除：1 次总线读取直接命中', p: '32 位机器每字 4 字节。一个 <code>int</code> 从地址 <code>4</code> 开始，恰好完整落在 Word 1 内部，CPU 一次总线读取就能拿到全部 4 个字节。', mode: 'int4' },
+        { act: '未对齐访问 · int @ 6', h: '跨过字边界：2 次总线读取 + 拼接，甚至触发 UBSan 报错', p: '若 <code>int</code> 从地址 <code>6</code> 开始，它横跨 Word 1（6..7）和 Word 2（8..9）。CPU 被迫读两次再拼接；在 C/C++ 中强转并解引用未对齐指针属于 UB，UBSan 会直接报错，SSE 对齐指令更会触发硬件异常。', mode: 'int6' },
+        { act: '简化字填充 · "Hello"', h: '5 字节字符串后补 3 个填充字节凑齐 2 个字', p: '不含 <code>\\0</code> 的 <code>"Hello"</code> 占 5 字节。为了让下一项从 Word 2（addr 8）起始，编译器补入 3 个未使用的 <code>pad</code> 字节（若含 <code>\\0</code> 共 6 字节，则补 2 字节）。', mode: 'hello' },
+        { act: '实测规律 ① · char[5] + int', h: '填充大小由紧随其后的数据 alignof 决定（sizeof = 12）', p: '真实 C/C++ 编译器不死板凑整字。<code>char c[5]</code> 后面跟 <code>int</code>（要求 4 字节对齐），因此在偏移 5 后补 3 字节让 <code>x</code> 落在偏移 8，总大小 <code>12</code>。', mode: 's1' },
+        { act: '实测规律 ② · char[5] + char', h: '后接 1 字节对齐的 char：0 字节填充（sizeof = 6）', p: '若 <code>char c[5]</code> 后面跟的是 <code>char y</code>（<code>alignof(char) = 1</code>），则无需任何填充，<code>y</code> 紧挨着放在偏移 5，总大小只有 <code>6</code>。', mode: 's2' }
+      ]
+    },
+    {
+      id: 'stackvm', t: '纯栈式机器', s: '11_02 §六', act: 0,
+      turn: ['寄存器指令必须显式写出 3 个槽位，代码体积较大', '采用 0 操作数纯栈机，依靠“只留顶值、不毁栈底 S”的不变性递归生成代码', '纯栈机每次运算都访存太慢，如何引入累加器落到真实 MIPS 上？'],
+      era: '可在上方选择或输入任意嵌套加法算式（如 7 + (5 + 3)），实时观察纯栈不变性。',
+      scene: sceneStackVM,
+      frames: () => buildStackVMFrames('7 + (5 + 3)')
+    },
+    {
+      id: 'mips_acc', t: 'MIPS 累加器', s: '11_03 §一.1–3', act: 1,
+      turn: ['纯栈机读写栈过于频繁，真实硬件有通用寄存器', '借用 $a0 当累加器保存当前表达式结果，并约定 $sp 指向下一空槽', '算 e1 + e2 时，e2 也会用 $a0，怎么保住 e1 的结果？'],
+      era: '注意红色/橙色表示编译期（cgen 规则），蓝色表示运行期（生成的 MIPS 机器指令）。',
+      scene: sceneMipsAcc,
+      frames: () => [
+        { act: '模型 · 三个核心 MIPS 寄存器', h: '用 3 个寄存器模拟带累加器的栈式机器', p: '<code>$a0</code> 充当累加器保存当前算式结果；<code>$sp</code> 指向栈上的<strong>下一个空闲槽位</strong>；<code>$t1</code> 暂存从栈里取出的左操作数（到 §二 还会加入 <code>$fp</code> 和 <code>$ra</code>）。', accLines: [], blueLines: [], a0: '7', spLabel: 'S', t1: '?', hotReg: 'a0', m1Cls: 'free', m1Txt: '(空闲槽位)', m2Cls: 'free', m2Txt: '(未分配)', spSlot: 1, topSlot: 0, hideTop: false, note: '<b>课上约定：</b>栈向低地址增长（高地址在上）；让 <code>$sp</code> 指向空槽位是本课简化规则（真实编译器常在入口一次性减完 <code>$sp</code>）。' },
+        { act: '约定 · $sp 与 4($sp)', h: '因为 $sp 指着空槽，真正的栈顶在 4($sp)', p: '高地址在上。既然 <code>$sp</code>（地址 <code>S</code>）里面还没写数据，那么之前最近一次压进去的元素就落在它上方一格，也就是 <code>4($sp)</code>（地址 <code>S + 4</code>）。', accLines: [5, 6], blueLines: [], a0: '7', spLabel: 'S', t1: '?', hotReg: 'sp', m1Cls: 'free', m1Txt: '(空闲槽位)', m2Cls: 'free', m2Txt: '(未分配)', spSlot: 1, topSlot: 0, hideTop: false, note: '出栈时先 <code>lw $t1 4($sp)</code> 读出栈顶元素，再 <code>addiu $sp $sp 4</code> 把空槽指针抬回去。' },
+        { act: '压栈 ① · sw $a0 0($sp)', h: '先把累加器 $a0=7 存进 $sp 指着的空槽 S', p: '执行 <code>sw $a0 0($sp)</code>：把 <code>7</code> 写进地址 <code>S</code>。此时 <code>$sp</code> 还没挪动，所以 <code>7</code> 暂时还在 <code>0($sp)</code> 处。', accLines: [1], blueLines: [], a0: '7', spLabel: 'S', t1: '?', hotReg: 'a0', m1Cls: 'acc', m1Txt: '7', m2Cls: 'free', m2Txt: '(未分配)', spSlot: 1, topSlot: 0, hideTop: false, note: '压栈第一步只写入数据，不移动指针。' },
+        { act: '压栈 ② · addiu $sp $sp -4', h: '再把 $sp 减 4，让 7 落到 4($sp) 成为新栈顶', p: '执行 <code>addiu $sp $sp -4</code>：<code>$sp</code> 下移到 <code>S - 4</code>（新的下一空槽），于是刚刚写入的 <code>7</code> 自然而然变成了 <code>4($sp)</code>！', accLines: [2], blueLines: [], a0: '7', spLabel: 'S − 4', t1: '?', hotReg: 'sp', m1Cls: 'acc', m1Txt: '7', m2Cls: 'free', m2Txt: '(空闲槽位)', spSlot: 2, topSlot: 1, hideTop: false, note: '<code>$sp</code> 永远指向未分配空槽，而 <code>4($sp)</code> 永远是当前栈顶元素。' },
+        { act: '反例 · 若颠倒顺序先减 $sp', h: '先减 $sp 再存值会写进 S-4，彻底打破 4($sp) 约定', p: '如果颠倒成先 <code>addiu $sp $sp -4</code> 再 <code>sw $a0 0($sp)</code>，7 会被写进 <code>$sp</code> 当前指着的 <code>S-4</code>，而不是 <code>4($sp)</code>；<code>S</code> 槽位反而空着，后续出栈读 <code>4($sp)</code> 就会读出垃圾值！（x86 <code>pushq</code> 则是先减再写，<code>[rsp]</code> 即栈顶。）', accLines: [], blueLines: [1, 2], a0: '7', spLabel: 'S − 4 (错位)', t1: '?', hotReg: 'sp', bad: true, m1Cls: 'free', m1Txt: '(空洞!)', m2Cls: 'bad', m2Txt: '7 (错落到 0($sp))', spSlot: 2, topSlot: 1, hideTop: true, note: '<b style="color:var(--acc-t)">纠偏：</b>“先写后减”与“栈顶在 <code>4($sp)</code>”是配套捆绑的。' },
+        { act: '常量 · cgen(i) = li $a0 i', h: '区分编译期生成规则与运行期指令，并守住两条不变性', p: '求值整数常量 <code>7</code> 直接 <code>li $a0 7</code> 即可，栈完全不动。后续所有 <code>cgen(e)</code> 都必须遵守：<b>1) 结果留在 <code>$a0</code>；2) <code>$sp</code> 和原有栈内容不变</b>。', accLines: [9], blueLines: [], a0: '7', spLabel: 'S', t1: '?', hotReg: 'a0', m1Cls: 'free', m1Txt: '(空闲槽位)', m2Cls: 'free', m2Txt: '(未分配)', spSlot: 1, topSlot: 0, hideTop: false, note: '<code>cgen(i)</code> 在编译期运行，输出的 <code>li $a0 i</code> 等程序跑起来才由 MIPS 执行。' }
+      ]
+    },
+    {
+      id: 'cgen_add', t: '加法与$t1覆盖', s: '11_03 §一.4', act: 1,
+      turn: ['算 e2 时会覆盖 $a0 里的 e1；若偷懒把 e1 留进 $t1 行不行？', '嵌套表达式 1+(2+3) 会冲掉外层 $t1，必须压栈保存左操作数', '表达式有栈规约了，函数参数和返回地址又该怎么放进 AR？'],
+      era: '可在上方选择 1 + (2 + 3)、3 + (7 + 5) 或 (1 + 2) + 3，同屏对照“正确栈法”与“$t1 覆盖反例”。',
+      scene: sceneCgenAdd,
+      frames: () => buildCgenAddFrames('1 + (2 + 3)')
+    },
+    {
+      id: 'ar_layout', t: '极简AR与逆序', s: '11_03 §二.1–2', act: 1,
+      turn: ['函数调用需要传递多个实参并记住返回地址，且求值时 $sp 会动', '逆序压入实参并用固定 $fp 指向栈顶 RA，让第 i 个参数永远在 4i($fp)', 'Caller 和 Callee 如何通过 jal 接力建帧与拆帧？'],
+      era: '可切换 2 参 f(x, y) 与 3 参 g(x, y, z)，观察 x1 为什么永远死守在 4($fp)。',
+      scene: sceneArLayout,
+      frames: () => [
+        { act: '取舍 · 极简语言让 AR 瘦身', h: '没有局部变量也没有非局部作用域：AR 只需存 old fp、实参、RA', p: '通用模型有返回格与控制链；但在本小语言里，返回值固定留 <code>$a0</code>，而 <code>old fp</code> 指针本身在内容上就是控制链（加上栈规约保证 <code>$sp</code> 自动复原）。', step: 0, note: '<b>补充：</b>“不需要控制链”是因为不用沿着链找外层嵌套变量；保存 <code>old fp</code> 是为了返回时恢复调用方的 <code>$fp</code>。' },
+        { act: 'Caller ① · 压入 old fp', h: '调用方先保存自己的帧指针 $fp', p: '执行 <code>sw $fp 0($sp); addiu $sp $sp -4</code>。因为被调用方进门后就要改写 <code>$fp</code> 为它自己的帧指针，这里必须先备份。', step: 1, note: '此时 <code>$fp</code> 仍指着调用方自己的帧顶。' },
+        { act: 'Caller ② · 逆序压入后面的实参', h: '按 x_n ... x_1 从右往左压栈（先压 y，若有 z 则先压 z）', p: '把最后一个参数先压在靠近栈底（高地址）的位置，第一个参数 <code>x</code> 留到最后压。', step: 2, note: '这样不管传了 2 个还是 10 个参数，<code>x</code> 都会紧贴着 <code>RA</code>。' },
+        { act: 'Caller ③ · 压入第 1 参 x 并 jal 跳转', h: '最后压入 x，再用 jal 跳转到函数入口', p: '<code>x</code> 压在最靠近栈顶的位置；随后 <code>jal f_entry</code> 跳进函数体，并把返回点（下条指令地址）放进 <code>$ra</code> 寄存器。', step: 3, note: '此时刚跳进 <code>f_entry</code>，<code>$fp</code> 还是调用方的旧指针，<code>RA</code> 还没压进栈！' },
+        { act: 'Callee ① · move $fp $sp 定锚新 FP', h: '被调用方先把 $fp 对齐到当前 $sp，并把 $ra 存进 0($fp)', p: '执行 <code>move $fp $sp</code> 再 <code>sw $ra 0($sp); addiu $sp $sp -4</code>。现在 <code>$fp</code> 指向栈顶的 <code>RA</code> 槽位，<code>x</code> 稳稳落在 <code>4($fp)</code>，<code>y</code> 在 <code>8($fp)</code>！', step: 5, note: '<b>纠偏：</b><code>x</code> 和 <code>RA</code> 靠近的是栈<strong>顶</strong>（低地址），而不是栈底！<code>$fp</code> 永远指向当前栈帧顶部。' },
+        { act: '寻址 · cgen(x_i) = lw $a0 4i($fp)', h: '即便函数体算表达式时不断压栈移动 $sp，4($fp) 也绝不偏移', p: '因为 <code>$fp</code> 在函数体执行期间纹丝不动，第 <code>i</code> 个参数永远在编译期算死的 <code>4i($fp)</code>；若改用 <code>$sp</code> 当基准，每次算加法压栈都会让偏移乱掉。', step: 6, note: '最后一个未展开的文法符号 <code>id</code> 终于落地：<code>cgen(x_i) = lw $a0 4i($fp)</code>。' }
+      ]
+    },
+    {
+      id: 'sumto_trace', t: 'sumto(2)全追踪', s: '11_03 §二.3, §三', act: 1,
+      turn: ['递归时，外层调用把哪些值留在栈里？', '沿着指令看实参、返回地址和加法左操作数分别写到哪一格', '栈指针反复移动，下一章改用固定临时槽'],
+      era: '顶部的上一页、下一页切换阶段。页内可单步执行，播放也会逐条走。指令区橙色是刚执行的指令，蓝色是下一条。',
+      scene: sceneSumto,
+      frames: buildSumtoFrames
+    },
+    {
+      id: 'temps', t: '固定临时槽', s: '11_03 §四', act: 2,
+      turn: ['存一次临时值、取一次临时值，为什么要移动两次 $sp？', '先算出同时要用几格，进入函数时一次预留，再用相对 $fp 的偏移读写', '临时值的两个槽何时同时占用，又何时可以复用？'],
+      era: '先并排看 sumto(2) 的栈、$sp 和汇编。橙色是临时值，蓝色是调用记录。随后用同一段源码算 NT，再看 fib。',
+      scene: sceneTemps,
+      frames: () => [
+        ...SUMTO_TEMP_FRAMES,
+        ...SUMTO_NT_STEPS.map((step, ntStep) => ({ ...step, ntStep })),
+        ...FIB_TEMP_STEPS.map((step, fibStep) => ({ ...step, fibStep }))
+      ]
+    },
+    {
+      id: 'obj_layout', t: '对象内存布局', s: '11_03 §五前半', act: 2,
+      turn: ['B 是 A 的子类：任何期待 A 对象的地方都能直接传入 B 对象', '把对象放连续内存中，子类新增字段直接接在父类字段末尾（前缀不变）', '属性偏移固定解决了数据读写，同一句 p->f() 怎么调到不同方法？'],
+      era: '支持在 Cool 3 字对象头（Slide 75）与 g++ 13.3 x86-64 实测布局间实时切换对照。',
+      scene: sceneObjLayout,
+      frames: () => [
+        { act: '问题 · Liskov 替换原则对代码生成的约束', h: '为父类 A 编译的方法代码，必须无需修改就能跑在子类 B / C 上', p: '<code>A::f</code>、<code>B::g</code>、<code>C::h</code> 全都读取属性 <code>a</code>。当把 <code>B</code> 对象伪装成 <code>A*</code> 传给期待 <code>A</code> 的方法时，方法必须能用完全相同的偏移找到 <code>a</code>。', mode: 'cool', showCount: 1, bandCols: null, accLines: [0, 1, 2], blueLines: [] },
+        { act: '父类 A · 对象头 + 属性 a, d', h: 'Cool 对象前缀含 3 个字（tag、size、disp*），属性从偏移 12 开始', p: '在 Cool 模型中，偏移 <code>0/4/8</code> 分别是类标签、字大小与分派表指针；<code>a</code> 位于偏移 <code>12</code>，<code>d</code> 位于偏移 <code>16</code>。', mode: 'cool', showCount: 1, bandCols: [3, 4], accLines: [1], blueLines: [] },
+        { act: '子类 B · 前缀保持不变，末尾追加 b', h: 'B 继承 A 的前 5 个槽位，只把新增字段 b 接在偏移 20', p: '由于 <code>B</code> 的前段布局与 <code>A</code> 一模一样，凡是为 <code>A</code> 编译的指令按 <code>12(self)</code> 去读 <code>a</code>，拿到 <code>B</code> 对象照样精准读到 <code>a</code>！', mode: 'cool', showCount: 2, bandCols: [3, 4], accLines: [4, 5], blueLines: [1] },
+        { act: '子类 C · 与 B 互不为子类，安全复用槽位 20', h: 'C 把新增字段 c 放在偏移 20：和 b 位置相同却永不冲突', p: '虽然 <code>B</code> 的 <code>b</code> 和 <code>C</code> 的 <code>c</code> 都占用偏移 20，但 <code>B</code> 与 <code>C</code> 互不为继承关系，<code>B</code> 的方法绝不会收到 <code>C</code> 对象，因此毫无冲突。', mode: 'cool', showCount: 3, bandCols: [3, 4], accLines: [9, 10], blueLines: [1, 5] },
+        { act: '实测对照 · g++ 13.3 (x86-64)', h: '真实 C++ 对象头是 8 字节 vptr，同样遵循“父类在前、子类追加”', p: '切到 <code>g++</code> 视图可见：<code>vptr@0</code>（8B）、<code>a@8</code>、<code>d@12</code>、<code>b/c@16</code>；因为 <code>vptr</code> 要求 8 字节对齐，<code>B</code> 与 <code>C</code> 末尾自动补 4 字节填充，使 <code>sizeof(A)=16</code>、<code>sizeof(B)=sizeof(C)=24</code>。', mode: 'gcc', showCount: 3, bandCols: [1, 2], accLines: [2, 6, 7, 11], blueLines: [] }
+      ]
+    },
+    {
+      id: 'dispatch', t: '分派表与虚调', s: '11_03 §五后半', act: 2,
+      turn: ['属性前缀固定解决了字段访问，但子类会重写（override）父类方法', '为每个类建一张分派表（vtable），重写方法占用相同槽号，只替换表内指针', '完成 11_02 与 11_03：静态程序正式拥有了完整运行时与目标代码'],
+      era: '随时点击右侧上方的 new A() / new B() / new C() 按钮，观察同一段机器码如何动态跳转。',
+      scene: sceneDispatch,
+      frames: () => [
+        { act: '结构全览 · 分派表与槽位号对齐', h: '每个类有一张只读分派表，方法 f 在三张表里全都位于偏移 0', p: '类 <code>A</code> 的表在 0 槽放 <code>A::f</code>；子类 <code>B</code> 重写了 <code>f</code>，所以把自己的 0 槽换成了 <code>B::f</code>，新增的 <code>g</code> 接在偏移 4；<code>C</code> 没重写 <code>f</code>，0 槽继续填 <code>A::f</code>，新增的 <code>h</code> 接在偏移 4。', overview: true, stage: 4, accLines: [], blueLines: [0] },
+        { act: '步骤 ① · 堆上对象与调用点指令', h: '调用点只知道 p 的静态类型是 A*，机器码在编译期已写死', p: '无论运行期 <code>p</code> 指向 <code>A</code>、<code>B</code> 还是 <code>C</code>，调用点 <code>p->f()</code> 的指令完全一致：只看静态类型 <code>A</code> 查出 <code>f</code> 在第 <code>0</code> 槽，准备按两步间接寻址。', overview: false, stage: 1, accLines: [0], blueLines: [] },
+        { act: '步骤 ② · lw $t0 8($a0) 取出分派表指针', h: '顺着对象头偏移 8 的 disp*（C++ 中是 0 偏移的 vptr）找到类表', p: '由于对象创建时已在对象头里埋好了所属类的分派表地址，运行期第一步先从 <code>self</code> 读出这张表的首地址。', overview: false, stage: 2, accLines: [2], blueLines: [] },
+        { act: '步骤 ③ · lw $t0 0($t0) 按固定槽号取方法地址', h: '从分派表偏移 0 取出函数入口地址', p: '因为所有子类分派表的第 0 槽都留给了 <code>f</code>，这里直接按编译期定死的偏移 <code>0</code> 读取，就能拿到当前真实类对应的 <code>f</code> 实现地址。', overview: false, stage: 3, accLines: [3], blueLines: [] },
+        { act: '步骤 ④ · jalr $t0 传入 self=p 间接跳转', h: '同一个 callf 分别返回 1 (A)、0 (B)、1 (C)', p: '把 <code>self = p</code> 留在 <code>$a0</code>（x86-64 是 <code>%rdi</code>）后执行间接跳转。切换到 <code>new B()</code> 会跳去 <code>B::f</code> 返回 <code>0</code>，切换到 <code>new A()/C()</code> 则跳去 <code>A::f</code> 返回 <code>1</code>；<code>g++ -O2</code> 下正是 <code>movq (%rdi), %rax ; jmp *(%rax)</code> 两条指令！', overview: false, stage: 4, accLines: [4, 5], blueLines: [] }
+      ]
+    }
+  ];
+
+  /* =====================================================================
+     Runtime Engine & Interactive Wiring
+     ===================================================================== */
+  const state = {
+    frames: [],
+    idx: 0,
+    playing: false,
+    timer: null,
+    speed: 1,
+    starts: {},
+    mountedCh: null,
+    stackExpr: '7 + (5 + 3)',
+    cgenExpr: '1 + (2 + 3)'
+  };
+
+  const PRESETS_STACK = [
+    ['7 + (5 + 3)', '11_02 §六.2 嵌套例'],
+    ['7 + 5', '11_02 §六.2 基础例'],
+    ['(1 + 2) + (3 + 4)', '双侧平衡树']
+  ];
+  const PRESETS_CGEN = [
+    ['1 + (2 + 3)', '11_03 §一.4 $t1 覆盖例 (算成7)'],
+    ['3 + (7 + 5)', '11_03 §一.4 补充反例 (算成19)'],
+    ['(1 + 2) + 3', '左嵌套（不覆盖对比）'],
+    ['9 - (4 - 1)', '减法嵌套顺序验证']
+  ];
+
+  function rebuildFrames() {
+    const frames = [];
+    CHAPTERS.forEach((ch, chi) => {
+      state.starts[ch.id] = frames.length;
+      let list;
+      if (ch.id === 'stackvm') list = buildStackVMFrames(state.stackExpr);
+      else if (ch.id === 'cgen_add') list = buildCgenAddFrames(state.cgenExpr);
+      else list = ch.frames();
+      list.forEach(f => frames.push({ ch: ch.id, chi, f }));
+    });
+    state.frames = frames;
+    byId('scrub').max = String(frames.length - 1);
+  }
+
+  function renderRail() {
+    byId('rail').innerHTML = CHAPTERS.map((c, i) =>
+      `<button type="button" class="ch-btn" id="ch-${c.id}" data-ch="${c.id}"><b>${i + 1}. ${esc(c.t)}</b><span>${esc(c.s)}</span></button>`
+    ).join('');
+    CHAPTERS.forEach(c => {
+      byId('ch-' + c.id).addEventListener('click', () => {
+        stop();
+        show(state.starts[c.id]);
+        try { location.hash = c.id; } catch (e) {}
+      });
+    });
+  }
+
+  function renderActs(curChi) {
+    byId('acts').innerHTML = ACTS.map((a, i) => {
+      const on = curChi >= a[0] && curChi <= a[1];
+      return (i > 0 ? '<span class="sep" aria-hidden="true">→</span>' : '') +
+        `<button type="button" class="act${on ? ' on' : ''}" data-start="${a[0]}">${esc(a[2])}</button>`;
+    }).join('');
+    byId('acts').querySelectorAll('button.act').forEach(btn => {
+      btn.onclick = () => {
+        const ch = CHAPTERS[Number(btn.dataset.start)];
+        stop();
+        show(state.starts[ch.id]);
+        try { location.hash = ch.id; } catch (e) {}
+      };
+    });
+  }
+
+  function renderTurn(ch) {
+    const t = ch.turn;
+    return `<div class="t-q"><span>遇到的问题</span>${esc(t[0])}</div>` +
+      `<div class="t-arrow" aria-hidden="true">→</div>` +
+      `<div class="t-a"><span>改进方案</span>${esc(t[1])}</div>` +
+      `<div class="t-arrow" aria-hidden="true">→</div>` +
+      `<div class="t-n"><span>遗留问题 / 下一步</span>${esc(t[2])}</div>` +
+      `<div class="t-e">${esc(ch.era)}</div>`;
+  }
+
+  function updateInputBar(chId) {
+    const form = byId('input-form');
+    const msg = byId('input-msg');
+    msg.textContent = '';
+    if (chId !== 'stackvm' && chId !== 'cgen_add') {
+      form.hidden = true;
+      return;
+    }
+    form.hidden = false;
+    const list = chId === 'stackvm' ? PRESETS_STACK : PRESETS_CGEN;
+    const curVal = chId === 'stackvm' ? state.stackExpr : state.cgenExpr;
+    const sel = byId('input-preset');
+    sel.innerHTML = list.map(([v, label]) => `<option value="${esc(v)}"${v === curVal ? ' selected' : ''}>${esc(v)}（${esc(label)}）</option>`).join('');
+    byId('input-text').value = curVal;
+  }
+
+  const stage = byId('stage');
+  const sceneCtx = {
+    repatch(override) {
+      const item = state.frames[state.idx];
+      const ch = CHAPTERS[item.chi];
+      ch.scene.patch(item.f, null, override);
+    }
+  };
+
+  function show(i) {
+    const n = state.frames.length;
+    state.idx = Math.max(0, Math.min(n - 1, i));
+    const item = state.frames[state.idx];
+    const ch = CHAPTERS[item.chi];
+    const f = item.f;
+
+    if (state.mountedCh !== ch.id) {
+      state.mountedCh = ch.id;
+      ch.scene.mount(stage, sceneCtx);
+      byId('turn').innerHTML = renderTurn(ch);
+      renderActs(item.chi);
+      updateInputBar(ch.id);
+    }
+    byId('s10-source-panel').hidden = ch.id !== 'temps' || (f.sourceLine === undefined && f.fibStep === undefined);
+    ch.scene.patch(f, null, null);
+
+    byId('cap-ch').textContent = `第 ${item.chi + 1} 章 · ${ch.t}（${ch.s}）`;
+    byId('cap-act').textContent = '▸ ' + f.act;
+    byId('cap-h').textContent = f.h;
+    byId('cap-p').innerHTML = f.p;
+
+    byId('scrub').value = String(state.idx);
+    byId('pos').textContent = `${state.idx + 1} / ${n}`;
+    byId('b-prev').disabled = state.idx === 0;
+    byId('b-next').disabled = state.idx === n - 1;
+    byId('b-play').textContent = state.playing ? '暂停' : (state.idx >= n - 1 ? '从头播放' : '播放');
+
+    CHAPTERS.forEach((c, ci) => {
+      const btn = byId('ch-' + c.id);
+      if (ci === item.chi) btn.setAttribute('aria-current', 'step');
+      else btn.removeAttribute('aria-current');
+      btn.classList.toggle('done', ci < item.chi);
+    });
+  }
+
+  function duration(item) {
+    if (item.ch === 'sumto_trace') {
+      const step = sceneSumto.steps[sceneSumto.stepIndex];
+      return Math.min(7000, 1300 + step.explanation.length * 38) / state.speed;
+    }
+    const len = item.f.h.length + item.f.p.replace(/<[^>]+>/g, '').length;
+    return Math.min(11000, 1700 + len * 48) / state.speed;
+  }
+
+  function schedule() {
+    state.timer = setTimeout(() => {
+      if (!state.playing) return;
+      if (state.idx >= state.frames.length - 1) { stop(); return; }
+      const insideTrace = state.frames[state.idx].ch === 'sumto_trace';
+      if (!insideTrace || !sceneSumto.advance()) show(state.idx + 1);
+      schedule();
+    }, duration(state.frames[state.idx]));
+  }
+
+  function play() {
+    if (state.idx >= state.frames.length - 1) show(0);
+    state.playing = true;
+    byId('b-play').textContent = '暂停';
+    byId('b-play').setAttribute('aria-pressed', 'true');
+    schedule();
+  }
+
+  function stop() {
+    state.playing = false;
+    if (state.timer !== null) { clearTimeout(state.timer); state.timer = null; }
+    byId('b-play').textContent = state.idx >= state.frames.length - 1 ? '从头播放' : '播放';
+    byId('b-play').setAttribute('aria-pressed', 'false');
+  }
+
+  function applyCustomExpr(expr) {
+    const item = state.frames[state.idx];
+    const chId = item.ch;
+    const parsed = parseExpr(expr);
+    const msg = byId('input-msg');
+    if (parsed.error) { msg.textContent = parsed.error; return; }
+    if (chId === 'stackvm') state.stackExpr = expr.trim();
+    else if (chId === 'cgen_add') state.cgenExpr = expr.trim();
+    msg.textContent = '';
+    stop();
+    rebuildFrames();
+    state.mountedCh = null;
+    show(state.starts[chId]);
+  }
+
+  function wire() {
+    byId('b-first').onclick = () => { stop(); show(0); };
+    byId('b-prev').onclick = () => { stop(); show(state.idx - 1); };
+    byId('b-next').onclick = () => { stop(); show(state.idx + 1); };
+    byId('b-play').onclick = () => { if (state.playing) stop(); else play(); };
+    byId('scrub').addEventListener('input', () => { stop(); show(Number(byId('scrub').value)); });
+    byId('speed').addEventListener('change', () => { state.speed = Number(byId('speed').value); });
+
+    byId('input-preset').addEventListener('change', e => {
+      byId('input-text').value = e.target.value;
+      applyCustomExpr(e.target.value);
+    });
+    byId('input-form').addEventListener('submit', e => {
+      e.preventDefault();
+      applyCustomExpr(byId('input-text').value);
+    });
+
+    byId('btn-theme').onclick = () => {
+      const root = document.documentElement;
+      const cur = root.getAttribute('data-theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const next = cur ? (cur === 'dark' ? 'light' : 'dark') : (prefersDark ? 'light' : 'dark');
+      root.setAttribute('data-theme', next);
+    };
+
+    document.addEventListener('keydown', e => {
+      const tag = e.target && e.target.tagName ? e.target.tagName : '';
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (e.key === ' ') {
+        if (tag === 'BUTTON') return;
+        e.preventDefault();
+        if (state.playing) stop(); else play();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault(); stop(); show(state.idx + 1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault(); stop(); show(state.idx - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault(); stop(); show(0);
+      } else if (e.key === 'End') {
+        e.preventDefault(); stop(); show(state.frames.length - 1);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      const item = state.frames[state.idx];
+      if (!item) return;
+      const sc = CHAPTERS[item.chi].scene;
+      if (sc.layoutWires) sc.layoutWires();
+      if (sc.layoutArcs) sc.layoutArcs();
+      if (item.ch === 'alignment' || item.ch === 'obj_layout') sc.patch(item.f, null, null);
+    });
+
+    window.addEventListener('hashchange', () => {
+      let id = '';
+      try { id = location.hash.slice(1); } catch (e) {}
+      if (Object.prototype.hasOwnProperty.call(state.starts, id)) {
+        stop();
+        show(state.starts[id]);
+      }
+    });
+  }
+
+  renderRail();
+  rebuildFrames();
+  wire();
+  let initIdx = 0;
+  try {
+    const hid = location.hash.slice(1);
+    if (Object.prototype.hasOwnProperty.call(state.starts, hid)) initIdx = state.starts[hid];
+  } catch (e) {}
+  show(initIdx);
+})();
+</script>
+</body>
+</html>

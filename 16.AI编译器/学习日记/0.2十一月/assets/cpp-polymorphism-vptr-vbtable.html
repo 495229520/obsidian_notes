@@ -1,0 +1,1615 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>C++ 多态与虚基表：编译原理后端视角动画演示</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap">
+<style>
+/*
+ * Design System: Claude Warm Paper (Aligned with runtime-codegen.html)
+ * - Palette: --bg (#F0EEE6), --paper (#FAF9F5), --ink (#141413), --muted (#6F6D66),
+ *   --line (#B0AEA5), --dead (#E6E3D9), --acc (#D97757), --blue (#4F7FAF)
+ * - Typography: Noto Sans SC + JetBrains Mono
+ * - Motion: cubic-bezier(.4, 0, .2, 1), 420ms, persistent-DOM mutation per chapter
+ */
+:root {
+  --bg: #F0EEE6;
+  --paper: #FAF9F5;
+  --ink: #141413;
+  --muted: #6F6D66;
+  --line: #B0AEA5;
+  --dead: #E6E3D9;
+  --acc: #D97757;
+  --on-acc: #141413;
+  --acc-t: #A04A29;
+  --acc-f: #F5DDD1;
+  --blue: #4F7FAF;
+  --blue-t: #3D6A97;
+  --blue-f: #DCE7F2;
+  --sage: #5A8266;
+  --sage-t: #3B5E46;
+  --sage-f: #DDE9E0;
+  --code-bg: #262522;
+  --code-ink: #EAE6DC;
+  --code-cmt: #949085;
+  --code-kw: #E8A67D;
+  --code-num: #D9A06B;
+  --code-str: #A5C392;
+  --code-reg: #8FB7DF;
+  --sans: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --mono: 'JetBrains Mono', D2Coding, ui-monospace, Menlo, Consolas, monospace;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --dur: 420ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1E1D1A;
+    --paper: #2A2925;
+    --ink: #F0EEE6;
+    --muted: #A8A69C;
+    --line: #55534C;
+    --dead: #33322D;
+    --acc: #E08A6C;
+    --on-acc: #141413;
+    --acc-t: #F0A78C;
+    --acc-f: #4B2E22;
+    --blue: #7FA9D3;
+    --blue-t: #A5C4E3;
+    --blue-f: #253648;
+    --sage: #7FB08E;
+    --sage-t: #A6D1B3;
+    --sage-f: #23382A;
+    --code-bg: #171613;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1E1D1A;
+  --paper: #2A2925;
+  --ink: #F0EEE6;
+  --muted: #A8A69C;
+  --line: #55534C;
+  --dead: #33322D;
+  --acc: #E08A6C;
+  --on-acc: #141413;
+  --acc-t: #F0A78C;
+  --acc-f: #4B2E22;
+  --blue: #7FA9D3;
+  --blue-t: #A5C4E3;
+  --blue-f: #253648;
+  --sage: #7FB08E;
+  --sage-t: #A6D1B3;
+  --sage-f: #23382A;
+  --code-bg: #171613;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.6 var(--sans);
+  text-wrap: pretty;
+}
+[hidden] { display: none !important; }
+button, select, input { font: inherit; color: inherit; }
+code {
+  font-family: var(--mono);
+  font-size: .92em;
+  background: var(--dead);
+  padding: 0 .32em;
+  border-radius: 4px;
+}
+kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 5px;
+  background: var(--paper);
+}
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.shell {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 18px 18px 56px;
+  display: grid;
+  gap: 12px;
+}
+.shell > * { min-width: 0; }
+
+/* Header */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+.top-main { min-width: 0; flex: 1 1 540px; }
+.top h1 {
+  margin: 0;
+  font-size: clamp(20px, 2.4vw, 24px);
+  line-height: 1.3;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.top p { margin: 4px 0 0; color: var(--muted); max-width: 82ch; }
+.top-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pill-btn {
+  padding: 4px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--ink);
+  transition: background .18s var(--ease), border-color .18s var(--ease);
+}
+.pill-btn:hover { background: var(--dead); border-color: var(--muted); }
+
+/* Chapter rail */
+.rail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.ch-btn {
+  display: grid;
+  text-align: left;
+  padding: 7px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 0;
+  transition: background .22s var(--ease), border-color .22s var(--ease), transform .14s var(--ease);
+}
+.ch-btn:hover { background: var(--dead); }
+.ch-btn:active { transform: scale(.985); }
+.ch-btn b { font-weight: 600; line-height: 1.3; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-btn span { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-btn.done { background: var(--blue-f); border-color: var(--blue); }
+.ch-btn[aria-current="step"] {
+  background: var(--acc-f);
+  border-color: var(--acc);
+  box-shadow: inset 0 0 0 1px var(--acc);
+}
+
+/* Playback bar */
+.bar {
+  position: sticky;
+  top: 6px;
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(20, 20, 19, .05);
+}
+.btns { display: flex; gap: 4px; }
+.btns button {
+  padding: 5px 11px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s var(--ease), transform .1s var(--ease);
+}
+.btns button:hover:not(:disabled) { background: var(--dead); }
+.btns button:active:not(:disabled) { transform: scale(.97); }
+.btns button:disabled { opacity: .42; cursor: default; }
+.btns .primary {
+  min-width: 82px;
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--on-acc);
+  font-weight: 600;
+}
+.btns .primary:hover:not(:disabled) { filter: brightness(1.07); }
+.scrub { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.scrub input { flex: 1; min-width: 0; accent-color: var(--acc); cursor: pointer; }
+.scrub span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.speed { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.speed select { padding: 3px 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; }
+
+/* Evolution strip */
+.turn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: stretch;
+}
+.turn > div {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12.8px;
+  line-height: 1.45;
+}
+.turn span { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+.turn .t-q { border-color: var(--acc); background: var(--acc-f); }
+.turn .t-q span { color: var(--acc-t); }
+.turn .t-a { border-color: var(--blue); background: var(--blue-f); }
+.turn .t-a span { color: var(--blue-t); }
+.turn > .t-arrow { background: none; border: 0; padding: 0; align-self: center; color: var(--muted); font-size: 16px; }
+
+/* Caption box */
+.cap {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-height: 98px;
+}
+.cap-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.cap-ch { font-size: 12px; color: var(--acc-t); font-weight: 600; }
+.cap-act {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 5px;
+  background: var(--dead);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.cap h2 { margin: 4px 0 4px; font-size: 17px; line-height: 1.35; font-weight: 700; text-wrap: balance; }
+.cap p { margin: 0; max-width: 100ch; }
+
+/* Panels & Layouts */
+.grid { display: grid; gap: 12px; align-items: start; }
+.grid > * { min-width: 0; }
+.g-code-stage { grid-template-columns: minmax(320px, .88fr) minmax(0, 1.35fr); }
+.g-2col { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.panel h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.panel h3 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.note-box {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.note-box b { color: var(--ink); }
+.note-box.acc { background: var(--acc-f); border-color: var(--acc); color: var(--ink); }
+.note-box.blue { background: var(--blue-f); border-color: var(--blue); color: var(--ink); }
+
+.seg-toggle { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.seg-toggle button {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .2s var(--ease), border-color .2s var(--ease);
+}
+.seg-toggle button.on {
+  background: var(--acc-f);
+  border-color: var(--acc);
+  color: var(--acc-t);
+  font-weight: 600;
+}
+.seg-toggle button.on-b {
+  background: var(--blue-f);
+  border-color: var(--blue);
+  color: var(--blue-t);
+  font-weight: 600;
+}
+
+/* Code Panels (strict code-panels.md spec: zero scroll, >=0.5 alpha highlight, sentinel highlighting) */
+.codebox {
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 12px 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.codebox + .codebox { margin-top: 8px; }
+.cl {
+  padding: 2px 14px;
+  white-space: pre;
+  color: var(--code-ink);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.cl .cmt { color: var(--code-cmt); }
+.cl .kw { color: var(--code-kw); }
+.cl .num { color: var(--code-num); }
+.cl .str { color: var(--code-str); }
+.cl .reg { color: var(--code-reg); }
+.cl[class*="hl-"] { color: #F7F4EA; }
+.cl[class*="hl-"] .cmt { color: #CCC8BA; }
+.cl.hl-acc {
+  background: rgba(217, 119, 87, .52);
+  box-shadow: inset 4px 0 0 #F2A88E;
+}
+.cl.hl-blue {
+  background: rgba(52, 122, 198, .52);
+  box-shadow: inset 4px 0 0 #82B4E8;
+}
+.cl.hl-sage {
+  background: rgba(90, 130, 102, .54);
+  box-shadow: inset 4px 0 0 #9CD1AC;
+}
+
+/* Connector SVG (strict connector-arrows.md spec) */
+.stage-board {
+  position: relative;
+}
+.wire-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 4;
+}
+.wire-svg path:not(.arrow) {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  opacity: .12;
+  transition: opacity 280ms var(--ease), stroke var(--dur) var(--ease), stroke-width 280ms var(--ease);
+}
+.wire-svg.has-focus path:not(.arrow):not(.on) {
+  opacity: 0;
+}
+.wire-svg path.on:not(.arrow) {
+  opacity: 1;
+  stroke-width: 3;
+}
+.wire-svg path.acc:not(.arrow).on { stroke: var(--acc); }
+.wire-svg path.blue:not(.arrow).on { stroke: var(--blue); }
+.wire-svg path.sage:not(.arrow).on { stroke: var(--sage); }
+
+.wire-svg .arrow {
+  fill: var(--line);
+  stroke: none;
+  opacity: .12;
+  transition: opacity 220ms var(--ease), fill var(--dur) var(--ease);
+}
+.wire-svg.has-focus .arrow:not(.on) { opacity: 0; }
+.wire-svg .arrow.on { opacity: 1; transition-delay: 200ms; }
+.wire-svg .arrow.acc.on { fill: var(--acc); }
+.wire-svg .arrow.blue.on { fill: var(--blue); }
+.wire-svg .arrow.sage.on { fill: var(--sage); }
+
+.wire-svg .port {
+  fill: var(--paper);
+  stroke: var(--line);
+  stroke-width: 2;
+  opacity: .2;
+  transition: opacity 220ms var(--ease), stroke var(--dur) var(--ease);
+}
+.wire-svg.has-focus .port:not(.on) { opacity: 0; }
+.wire-svg .port.on { opacity: 1; }
+.wire-svg .port.acc.on { stroke: var(--acc); }
+.wire-svg .port.blue.on { stroke: var(--blue); }
+.wire-svg .port.sage.on { stroke: var(--sage); }
+
+/* Reusable Memory Boxes & Cards */
+.cols-3 {
+  display: grid;
+  grid-template-columns: minmax(195px, 1.08fr) 56px minmax(175px, 1fr) 56px minmax(150px, .85fr);
+  align-items: center;
+  gap: 8px 0;
+}
+.cols-2 {
+  display: grid;
+  grid-template-columns: minmax(230px, 1.12fr) 64px minmax(200px, 1fr);
+  align-items: center;
+  gap: 8px 0;
+}
+.col-stack { display: grid; gap: 10px; }
+.col-hdr {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 2px;
+}
+
+.mbox {
+  border: 1.5px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.mbox.on { background: var(--acc-f); border-color: var(--acc); }
+.mbox.on-b { background: var(--blue-f); border-color: var(--blue); }
+.mbox.on-s { background: var(--sage-f); border-color: var(--sage); }
+.mbox.dim { opacity: .38; }
+.mbox-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  margin-bottom: 5px;
+  gap: 6px;
+}
+.mbox-title small { font-weight: 500; font-size: 10.5px; color: var(--muted); }
+.slot-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.slot-col { display: grid; gap: 4px; }
+
+.mslot {
+  flex: 1 1 auto;
+  min-width: 50px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--paper);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.mslot.col { flex-direction: column; align-items: center; gap: 1px; text-align: center; }
+.mslot small { font-size: 10px; color: var(--muted); font-weight: 500; }
+.mslot.hot { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); font-weight: 700; }
+.mslot.hot-b { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); font-weight: 700; }
+.mslot.hot-s { background: var(--sage-f); border-color: var(--sage); color: var(--sage-t); font-weight: 700; }
+.mslot.neg { background: var(--dead); border-style: dashed; }
+.mslot.neg.hot { background: var(--acc-f); border-style: solid; border-color: var(--acc); color: var(--acc-t); }
+.mslot.neg.hot-b { background: var(--blue-f); border-style: solid; border-color: var(--blue); color: var(--blue-t); }
+
+/* Horizontal memory strip with sliding pointer */
+.mem-track-wrap {
+  position: relative;
+  padding: 36px 4px 12px;
+  margin-top: 4px;
+  overflow-x: auto;
+}
+.this-ptr {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--acc);
+  color: var(--on-acc);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  z-index: 5;
+  pointer-events: none;
+  transition: left var(--dur) var(--ease), opacity 240ms var(--ease), background var(--dur) var(--ease);
+}
+.this-ptr::after {
+  content: "";
+  position: absolute;
+  left: 22px;
+  bottom: -6px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--acc);
+  transition: border-top-color var(--dur) var(--ease);
+}
+.this-ptr.blue { background: var(--blue); color: #FAF9F5; }
+.this-ptr.blue::after { border-top-color: var(--blue); }
+
+.mem-strip {
+  display: flex;
+  gap: 5px;
+  align-items: stretch;
+  min-width: 520px;
+}
+.mcell {
+  flex: 1 1 0;
+  min-width: 68px;
+  border: 1.5px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 5px;
+  background: var(--paper);
+  font-family: var(--mono);
+  text-align: center;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform var(--dur) var(--ease), opacity var(--dur) var(--ease), flex-grow var(--dur) var(--ease);
+}
+.mcell .off { display: block; font-size: 10px; color: var(--muted); }
+.mcell .val { display: block; font-size: 12px; font-weight: 700; margin-top: 2px; }
+.mcell .sub { display: block; font-size: 10px; color: var(--muted); margin-top: 1px; }
+.mcell.b1 { background: var(--blue-f); border-color: var(--blue); }
+.mcell.b2 { background: var(--sage-f); border-color: var(--sage); }
+.mcell.acc { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); }
+.mcell.dim { opacity: .4; }
+.mcell.pop { animation: cellPop .42s var(--ease); }
+@keyframes cellPop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.045); }
+  100% { transform: scale(1); }
+}
+
+/* Ch3 Diamond comparison tracks */
+.diamond-rows { display: grid; gap: 14px; }
+.drow-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.drow-card.on { border-color: var(--acc); background: var(--paper); }
+.drow-card.dim { opacity: .45; }
+.drow-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.drow-hdr .delta-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--dead);
+  border: 1px solid var(--line);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.drow-hdr .delta-badge.acc { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); }
+.drow-hdr .delta-badge.blue { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); }
+
+.dstrip {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+.dseg {
+  border: 1.5px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 6px;
+  background: var(--paper);
+  font-family: var(--mono);
+  text-align: center;
+  font-size: 11.5px;
+  transition: all var(--dur) var(--ease);
+}
+.dseg small { display: block; font-size: 10px; color: var(--muted); }
+.dseg.b { background: var(--blue-f); border-color: var(--blue); }
+.dseg.c { background: var(--sage-f); border-color: var(--sage); }
+.dseg.a { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); font-weight: 700; }
+.dseg.ghost { opacity: 0; pointer-events: none; border-style: dashed; }
+.dseg.warn { border-style: dashed; border-color: var(--acc); background: var(--acc-f); color: var(--acc-t); }
+
+.reg-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.rpill {
+  flex: 1 1 130px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 9px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.rpill small { display: block; font-size: 10px; color: var(--muted); }
+.rpill b { font-size: 13px; }
+.rpill.on { background: var(--acc-f); border-color: var(--acc); color: var(--acc-t); }
+.rpill.on-b { background: var(--blue-f); border-color: var(--blue); color: var(--blue-t); }
+
+.foot { font-size: 12px; color: var(--muted); max-width: 96ch; }
+.foot p { margin: 0; }
+
+@media (max-width: 1060px) {
+  .rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g-code-stage, .g-2col { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 780px) {
+  .turn { grid-template-columns: minmax(0, 1fr); }
+  .turn > .t-arrow { display: none; }
+  .cols-3, .cols-2 { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .wire-gap, .wire-svg { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="top-main">
+      <h1>C++ 多态的后端本质：vptr、Thunk 与虚基表</h1>
+      <p>承接 <code>runtime-codegen.html</code> 第 11–12 章。从编译原理后端（Codegen &amp; ABI）视角追踪：静态机器码如何在运行期靠“前缀不变性”与“查表间接寻址”，同时驾驭虚函数重写、多继承 <code>this</code> 偏移和菱形虚继承。</p>
+    </div>
+    <div class="top-actions">
+      <a class="pill-btn" href="./runtime-codegen.html#obj_layout">← 回到 11. 对象内存布局</a>
+      <button type="button" class="pill-btn" id="btn-theme">深色 / 浅色</button>
+    </div>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="章节导航"></nav>
+
+  <div class="bar" role="group" aria-label="播放控制">
+    <div class="btns">
+      <button type="button" id="b-first" title="回到起点 (Home)">起点</button>
+      <button type="button" id="b-prev" title="上一步 (←)">上一步</button>
+      <button type="button" id="b-play" class="primary" aria-pressed="false" title="播放或暂停 (空格)">播放</button>
+      <button type="button" id="b-next" title="下一步 (→)">下一步</button>
+    </div>
+    <div class="scrub">
+      <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="切换步骤">
+      <span id="pos">1 / 1</span>
+    </div>
+    <label class="speed">速度
+      <select id="speed">
+        <option value="0.65">0.65x 慢速</option>
+        <option value="1" selected>1x 正常</option>
+        <option value="1.6">1.6x 快速</option>
+      </select>
+    </label>
+  </div>
+
+  <section class="turn" id="turn" aria-label="本章的问题演进"></section>
+
+  <section class="cap" aria-live="polite">
+    <div class="cap-top">
+      <span class="cap-ch" id="cap-ch"></span>
+      <span class="cap-act" id="cap-act"></span>
+    </div>
+    <h2 id="cap-h"></h2>
+    <p id="cap-p"></p>
+  </section>
+
+  <main id="stage" class="stage"></main>
+
+  <footer class="foot">
+    <p>快捷键：<kbd>←</kbd> / <kbd>→</kbd> 步进，<kbd>空格</kbd> 自动播放或暂停，<kbd>Home</kbd> 回到当前开头。所有动画区域均采用持久化 DOM 原地状态突变与 SVG <code>stroke-dashoffset</code> 连线绘制。</p>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const byId = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* Safe Sentinel-based Syntax Highlighter (strict code-panels.md spec) */
+  function hlCppLine(line) {
+    const m = line.match(/^(.*?)(\/\/.*|;.*)?$/);
+    let code = m[1];
+    const cmt = m[2] || '';
+    const strs = [];
+    code = code.replace(/"[^"]*"/g, s => {
+      strs.push(s);
+      return '\u0001' + String.fromCharCode(65 + strs.length - 1) + '\u0001';
+    });
+    code = esc(code)
+      .replace(/\b(class|struct|public|virtual|override|int|return|new|void|subq|addq|movq|movl|movslq|leaq|jmp|call|ret)\b/g, '<span class="kw">$1</span>')
+      .replace(/(%[a-z0-9]+)/g, '<span class="reg">$1</span>')
+      .replace(/(^|[^a-zA-Z0-9_"])(-?\d+)\b/g, '$1<span class="num">$2</span>')
+      .replace(/\u0001([A-Z])\u0001/g, (_, c) => '<span class="str">' + esc(strs[c.charCodeAt(0) - 65]) + '</span>');
+    return code + (cmt ? '<span class="cmt">' + esc(cmt) + '</span>' : '');
+  }
+
+  function buildCodeBox(idPrefix, lines) {
+    return '<div class="codebox" id="' + idPrefix + '">' +
+      lines.map((l, i) => '<div class="cl" id="' + idPrefix + '-l' + i + '">' + hlCppLine(l) + '</div>').join('') +
+      '</div>';
+  }
+
+  function paintCodeLines(idPrefix, count, accLines, blueLines, sageLines) {
+    const acc = new Set(accLines || []);
+    const blue = new Set(blueLines || []);
+    const sage = new Set(sageLines || []);
+    for (let i = 0; i < count; i++) {
+      const el = byId(idPrefix + '-l' + i);
+      if (!el) continue;
+      el.className = 'cl' + (acc.has(i) ? ' hl-acc' : blue.has(i) ? ' hl-blue' : sage.has(i) ? ' hl-sage' : '');
+    }
+  }
+
+  /* Connector Draw-in Helper (strict connector-arrows.md spec) */
+  function drawInPath(pathEl) {
+    if (!pathEl) return;
+    const len = pathEl.getTotalLength ? pathEl.getTotalLength() : 0;
+    if (!len) return;
+    pathEl.style.transition = 'none';
+    pathEl.style.strokeDasharray = String(len);
+    pathEl.style.strokeDashoffset = String(len);
+    void pathEl.getBoundingClientRect();
+    pathEl.style.transition = '';
+    pathEl.style.strokeDashoffset = '0';
+    clearTimeout(pathEl._t);
+    pathEl._t = setTimeout(() => {
+      pathEl.style.strokeDasharray = '';
+      pathEl.style.strokeDashoffset = '';
+    }, 560);
+  }
+
+  function setWireGeometry(boardId, svgId, wires) {
+    const board = byId(boardId);
+    const svg = byId(svgId);
+    if (!board || !svg) return;
+    const br = board.getBoundingClientRect();
+    if (br.width < 10) return;
+    svg.setAttribute('viewBox', '0 0 ' + br.width + ' ' + br.height);
+
+    // Count fan-in per target so arrowheads stagger >= 18px
+    const targetGroups = {};
+    wires.forEach(w => {
+      if (!targetGroups[w.to]) targetGroups[w.to] = [];
+      targetGroups[w.to].push(w.id);
+    });
+
+    wires.forEach(w => {
+      const srcEl = byId(w.from);
+      const dstEl = byId(w.to);
+      if (!srcEl || !dstEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const dr = dstEl.getBoundingClientRect();
+
+      const isRtl = w.dir === 'rtl';
+      const x1 = (isRtl ? sr.left : sr.right) - br.left;
+      const y1 = sr.top + sr.height / 2 - br.top;
+
+      const group = targetGroups[w.to];
+      const slot = group.indexOf(w.id);
+      const ySpread = (slot - (group.length - 1) / 2) * 18;
+      const tipX = (isRtl ? dr.right : dr.left) - br.left;
+      const x2 = isRtl ? tipX + 9 : tipX - 9;
+      const y2 = dr.top + dr.height / 2 - br.top + ySpread;
+      const mx = x1 + (x2 - x1) * 0.5;
+
+      const port = byId(w.id + '-pt');
+      const path = byId(w.id + '-ln');
+      const arr = byId(w.id + '-ar');
+      if (port) {
+        port.setAttribute('cx', String(x1));
+        port.setAttribute('cy', String(y1));
+      }
+      if (path) {
+        path.setAttribute('d', `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`);
+      }
+      if (arr) {
+        arr.setAttribute('d', isRtl
+          ? `M ${tipX} ${y2} L ${tipX + 9} ${y2 - 5} L ${tipX + 9} ${y2 + 5} Z`
+          : `M ${tipX} ${y2} L ${tipX - 9} ${y2 - 5} L ${tipX - 9} ${y2 + 5} Z`);
+      }
+    });
+  }
+
+  function updateWireLights(svgId, litSet, activeWires) {
+    const svg = byId(svgId);
+    if (!svg) return;
+    const active = new Set(activeWires.map(w => w.id));
+    svg.classList.toggle('has-focus', active.size > 0);
+
+    svg.querySelectorAll('[data-wid]').forEach(el => {
+      const wid = el.dataset.wid;
+      const cls = el.dataset.wcls || 'acc';
+      const isOn = active.has(wid);
+      const baseCls = el.classList.contains('arrow') ? 'arrow' : el.classList.contains('port') ? 'port' : '';
+      el.setAttribute('class', [baseCls, cls, isOn ? 'on' : ''].filter(Boolean).join(' '));
+    });
+
+    activeWires.forEach(w => {
+      if (!litSet.has(w.id)) {
+        drawInPath(byId(w.id + '-ln'));
+      }
+    });
+    litSet.clear();
+    active.forEach(id => litSet.add(id));
+  }
+
+  /* =====================================================================
+     Scene 1: Single Inheritance vptr & vtable (Codegen + Construction)
+     ===================================================================== */
+  const sceneVptr = {
+    selectedType: 'B',
+    litWires: new Set(),
+    cppLines: [
+      'class A { public:',
+      '  int a = 0, d = 1;',
+      '  virtual int f() { return a + d; } // vtable[0]',
+      '};',
+      'class B : public A { public:',
+      '  int b = 2;',
+      '  int f() override { return a; }    // 覆盖 vtable[0]',
+      '};',
+      'int callf(A* p) { return p->f(); }  // 静态类型是 A*'
+    ],
+    asmLines: [
+      '; B::B() 构造序言重写 vptr:',
+      '  call A::A()            ; 先把 vptr 写为 &A_vtable',
+      '  leaq B_vtable(%rip), %rax',
+      '  movq %rax, (%rdi)      ; 再覆盖成 &B_vtable',
+      '; callf(A* p) 调用点 (全程不变):',
+      '  movl 8(%rdi), %eax     ; 读字段 a: 固定偏移 +8',
+      '  movq (%rdi), %rax      ; ① 读对象头 vptr',
+      '  jmp  *(%rax)           ; ② 查 vtable[0] 间接跳转'
+    ],
+    mount(root, ctx) {
+      this.litWires = new Set();
+      root.innerHTML =
+        '<div class="grid g-code-stage">' +
+          '<section class="panel">' +
+            '<h3>源码与后端汇编 <small>g++ 13.3 x86-64</small></h3>' +
+            buildCodeBox('s1-cpp', this.cppLines) +
+            buildCodeBox('s1-asm', this.asmLines) +
+            '<div class="reg-pills">' +
+              '<div class="rpill" id="s1-reg-rdi"><small>%rdi (this)</small><b>obj*</b></div>' +
+              '<div class="rpill" id="s1-reg-rax"><small>%rax (vptr / fn)</small><b>—</b></div>' +
+            '</div>' +
+          '</section>' +
+          '<section class="panel">' +
+            '<h3>堆对象 → vtable (.rodata) → 代码段 ' +
+              '<div class="seg-toggle">' +
+                '<button type="button" id="s1-tA">new A()</button>' +
+                '<button type="button" id="s1-tB" class="on">new B()</button>' +
+              '</div>' +
+            '</h3>' +
+            '<div class="stage-board cols-3" id="s1-board">' +
+              '<svg class="wire-svg" id="s1-svg"></svg>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr">Heap 对象内存</div>' +
+                '<div class="mbox" id="s1-obj">' +
+                  '<div class="mbox-title"><span id="s1-obj-name">B 实例</span><small id="s1-obj-sz">sizeof=24</small></div>' +
+                  '<div class="slot-col">' +
+                    '<div class="mslot" id="s1-vptr"><span>+0: vptr</span><small id="s1-vptr-val">&amp;B_vt</small></div>' +
+                    '<div class="mslot" id="s1-a"><span>+8: a=0</span><small>+12: d=1</small></div>' +
+                    '<div class="mslot" id="s1-b"><span>+16: b=2</span><small>4B pad</small></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="wire-gap"></div>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr">.rodata 只读分派表</div>' +
+                '<div class="mbox" id="s1-vtA">' +
+                  '<div class="mbox-title"><span>A_vtable</span><small>基类表</small></div>' +
+                  '<div class="slot-col"><div class="mslot" id="s1-vtA0"><span>[0] A::f</span><small>0x401120</small></div></div>' +
+                '</div>' +
+                '<div class="mbox" id="s1-vtB">' +
+                  '<div class="mbox-title"><span>B_vtable</span><small>派生表</small></div>' +
+                  '<div class="slot-col">' +
+                    '<div class="mslot" id="s1-vtB0"><span>[0] B::f</span><small>0x401160</small></div>' +
+                    '<div class="mslot" id="s1-vtB1"><span>[8] B::g</span><small>0x401190</small></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="wire-gap"></div>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr">.text 代码段</div>' +
+                '<div class="mbox" id="s1-fnA"><div class="mbox-title"><span>A::f(this)</span></div><small>读 8(%rdi)+12(%rdi) → 1</small></div>' +
+                '<div class="mbox" id="s1-fnB"><div class="mbox-title"><span>B::f(this)</span></div><small>读 8(%rdi) → 0</small></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="note-box" id="s1-note"></div>' +
+          '</section>' +
+        '</div>';
+
+      const wireDefs = [
+        { id: 's1-w-vA', from: 's1-vptr', to: 's1-vtA', cls: 'blue' },
+        { id: 's1-w-vB', from: 's1-vptr', to: 's1-vtB', cls: 'blue' },
+        { id: 's1-w-fA', from: 's1-vtA0', to: 's1-fnA', cls: 'acc' },
+        { id: 's1-w-fB', from: 's1-vtB0', to: 's1-fnB', cls: 'acc' }
+      ];
+      byId('s1-svg').innerHTML = wireDefs.map(w =>
+        `<path id="${w.id}-ln" data-wid="${w.id}" data-wcls="${w.cls}"></path>` +
+        `<path id="${w.id}-ar" class="arrow" data-wid="${w.id}" data-wcls="${w.cls}"></path>` +
+        `<circle id="${w.id}-pt" class="port" r="4" data-wid="${w.id}" data-wcls="${w.cls}"></circle>`
+      ).join('');
+      this.wireDefs = wireDefs;
+
+      byId('s1-tA').onclick = () => { this.selectedType = 'A'; ctx.repatch({ forceType: 'A' }); };
+      byId('s1-tB').onclick = () => { this.selectedType = 'B'; ctx.repatch({ forceType: 'B' }); };
+    },
+    patch(f, override) {
+      const t = (override && override.forceType) ? override.forceType : (f.forceType || this.selectedType);
+      this.selectedType = t;
+      byId('s1-tA').className = t === 'A' ? 'on' : '';
+      byId('s1-tB').className = t === 'B' ? 'on' : '';
+
+      paintCodeLines('s1-cpp', this.cppLines.length, f.cppAcc, f.cppBlue, []);
+      paintCodeLines('s1-asm', this.asmLines.length, f.asmAcc, f.asmBlue, []);
+
+      const isB = t === 'B';
+      const showInitBase = f.phase === 'ctor_base';
+      const activeTable = showInitBase ? 'A' : t;
+
+      byId('s1-obj-name').textContent = isB ? 'B 实例' : 'A 实例';
+      byId('s1-obj-sz').textContent = isB ? 'sizeof=24' : 'sizeof=16';
+      byId('s1-b').style.display = isB ? '' : 'none';
+      byId('s1-vptr-val').textContent = activeTable === 'B' ? '&B_vtable' : '&A_vtable';
+
+      byId('s1-obj').className = 'mbox' + (f.phase === 'data' || f.phase === 'ctor_base' || f.phase === 'ctor_der' ? ' on-b' : '');
+      byId('s1-vptr').className = 'mslot' + (f.hlVptr ? ' hot-b' : '');
+      byId('s1-a').className = 'mslot' + (f.phase === 'data' ? ' hot' : '');
+      byId('s1-b').className = 'mslot';
+
+      byId('s1-vtA').className = 'mbox' + (activeTable === 'A' && f.stage >= 1 ? ' on-b' : activeTable !== 'A' && f.stage >= 1 ? ' dim' : '');
+      byId('s1-vtB').className = 'mbox' + (activeTable === 'B' && f.stage >= 1 ? ' on-b' : activeTable !== 'B' && f.stage >= 1 ? ' dim' : '');
+      byId('s1-vtA0').className = 'mslot' + (activeTable === 'A' && f.stage >= 2 ? ' hot' : '');
+      byId('s1-vtB0').className = 'mslot' + (activeTable === 'B' && f.stage >= 2 ? ' hot' : '');
+
+      byId('s1-fnA').className = 'mbox' + (activeTable === 'A' && f.stage >= 3 ? ' on' : f.stage >= 3 ? ' dim' : '');
+      byId('s1-fnB').className = 'mbox' + (activeTable === 'B' && f.stage >= 3 ? ' on' : f.stage >= 3 ? ' dim' : '');
+
+      byId('s1-reg-rdi').className = 'rpill' + (f.stage >= 1 || f.phase === 'data' ? ' on-b' : '');
+      byId('s1-reg-rdi').querySelector('b').textContent = isB ? '0x7000 (B*)' : '0x7000 (A*)';
+      byId('s1-reg-rax').className = 'rpill' + (f.stage >= 1 ? ' on' : '');
+      byId('s1-reg-rax').querySelector('b').textContent =
+        f.stage === 0 ? '—' :
+        f.stage === 1 ? (activeTable === 'B' ? '&B_vtable' : '&A_vtable') :
+        (activeTable === 'B' ? '0x401160 (B::f)' : '0x401120 (A::f)');
+
+      const activeWires = [];
+      if (f.stage >= 1) activeWires.push({ id: activeTable === 'B' ? 's1-w-vB' : 's1-w-vA' });
+      if (f.stage >= 2) activeWires.push({ id: activeTable === 'B' ? 's1-w-fB' : 's1-w-fA' });
+
+      setWireGeometry('s1-board', 's1-svg', this.wireDefs);
+      updateWireLights('s1-svg', this.litWires, activeWires);
+
+      byId('s1-note').className = 'note-box ' + (f.stage >= 2 ? 'acc' : f.stage >= 1 ? 'blue' : '');
+      byId('s1-note').innerHTML =
+        f.phase === 'ctor_base' ? '<b>构造期细节：</b>调用 <code>A::A()</code> 时，<code>vptr</code> 先被设为 <code>&amp;A_vtable</code>；因此基类构造函数内调用虚函数只会调到 <code>A::f</code>。' :
+        f.phase === 'ctor_der' ? '<b>构造序言覆盖：</b>进入 <code>B::B()</code> 后，编译器插入的指令将偏移 0 处的 <code>vptr</code> 改写为 <code>&amp;B_vtable</code>（点击右上角 <code>new A() / new B()</code> 可对照）。' :
+        f.phase === 'data' ? '<b>数据访问零开销：</b>由于前缀不变性，<code>a</code> 永远在 <code>8(%rdi)</code>，后端直接生成单条访存指令，无需查表。' :
+        `<b>动态分派完成：</b>同一份机器码顺着 <code>(${t}*)->vptr</code> → <code>${t}_vtable[0]</code> → 跳转到 <code>${t}::f</code>，返回值 <code>${isB ? 0 : 1}</code>。`;
+    }
+  };
+
+  /* =====================================================================
+     Scene 2: Multiple Inheritance & Thunk Adjustment
+     ===================================================================== */
+  const sceneMulti = {
+    litWires: new Set(),
+    cppLines: [
+      'struct B1 { int x=1; virtual int f(){return x;} };',
+      'struct B2 { int y=2; virtual int g(){return y;} };',
+      'struct D : B1, B2 {',
+      '  int z=3;',
+      '  int g() override { return x + z; } // 需完整 D*',
+      '};',
+      'B2* p2 = &d;      // ① 编译器静态加 +16 偏移',
+      'p2->g();          // ② 传入的是 B2* 而非 D* !'
+    ],
+    asmLines: [
+      '; B2* p2 = &d:',
+      '  leaq 16(%rdi), %rdi   ; this 指针滑向 B2 子对象',
+      '; p2->g() 调用点:',
+      '  movq (%rdi), %rax     ; 读偏移 16 处的 vptr_B2',
+      '  jmp  *(%rax)          ; 跳进 thunk_D_g !',
+      '; 编译器后端合成的 Thunk 跳板:',
+      'thunk_D_g:',
+      '  subq $16, %rdi        ; ③ 将 this 回调 -16 还原成 D*',
+      '  jmp  D::g             ; ④ 再跳真正的 D::g (读 x 与 z)'
+    ],
+    mount(root) {
+      this.litWires = new Set();
+      root.innerHTML =
+        '<div class="grid g-code-stage">' +
+          '<section class="panel">' +
+            '<h3>多继承源码与后端 Thunk <small>x86-64</small></h3>' +
+            buildCodeBox('s2-cpp', this.cppLines) +
+            buildCodeBox('s2-asm', this.asmLines) +
+          '</section>' +
+          '<section class="panel">' +
+            '<h3>D 对象连续布局（含两根 vptr）与 this 指针滑动</h3>' +
+            '<div class="mem-track-wrap" id="s2-track">' +
+              '<div class="this-ptr" id="s2-ptr">this (%rdi) = +0 (D*)</div>' +
+              '<div class="mem-strip">' +
+                '<div class="mcell b1" id="s2-c0"><span class="off">+0</span><span class="val">vptr_B1</span><span class="sub">8B 主表</span></div>' +
+                '<div class="mcell b1" id="s2-c1"><span class="off">+8</span><span class="val">B1::x=1</span><span class="sub">4B+4pad</span></div>' +
+                '<div class="mcell b2" id="s2-c2"><span class="off">+16</span><span class="val">vptr_B2</span><span class="sub">8B 次表</span></div>' +
+                '<div class="mcell b2" id="s2-c3"><span class="off">+24</span><span class="val">B2::y=2</span><span class="sub">4B</span></div>' +
+                '<div class="mcell" id="s2-c4"><span class="off">+28</span><span class="val">D::z=3</span><span class="sub">4B</span></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="stage-board cols-3" id="s2-board" style="margin-top:10px">' +
+              '<svg class="wire-svg" id="s2-svg"></svg>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr">对象内的 vptr</div>' +
+                '<div class="mbox on-b" id="s2-vp1"><div class="mbox-title"><span>vptr_B1 (+0)</span></div><small>主子对象头</small></div>' +
+                '<div class="mbox on-s" id="s2-vp2"><div class="mbox-title"><span>vptr_B2 (+16)</span></div><small>次基类子对象头</small></div>' +
+              '</div>' +
+              '<div class="wire-gap"></div>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr">D 的分派表（两张视图）</div>' +
+                '<div class="mbox" id="s2-vt1"><div class="mbox-title"><span>vtable_D (主)</span></div><div class="slot-col"><div class="mslot" id="s2-vt1-0"><span>[0] B1::f</span></div><div class="mslot" id="s2-vt1-1"><span>[8] D::g</span></div></div></div>' +
+                '<div class="mbox" id="s2-vt2"><div class="mbox-title"><span>vtable_D_B2 (次)</span></div><div class="slot-col"><div class="mslot" id="s2-vt2-0"><span>[0] thunk_D_g</span><small>先减16!</small></div></div></div>' +
+              '</div>' +
+              '<div class="wire-gap"></div>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr">后端生成指令</div>' +
+                '<div class="mbox" id="s2-thunk"><div class="mbox-title"><span>thunk_D_g</span></div><small>subq $16, %rdi<br>jmp D::g</small></div>' +
+                '<div class="mbox" id="s2-fnDg"><div class="mbox-title"><span>D::g(D* this)</span></div><small>return x(+8) + z(+28)</small></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="note-box" id="s2-note"></div>' +
+          '</section>' +
+        '</div>';
+
+      const wireDefs = [
+        { id: 's2-w1', from: 's2-vp1', to: 's2-vt1', cls: 'blue' },
+        { id: 's2-w2', from: 's2-vp2', to: 's2-vt2', cls: 'sage' },
+        { id: 's2-w3', from: 's2-vt2-0', to: 's2-thunk', cls: 'acc' },
+        { id: 's2-w4', from: 's2-thunk', to: 's2-fnDg', cls: 'acc' }
+      ];
+      byId('s2-svg').innerHTML = wireDefs.map(w =>
+        `<path id="${w.id}-ln" data-wid="${w.id}" data-wcls="${w.cls}"></path>` +
+        `<path id="${w.id}-ar" class="arrow" data-wid="${w.id}" data-wcls="${w.cls}"></path>` +
+        `<circle id="${w.id}-pt" class="port" r="4" data-wid="${w.id}" data-wcls="${w.cls}"></circle>`
+      ).join('');
+      this.wireDefs = wireDefs;
+    },
+    positionPtr(cellId, label, isBlue) {
+      const wrap = byId('s2-track');
+      const cell = byId(cellId);
+      const ptr = byId('s2-ptr');
+      if (!wrap || !cell || !ptr) return;
+      ptr.textContent = label;
+      ptr.className = 'this-ptr' + (isBlue ? ' blue' : '');
+      const wr = wrap.getBoundingClientRect();
+      const cr = cell.getBoundingClientRect();
+      const rawLeft = cr.left - wr.left + wrap.scrollLeft;
+      const ptrW = Math.ceil(ptr.getBoundingClientRect().width);
+      const maxLeft = Math.max(4, wrap.scrollWidth - ptrW - 4);
+      ptr.style.left = Math.max(4, Math.min(maxLeft, rawLeft)) + 'px';
+    },
+    patch(f) {
+      paintCodeLines('s2-cpp', this.cppLines.length, f.cppAcc, f.cppBlue, f.cppSage);
+      paintCodeLines('s2-asm', this.asmLines.length, f.asmAcc, f.asmBlue, f.asmSage);
+
+      const ptrAtB2 = f.ptrAt === 'B2';
+      this.positionPtr(ptrAtB2 ? 's2-c2' : 's2-c0', ptrAtB2 ? 'this (%rdi) = +16 (B2*)' : 'this (%rdi) = +0 (D*)', ptrAtB2);
+
+      byId('s2-c0').className = 'mcell b1' + (f.step === 0 ? ' acc' : '');
+      byId('s2-c2').className = 'mcell b2' + (ptrAtB2 ? ' acc' : '');
+      byId('s2-c1').className = 'mcell b1' + (f.step === 4 ? ' acc' : '');
+      byId('s2-c4').className = 'mcell' + (f.step === 4 ? ' acc' : '');
+
+      byId('s2-vt1').className = 'mbox' + (f.step === 0 ? ' on-b' : ' dim');
+      byId('s2-vt2').className = 'mbox' + (f.step >= 2 ? ' on-s' : f.step === 0 ? '' : ' dim');
+      byId('s2-vt2-0').className = 'mslot' + (f.step >= 2 ? ' hot' : '');
+      byId('s2-thunk').className = 'mbox' + (f.step === 3 ? ' on' : f.step > 3 ? ' on-b' : ' dim');
+      byId('s2-fnDg').className = 'mbox' + (f.step === 4 ? ' on' : ' dim');
+
+      const active = [];
+      if (f.step === 0) active.push({ id: 's2-w1' }, { id: 's2-w2' });
+      if (f.step >= 2) active.push({ id: 's2-w2' }, { id: 's2-w3' });
+      if (f.step >= 4) active.push({ id: 's2-w4' });
+
+      setWireGeometry('s2-board', 's2-svg', this.wireDefs);
+      updateWireLights('s2-svg', this.litWires, active);
+
+      byId('s2-note').className = 'note-box ' + (f.step === 3 ? 'acc' : ptrAtB2 ? 'blue' : '');
+      byId('s2-note').innerHTML = f.note;
+    }
+  };
+
+  /* =====================================================================
+     Scene 3: Diamond Virtual Inheritance Dilemma
+     ===================================================================== */
+  const sceneDiamond = {
+    cppLines: [
+      'class A { public: int a = 42; };',
+      'class B : virtual public A { public: int b = 1; };',
+      'class C : virtual public A { public: int c = 2; };',
+      'class D : public B, public C { public: int d = 3; };',
+      '',
+      '// 单独编译 B 的方法时，后端必须回答：',
+      'int read_a(B* pb) {',
+      '  return pb->a; // A 到底在 pb + 16 还是 pb + 40 ?!',
+      '}'
+    ],
+    mount(root) {
+      root.innerHTML =
+        '<div class="grid g-code-stage">' +
+          '<section class="panel">' +
+            '<h3>菱形虚继承与后端编译困境 <small>静态偏移失效</small></h3>' +
+            buildCodeBox('s3-cpp', this.cppLines) +
+            '<div class="note-box" id="s3-code-note"></div>' +
+          '</section>' +
+          '<section class="panel">' +
+            '<h3>同一份 B* 视角下的内存布局剧变（对比观察 A 的偏移）</h3>' +
+            '<div class="diamond-rows">' +
+              '<div class="drow-card" id="s3-card-nonv">' +
+                '<div class="drow-hdr"><span>反例：若不用 virtual（普通多继承 D）</span><span class="delta-badge acc">A 存在两份冗余拷贝!</span></div>' +
+                '<div class="dstrip">' +
+                  '<div class="dseg b">B::b<small>+0</small></div>' +
+                  '<div class="dseg warn">A::a (份1)<small>+4</small></div>' +
+                  '<div class="dseg c">C::c<small>+8</small></div>' +
+                  '<div class="dseg warn">A::a (份2)<small>+12</small></div>' +
+                  '<div class="dseg">D::d<small>+16</small></div>' +
+                  '<div class="dseg ghost"></div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="drow-card" id="s3-card-B">' +
+                '<div class="drow-hdr"><span>情况 1：独立实例化 B b;</span><span class="delta-badge blue" id="s3-delta-B">偏移 Δ₁ = +16</span></div>' +
+                '<div class="dstrip">' +
+                  '<div class="dseg b">B::vptr<small>+0 (8B)</small></div>' +
+                  '<div class="dseg b">B::b<small>+8 (8B)</small></div>' +
+                  '<div class="dseg a" id="s3-B-A">共享 A::a<small id="s3-B-A-off">+16</small></div>' +
+                  '<div class="dseg ghost"></div>' +
+                  '<div class="dseg ghost"></div>' +
+                  '<div class="dseg ghost"></div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="drow-card" id="s3-card-D">' +
+                '<div class="drow-hdr"><span>情况 2：B 子对象嵌在 D d; 中</span><span class="delta-badge acc" id="s3-delta-D">偏移 Δ₂ = +40 (变了!)</span></div>' +
+                '<div class="dstrip">' +
+                  '<div class="dseg b">B::vptr<small>+0 (8B)</small></div>' +
+                  '<div class="dseg b">B::b<small>+8 (8B)</small></div>' +
+                  '<div class="dseg c" id="s3-D-C1">C::vptr<small>+16 (8B)</small></div>' +
+                  '<div class="dseg c" id="s3-D-C2">C::c<small>+24 (8B)</small></div>' +
+                  '<div class="dseg" id="s3-D-D">D::d<small>+32 (8B)</small></div>' +
+                  '<div class="dseg a" id="s3-D-A">共享 A::a<small>+40 (被推到末尾)</small></div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</section>' +
+        '</div>';
+    },
+    patch(f) {
+      paintCodeLines('s3-cpp', this.cppLines.length, f.cppAcc, f.cppBlue, []);
+
+      byId('s3-card-nonv').className = 'drow-card' + (f.mode === 'nonv' ? ' on' : ' dim');
+      byId('s3-card-B').className = 'drow-card' + (f.mode === 'nonv' ? ' dim' : ' on');
+      byId('s3-card-D').className = 'drow-card' + (f.mode === 'D' || f.mode === 'conflict' ? ' on' : ' dim');
+
+      const isConflict = f.mode === 'conflict';
+      byId('s3-delta-B').className = 'delta-badge ' + (isConflict ? 'acc' : 'blue');
+      byId('s3-delta-D').className = 'delta-badge acc';
+
+      byId('s3-code-note').className = 'note-box ' + (isConflict ? 'acc' : 'blue');
+      byId('s3-code-note').innerHTML = f.note;
+    }
+  };
+
+  /* =====================================================================
+     Scene 4: Virtual Base Table (Itanium/GCC vtable negative vs MSVC vbtable)
+     ===================================================================== */
+  const sceneVbtable = {
+    abi: 'gcc',
+    instance: 'D',
+    litWires: new Set(),
+    gccCpp: [
+      'int read_a(B* pb) {',
+      '  return pb->a; // pb 可能指向独立 B 或 D 内的 B',
+      '}',
+      '; g++ (Itanium ABI) 生成唯一固定汇编:',
+      '  movq (%rdi), %rax      ; ① 读 B 对象的 vptr',
+      '  movq -24(%rax), %rax   ; ② 往 vtable 负偏移取 vbase_offset!',
+      '  addq %rax, %rdi        ; ③ pb += Δ (动态定位到共享 A)',
+      '  movl (%rdi), %eax      ; ④ 读 A::a (固定偏移 0)'
+    ],
+    msvcCpp: [
+      'int read_a(B* pb) {',
+      '  return pb->a; // pb 可能指向独立 B 或 D 内的 B',
+      '}',
+      '; MSVC (Windows ABI) 生成唯一固定汇编:',
+      '  movq (%rdi), %rax      ; ① 读独立槽位 vbptr (假设在 +0)',
+      '  movslq 4(%rax), %rax   ; ② 读 vbtable[1]: vbptr 到 A 偏移',
+      '  addq %rax, %rdi        ; ③ pb += Δ (动态定位到共享 A)',
+      '  movl (%rdi), %eax      ; ④ 读 A::a (固定偏移 0)'
+    ],
+    mount(root, ctx) {
+      this.litWires = new Set();
+      root.innerHTML =
+        '<div class="grid g-code-stage">' +
+          '<section class="panel">' +
+            '<h3>后端汇编对照 ' +
+              '<div class="seg-toggle">' +
+                '<button type="button" id="s4-abi-gcc" class="on">GCC / Itanium ABI</button>' +
+                '<button type="button" id="s4-abi-msvc">MSVC ABI</button>' +
+              '</div>' +
+            '</h3>' +
+            '<div id="s4-code-wrap">' +
+              buildCodeBox('s4-code-gcc', this.gccCpp) +
+              '<div hidden>' + buildCodeBox('s4-code-msvc', this.msvcCpp) + '</div>' +
+            '</div>' +
+            '<div class="reg-pills">' +
+              '<div class="rpill" id="s4-r-rdi"><small>%rdi (当前指针)</small><b>0x1000 (B*)</b></div>' +
+              '<div class="rpill" id="s4-r-rax"><small>%rax (表 / 偏移 Δ)</small><b>—</b></div>' +
+            '</div>' +
+          '</section>' +
+          '<section class="panel">' +
+            '<h3>虚基表运行期查表与指针重定位 ' +
+              '<div class="seg-toggle">' +
+                '<button type="button" id="s4-inst-B">实参: 独立 B</button>' +
+                '<button type="button" id="s4-inst-D" class="on-b">实参: D 内的 B</button>' +
+              '</div>' +
+            '</h3>' +
+            '<div class="stage-board cols-2" id="s4-board">' +
+              '<svg class="wire-svg" id="s4-svg"></svg>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr">Heap 对象内存（注意指针起点与共享 A）</div>' +
+                '<div class="mbox" id="s4-obj">' +
+                  '<div class="mbox-title"><span id="s4-obj-t">D 对象 (0x1000)</span><small id="s4-obj-sub">Δ = +40</small></div>' +
+                  '<div class="slot-col">' +
+                    '<div class="mslot" id="s4-ptr"><span>+0: <b id="s4-ptr-name">vptr</b></span><small id="s4-ptr-val">&amp;vt_B_in_D</small></div>' +
+                    '<div class="mslot" id="s4-b"><span>+8: B::b</span><small>8B</small></div>' +
+                    '<div class="mslot" id="s4-mid"><span>+16..39: C 与 D::d</span><small>夹在中间</small></div>' +
+                    '<div class="mslot" id="s4-a"><span id="s4-a-off">+40: 共享 A::a = 42</span><small>目标基类</small></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="wire-gap"></div>' +
+              '<div class="col-stack">' +
+                '<div class="col-hdr" id="s4-tbl-hdr">.rodata 虚表（含负偏移 vbase_offset）</div>' +
+                '<div class="mbox" id="s4-tbl">' +
+                  '<div class="mbox-title"><span id="s4-tbl-t">vtable_B_in_D</span><small id="s4-tbl-sub">双向索引</small></div>' +
+                  '<div class="slot-col" id="s4-tbl-gcc">' +
+                    '<div class="mslot neg" id="s4-g-vbase"><span>-24: vbase_offset</span><small id="s4-g-vbase-v">+40</small></div>' +
+                    '<div class="mslot neg" id="s4-g-top"><span>-16: offset_to_top</span><small>0</small></div>' +
+                    '<div class="mslot neg" id="s4-g-rtti"><span>-8: RTTI typeinfo*</span><small>&amp;D_ti</small></div>' +
+                    '<div class="mslot" id="s4-g-zero"><span>+0: 虚函数槽 (vptr 指向处)</span><small>—</small></div>' +
+                  '</div>' +
+                  '<div class="slot-col" id="s4-tbl-msvc" hidden>' +
+                    '<div class="mslot" id="s4-m-zero"><span>+0 (slot 0): vbptr→自身</span><small>0</small></div>' +
+                    '<div class="mslot" id="s4-m-vbase"><span>+4 (slot 1): vbptr→A</span><small id="s4-m-vbase-v">+40</small></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="note-box" id="s4-note"></div>' +
+          '</section>' +
+        '</div>';
+
+      const wireDefs = [
+        { id: 's4-w-gcc-ptr', from: 's4-ptr', to: 's4-g-zero', cls: 'blue' },
+        { id: 's4-w-gcc-ret', from: 's4-g-vbase', to: 's4-a', cls: 'acc', dir: 'rtl' },
+        { id: 's4-w-msvc-ptr', from: 's4-ptr', to: 's4-m-zero', cls: 'blue' },
+        { id: 's4-w-msvc-ret', from: 's4-m-vbase', to: 's4-a', cls: 'acc', dir: 'rtl' }
+      ];
+      byId('s4-svg').innerHTML = wireDefs.map(w =>
+        `<path id="${w.id}-ln" data-wid="${w.id}" data-wcls="${w.cls}"></path>` +
+        `<path id="${w.id}-ar" class="arrow" data-wid="${w.id}" data-wcls="${w.cls}"></path>` +
+        `<circle id="${w.id}-pt" class="port" r="4" data-wid="${w.id}" data-wcls="${w.cls}"></circle>`
+      ).join('');
+      this.wireDefs = wireDefs;
+
+      byId('s4-abi-gcc').onclick = () => { this.abi = 'gcc'; ctx.repatch({ forceAbi: 'gcc' }); };
+      byId('s4-abi-msvc').onclick = () => { this.abi = 'msvc'; ctx.repatch({ forceAbi: 'msvc' }); };
+      byId('s4-inst-B').onclick = () => { this.instance = 'B'; ctx.repatch({ forceInst: 'B' }); };
+      byId('s4-inst-D').onclick = () => { this.instance = 'D'; ctx.repatch({ forceInst: 'D' }); };
+    },
+    patch(f, override) {
+      const abi = (override && override.forceAbi) ? override.forceAbi : (f.forceAbi || this.abi);
+      const inst = (override && override.forceInst) ? override.forceInst : (f.forceInst || this.instance);
+      this.abi = abi;
+      this.instance = inst;
+
+      const isGcc = abi === 'gcc';
+      const isD = inst === 'D';
+      const delta = isD ? '+40' : '+16';
+
+      byId('s4-code-gcc').hidden = !isGcc;
+      byId('s4-code-msvc').parentElement.hidden = isGcc;
+      byId('s4-tbl-gcc').hidden = !isGcc;
+      byId('s4-tbl-msvc').hidden = isGcc;
+
+      byId('s4-abi-gcc').className = isGcc ? 'on' : '';
+      byId('s4-abi-msvc').className = !isGcc ? 'on' : '';
+      byId('s4-inst-B').className = inst === 'B' ? 'on-b' : '';
+      byId('s4-inst-D').className = inst === 'D' ? 'on-b' : '';
+
+      paintCodeLines(isGcc ? 's4-code-gcc' : 's4-code-msvc', 8, f.codeAcc, f.codeBlue, f.codeSage);
+
+      byId('s4-obj-t').textContent = isD ? 'D 对象 (0x1000)' : '独立 B 对象 (0x1000)';
+      byId('s4-obj-sub').textContent = 'Δ = ' + delta;
+      byId('s4-mid').style.display = isD ? '' : 'none';
+      byId('s4-a-off').textContent = `${delta}: 共享 A::a = 42`;
+
+      byId('s4-ptr-name').textContent = isGcc ? 'vptr' : 'vbptr';
+      byId('s4-ptr-val').textContent = isGcc
+        ? (isD ? '&vt_B_in_D[0]' : '&vt_B[0]')
+        : (isD ? '&vbtable_B_in_D' : '&vbtable_B');
+
+      byId('s4-tbl-hdr').textContent = isGcc
+        ? '.rodata 虚表（复用 vptr，负偏移存 vbase_offset）'
+        : '.rodata 独立虚基表 vbtable（只存字节偏移量）';
+      byId('s4-tbl-t').textContent = isGcc
+        ? (isD ? 'vtable_B_in_D' : 'vtable_B')
+        : (isD ? 'vbtable_B_in_D' : 'vbtable_B');
+      byId('s4-tbl-sub').textContent = isGcc ? '正/负双向索引' : '4字节整数表';
+
+      byId('s4-g-vbase-v').textContent = delta;
+      byId('s4-m-vbase-v').textContent = delta;
+
+      byId('s4-ptr').className = 'mslot' + (f.step === 1 ? ' hot-b' : '');
+      byId('s4-g-zero').className = 'mslot' + (isGcc && f.step === 1 ? ' hot-b' : '');
+      byId('s4-g-vbase').className = 'mslot neg' + (isGcc && f.step === 2 ? ' hot' : '');
+      byId('s4-m-zero').className = 'mslot' + (!isGcc && f.step === 1 ? ' hot-b' : '');
+      byId('s4-m-vbase').className = 'mslot' + (!isGcc && f.step === 2 ? ' hot' : '');
+      byId('s4-a').className = 'mslot' + (f.step >= 3 ? ' hot' : '');
+
+      byId('s4-r-rdi').className = 'rpill' + (f.step >= 3 ? ' on' : ' on-b');
+      byId('s4-r-rdi').querySelector('b').textContent =
+        f.step >= 3 ? (isD ? '0x1028 (0x1000+40, A*)' : '0x1010 (0x1000+16, A*)') : '0x1000 (B*)';
+      byId('s4-r-rax').className = 'rpill' + (f.step === 2 ? ' on' : f.step === 1 ? ' on-b' : '');
+      byId('s4-r-rax').querySelector('b').textContent =
+        f.step === 0 ? '—' :
+        f.step === 1 ? (isGcc ? 'vptr (&vt[0])' : 'vbptr (&vbt[0])') :
+        f.step === 2 ? `Δ = ${delta}` : '42 (A::a)';
+
+      const active = [];
+      if (f.step >= 1) active.push({ id: isGcc ? 's4-w-gcc-ptr' : 's4-w-msvc-ptr' });
+      if (f.step >= 2) active.push({ id: isGcc ? 's4-w-gcc-ret' : 's4-w-msvc-ret' });
+
+      const activeDefs = this.wireDefs.filter(w => isGcc ? w.id.includes('-gcc-') : w.id.includes('-msvc-'));
+      setWireGeometry('s4-board', 's4-svg', activeDefs);
+      updateWireLights('s4-svg', this.litWires, active);
+
+      byId('s4-note').className = 'note-box ' + (f.step >= 2 ? 'acc' : f.step === 1 ? 'blue' : '');
+      byId('s4-note').innerHTML = isGcc
+        ? `<b>Itanium/GCC 策略：</b>省去独立 <code>vbptr</code>，直接复用 <code>vptr</code>。哪怕 <code>A/B</code> 没有虚函数，只要有虚继承也会生成 <code>vptr</code>，从 <code>vtable</code> 负偏移 <code>-24</code> 读取本次实例化的虚基偏移 <code>${delta}</code>。`
+        : `<b>MSVC 策略：</b>对象头单独保留 <code>vbptr</code> 指向专职偏移表 <code>vbtable</code>，在偏移 <code>+4</code> 读取本次到共享 <code>A</code> 的字节偏移 <code>${delta}</code>，再加回指针定位 <code>A::a</code>。`;
+    }
+  };
+
+  /* =====================================================================
+     Chapters & Step Frames
+     ===================================================================== */
+  const CHAPTERS = [
+    {
+      id: 'vptr',
+      t: '单继承 vptr 与虚表',
+      s: '前缀不变 + 两步间接寻址',
+      turn: [
+        '静态机器码只知道 A*，如何既访问字段又动态调到 B::f？',
+        '属性靠“前缀不变性”固定偏移；方法靠“vptr → vtable[slot]”动态查表',
+        '单继承下父类独占偏移 0，但多继承时两个父类谁坐偏移 0？'
+      ],
+      scene: sceneVptr,
+      frames: () => [
+        { act: '步骤 ① · 构造函数序言先写基类 vptr', h: 'new B() 时先执行 A::A()，把偏移 0 的 vptr 写入 &A_vtable', p: '在构造子类前必须先构造基类。<code>A::A()</code> 序言先将 <code>vptr</code> 设为 <code>&amp;A_vtable</code>——这就是为什么基类构造期间调用虚函数不会多态落入子类。', phase: 'ctor_base', stage: 1, hlVptr: true, cppAcc: [0, 2], asmAcc: [1] },
+        { act: '步骤 ② · 派生类构造序言覆盖 vptr', h: '进入 B::B() 后，后端插入的指令把 vptr 改写为 &B_vtable', p: '<code>B::B()</code> 序言把 <code>(%rdi)</code> 原地覆盖为 <code>&amp;B_vtable</code>。至此堆上对象头彻底绑定动态类型，后续 <code>callf</code> 的代码无需任何修改。', phase: 'ctor_der', stage: 1, hlVptr: true, cppAcc: [4, 6], asmAcc: [2, 3] },
+        { act: '步骤 ③ · 数据访问依赖“前缀不变性”', h: '属性 a 无论在 A 还是 B 中都死死固定在 +8(%rdi)', p: '因为 <code>B</code> 的前 16 字节布局与 <code>A</code> 完全一致，后端访问 <code>p->a</code> 时直接生成 <code>movl 8(%rdi), %eax</code>，零查表、零额外开销。', phase: 'data', stage: 0, hlVptr: false, cppAcc: [1], asmAcc: [5] },
+        { act: '步骤 ④ · 虚调用两级跳转：vptr → vtable[0]', h: 'movq (%rdi), %rax ; jmp *(%rax) 在运行期完成多态分派', p: '编译期已将 <code>f</code> 分配在 0 号槽。运行期第 1 跳顺着对象头 <code>vptr</code> 找到 <code>B_vtable</code>，第 2 跳读出 <code>[0]</code> 槽的 <code>B::f</code> 入口地址并跳转（点右上角可切换 <code>new A()</code> 对照）。', phase: 'call', stage: 3, hlVptr: true, cppAcc: [8], asmAcc: [6, 7] }
+      ]
+    },
+    {
+      id: 'multi',
+      t: '多继承与 Thunk 跳板',
+      s: 'this 指针偏移与回调',
+      turn: [
+        'D 同时继承 B1 和 B2，两者都需要偏移 0 作为前缀，内存摆不下',
+        'B2 子对象只能排在 +16；给 B2 视图配次级 vtable 并用 Thunk 回调 this',
+        '如果 B1 和 B2 共同虚继承自同一个 A，前缀被彻底打碎怎么办？'
+      ],
+      scene: sceneMulti,
+      frames: () => [
+        { act: '布局 · D 内含两段前缀与两根 vptr', h: 'B1 占据 +0..15，B2 被顺延到 +16..27，D::z 接在 +28', p: '多继承让 <code>D</code> 拥有两根独立的虚指针：主子对象头的 <code>vptr_B1@0</code> 指向主虚表，次子对象头的 <code>vptr_B2@16</code> 指向次级虚表。', step: 0, ptrAt: 'D', cppBlue: [0, 1, 2], asmBlue: [], note: '<b>双前缀布局：</b>主基类 <code>B1</code> 与完整 <code>D</code> 共享偏移 <code>0</code>；次基类 <code>B2</code> 只能从 <code>+16</code> 起步，因此多了一根 <code>vptr_B2</code>。' },
+        { act: '步骤 ① · 指针切片 B2* p2 = &d', h: '编译器静态生成 add $16, %rdi，将 this 滑向 B2 子对象起点', p: '为了让 <code>B2</code> 的代码能用自己的前缀访问 <code>y</code>，向上转型为 <code>B2*</code> 时编译器自动把指针加 16（注意动画上方橙色 <code>this</code> 指针已滑至 <code>+16</code>）。', step: 1, ptrAt: 'B2', cppBlue: [6], asmBlue: [1], note: '<b>指针调整：</b>赋值 <code>B2* p2 = &amp;d</code> 时，编译器在汇编插入 <code>leaq 16(%rdi), %rdi</code>，使 <code>p2</code> 对齐到 <code>B2</code> 子对象。' },
+        { act: '步骤 ② · 通过 B2* 调用重写的 p2->g()', h: '从 +16 处的 vptr_B2 查次表 [0] 槽，拿到的是 thunk_D_g', p: '此时 <code>%rdi</code> 指向 <code>+16</code> 而非 <code>D</code> 的首地址 <code>+0</code>！如果直接跳进需要访问 <code>x(+8)</code> 和 <code>z(+28)</code> 的 <code>D::g</code>，所有偏移都会错位 16 字节！', step: 2, ptrAt: 'B2', cppAcc: [7], asmSage: [3, 4], note: '<b>次级虚表：</b>调用点不知道自己拿的是完整 <code>D</code>，只管从 <code>vptr_B2[0]</code> 取址跳转——结果先落进了编译器合成的跳板。' },
+        { act: '步骤 ③ · 执行后端合成的 Thunk 跳板', h: 'thunk_D_g 执行 subq $16, %rdi，把 this 平滑回调回 D 首地址', p: '后端在次级虚表槽里填入的不是 <code>D::g</code> 本体，而是一段两行指令的跳板函数（Thunk）：先把 <code>%rdi</code> 减去 16 恢复为完整 <code>D*</code>，再无条件 <code>jmp</code> 过去。', step: 3, ptrAt: 'D', cppAcc: [4], asmAcc: [6, 7], note: '<b>Thunk 回调：</b><code>subq $16, %rdi</code> 把滑出去的 <code>this</code> 指针拉回 <code>+0</code>，保证即将进入的 <code>D::g</code> 视角完全正确。' },
+        { act: '步骤 ④ · 落入 D::g 正确读写所有成员', h: 'this 归位 +0 后，D::g 按正常偏移读写 B1::x(+8) 与 D::z(+28)', p: '经过 Thunk 修正，<code>D::g</code> 终于拿到正确的 <code>D*</code>，成功返回 <code>x + z = 4</code>。这就是 C++ 多继承多态零侵入的秘密。', step: 4, ptrAt: 'D', cppAcc: [4], asmAcc: [8], note: '<b>成功执行：</b><code>D::g</code> 无需关心调用方最初拿到的是 <code>D*</code> 还是 <code>B2*</code>，直接按固定偏移读写 <code>x(+8)</code> 与 <code>z(+28)</code> 返回 <code>4</code>。' }
+      ]
+    },
+    {
+      id: 'diamond',
+      t: '菱形虚继承困境',
+      s: '为什么静态偏移会彻底失效？',
+      turn: [
+        '菱形结构 B/C 继承 A，D 再继承 B 和 C，既要避免两份 A 又要固定偏移',
+        '用 virtual 共享唯一 A 并放到末尾，却导致 A 相对 B 的偏移随派生层次剧变',
+        '编译期无法定死偏移量，只能像虚函数一样改成“运行时查表”'
+      ],
+      scene: sceneDiamond,
+      frames: () => [
+        { act: '反例 · 非虚继承下的两份冗余 A', h: '不用 virtual 时 D 内存里会出现两份 A::a，访问 d.a 直接编译报错', p: '如果 <code>B</code> 和 <code>C</code> 普通继承 <code>A</code>，两者各自携带一份 <code>A</code> 前缀。不仅浪费内存，<code>D</code> 里也会同时存在两个 <code>a</code>，造成著名的菱形二义性。', mode: 'nonv', cppAcc: [0], note: '<b>反例：</b>普通多继承保留两份 <code>A</code>，虽然 <code>B</code> 内偏移固定，但数据冗余且破坏统一状态。' },
+        { act: '情况 1 · 独立 B 对象中的虚基类 A', h: '加上 virtual 后，独立实例化 B 时共享 A 紧跟在 B 后面（偏移 +16）', p: '当独立构造一个 <code>B b;</code> 时，<code>B</code> 自己占 16 字节，共享的虚基类 <code>A</code> 就排在偏移 <code>+16</code> 处，此时 Δ₁ = +16。', mode: 'B', cppBlue: [1], note: '<b>独立 B 实例：</b><code>B*</code> 到 <code>A</code> 的距离是 <code>+16</code>。' },
+        { act: '情况 2 · 嵌在 D 对象中的 B 子对象', h: '在 D 中，B 后面紧挨着 C 和 D 自己的字段，共享 A 被推到了偏移 +40！', p: '因为整棵继承树只能有一份 <code>A</code>，在构造 <code>D</code> 时，<code>C</code> 和 <code>D::d</code> 必须插在 <code>B</code> 与公共 <code>A</code> 之间。<code>A</code> 相对 <code>B</code> 首地址的偏移暴增到 Δ₂ = +40！', mode: 'D', cppBlue: [2, 3], note: '<b>完整 D 实例：</b><code>B</code> 在 <code>D</code> 的开头，但共享 <code>A</code> 被挤到了 <code>+40</code>。' },
+        { act: '死局 · 编译期偏移量不再是常量！', h: 'Δ₁ (+16) ≠ Δ₂ (+40)：单独编译 read_a(B* pb) 时无法硬编码偏移', p: '编译 <code>read_a(B* pb)</code> 时，后端不知道运行期传进来的是独立 <code>B</code> 还是 <code>D</code> 里的 <code>B</code>。<b>前缀不变性彻底破产！</b>必须引入“虚基表”在运行期动态查出偏移 Δ。', mode: 'conflict', cppAcc: [6, 7], note: '<b>编译后端结论：</b>既然 <code>pb->a</code> 的偏移在编译期算不出来，就必须把动态偏移量存进只读表，运行时多查一次表！' }
+      ]
+    },
+    {
+      id: 'vbtable',
+      t: '虚基表双雄：GCC vs MSVC',
+      s: 'vtable 负偏移 vs 独立 vbtable',
+      turn: [
+        'B 访问虚基类 A 时，运行期需要查出“B 到 A 的动态字节偏移 Δ”',
+        'MSVC 单独插 vbptr 查 vbtable；GCC/Clang 直接复用 vptr 往 vtable 负偏移查',
+        '同一份后端机器码，靠换表里的 Δ 值即可统一处理独立 B 与 D 内的 B'
+      ],
+      scene: sceneVbtable,
+      frames: () => [
+        { act: '总览 · 两种 ABI 对虚基表的不同落地', h: '无论哪种 ABI，目标都是用同一份固定汇编适应不同的运行时 Δ', p: '请点击上方切换 <b>GCC / Itanium ABI</b> 与 <b>MSVC ABI</b>，并切换 <b>独立 B (+16) / D 内的 B (+40)</b>，观察同一段指令如何完成指针重定位。', step: 0, codeBlue: [0, 1], codeAcc: [] },
+        { act: '步骤 ① · 读取对象头指针（vptr / vbptr）', h: 'GCC 读 vptr 到 vtable[0]；MSVC 读独立 vbptr 到 vbtable[0]', p: '在 GCC 下，即使 <code>A</code> 和 <code>B</code> 一个虚函数都没有，只要有 <code>virtual</code> 继承，后端也会合成 <code>vptr</code>；而 MSVC 会单独开辟一个 <code>vbptr</code> 槽位。', step: 1, codeBlue: [4], codeAcc: [] },
+        { act: '步骤 ② · 查表取出虚基偏移 Δ（+40 或 +16）', h: 'GCC 往负方向读 -24(%rax) 的 vbase_offset；MSVC 读 vbtable[1]', p: '<b>关键区别：</b><code>vtable</code> 正偏移存函数地址，而虚基表存的是<b>字节偏移量整数</b>！在 <code>D</code> 中查出 <code>+40</code>，在独立 <code>B</code> 中查出 <code>+16</code>。', step: 2, codeBlue: [], codeAcc: [5] },
+        { act: '步骤 ③ · 重定位指针并读取共享 A::a', h: 'addq %rax, %rdi 将 B* 精准移动到共享 A 首地址，再读取 A::a=42', p: '至此后端完成了“动态偏移计算”：<code>(char*)pb + Δ</code> 指向唯一共享的 <code>A</code> 实例，最后按 <code>A</code> 内部固定偏移读取成员 <code>a</code>，彻底解决菱形虚继承访问问题！', step: 3, codeBlue: [], codeAcc: [6, 7] }
+      ]
+    }
+  ];
+
+  /* =====================================================================
+     Playback & State Engine
+     ===================================================================== */
+  const state = {
+    frames: [],
+    idx: 0,
+    playing: false,
+    timer: null,
+    speed: 1,
+    starts: {},
+    mountedCh: null
+  };
+
+  function buildAllFrames() {
+    const all = [];
+    CHAPTERS.forEach((ch, chi) => {
+      state.starts[ch.id] = all.length;
+      ch.frames().forEach(f => all.push({ ch: ch.id, chi, f }));
+    });
+    state.frames = all;
+    byId('scrub').max = String(all.length - 1);
+  }
+
+  function renderRail() {
+    byId('rail').innerHTML = CHAPTERS.map((c, i) =>
+      `<button type="button" class="ch-btn" id="ch-${c.id}" data-ch="${c.id}"><b>${i + 1}. ${esc(c.t)}</b><span>${esc(c.s)}</span></button>`
+    ).join('');
+    CHAPTERS.forEach(c => {
+      byId('ch-' + c.id).onclick = () => {
+        stop();
+        show(state.starts[c.id]);
+        try { location.hash = c.id; } catch (e) {}
+      };
+    });
+  }
+
+  function renderTurn(ch) {
+    const t = ch.turn;
+    return `<div class="t-q"><span>遇到的问题</span>${esc(t[0])}</div>` +
+      `<div class="t-arrow" aria-hidden="true">→</div>` +
+      `<div class="t-a"><span>编译器后端方案</span>${esc(t[1])}</div>` +
+      `<div class="t-arrow" aria-hidden="true">→</div>` +
+      `<div><span>遗留与下一步</span>${esc(t[2])}</div>`;
+  }
+
+  const ctx = {
+    repatch(override) {
+      const item = state.frames[state.idx];
+      if (!item) return;
+      CHAPTERS[item.chi].scene.patch(item.f, override);
+    }
+  };
+
+  function show(i, override) {
+    state.idx = Math.max(0, Math.min(state.frames.length - 1, i));
+    const item = state.frames[state.idx];
+    const ch = CHAPTERS[item.chi];
+
+    CHAPTERS.forEach((c, idx) => {
+      const btn = byId('ch-' + c.id);
+      btn.setAttribute('aria-current', idx === item.chi ? 'step' : 'false');
+      btn.classList.toggle('done', idx < item.chi);
+    });
+
+    if (state.mountedCh !== ch.id) {
+      state.mountedCh = ch.id;
+      byId('turn').innerHTML = renderTurn(ch);
+      ch.scene.mount(byId('stage'), ctx);
+    }
+
+    requestAnimationFrame(() => ch.scene.patch(item.f, override));
+
+    byId('cap-ch').textContent = `第 ${item.chi + 1} 章 · ${ch.t}`;
+    byId('cap-act').textContent = '▸ ' + item.f.act;
+    byId('cap-h').textContent = item.f.h;
+    byId('cap-p').innerHTML = item.f.p;
+
+    byId('scrub').value = String(state.idx);
+    byId('pos').textContent = `${state.idx + 1} / ${state.frames.length}`;
+    byId('b-first').disabled = state.idx === 0;
+    byId('b-prev').disabled = state.idx === 0;
+    byId('b-next').disabled = state.idx === state.frames.length - 1;
+  }
+
+  function stepDelay() { return Math.round(3100 / state.speed); }
+
+  function play() {
+    if (state.idx >= state.frames.length - 1) show(0);
+    state.playing = true;
+    const bp = byId('b-play');
+    bp.textContent = '暂停';
+    bp.setAttribute('aria-pressed', 'true');
+    clearInterval(state.timer);
+    state.timer = setInterval(() => {
+      if (state.idx >= state.frames.length - 1) { stop(); return; }
+      show(state.idx + 1);
+    }, stepDelay());
+  }
+
+  function stop() {
+    state.playing = false;
+    clearInterval(state.timer);
+    state.timer = null;
+    const bp = byId('b-play');
+    bp.textContent = '播放';
+    bp.setAttribute('aria-pressed', 'false');
+  }
+
+  function initControls() {
+    byId('b-first').onclick = () => { stop(); show(state.starts[state.frames[state.idx].ch]); };
+    byId('b-prev').onclick = () => { stop(); show(state.idx - 1); };
+    byId('b-next').onclick = () => { stop(); show(state.idx + 1); };
+    byId('b-play').onclick = () => state.playing ? stop() : play();
+    byId('scrub').oninput = e => { stop(); show(Number(e.target.value)); };
+    byId('speed').onchange = e => {
+      state.speed = Number(e.target.value);
+      if (state.playing) play();
+    };
+    byId('btn-theme').onclick = () => {
+      const root = document.documentElement;
+      const cur = root.getAttribute('data-theme');
+      const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+      const next = cur ? (cur === 'dark' ? 'light' : 'dark') : (sysDark ? 'light' : 'dark');
+      root.setAttribute('data-theme', next);
+    };
+
+    window.addEventListener('keydown', e => {
+      if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); stop(); show(state.idx + 1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); stop(); show(state.idx - 1); }
+      else if (e.key === ' ') { e.preventDefault(); state.playing ? stop() : play(); }
+      else if (e.key === 'Home') { e.preventDefault(); stop(); show(state.starts[state.frames[state.idx].ch]); }
+    });
+
+    window.addEventListener('resize', () => ctx.repatch());
+  }
+
+  buildAllFrames();
+  renderRail();
+  initControls();
+
+  const h = (location.hash || '').replace('#', '');
+  show(h && state.starts[h] !== undefined ? state.starts[h] : 0);
+})();
+</script>
+</body>
+</html>

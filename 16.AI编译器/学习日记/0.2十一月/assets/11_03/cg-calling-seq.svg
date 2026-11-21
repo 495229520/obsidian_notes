@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="992" height="450" viewBox="-16 -16 992 450" role="img" aria-label="f(x, y) 调用序列的四个时刻：调用前、jal 刚进入时、函数体结束返回前、调用后。① 调用方压入 old fp、y、x 并用 jal 跳转；② 被调用方把 FP 对齐到 RA 槽位并保存 $ra；③ 被调用方读回 $ra，一次性弹出 4n + 8 = 16 字节，再从 old fp 恢复 FP 并用 jr $ra 返回。调用后 FP 和 SP 恢复原状，结果留在 $a0。">
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace; }
+    .sm { font-size: 11px; }
+    .lg { font-size: 14px; font-weight: 600; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 2; stroke-dasharray: 5 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.3; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; } .h-acc { fill: #D97757; } .h-blue { fill: #4F7FAF; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .band { fill: none; stroke: #D97757; stroke-width: 1.6; stroke-dasharray: 5 3; }
+  </style>
+  <rect x="-16" y="-16" width="992" height="450" rx="14" fill="rgb(245, 244, 237)"/>
+  <defs><marker id="cg-calling-seq-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker><marker id="cg-calling-seq-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="cg-calling-seq-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <text class="b" x="100" y="16" text-anchor="middle" xml:space="preserve">调用前</text>
+  <text class="sm muted" x="100" y="36" text-anchor="middle" xml:space="preserve">FP、SP 均属于调用方</text>
+  <rect class="plain" x="40" y="54" width="120" height="30" rx="3"/>
+  <text class="sm" x="100.0" y="73.0" text-anchor="middle" xml:space="preserve">(调用方)</text>
+  <rect class="ghost" x="40" y="84" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="30" y="73" text-anchor="end" xml:space="preserve">FP</text>
+  <line class="ln" x1="31" y1="69" x2="38" y2="69" marker-end="url(#cg-calling-seq-a)"/>
+  <text class="mono sm b" x="30" y="103" text-anchor="end" xml:space="preserve">SP</text>
+  <line class="ln" x1="31" y1="99" x2="38" y2="99" marker-end="url(#cg-calling-seq-a)"/>
+  <line class="ln-acc" x1="182" y1="120" x2="236" y2="120" marker-end="url(#cg-calling-seq-acc)"/>
+  <rect class="acc" x="196.0" y="89.0" width="26" height="22" rx="6"/>
+  <text class="sm b" x="209" y="104.5" text-anchor="middle" xml:space="preserve">①</text>
+  <text class="b" x="360" y="16" text-anchor="middle" xml:space="preserve">进入时</text>
+  <text class="sm muted" x="360" y="36" text-anchor="middle" xml:space="preserve">刚执行 jal，FP 仍属调用方</text>
+  <rect class="plain" x="300" y="54" width="120" height="30" rx="3"/>
+  <text class="sm" x="360.0" y="73.0" text-anchor="middle" xml:space="preserve">(调用方)</text>
+  <rect class="blue" x="300" y="84" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="360.0" y="103.0" text-anchor="middle" xml:space="preserve">old fp</text>
+  <rect class="blue" x="300" y="114" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="360.0" y="133.0" text-anchor="middle" xml:space="preserve">y</text>
+  <rect class="blue" x="300" y="144" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="360.0" y="163.0" text-anchor="middle" xml:space="preserve">x</text>
+  <rect class="ghost" x="300" y="174" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="290" y="73" text-anchor="end" xml:space="preserve">FP</text>
+  <line class="ln" x1="291" y1="69" x2="298" y2="69" marker-end="url(#cg-calling-seq-a)"/>
+  <text class="mono sm b" x="290" y="193" text-anchor="end" xml:space="preserve">SP</text>
+  <line class="ln" x1="291" y1="189" x2="298" y2="189" marker-end="url(#cg-calling-seq-a)"/>
+  <line class="ln-acc" x1="442" y1="120" x2="496" y2="120" marker-end="url(#cg-calling-seq-acc)"/>
+  <rect class="acc" x="456.0" y="89.0" width="26" height="22" rx="6"/>
+  <text class="sm b" x="469" y="104.5" text-anchor="middle" xml:space="preserve">②</text>
+  <text class="b" x="620" y="16" text-anchor="middle" xml:space="preserve">返回前</text>
+  <text class="sm muted" x="620" y="36" text-anchor="middle" xml:space="preserve">函数体 cgen(e) 执行完毕</text>
+  <rect class="plain" x="560" y="54" width="120" height="30" rx="3"/>
+  <text class="sm" x="620.0" y="73.0" text-anchor="middle" xml:space="preserve">(调用方)</text>
+  <rect class="blue" x="560" y="84" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="620.0" y="103.0" text-anchor="middle" xml:space="preserve">old fp</text>
+  <rect class="blue" x="560" y="114" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="620.0" y="133.0" text-anchor="middle" xml:space="preserve">y</text>
+  <rect class="blue" x="560" y="144" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="620.0" y="163.0" text-anchor="middle" xml:space="preserve">x</text>
+  <rect class="acc" x="560" y="174" width="120" height="30" rx="3"/>
+  <text class="mono sm b" x="620.0" y="193.0" text-anchor="middle" xml:space="preserve">RA</text>
+  <rect class="ghost" x="560" y="204" width="120" height="30" rx="3"/>
+  <text class="mono sm b acc-t" x="550" y="193" text-anchor="end" xml:space="preserve">FP</text>
+  <line class="ln-acc" x1="551" y1="189" x2="558" y2="189" marker-end="url(#cg-calling-seq-acc)"/>
+  <text class="mono sm b" x="550" y="223" text-anchor="end" xml:space="preserve">SP</text>
+  <line class="ln" x1="551" y1="219" x2="558" y2="219" marker-end="url(#cg-calling-seq-a)"/>
+  <line class="ln-acc" x1="702" y1="120" x2="756" y2="120" marker-end="url(#cg-calling-seq-acc)"/>
+  <rect class="acc" x="716.0" y="89.0" width="26" height="22" rx="6"/>
+  <text class="sm b" x="729" y="104.5" text-anchor="middle" xml:space="preserve">③</text>
+  <text class="b" x="880" y="16" text-anchor="middle" xml:space="preserve">调用后</text>
+  <text class="sm muted" x="880" y="36" text-anchor="middle" xml:space="preserve">FP、SP 恢复原状</text>
+  <rect class="plain" x="820" y="54" width="120" height="30" rx="3"/>
+  <text class="sm" x="880.0" y="73.0" text-anchor="middle" xml:space="preserve">(调用方)</text>
+  <rect class="dead" x="820" y="84" width="120" height="30" rx="3"/>
+  <text class="mono sm b muted" x="880.0" y="103.0" text-anchor="middle" xml:space="preserve">old fp</text>
+  <rect class="dead" x="820" y="114" width="120" height="30" rx="3"/>
+  <text class="mono sm b muted" x="880.0" y="133.0" text-anchor="middle" xml:space="preserve">y</text>
+  <rect class="dead" x="820" y="144" width="120" height="30" rx="3"/>
+  <text class="mono sm b muted" x="880.0" y="163.0" text-anchor="middle" xml:space="preserve">x</text>
+  <rect class="dead" x="820" y="174" width="120" height="30" rx="3"/>
+  <text class="mono sm b muted" x="880.0" y="193.0" text-anchor="middle" xml:space="preserve">RA</text>
+  <text class="mono sm b" x="810" y="73" text-anchor="end" xml:space="preserve">FP</text>
+  <line class="ln" x1="811" y1="69" x2="818" y2="69" marker-end="url(#cg-calling-seq-a)"/>
+  <text class="mono sm b" x="810" y="103" text-anchor="end" xml:space="preserve">SP</text>
+  <line class="ln" x1="811" y1="99" x2="818" y2="99" marker-end="url(#cg-calling-seq-a)"/>
+  <text class="sm" x="880" y="238" text-anchor="middle" xml:space="preserve">结果在 $a0，灰色槽位作废</text>
+  <rect class="box" x="110" y="262" width="230" height="150" rx="8"/>
+  <text class="sm b" x="122" y="283.02" xml:space="preserve">① 调用方：call 模板</text>
+  <text class="mono sm" x="122" y="306.0" xml:space="preserve">sw $fp 0($sp)</text>
+  <text class="mono sm" x="122" y="327.0" xml:space="preserve">addiu $sp $sp -4</text>
+  <text class="mono sm" x="122" y="348.0" xml:space="preserve">cgen(y); 压栈</text>
+  <text class="mono sm" x="122" y="369.0" xml:space="preserve">cgen(x); 压栈</text>
+  <text class="mono sm" x="122" y="390.0" xml:space="preserve">jal f_entry   # $ra ← 下条地址</text>
+  <rect class="box" x="360" y="262" width="240" height="150" rx="8"/>
+  <text class="sm b" x="372" y="283.02" xml:space="preserve">② 被调用方入口：def 模板</text>
+  <text class="mono sm" x="372" y="306.0" xml:space="preserve">move $fp $sp</text>
+  <text class="mono sm" x="372" y="327.0" xml:space="preserve">sw $ra 0($sp)</text>
+  <text class="mono sm" x="372" y="348.0" xml:space="preserve">addiu $sp $sp -4</text>
+  <text class="mono sm" x="372" y="369.0" xml:space="preserve">cgen(e)       # 结果留在 $a0</text>
+  <rect class="box" x="620" y="262" width="240" height="150" rx="8"/>
+  <text class="sm b" x="632" y="283.02" xml:space="preserve">③ 被调用方出口</text>
+  <text class="mono sm" x="632" y="306.0" xml:space="preserve">lw $ra 4($sp)</text>
+  <text class="mono sm" x="632" y="327.0" xml:space="preserve">addiu $sp $sp 16  # z = 4n + 8</text>
+  <text class="mono sm" x="632" y="348.0" xml:space="preserve">lw $fp 0($sp)</text>
+  <text class="mono sm" x="632" y="369.0" xml:space="preserve">jr $ra</text>
+</svg>

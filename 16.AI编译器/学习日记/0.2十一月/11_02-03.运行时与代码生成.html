@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>从一棵 AST 到一次函数调用 · CS143</title>
+<style>
+:root{--ink:#302d29;--paper:#faf7ef;--line:#d8d1c3;--rust:#984421;--orange:#f3d4bc;--green:#d6e6d3;--blue:#d8e6f0;--purple:#e6def1}*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:28px}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.8 "Microsoft YaHei",sans-serif}main{max-width:1040px;margin:auto;padding:44px clamp(18px,5vw,64px) 60px}header{border-top:3px solid var(--rust);padding-top:18px}small,figcaption{color:#665e54}h1,h2,h3{font-family:"Songti SC",SimSun,serif;line-height:1.35}h1{font-size:clamp(32px,5vw,55px);margin:25px 0 12px}h2{font-size:clamp(25px,4vw,35px);margin:7px 0 20px}h3{margin:18px 0 5px}p{margin:9px 0 15px}nav{display:flex;gap:10px 24px;flex-wrap:wrap;margin:23px 0}a{color:var(--rust);text-underline-offset:4px}section{border-top:1px solid var(--line);padding:32px 0 17px}article,figure{border:1px solid var(--line);background:#fffcf7;border-radius:12px;padding:18px;margin:12px 0}figure{border-top:3px solid var(--rust)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid>*{min-width:0}.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}code,pre,.cell,output{font-family:Consolas,"Microsoft YaHei",monospace}pre{background:#312f2b;color:#fff5df;padding:16px;border-radius:8px;overflow:auto;font-size:.91rem;line-height:1.65}.cell{display:block;background:var(--blue);border:1px solid #0002;padding:7px 13px;border-radius:5px;margin:4px 0}.left{background:var(--orange)}.result{background:var(--green)}.addr{background:var(--purple)}.stack{display:flex;flex-direction:column;gap:1px}button{font:inherit;color:var(--ink);border:1px solid #aca295;border-radius:6px;background:#fffaf0;padding:4px 14px;cursor:pointer}button:hover,button[aria-pressed=true]{background:#443830;color:white}button:disabled{opacity:.4;cursor:default}button:focus-visible,a:focus-visible{outline:3px solid #83659f}output{color:var(--rust)}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:6px;border-bottom:1px solid var(--line)}figcaption{margin-top:11px}details{margin:15px 0}summary{cursor:pointer;color:var(--rust)}@media(max-width:650px){.grid{grid-template-columns:1fr;gap:0}main{padding-top:20px}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+.syntaxTree{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:20px auto;max-width:520px}
+.syntaxTree span{text-align:center;border:1px solid #baa792;border-radius:9px;padding:6px;background:#faf6ef}
+#astRoot{grid-column:1/5}#astOne{grid-column:1/3}#astInner{grid-column:3/5}#astTwo{grid-column:3}#astThree{grid-column:4}
+.syntaxTree .typed{background:#dce9db}.syntaxTree [aria-current="step"]{outline:2px solid #92512e}
+html{scroll-behavior:auto}body{background:#f1eee6}main{max-width:1440px;padding:14px clamp(12px,2vw,32px) 36px}header{padding:0;border:0}header h1{font-size:26px;margin:2px 0}header p{display:none}
+nav{position:sticky;top:0;z-index:5;background:#f1eee6;margin:0;padding:8px 0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;counter-reset:chapter}
+nav a{counter-increment:chapter;display:block;border:1px solid #bcb6a9;border-radius:6px;padding:8px;background:#fffdf7;text-decoration:none;color:var(--ink);font-weight:600}
+nav a::before{content:counter(chapter) ". "}nav a[aria-current=page]{background:#f6ded0;border-color:#c46843;box-shadow:inset 0 0 0 1px #c46843}
+main>section{margin:7px 0;background:#fffdf8;border:1px solid #c8c1b4;border-radius:9px;padding:clamp(12px,2vw,24px)}section[hidden]{display:none}
+#machine figure{margin:8px 0}.traceTable td:first-child{font-family:Consolas,monospace}.traceTable tr.pointed{background:var(--purple)}.traceTable tr.accessed td:first-child{box-shadow:inset 4px 0 #b66537}.traceTable td,.traceTable th{padding:7px 9px}.traceTable caption{text-align:left;font-weight:bold}.traceControls{margin-bottom:12px}.traceControls input{flex:1;min-width:90px;accent-color:#ba633f}
+@media(max-width:820px){nav{grid-template-columns:repeat(4,minmax(0,1fr))}nav a{font-size:14px;padding:5px}}@media(max-width:420px){nav a{font-size:12px}}
+</style><main><header><small>CS143　/　学习日记　/　11.02 — 11.03</small><h1>从一棵 AST 到一次函数调用</h1><p>先跟着你写过的 AddCheck 检查 1 + (2 + 3)，再执行这棵树生成的 MIPS 指令。同样是等右边算完再相加，把右边换成递归调用，外层的值又该放在哪里？</p></header><nav aria-label="课程章节"><a href="#check">AST 类型检查</a><a href="#machine">表达式求值</a><a href="#frame">递归栈帧</a><a href="#memory">存储与对齐</a><a href="#call">调用序列</a><a href="#temp">临时槽位</a><a href="#object">动态分派</a></nav><section id="check"><small>编译期 · 语义分析</small><h2>你的 AddCheck 遇到另一层 Add，会拿到什么？</h2>
+<p>把 <code>1 + (2 + 3)</code> 交给你写过的 <code>check</code>。外层 Add 要求两个孩子都是 Int。右孩子也是 Add，所以先让它检查自己的两个孩子，再回来读它的类型。</p>
+<figure><b>跟着 check 访问节点</b><div class="syntaxTree" aria-label="表达式的抽象语法树">
+<span id="astRoot">Add</span><span id="astOne">1</span><span id="astInner">Add</span><span id="astTwo">2</span><span id="astThree">3</span></div>
+<p id="checkWhy" aria-live="polite"></p><div class="row"><button id="checkBack">上一步</button><button id="checkNext">下一步</button><output id="checkCount"></output></div></figure>
+<p>检查结束，根节点的类型是 Int。接下来 <code>cgen</code> 读这棵树，为两个 Add 各生成一组指令。运行时算出的 5 和 6，要等处理器执行到相应的加法才会出现。</p></section><section id="machine"><small>11.02 → 11.03　从抽象机器到 MIPS</small><h2>算右边时，左边的值放在哪里？</h2><p>纯栈机算 <code>7 + 5</code> 时先把 7、5 依次压栈，ADD 取出两数，再压回 12。讲义把最新结果留在累加器 <code>$a0</code>。如果右子树还要用这个寄存器，就先把左值存到栈里。</p><figure><b>单步执行　1 + (2 + 3)</b>
+<div class="row traceControls"><button id="exStart">起点</button><button id="exBack">上一步</button><button id="exNext">下一步</button><input id="exSeek" type="range" min="0" value="0" aria-label="指令进度"><output id="exCount"></output></div>
+<div class="grid"><div><strong id="activeExpr"></strong><pre id="inst"></pre><div class="row"><div class="cell result"><strong id="acc"></strong><br><small>累加器，保存当前子表达式算出的值。</small></div><div class="cell addr"><strong id="sp"></strong><br><small>栈指针，保存下一个空闲栈槽的地址。入栈时先写入该槽，再将指针下移一格。</small></div><div class="cell left"><strong id="t1"></strong><br><small>临时寄存器，暂存从栈里读回的左操作数，供加法使用。</small></div></div><p id="why" aria-live="polite"></p></div>
+<div><table class="traceTable"><caption>栈内存 · 向低地址增长 ↓</caption><thead><tr><th>地址</th><th>内存值</th><th>本步状态</th></tr></thead><tbody id="stackRows"></tbody></table><small>紫色行是 $sp 当前指向的地址。每格 4 字节，完成入栈后，栈顶元素在 4($sp)。</small></div></div></figure><p><code>cgen(e)</code> 在编译期生成指令。这些指令运行完毕时，结果在 <code>$a0</code>，栈指针回到入口位置，原先仍在使用的栈槽内容保持原值。于是外层加法可以直接拼接内层表达式的代码。</p><details><summary>如果所有左值都用 $t1 保存，会算出什么？</summary><p>外层先把 1 存入 $t1，内层随后把 2 写进同一个寄存器。内层算出 5 后，外层读到的左值成了 2，得到 7。上面的两个栈槽分别保住了 1 和 2。</p></details></section>
+<section id="frame"><small>11.02　运行时组织</small><h2>一份函数代码，三份调用状态</h2><div class="grid"><div><pre>sumto(x) =
+    if x == 0 then 0
+    else x + sumto(x - 1)</pre><p>调用 <code>sumto(2)</code> 时，外层要等内层返回才能做加法。每次进入函数都建立一份激活记录（AR），保存本次参数和返回信息。各次调用执行同一段代码，当前帧指针决定指令读到哪一份 x。</p></div><figure><b>调用栈 · 当前帧在最下方</b><div id="frames" class="stack"></div><p id="frameText" aria-live="polite"></p><div class="row"><button id="fpBack">上一步</button><button id="fpNext">下一步</button><output id="frameCount"></output></div></figure></div><p>普通同步调用按进入的逆序返回。作用域决定源码中哪些位置可以引用名字，生命周期描述运行时对象从何时存在到何时结束。三次调用的 x 来自同一个声明，各自有自己的生命周期。</p></section>
+<section id="memory"><small>11.02　存储组织</small><h2>哪些数据要跟着函数返回？</h2><p>以 Linux 上的 C 程序为例，加载器建立映射，启动代码完成初始化后进入 main。程序开始运行后，各类数据按用途和存活时间安排位置。</p><div class="grid"><article><span class="cell addr">代码区　sumto 的机器指令</span><span class="cell">静态存储区　全局计数器</span><span class="cell result">堆　函数返回后仍要使用的动态对象</span><span class="cell left">栈　每次调用的参数、返回地址、临时值</span><small>按用途分组，图中位置不代表实际虚拟地址。</small></article><article><h3>偏移为什么有时会跳一格？</h3><p>假设 char 占 1 字节，int 占 4 字节且要求 4 字节对齐。在结构体中先放 char，再放 int，编译器会在两者之间留出 3 字节。</p><div class="row"><span class="cell left">0 · char</span><span class="cell">1–3 · 填充</span><span class="cell result">4–7 · int</span></div></article></div></section>
+
+<section id="call"><small>11.03　教学用 MIPS 调用约定</small><h2>同一条 lw，取出本次调用的参数</h2><div class="grid"><figure><b>f(x, y) 刚进入函数体</b><span class="cell addr">12($fp)　调用者的旧 $fp</span><span class="cell left">8($fp)　 y</span><span class="cell left">4($fp)　 x</span><span class="cell addr">0($fp)　 返回地址 RA</span><span class="cell">−4($fp)　下一空槽 ← $sp</span><figcaption>高地址在上。$fp 定位本帧，$sp 跟踪空槽。</figcaption></figure><div><h3>进入</h3><p>调用者压入旧 $fp，再依次压入 y、x。<code>jal f_entry</code> 把返回地址写入 $ra。被调用者令 $fp = $sp，保存 $ra，并下移 $sp 一格。这样，嵌套调用可以安全改写 $ra。</p><h3>返回</h3><p>函数体把结果留在 $a0。被调用者恢复 $ra，将 $sp 上移 4n + 8 字节（n 个实参、旧 $fp 和 RA），从恢复后的栈指针所指位置读回旧 $fp，再执行 <code>jr $ra</code>。</p></div></div><details open><summary>把调用序列代回 sumto(2)</summary><pre>lw   $a0, 4($fp)     # 当前帧的 x = 2
+# 按加法模板把左值 2 压栈
+# 保存旧 fp，计算 x - 1，将结果 1 作为实参压栈
+jal  sumto_entry     # 内层返回时，$a0 = 1
+lw   $t1, 4($sp)     # 调用已清理，外层左值重新位于栈顶
+add  $a0, $t1, $a0   # 2 + 1 = 3
+addiu $sp, $sp, 4</pre><p>条件比较由 <code>beq</code> 选择分支。x 为 0 时直接返回 0，递归分支保留 x，等子调用返回后执行加法。以上为讲义指令片段，省略分支标签及调用准备指令。</p></details></section>
+<section id="temp"><small>11.03　固定临时槽位</small><h2>编译时就能数出要留几格</h2><p>按从左到右的顺序计算加法。算左子树时所有槽位可用；算右子树时已有一格保存左值。因此 <code>NT(L + R) = max(NT(L), 1 + NT(R))</code>。常量和变量都直接写入 $a0，需求为 0。</p><figure><b>换一下括号，观察峰值</b><div class="row"><button id="treeR">1 + (2 + 3)</button><button id="treeL">(1 + 2) + 3</button></div><div id="tree" aria-live="polite"></div></figure><p>编译器先遍历函数体，为每个调用帧预留 NT 个槽位。以笔记的 fib 为例，T0 在 −8($fp)，T1 在 −4($fp)。表达式用固定偏移读写临时值，省去临时压栈和弹栈时的指针调整。准备下一次函数调用时仍要移动 $sp。</p><details><summary>函数调用的 NT 为什么取各实参需求的最大值？</summary><p>每算完一个实参，就把结果放入传参区，其临时槽随即可以复用。这里的 NT 只统计表达式临时槽，传参区单独计算。</p></details><table><caption>笔记记录的模拟器结果 · fib(15)</caption><tr><th>动态执行计数</th><th>逐次压栈</th><th>固定槽位</th></tr><tr><td>调整 $sp 的指令</td><td>12,940</td><td>4,876</td></tr><tr><td>全部指令</td><td>43,841</td><td>35,777</td></tr></table></section>
+<section id="object"><small>11.03　对象布局与动态分派</small><h2>偏移固定，调用目标可以变化</h2><p>沿用“基址 + 偏移”的寻址思路。单继承教学模型中，B 继承 A 的字段布局，新字段接在后面。因此 A 的方法拿到 B 对象的 self，也能按原偏移读出 a。</p><figure><div class="row"><b>调用 e.f()　选择 e 的实际类型</b><button id="typeA">A</button><button id="typeB">B</button></div><div id="dispatch" aria-live="polite"></div><figcaption>示意布局假设指针和字段各占 4 字节，方法 f 使用表中第 0 槽。</figcaption></figure><p>编译器根据 e 的静态类型 A 确定 f 的槽号。运行时从 e 取表指针，再按槽号加载函数地址，把 e 作为 self 传入并间接调用。子类重写方法时，只要在自己的表中换掉该槽的地址即可。</p></section><footer>原始笔记　<a id="note2">11_02 · 运行时组织</a>　<a id="note3">11_03 · 代码生成策略</a></footer></main>
+<script>
+const el=id=>document.getElementById(id);
+function stepper(back,next,count,states,render){
+    let step=0;
+    function show(){render(states[step]);el(back).disabled=step===0;el(next).disabled=step===states.length-1;el(count).textContent=(step+1)+' / '+states.length}
+    el(back).onclick=()=>{step--;show()};el(next).onclick=()=>{step++;show()};show();
+}
+const checkNodes=['astOne','astTwo','astThree','astInner','astRoot'];
+const nodeLabels=['1','2','3','Add','Add'];
+const visits=[
+    '从根节点开始。左孩子是 1，右孩子是整棵 (2 + 3)。此时两个孩子的类型都待查。',
+    '左孩子 1 是整数字面量。把 Int 写回节点，回到外层 Add。',
+    '进入右孩子 Add，先检查它的左孩子 2，得到 Int。',
+    '再检查 3，得到 Int。内层 Add 现在可以读取两个孩子的类型。',
+    '2 和 3 都是 Int，内层 Add 的类型也是 Int。把这个类型交回外层。',
+    '外层读到 1 的类型和右子树的类型，两边都是 Int，根节点检查通过。'
+];
+stepper('checkBack','checkNext','checkCount',visits.map((_,i)=>i),step=>{
+    checkNodes.forEach((id,i)=>{
+        const node=el(id);
+        node.textContent=nodeLabels[i]+(i<step?' · Int':'');
+        node.classList.toggle('typed',i<step);
+        if(id===(step===0?'astRoot':checkNodes[step-1])) node.setAttribute('aria-current','step');
+        else node.removeAttribute('aria-current');
+    });
+    el('checkWhy').textContent=visits[step];
+});
+const frameStates=[[[2],'进入外层，x = 2。'],[[2,1],'外层保留 2，等待内层返回。'],[[2,1,0],'到达基例，本次调用准备返回 0。'],[[2,1],'最内层退出，当前帧取 x = 1，加上返回值 0。'],[[2],'当前帧取 x = 2，加上返回值 1。'],[[],'外层返回 3，三个调用帧均已回收。']];
+stepper('fpBack','fpNext','frameCount',frameStates,([frames,why])=>{
+    el('frames').innerHTML=frames.map((x,i)=>'<span class="cell '+(i===frames.length-1?'result':'left')+'">sumto('+x+')　'+(i===frames.length-1?'执行中':'等待返回')+'</span>').join('');
+    el('frameText').textContent=why;
+});
+const program=[
+    ['进入表达式','尚未执行指令','从 $sp = 100 开始，此时没有已占用的栈槽。'],
+    ['外层左操作数','li $a0, 1','把 1 放进累加器。计算右边之前，要给 1 留个位置。'],
+    ['压入 1 · 写栈','sw $a0, 0($sp)','把 1 写到地址 100。sw 只写内存，此刻 $sp 仍指着刚写入的 1。'],
+    ['压入 1 · 移动指针','addiu $sp, $sp, -4','从 100 下移到 96，完成入栈。1 现在位于 4($sp)。'],
+    ['内层左操作数','li $a0, 2','累加器改存 2，外层的 1 还在地址 100。'],
+    ['压入 2 · 写栈','sw $a0, 0($sp)','把 2 写入地址 96，地址 100 的 1 仍在等外层加法。'],
+    ['压入 2 · 移动指针','addiu $sp, $sp, -4','从 96 下移到 92。现在有两个栈槽被占用，最近压入的 2 在地址 96。'],
+    ['内层右操作数','li $a0, 3','3 留在累加器。内层加法现在需要取回左操作数 2。'],
+    ['取回 2 · 读栈','lw $t1, 4($sp)','92 + 4 = 96，从地址 96 读出 2 放进 $t1。lw 完成后，指针还在 92。'],
+    ['内层加法','add $a0, $t1, $a0','2 + 3 = 5，结果写进 $a0。下一步可以释放保存 2 的槽。'],
+    ['弹出 2 · 释放槽位','addiu $sp, $sp, 4','从 92 上移到 96。地址 96 可以复用，内存里仍留着旧值 2。'],
+    ['取回 1 · 读栈','lw $t1, 4($sp)','96 + 4 = 100，从地址 100 取回最先保存的 1。'],
+    ['外层加法','add $a0, $t1, $a0','1 + 5 = 6，结果写进 $a0。'],
+    ['弹出 1 · 释放槽位','addiu $sp, $sp, 4','从 96 上移到 100，回到入口位置。两个槽都可复用，结果 6 留在 $a0。']
+];
+let acc='—', tmp='—', pointer=100;
+const memory={}, occupied=new Set();
+const trace=program.map(([phase,inst,why])=>{
+    let access=null,action='';
+    if(inst.startsWith('li ')) acc=Number(inst.split(', ')[1]);
+    if(inst.startsWith('sw ')){access=pointer;action='写入';memory[pointer]=acc;occupied.add(pointer)}
+    if(inst.startsWith('lw ')){access=pointer+4;action='读取';tmp=memory[access]}
+    if(inst.startsWith('add ')) acc=tmp+acc;
+    if(inst.startsWith('addiu ')){pointer+=Number(inst.split(', ').pop());if(inst.endsWith(', 4')) occupied.delete(pointer)}
+    return {phase,inst,why,acc,tmp,pointer,access,action,memory:{...memory},occupied:new Set(occupied)};
+});
+let exStep=0;
+function showInstruction(index){
+    exStep=index;
+    const s=trace[index];
+    el('activeExpr').textContent=s.phase;el('inst').textContent=s.inst;el('why').textContent=s.why;
+    el('acc').textContent='$a0 = '+s.acc;el('t1').textContent='$t1 = '+s.tmp;el('sp').textContent='$sp = '+s.pointer;
+    el('stackRows').innerHTML=[100,96,92].map(addr=>{
+        const pointed=addr===s.pointer, accessed=addr===s.access;
+        const labels=[];
+        if(pointed) labels.push('← $sp');
+        if(accessed) labels.push(s.action);
+        labels.push(s.occupied.has(addr)?'占用':addr in s.memory?'已释放 · 可复用':'空闲');
+        return '<tr class="'+(pointed?'pointed ':'')+(accessed?'accessed':'')+'"><td>'+addr+'</td><td>'+(s.memory[addr]??'—')+'</td><td>'+labels.join('　')+'</td></tr>';
+    }).join('');
+    el('exSeek').value=index;el('exCount').textContent=index+' / '+(trace.length-1);
+    el('exStart').disabled=el('exBack').disabled=index===0;el('exNext').disabled=index===trace.length-1;
+}
+el('exSeek').max=trace.length-1;el('exSeek').oninput=e=>showInstruction(Number(e.target.value));
+el('exStart').onclick=()=>showInstruction(0);el('exBack').onclick=()=>showInstruction(exStep-1);el('exNext').onclick=()=>showInstruction(exStep+1);showInstruction(0);
+
+const chapters=[...document.querySelectorAll('main > section')];
+const links=[...document.querySelectorAll('nav a')];
+function openChapter(){
+    const current=chapters.find(section=>'#'+section.id===location.hash)||chapters[0];
+    chapters.forEach(section=>section.hidden=section!==current);
+    links.forEach(link=>{
+        if(link.hash==='#'+current.id)link.setAttribute('aria-current','page');
+        else link.removeAttribute('aria-current');
+    });
+    window.scrollTo(0,0);
+}
+links.forEach(link=>link.addEventListener('click',event=>{
+    if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    event.preventDefault();if(location.hash!==link.hash)history.pushState(null,'',link.hash);openChapter();
+}));
+window.addEventListener('popstate',openChapter);window.addEventListener('hashchange',openChapter);openChapter();function choose(ids,render){
+    function select(i){ids.forEach((id,k)=>el(id).setAttribute('aria-pressed',String(k===i)));render(i)}
+    ids.forEach((id,i)=>el(id).onclick=()=>select(i));select(0);
+}
+choose(['treeR','treeL'],i=>{el('tree').innerHTML=i?'<span class="cell left">T0　先存 1，内层加完后复用该槽存 3</span><p>左子树需要 1 格，右侧常量需要 0 格。峰值 max(1, 1 + 0) = 1。</p>':'<span class="cell left">T0　1 等待右子树返回</span><span class="cell">T1　2 等待与 3 相加</span><p>右子树自己需要 1 格，同时还要保存外层的 1。峰值 max(0, 1 + 1) = 2。</p>'});
+choose(['typeA','typeB'],i=>{const t=i?'B':'A';el('dispatch').innerHTML='<div class="grid"><div><h3>对象内存</h3><span class="cell addr">self + 0　→ '+t+' 的分派表</span><span class="cell left">self + 4　字段 a</span>'+(i?'<span class="cell">self + 8　新增字段 b</span>':'')+'</div><div><h3>'+t+' 的分派表</h3><span class="cell result">第 0 槽　→ '+t+'.f</span><p>本次调用执行 '+t+'.f(self)。</p></div></div>'});
+for(const n of [2,3])el('note'+n).href='obsidian://open?vault=C%2B%2B&file='+encodeURIComponent('16.AI编译器/学习日记/0.2十一月/11_0'+n);
+</script></html>
