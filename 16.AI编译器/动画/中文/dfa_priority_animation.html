@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>DFA 静态优先级盖章与词法分析仿真</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border-color: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --purple: #a855f7;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .state-node {
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+    .state-node:hover circle.main-circle {
+      filter: drop-shadow(0 0 8px var(--primary));
+    }
+    .state-active circle.main-circle {
+      stroke: #38bdf8 !important;
+      stroke-width: 4px !important;
+      filter: drop-shadow(0 0 12px #38bdf8);
+    }
+    .table-active-row {
+      background-color: rgba(56, 189, 248, 0.15) !important;
+      border-left: 3px solid #38bdf8;
+    }
+    .table-active-cell {
+      background-color: rgba(245, 158, 11, 0.25) !important;
+      color: #fbbf24 !important;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="p-6 antialiased">
+  <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- 顶栏标题 -->
+    <header class="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-lg">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>⚡ DFA 静态优先级盖章与切分过程动画</span>
+          </h1>
+          <p class="text-sm text-[#94a3b8] mt-1">
+            演示场景：规则 ① <code class="text-amber-400">Keyword = "if"</code> (优先级高) ｜ 规则 ② <code class="text-sky-400">ID = [a-z][a-z0-9]*</code> (优先级低) ｜ 规则 ③ <code class="text-red-400">Error = [任意字符]</code> (兜底)
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full font-mono">
+            冲突焦点：状态 S2 (读到 "if")
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主控台与交互模拟器 -->
+    <div class="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-lg space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-[#334155]">
+        <!-- 预设输入测试用例 -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-[#94a3b8]">预设测试字符串：</span>
+          <button onclick="setInput('if ')" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-xs rounded text-slate-200 transition">
+            1. "if " (看优先级)
+          </button>
+          <button onclick="setInput('if8')" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-xs rounded text-slate-200 transition">
+            2. "if8" (看最长匹配)
+          </button>
+          <button onclick="setInput('i ')" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-xs rounded text-slate-200 transition">
+            3. "i " (单字符ID)
+          </button>
+          <button onclick="setInput('$x ')" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-xs rounded text-slate-200 transition">
+            4. "$x " (Error兜底恢复)
+          </button>
+        </div>
+
+        <!-- 播放控制按键 -->
+        <div class="flex items-center gap-2">
+          <button id="btnPrev" onclick="stepBackward()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs rounded font-medium disabled:opacity-40">
+            ⏮ 上一步
+          </button>
+          <button id="btnStep" onclick="stepForward()" class="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs rounded font-medium shadow">
+            单步推进一步 ⏭
+          </button>
+          <button id="btnPlay" onclick="togglePlay()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded font-medium">
+            ▶ 自动播放
+          </button>
+          <button onclick="resetSim()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs rounded text-slate-300">
+            重置
+          </button>
+        </div>
+      </div>
+
+      <!-- 磁带输入指针与实时状态监视 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <!-- 字符纸带 -->
+        <div class="col-span-2 bg-slate-900/80 rounded-lg p-3 border border-slate-700/60">
+          <div class="text-[#94a3b8] mb-1.5 flex justify-between">
+            <span>输入缓冲区纸带（当前探测指针 i）：</span>
+            <span id="tapePos" class="font-mono text-sky-400">pos=0, i=0</span>
+          </div>
+          <div id="tapeContainer" class="flex gap-1.5 overflow-x-auto py-1 font-mono text-sm">
+            <!-- 动态生成纸带格子 -->
+          </div>
+        </div>
+
+        <!-- 寄存器状态：当前状态与存档点 -->
+        <div class="bg-slate-900/80 rounded-lg p-3 border border-slate-700/60 flex flex-col justify-between">
+          <div>
+            <div class="text-[#94a3b8] mb-1">DFA 当前运行环境：</div>
+            <div class="flex items-center justify-between text-xs py-0.5">
+              <span class="text-slate-400">当前状态：</span>
+              <span id="curStateLabel" class="font-bold text-sky-400">S0 (初始态)</span>
+            </div>
+            <div class="flex items-center justify-between text-xs py-0.5">
+              <span class="text-slate-400">最后接受存档 (last)：</span>
+              <span id="lastArchive" class="font-bold text-amber-400">None</span>
+            </div>
+          </div>
+          <div class="pt-1 border-t border-slate-800 text-[11px] text-slate-400" id="stepExplanation">
+            点击“单步推进”查看状态跃迁。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中部：DFA 拓扑图与二维转移表 -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- 左侧：DFA 状态机可视化图 (7 cols) -->
+      <div class="lg:col-span-7 bg-[#1e293b] border border-[#334155] rounded-xl p-4 shadow-lg flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-sm font-semibold text-white">1. DFA 状态转移图 (双圈 = 接受状态)</h2>
+          <span class="text-[11px] text-[#94a3b8]">节点闪烁指示当前所在状态</span>
+        </div>
+
+        <div class="relative bg-slate-950/70 border border-slate-800 rounded-lg flex-1 flex items-center justify-center min-h-[360px] overflow-hidden">
+          <svg id="dfaSvg" viewBox="0 0 580 340" class="w-full h-full select-none">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="21" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#94a3b8"/>
+              </marker>
+              <marker id="arrow-active" viewBox="0 0 10 10" refX="21" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8"/>
+              </marker>
+              <marker id="arrow-err" viewBox="0 0 10 10" refX="21" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ef4444"/>
+              </marker>
+            </defs>
+
+            <!-- 转移连线 -->
+            <!-- Start -> S0 -->
+            <path d="M 15 160 L 50 160" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <!-- S0 -> S1 ('i') -->
+            <path id="edge-0-1" d="M 85 140 Q 150 70 215 110" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+            <text x="145" y="80" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="bold">'i'</text>
+
+            <!-- S1 -> S2 ('f') -->
+            <path id="edge-1-2" d="M 265 120 L 375 120" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+            <text x="315" y="112" fill="#fbbf24" font-size="12" font-family="monospace" font-weight="bold">'f'</text>
+
+            <!-- S0 -> S3 (a-h, j-z) -->
+            <path id="edge-0-3" d="M 85 175 Q 180 235 300 230" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+            <text x="180" y="225" fill="#94a3b8" font-size="11" font-family="monospace">其它字母</text>
+
+            <!-- S1 -> S3 (除'f'以外的字母/数字) -->
+            <path id="edge-1-3" d="M 255 145 Q 275 185 305 215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+            <text x="240" y="185" fill="#94a3b8" font-size="11" font-family="monospace">其它/数字</text>
+
+            <!-- S2 -> S3 (字母/数字，如 if8 的 '8') -->
+            <path id="edge-2-3" d="M 390 145 Q 365 185 335 215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+            <text x="375" y="185" fill="#38bdf8" font-size="11" font-family="monospace">字母/数字</text>
+
+            <!-- S3 自环 (字母/数字) -->
+            <path id="edge-3-3" d="M 345 235 C 380 280 400 240 345 250" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+            <text x="390" y="260" fill="#94a3b8" font-size="11" font-family="monospace">[a-z0-9]</text>
+
+            <!-- S0 -> Serr (非法字符，如 '$') -->
+            <path id="edge-0-err" d="M 70 185 L 115 285" stroke="#ef4444" stroke-width="2" fill="none" marker-end="url(#arrow-err)"/>
+            <text x="65" y="250" fill="#ef4444" font-size="11" font-family="monospace">其它字符</text>
+
+            <!-- 节点元素绘制 -->
+            <!-- S0: 起始状态 (非接受) -->
+            <g id="node-s0" class="state-node" transform="translate(70, 160)">
+              <circle class="main-circle" r="24" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/>
+              <text y="4" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="bold">S0</text>
+              <text y="40" text-anchor="middle" fill="#64748b" font-size="10">起点</text>
+            </g>
+
+            <!-- S1: 接收 'i' (接受态: ID) -->
+            <g id="node-s1" class="state-node" transform="translate(240, 120)">
+              <circle r="26" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2"/>
+              <circle class="main-circle" r="22" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+              <text y="4" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="bold">S1</text>
+              <rect x="-24" y="32" width="48" height="18" rx="4" fill="#0284c7" opacity="0.9"/>
+              <text y="44" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="bold">ID ("i")</text>
+            </g>
+
+            <!-- S2: 接收 'if' (冲突态：KW 与 ID 冲突 -> 静态盖章为 KEYWORD) -->
+            <g id="node-s2" class="state-node" transform="translate(400, 120)">
+              <!-- 外双圈 -->
+              <circle r="28" fill="none" stroke="#f59e0b" stroke-width="2"/>
+              <circle class="main-circle" r="22" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+              <text y="4" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="bold">S2</text>
+              <!-- 盖章标签 -->
+              <g transform="translate(0, 36)">
+                <rect x="-35" y="0" width="70" height="20" rx="4" fill="#b45309" stroke="#f59e0b" stroke-width="1"/>
+                <text y="13" text-anchor="middle" fill="#fef3c7" font-size="10" font-weight="bold">★ KEYWORD</text>
+              </g>
+            </g>
+
+            <!-- S3: 通用标识符 (接受态: ID) -->
+            <g id="node-s3" class="state-node" transform="translate(320, 230)">
+              <circle r="26" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+              <circle class="main-circle" r="22" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+              <text y="4" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="bold">S3</text>
+              <rect x="-28" y="32" width="56" height="18" rx="4" fill="#0284c7" opacity="0.9"/>
+              <text y="44" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="bold">ID (多字符)</text>
+            </g>
+
+            <!-- Serr: 非法字符 (接受态: ERROR 兜底) -->
+            <g id="node-serr" class="state-node" transform="translate(130, 290)">
+              <circle r="26" fill="none" stroke="#ef4444" stroke-width="1.5"/>
+              <circle class="main-circle" r="22" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+              <text y="4" text-anchor="middle" fill="#fca5a5" font-size="12" font-weight="bold">Serr</text>
+              <rect x="-28" y="30" width="56" height="18" rx="4" fill="#b91c1c" opacity="0.9"/>
+              <text y="42" text-anchor="middle" fill="#fee2e2" font-size="9" font-weight="bold">ERROR兜底</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- 右侧：二维转移表与静态盖章明细 (5 cols) -->
+      <div class="lg:col-span-5 bg-[#1e293b] border border-[#334155] rounded-xl p-4 shadow-lg flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-sm font-semibold text-white">2. 预生成的二维转移表 T[state][char]</h2>
+            <span class="text-[11px] text-amber-400 font-medium">生成期已完成消歧</span>
+          </div>
+
+          <div class="overflow-x-auto border border-slate-700 rounded-lg">
+            <table class="w-full text-xs text-left text-slate-300">
+              <thead class="bg-slate-800/90 text-slate-400 border-b border-slate-700">
+                <tr>
+                  <th class="p-2 font-mono">状态</th>
+                  <th class="p-2">包含的NFA状态</th>
+                  <th class="p-2">静态盖章类型</th>
+                  <th class="p-1.5 text-center font-mono text-sky-300">'i'</th>
+                  <th class="p-1.5 text-center font-mono text-amber-300">'f'</th>
+                  <th class="p-1.5 text-center font-mono text-slate-300">其它字母</th>
+                  <th class="p-1.5 text-center font-mono text-red-300">其它($)</th>
+                </tr>
+              </thead>
+              <tbody id="transTableBody" class="divide-y divide-slate-800 font-mono">
+                <!-- S0 -->
+                <tr id="row-s0" class="hover:bg-slate-800/50">
+                  <td class="p-2 font-bold text-white">S0</td>
+                  <td class="p-2 text-slate-400 font-sans text-[11px]">{0} (起始)</td>
+                  <td class="p-2 text-slate-500 font-sans">非接受态</td>
+                  <td id="cell-s0-i" class="p-1.5 text-center">S1</td>
+                  <td id="cell-s0-f" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s0-other" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s0-err" class="p-1.5 text-center text-red-400">Serr</td>
+                </tr>
+                <!-- S1 -->
+                <tr id="row-s1" class="hover:bg-slate-800/50">
+                  <td class="p-2 font-bold text-sky-400">S1</td>
+                  <td class="p-2 text-slate-400 font-sans text-[11px]">{NFA_ID1}</td>
+                  <td class="p-2 text-sky-300 font-sans font-bold">ID ("i")</td>
+                  <td id="cell-s1-i" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s1-f" class="p-1.5 text-center text-amber-300 font-bold">S2</td>
+                  <td id="cell-s1-other" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s1-err" class="p-1.5 text-center text-slate-600">-</td>
+                </tr>
+                <!-- S2: 冲突焦点行 -->
+                <tr id="row-s2" class="bg-amber-950/20 border-l-2 border-amber-500 hover:bg-amber-950/30">
+                  <td class="p-2 font-bold text-amber-400 flex items-center gap-1">
+                    <span>S2</span>
+                    <span class="text-[9px] px-1 bg-amber-500/20 text-amber-300 rounded">冲突</span>
+                  </td>
+                  <td class="p-2 text-amber-200/80 font-sans text-[10px]">
+                    <span class="text-amber-400 font-bold">KW_态</span> + <span class="text-sky-400">ID_态</span>
+                  </td>
+                  <td class="p-2 text-amber-300 font-sans font-bold">
+                    ★ KEYWORD
+                  </td>
+                  <td id="cell-s2-i" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s2-f" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s2-other" class="p-1.5 text-center text-sky-300 font-bold">S3</td>
+                  <td id="cell-s2-err" class="p-1.5 text-center text-slate-600">-</td>
+                </tr>
+                <!-- S3 -->
+                <tr id="row-s3" class="hover:bg-slate-800/50">
+                  <td class="p-2 font-bold text-sky-400">S3</td>
+                  <td class="p-2 text-slate-400 font-sans text-[11px]">{NFA_ID_loop}</td>
+                  <td class="p-2 text-sky-300 font-sans font-bold">ID (标识符)</td>
+                  <td id="cell-s3-i" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s3-f" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s3-other" class="p-1.5 text-center">S3</td>
+                  <td id="cell-s3-err" class="p-1.5 text-center text-slate-600">-</td>
+                </tr>
+                <!-- Serr -->
+                <tr id="row-serr" class="hover:bg-slate-800/50">
+                  <td class="p-2 font-bold text-red-400">Serr</td>
+                  <td class="p-2 text-slate-400 font-sans text-[11px]">{NFA_Error}</td>
+                  <td class="p-2 text-red-400 font-sans font-bold">ERROR</td>
+                  <td class="p-1.5 text-center text-slate-600">-</td>
+                  <td class="p-1.5 text-center text-slate-600">-</td>
+                  <td class="p-1.5 text-center text-slate-600">-</td>
+                  <td class="p-1.5 text-center text-slate-600">-</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 静态盖章解析卡片 -->
+        <div class="mt-4 p-3 bg-slate-900/90 border border-slate-700/80 rounded-lg text-xs space-y-1.5">
+          <div class="font-bold text-amber-300 flex items-center gap-1.5">
+            <span>🔍 为什么叫“静态盖章”？</span>
+          </div>
+          <p class="text-slate-300 leading-relaxed text-[11px]">
+            在将 NFA 转换打包成 DFA 状态 <span class="text-amber-400 font-bold">S2</span> 时，算法发现该状态同时包含了两个 NFA 接受态：
+            <code class="text-amber-300 font-bold">KW("if")</code> 与 <code class="text-sky-300 font-bold">ID("if")</code>。
+          </p>
+          <p class="text-slate-400 text-[11px]">
+            编译器在生成代码时，直接依据声明顺序（关键字写在最前面），把 <span class="text-amber-400 font-semibold">KEYWORD</span> 永久“印”在表第 3 行。<strong>运行时只需 0 次多余判断，直接取走印好的类型！</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部：已切出的 Token 结果流 -->
+    <div class="bg-[#1e293b] border border-[#334155] rounded-xl p-4 shadow-lg">
+      <div class="text-xs text-[#94a3b8] mb-2 font-semibold">切分产出的 Token 流（输出缓冲区）：</div>
+      <div id="tokenStream" class="flex flex-wrap items-center gap-2 min-h-[32px] font-mono text-xs">
+        <span class="text-slate-600 italic">暂无 Token 吐出...</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 仿真状态机引擎
+    let rawInput = "if8";
+    let inputChars = [];
+    let pos = 0;   // 当前未切分起点
+    let i = 0;     // 贪心前瞻探测指针
+    let curState = "s0";
+    let lastArchive = null; // { pos, tokenType }
+    let emittedTokens = [];
+    let isPlaying = false;
+    let timer = null;
+
+    function setInput(str) {
+      rawInput = str;
+      resetSim();
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      inputChars = Array.from(rawInput);
+      pos = 0;
+      i = 0;
+      curState = "s0";
+      lastArchive = null;
+      emittedTokens = [];
+      renderTape();
+      renderTokens();
+      updateUI("重置完成，准备从第 0 个字符开始扫描。");
+    }
+
+    function renderTape() {
+      const container = document.getElementById("tapeContainer");
+      container.innerHTML = "";
+      inputChars.forEach((ch, idx) => {
+        const item = document.createElement("div");
+        item.className = "flex flex-col items-center";
+        
+        let displayChar = ch === " " ? "␠" : ch;
+        let borderClass = "border-slate-700 bg-slate-800 text-slate-300";
+
+        if (idx === i) {
+          borderClass = "border-sky-400 bg-sky-950/80 text-sky-200 ring-2 ring-sky-500 scale-105";
+        } else if (idx >= pos && idx < i) {
+          borderClass = "border-slate-500 bg-slate-700 text-white";
+        } else if (idx < pos) {
+          borderClass = "border-slate-800 bg-slate-900/50 text-slate-600";
+        }
+
+        item.innerHTML = `
+          <div class="w-8 h-8 rounded border flex items-center justify-center font-bold text-sm ${borderClass}">
+            ${displayChar}
+          </div>
+          <span class="text-[9px] text-slate-500 mt-0.5">${idx}</span>
+        `;
+        container.appendChild(item);
+      });
+      document.getElementById("tapePos").textContent = `pos=${pos}, i=${i}`;
+    }
+
+    function renderTokens() {
+      const stream = document.getElementById("tokenStream");
+      if (emittedTokens.length === 0) {
+        stream.innerHTML = '<span class="text-slate-600 italic">暂无 Token 吐出...</span>';
+        return;
+      }
+      stream.innerHTML = "";
+      emittedTokens.forEach(t => {
+        const badge = document.createElement("div");
+        let color = "bg-sky-900/60 border-sky-500 text-sky-200";
+        if (t.type === "KEYWORD") color = "bg-amber-900/60 border-amber-500 text-amber-200";
+        if (t.type === "ERROR") color = "bg-red-900/60 border-red-500 text-red-200";
+        badge.className = `px-2.5 py-1 rounded border text-xs flex items-center gap-1.5 font-mono shadow ${color}`;
+        badge.innerHTML = `<span>&lt;<strong>${t.type}</strong>, "${t.lexeme}"&gt;</span>`;
+        stream.appendChild(badge);
+      });
+    }
+
+    // 单步向前推进核心逻辑
+    function stepForward() {
+      if (pos >= inputChars.length) {
+        updateUI("输入已全部切分完毕！");
+        if (isPlaying) togglePlay();
+        return;
+      }
+
+      // 如果当前探针已经到达末尾，或者下一步没路可走，触发【撞墙回退或输出】
+      if (i >= inputChars.length || getNextState(curState, inputChars[i]) === "dead") {
+        handleBacktrackOrError();
+        return;
+      }
+
+      // 否则，正常查表前进一步
+      let ch = inputChars[i];
+      let nextState = getNextState(curState, ch);
+      
+      highlightCell(curState, ch);
+      curState = nextState;
+      i++;
+
+      let explanation = `读入字符 '${ch === " " ? "空格" : ch}'，沿转移表跳到状态 [${curState.toUpperCase()}]。`;
+
+      // 检查当前状态是否是接受状态（打存档点）
+      let accInfo = getAcceptingInfo(curState);
+      if (accInfo) {
+        lastArchive = { i: i, type: accInfo.type };
+        explanation += ` 发现接受状态！存底打卡：last 记录位置为 ${i}，类别为 <${accInfo.type}>。继续贪心向前探！`;
+      } else {
+        explanation += ` 非接受状态，继续前探...`;
+      }
+
+      renderTape();
+      updateUI(explanation);
+    }
+
+    function handleBacktrackOrError() {
+      // 撞墙处理
+      if (lastArchive !== null) {
+        let lexeme = inputChars.slice(pos, lastArchive.i).join("");
+        emittedTokens.push({ type: lastArchive.type, lexeme: lexeme });
+        let explanation = `走投无路撞墙！触发【最长匹配回退】：吐出最长 Token <${lastArchive.type}, "${lexeme}">。将起始点 pos 对齐到存档点 ${lastArchive.i}。`;
+        pos = lastArchive.i;
+        i = pos;
+        curState = "s0";
+        lastArchive = null;
+        renderTape();
+        renderTokens();
+        updateUI(explanation);
+      } else {
+        // last 是空，说明从 pos 起步连一个字符都匹配不上，触发 Error 兜底
+        let badChar = inputChars[pos];
+        emittedTokens.push({ type: "ERROR", lexeme: badChar });
+        let explanation = `连长度为 1 的合法 Token 都没匹配到！触发【Error 兜底规则】：记录非法字符 '${badChar}'，硬性跳过 1 格继续尝试切分。`;
+        pos++;
+        i = pos;
+        curState = "s0";
+        lastArchive = null;
+        renderTape();
+        renderTokens();
+        updateUI(explanation);
+      }
+    }
+
+    function getNextState(state, ch) {
+      if (state === "s0") {
+        if (ch === "i") return "s1";
+        if (isLetter(ch)) return "s3";
+        if (ch !== " " && ch !== "\n") return "serr";
+        return "dead";
+      }
+      if (state === "s1") {
+        if (ch === "f") return "s2";
+        if (isLetterOrDigit(ch)) return "s3";
+        return "dead";
+      }
+      if (state === "s2") {
+        if (isLetterOrDigit(ch)) return "s3"; // if8 继续走到 S3
+        return "dead"; // 遇到空格等死状态，回退吐出 KEYWORD
+      }
+      if (state === "s3") {
+        if (isLetterOrDigit(ch)) return "s3";
+        return "dead";
+      }
+      if (state === "serr") {
+        return "dead"; // Error 状态只吃单个字符即停
+      }
+      return "dead";
+    }
+
+    function getAcceptingInfo(state) {
+      if (state === "s1") return { type: "ID" };
+      if (state === "s2") return { type: "KEYWORD" }; // 静态盖章生效
+      if (state === "s3") return { type: "ID" };
+      if (state === "serr") return { type: "ERROR" };
+      return null;
+    }
+
+    function isLetter(c) {
+      return /^[a-zA-Z]$/.test(c);
+    }
+    function isLetterOrDigit(c) {
+      return /^[a-zA-Z0-9]$/.test(c);
+    }
+
+    function updateUI(explanation) {
+      // 更新状态节点样式
+      document.querySelectorAll(".state-node").forEach(n => n.classList.remove("state-active"));
+      let activeNode = document.getElementById("node-" + curState);
+      if (activeNode) activeNode.classList.add("state-active");
+
+      // 更新表格行高亮
+      document.querySelectorAll("#transTableBody tr").forEach(r => r.classList.remove("table-active-row"));
+      let activeRow = document.getElementById("row-" + curState);
+      if (activeRow) activeRow.classList.add("table-active-row");
+
+      // 更新标签显示
+      document.getElementById("curStateLabel").textContent = curState.toUpperCase();
+      if (lastArchive) {
+        document.getElementById("lastArchive").textContent = `(位置: ${lastArchive.i}, 类型: <${lastArchive.type}>)`;
+      } else {
+        document.getElementById("lastArchive").textContent = "None (暂未探到接受态)";
+      }
+      document.getElementById("stepExplanation").textContent = explanation;
+    }
+
+    function highlightCell(state, ch) {
+      document.querySelectorAll("td").forEach(td => td.classList.remove("table-active-cell"));
+      let cellId = null;
+      if (ch === "i") cellId = `cell-${state}-i`;
+      else if (ch === "f") cellId = `cell-${state}-f`;
+      else if (isLetterOrDigit(ch)) cellId = `cell-${state}-other`;
+      else cellId = `cell-${state}-err`;
+
+      let targetCell = document.getElementById(cellId);
+      if (targetCell) targetCell.classList.add("table-active-cell");
+    }
+
+    function togglePlay() {
+      const btn = document.getElementById("btnPlay");
+      if (isPlaying) {
+        clearInterval(timer);
+        isPlaying = false;
+        btn.textContent = "▶ 自动播放";
+        btn.className = "px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded font-medium";
+      } else {
+        isPlaying = true;
+        btn.textContent = "⏸ 暂停";
+        btn.className = "px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded font-medium";
+        timer = setInterval(() => {
+          if (pos >= inputChars.length) {
+            togglePlay();
+          } else {
+            stepForward();
+          }
+        }, 1200);
+      }
+    }
+
+    // 初始化
+    setInput("if8 ");
+  </script>
+</body>
+</html>

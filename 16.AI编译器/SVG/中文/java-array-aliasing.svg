@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="404" viewBox="0 0 960 404" role="img" aria-label="Java 数组协变规则与 Cool 对比，以及 a 和 b 指向同一可变 B 数组导致静态类型漏洞、由 JVM 运行时抛出 ArrayStoreException 拦截的机制。">
+  <title>Java 数组协变与内存别名</title>
+  <desc>Java 数组协变规则与 Cool 对比，以及 a 和 b 指向同一可变 B 数组导致静态类型漏洞、由 JVM 运行时抛出 ArrayStoreException 拦截的机制。</desc>
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', 'SimHei', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, 'Microsoft YaHei', monospace; }
+    .title { font-size: 15.5px; font-weight: 700; fill: #141413; }
+    .sub { font-size: 11.5px; fill: #6F6D66; }
+    .sec { font-size: 13px; font-weight: 600; fill: #141413; }
+    .sm { font-size: 11px; }
+    .xs { font-size: 10.5px; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .green-t { fill: #47703F; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .green { fill: #E0EBDB; stroke: #5E8A5A; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1.1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.8; stroke-dasharray: 5 3; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.4; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-green { stroke: #5E8A5A; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-blue-dash { stroke: #4F7FAF; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; }
+    .h-acc { fill: #D97757; }
+    .h-blue { fill: #4F7FAF; }
+    .h-green { fill: #5E8A5A; }
+  </style>
+  <defs>
+    <marker id="java-array-aliasing-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-array-aliasing-acc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-array-aliasing-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-array-aliasing-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect x="0" y="0" width="960" height="404" fill="rgb(245, 244, 237)"/>
+  <rect x="6" y="6" width="948" height="392" rx="14" fill="#F0EEE6"/>
+  <text class="title" x="26" y="36">Java 数组协变与内存别名：静态漏洞与运行时拦截</text>
+  <text class="sub" x="26" y="56">假设 B 继承自 A（B &lt; A）：两个不同类型的引用指向同一可变数组时，按父类写入会破坏子类读取的假设</text>
+
+  <!-- Left panel: Code + Subtyping rules -->
+  <rect class="box" x="24" y="72" width="336" height="314" rx="10"/>
+  <text class="sec" x="40" y="96">A · 触发问题的四行代码</text>
+
+  <rect class="plain" x="40" y="108" width="304" height="114" rx="7"/>
+  <text class="mono sm muted" x="52" y="130">1</text>
+  <text class="mono sm" x="70" y="130">B[] b = new B[10];</text>
+  <text class="mono sm muted" x="52" y="154">2</text>
+  <text class="mono sm blue-t b" x="70" y="154">A[] a = b;</text>
+  <text class="xs blue-t" x="166" y="154">// 协变允许 B[] &lt; A[]</text>
+  <text class="mono sm muted" x="52" y="178">3</text>
+  <text class="mono sm acc-t b" x="70" y="178">a[0] = new A();</text>
+  <text class="xs acc-t" x="206" y="178">// 写入父类实例</text>
+  <text class="mono sm muted" x="52" y="202">4</text>
+  <text class="mono sm acc-t" x="70" y="202">b[0].aMethodNotDeclaredInA();</text>
+
+  <text class="sec" x="40" y="246">B · Cool 与 Java 子类型规则对比</text>
+  <!-- Table header -->
+  <rect class="dead" x="40" y="256" width="184" height="28" rx="4"/>
+  <rect class="dead" x="224" y="256" width="60" height="28" rx="4"/>
+  <rect class="dead" x="284" y="256" width="60" height="28" rx="4"/>
+  <text class="sm b" x="50" y="274">规则</text>
+  <text class="sm b" x="254" y="274" text-anchor="middle">Cool</text>
+  <text class="sm b" x="314" y="274" text-anchor="middle">Java</text>
+
+  <!-- Row 1 -->
+  <rect class="plain" x="40" y="284" width="184" height="28"/>
+  <rect class="plain" x="224" y="284" width="60" height="28"/>
+  <rect class="plain" x="284" y="284" width="60" height="28"/>
+  <text class="mono sm" x="50" y="302">B &lt; A (B 继承 A)</text>
+  <text class="sm green-t b" x="254" y="302" text-anchor="middle">支持</text>
+  <text class="sm green-t b" x="314" y="302" text-anchor="middle">支持</text>
+
+  <!-- Row 2 -->
+  <rect class="plain" x="40" y="312" width="184" height="28"/>
+  <rect class="plain" x="224" y="312" width="60" height="28"/>
+  <rect class="plain" x="284" y="312" width="60" height="28"/>
+  <text class="mono sm" x="50" y="330">C &lt; B &lt; A ⇒ C &lt; A</text>
+  <text class="sm green-t b" x="254" y="330" text-anchor="middle">支持</text>
+  <text class="sm green-t b" x="314" y="330" text-anchor="middle">支持</text>
+
+  <!-- Row 3 -->
+  <rect class="acc" x="40" y="340" width="184" height="32" rx="4"/>
+  <rect class="plain" x="224" y="340" width="60" height="32" rx="4"/>
+  <rect class="acc" x="284" y="340" width="60" height="32" rx="4"/>
+  <text class="mono sm acc-t b" x="50" y="360">B[] &lt; A[] (协变)</text>
+  <text class="sm muted b" x="254" y="360" text-anchor="middle">无</text>
+  <text class="sm acc-t b" x="314" y="360" text-anchor="middle">支持</text>
+
+  <!-- Right panel: Aliasing memory layout -->
+  <rect class="box" x="378" y="72" width="558" height="314" rx="10"/>
+  <text class="sec" x="394" y="96">C · 可变数组上的不同类型别名（Aliasing）</text>
+
+  <!-- Reference a -->
+  <rect class="blue" x="412" y="114" width="124" height="44" rx="7"/>
+  <text class="mono b blue-t" x="474" y="133" text-anchor="middle">a : A[]</text>
+  <text class="xs blue-t" x="474" y="150" text-anchor="middle">按父类视角写入</text>
+
+  <!-- Center badge -->
+  <rect class="acc" x="572" y="118" width="174" height="36" rx="7"/>
+  <text class="sm b acc-t" x="659" y="140" text-anchor="middle">不同静态类型 · 同一地址</text>
+
+  <!-- Reference b -->
+  <rect class="green" x="782" y="114" width="124" height="44" rx="7"/>
+  <text class="mono b green-t" x="844" y="133" text-anchor="middle">b : B[]</text>
+  <text class="xs green-t" x="844" y="150" text-anchor="middle">按子类视角读取</text>
+
+  <!-- Arrows down to slot [0] -->
+  <path class="ln-acc" d="M 474 158 L 474 184 L 552 212" marker-end="url(#java-array-aliasing-acc)"/>
+  <text class="sm b acc-t" x="396" y="198">write: new A()</text>
+
+  <path class="ln-green" d="M 844 158 L 844 184 L 604 212" marker-end="url(#java-array-aliasing-green)"/>
+  <text class="sm b green-t" x="708" y="176">read: b[0].method()</text>
+
+  <!-- Shared heap array -->
+  <rect class="dead" x="404" y="216" width="112" height="58" rx="6"/>
+  <text class="xs muted" x="460" y="238" text-anchor="middle">运行时类型标签</text>
+  <text class="mono b" x="460" y="259" text-anchor="middle">tag = B[]</text>
+
+  <rect class="bad" x="516" y="216" width="116" height="58" rx="4"/>
+  <text class="mono xs acc-t" x="574" y="236" text-anchor="middle">slot [0]</text>
+  <text class="mono b acc-t" x="574" y="258" text-anchor="middle">A 实例 (?)</text>
+
+  <rect class="green" x="632" y="216" width="84" height="58" rx="4"/>
+  <text class="mono xs green-t" x="674" y="236" text-anchor="middle">slot [1]</text>
+  <text class="mono b green-t" x="674" y="258" text-anchor="middle">B</text>
+
+  <rect class="green" x="716" y="216" width="84" height="58" rx="4"/>
+  <text class="mono xs green-t" x="758" y="236" text-anchor="middle">slot [2]</text>
+  <text class="mono b green-t" x="758" y="258" text-anchor="middle">B</text>
+
+  <rect class="plain" x="800" y="216" width="112" height="58" rx="6"/>
+  <text class="mono xs muted" x="856" y="236" text-anchor="middle">slot [3..9]</text>
+  <text class="mono sm muted" x="856" y="258" text-anchor="middle">B's ...</text>
+
+  <!-- Runtime check callout -->
+  <rect class="acc" x="404" y="294" width="508" height="76" rx="8"/>
+  <text class="sm b acc-t" x="420" y="317">JVM 运行时拦截：每次引用数组写入都检查元素动态类型</text>
+  <text class="sm" x="420" y="338">执行 a[0] = new A() 时，比对数组标签 B[] 失败 → 立即抛出 ArrayStoreException</text>
+  <text class="xs muted" x="420" y="357">静态类型系统放行了不安全赋值，只能靠运行期写屏障兜底；泛型 List&lt;B&gt; 因此改为不变</text>
+</svg>

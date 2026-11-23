@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="972" height="722" viewBox="-16 -16 972 722" role="img" aria-label="循环 CFG 上全局常量传播迭代推演的四个阶段。① 初始状态分配（乐观假设）：程序总入口置为 X = ⊤，内部各节点与回边全部置为 X = ⊥；② 正向遍历一轮后：沿入口路径传播 3，回边暂为 ⊥，Y := 0 入口计算 lub(3, ⊥) = 3 顺利下行；③ 到达不动点：回边回传 3，lub(3, 3) = 3 不再发生改变，A := 2 * X 成功优化为 A := 2 * 3；④ 若错误地将内部初始化为 ⊤：回边以 ⊤ 起始导致 Y := 0 入口 lub(3, ⊤) = ⊤，环路自我强化导致 A := 2 * X 处 X 保持 ⊤ 而无法优化。">
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace; }
+    .sm { font-size: 11px; }
+    .lg { font-size: 14px; font-weight: 600; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 2; stroke-dasharray: 5 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.3; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; } .h-acc { fill: #D97757; } .h-blue { fill: #4F7FAF; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+  </style>
+  <rect x="-16" y="-16" width="972" height="722" rx="14" fill="#F0EEE6"/>
+  <defs><marker id="opt-init-states-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker><marker id="opt-init-states-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="opt-init-states-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="box" x="0" y="0" width="455" height="330" rx="8"/>
+  <text class="b" x="14" y="22" xml:space="preserve">① 初始化状态布局（乐观假设）</text>
+  <text class="sm muted" x="14" y="40" xml:space="preserve">Slide 45</text>
+  <rect class="plain" x="120" y="62" width="160" height="28" rx="8"/>
+  <text class="mono sm" x="200.0" y="80.5" text-anchor="middle" xml:space="preserve">X := 3 · B &gt; 0</text>
+  <rect class="plain" x="40" y="140" width="130" height="28" rx="8"/>
+  <text class="mono sm" x="105.0" y="158.5" text-anchor="middle" xml:space="preserve">Y := Z + W</text>
+  <rect class="plain" x="230" y="140" width="120" height="28" rx="8"/>
+  <text class="mono sm b" x="290.0" y="158.5" text-anchor="middle" xml:space="preserve">Y := 0</text>
+  <rect class="plain" x="120" y="214" width="160" height="30" rx="8"/>
+  <text class="mono sm b" x="200.0" y="233.5" text-anchor="middle" xml:space="preserve">A := 2 * X · A &lt; B</text>
+  <line class="ln" x1="66" y1="76" x2="118" y2="76" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b acc-t" x="14" y="80" xml:space="preserve">X = ⊤</text>
+  <polyline class="ln" points="160,90 160,112 105,112 105,138" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="111" y="132" xml:space="preserve">X = ⊥</text>
+  <polyline class="ln" points="240,90 240,112 290,112 290,138" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="296" y="132" xml:space="preserve">X = ⊥</text>
+  <polyline class="ln" points="105,168 105,190 170,190 170,212" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="111" y="184" xml:space="preserve">X = ⊥</text>
+  <polyline class="ln" points="290,168 290,190 230,190 230,212" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="296" y="184" xml:space="preserve">X = ⊥</text>
+  <polyline class="ln" points="280,229 392,229 392,154 352,154" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="398" y="196" xml:space="preserve">⊥</text>
+  <line class="ln" x1="200" y1="244" x2="200" y2="266" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="208" y="262" xml:space="preserve">X = ⊥</text>
+  <text class="sm" x="14" y="292" xml:space="preserve"><tspan class="b">[程序总入口] ──&gt; </tspan><tspan class="mono b acc-t">X = ⊤</tspan></text>
+  <text class="sm" x="14" y="312" xml:space="preserve"><tspan class="b">[程序内部各节点与回边] ──&gt; </tspan><tspan class="b">全局初始化为 X = ⊥</tspan></text>
+  <rect class="box" x="485" y="0" width="455" height="330" rx="8"/>
+  <text class="b" x="499" y="22" xml:space="preserve">② 首次正向推进传播</text>
+  <text class="sm muted" x="499" y="40" xml:space="preserve">Slide 46–47</text>
+  <rect class="plain" x="605" y="62" width="160" height="28" rx="8"/>
+  <text class="mono sm" x="685.0" y="80.5" text-anchor="middle" xml:space="preserve">X := 3 · B &gt; 0</text>
+  <rect class="plain" x="525" y="140" width="130" height="28" rx="8"/>
+  <text class="mono sm" x="590.0" y="158.5" text-anchor="middle" xml:space="preserve">Y := Z + W</text>
+  <rect class="acc" x="715" y="140" width="120" height="28" rx="8"/>
+  <text class="mono sm b" x="775.0" y="158.5" text-anchor="middle" xml:space="preserve">Y := 0</text>
+  <rect class="acc" x="605" y="214" width="160" height="30" rx="8"/>
+  <text class="mono sm b" x="685.0" y="233.5" text-anchor="middle" xml:space="preserve">A := 2 * X · A &lt; B</text>
+  <line class="ln" x1="551" y1="76" x2="603" y2="76" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b acc-t" x="499" y="80" xml:space="preserve">X = ⊤</text>
+  <polyline class="ln" points="645,90 645,112 590,112 590,138" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="596" y="132" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="725,90 725,112 775,112 775,138" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="781" y="132" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="590,168 590,190 655,190 655,212" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="596" y="184" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="775,168 775,190 715,190 715,212" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="781" y="184" xml:space="preserve">X = ⊥</text>
+  <polyline class="ln-acc" points="765,229 877,229 877,154 837,154" marker-end="url(#opt-init-states-acc)"/>
+  <text class="mono sm muted" x="883" y="196" xml:space="preserve">⊥</text>
+  <line class="ln" x1="685" y1="244" x2="685" y2="266" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm muted" x="693" y="262" xml:space="preserve">X = ⊥</text>
+  <text class="sm" x="499" y="292" xml:space="preserve"><tspan class="mono">Y := 0</tspan> 的入口 = lub(3, ⊥) = <tspan class="mono b blue-t">3</tspan></text>
+  <text class="sm" x="499" y="312" xml:space="preserve">回边上的 ⊥ 代表“控制流尚未到达”，不构成路径约束</text>
+  <rect class="box" x="0" y="360" width="455" height="330" rx="8"/>
+  <text class="b" x="14" y="382" xml:space="preserve">③ 收敛至不动点（Fixed Point）</text>
+  <text class="sm muted" x="14" y="400" xml:space="preserve">Slide 50 · 经求解器严格验算</text>
+  <rect class="plain" x="120" y="422" width="160" height="28" rx="8"/>
+  <text class="mono sm" x="200.0" y="440.5" text-anchor="middle" xml:space="preserve">X := 3 · B &gt; 0</text>
+  <rect class="plain" x="40" y="500" width="130" height="28" rx="8"/>
+  <text class="mono sm" x="105.0" y="518.5" text-anchor="middle" xml:space="preserve">Y := Z + W</text>
+  <rect class="plain" x="230" y="500" width="120" height="28" rx="8"/>
+  <text class="mono sm b" x="290.0" y="518.5" text-anchor="middle" xml:space="preserve">Y := 0</text>
+  <rect class="plain" x="120" y="574" width="160" height="30" rx="8"/>
+  <text class="mono sm b" x="200.0" y="593.5" text-anchor="middle" xml:space="preserve">A := 2 * X · A &lt; B</text>
+  <line class="ln" x1="66" y1="436" x2="118" y2="436" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b acc-t" x="14" y="440" xml:space="preserve">X = ⊤</text>
+  <polyline class="ln" points="160,450 160,472 105,472 105,498" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="111" y="492" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="240,450 240,472 290,472 290,498" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="296" y="492" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="105,528 105,550 170,550 170,572" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="111" y="544" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="290,528 290,550 230,550 230,572" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="296" y="544" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="280,589 392,589 392,514 352,514" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="398" y="556" xml:space="preserve">3</text>
+  <line class="ln" x1="200" y1="604" x2="200" y2="626" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="208" y="622" xml:space="preserve">X = 3</text>
+  <text class="sm" x="14" y="652" xml:space="preserve">回边亦传回 3 → lub(3, 3) = 3，状态不再改变</text>
+  <text class="sm" x="14" y="672" xml:space="preserve"><tspan class="mono">A := 2 * X</tspan> → <tspan class="mono b blue-t">A := 2 * 3</tspan> 可安全代换</text>
+  <rect class="box" x="485" y="360" width="455" height="330" rx="8"/>
+  <text class="b" x="499" y="382" xml:space="preserve">④ 若将内部错误初始化为 ⊤（悲观初始化对照）</text>
+  <text class="sm muted" x="499" y="400" xml:space="preserve">虽满足所有传播方程，但收敛于不精确的次优不动点</text>
+  <rect class="plain" x="605" y="422" width="160" height="28" rx="8"/>
+  <text class="mono sm" x="685.0" y="440.5" text-anchor="middle" xml:space="preserve">X := 3 · B &gt; 0</text>
+  <rect class="plain" x="525" y="500" width="130" height="28" rx="8"/>
+  <text class="mono sm" x="590.0" y="518.5" text-anchor="middle" xml:space="preserve">Y := Z + W</text>
+  <rect class="acc" x="715" y="500" width="120" height="28" rx="8"/>
+  <text class="mono sm b" x="775.0" y="518.5" text-anchor="middle" xml:space="preserve">Y := 0</text>
+  <rect class="acc" x="605" y="574" width="160" height="30" rx="8"/>
+  <text class="mono sm b" x="685.0" y="593.5" text-anchor="middle" xml:space="preserve">A := 2 * X · A &lt; B</text>
+  <line class="ln" x1="551" y1="436" x2="603" y2="436" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b acc-t" x="499" y="440" xml:space="preserve">X = ⊤</text>
+  <polyline class="ln" points="645,450 645,472 590,472 590,498" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="596" y="492" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="725,450 725,472 775,472 775,498" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="781" y="492" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="590,528 590,550 655,550 655,572" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b blue-t" x="596" y="544" xml:space="preserve">X = 3</text>
+  <polyline class="ln" points="775,528 775,550 715,550 715,572" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b acc-t" x="781" y="544" xml:space="preserve">X = ⊤</text>
+  <polyline class="ln-acc" points="765,589 877,589 877,514 837,514" marker-end="url(#opt-init-states-acc)"/>
+  <text class="mono sm b acc-t" x="883" y="556" xml:space="preserve">⊤</text>
+  <line class="ln" x1="685" y1="604" x2="685" y2="626" marker-end="url(#opt-init-states-a)"/>
+  <text class="mono sm b acc-t" x="693" y="622" xml:space="preserve">X = ⊤</text>
+  <text class="sm" x="499" y="652" xml:space="preserve"><tspan class="mono">Y := 0</tspan> 的入口 = lub(3, ⊤) = <tspan class="mono b acc-t">⊤</tspan>: 环路自我强化导致 ⊤ 无法消除</text>
+  <text class="sm" x="499" y="672" xml:space="preserve"><tspan class="mono">A := 2 * X</tspan><tspan class="b acc-t"> 处 X = ⊤ → 丧失常量优化机会</tspan></text>
+</svg>

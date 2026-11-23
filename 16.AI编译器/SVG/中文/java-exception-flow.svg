@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="404" viewBox="0 0 960 404" role="img" aria-label="左侧展示 Foo.main 调用 X 抛出 MyException 后的调用栈展开与捕获；右侧展示 try-catch 在正常返回 v1 与异常结果 T(v1) 下的两条大步操作语义路径。">
+  <title>Java 异常传播与操作语义</title>
+  <desc>左侧展示 Foo.main 调用 X 抛出 MyException 后的调用栈展开与捕获；右侧展示 try-catch 在正常返回 v1 与异常结果 T(v1) 下的两条大步操作语义路径。</desc>
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', 'SimHei', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, 'Microsoft YaHei', monospace; }
+    .title { font-size: 15.5px; font-weight: 700; fill: #141413; }
+    .sub { font-size: 11.5px; fill: #6F6D66; }
+    .sec { font-size: 13px; font-weight: 600; fill: #141413; }
+    .sm { font-size: 11px; }
+    .xs { font-size: 10.5px; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .green-t { fill: #47703F; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .green { fill: #E0EBDB; stroke: #5E8A5A; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1.1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.8; stroke-dasharray: 5 3; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.4; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-green { stroke: #5E8A5A; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-blue-dash { stroke: #4F7FAF; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; }
+    .h-acc { fill: #D97757; }
+    .h-blue { fill: #4F7FAF; }
+    .h-green { fill: #5E8A5A; }
+  </style>
+  <defs>
+    <marker id="java-exception-flow-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-exception-flow-acc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-exception-flow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-exception-flow-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect x="0" y="0" width="960" height="404" fill="rgb(245, 244, 237)"/>
+  <rect x="6" y="6" width="948" height="392" rx="14" fill="#F0EEE6"/>
+  <text class="title" x="26" y="36">Java 异常处理：调用栈展开与操作语义双路径</text>
+  <text class="sub" x="26" y="56">异常把错误信号包装成特殊结果 T(v)，沿调用栈向上穿透，直到命中匹配的 catch 块</text>
+
+  <!-- Left panel: Call stack unwinding -->
+  <rect class="box" x="24" y="72" width="424" height="314" rx="10"/>
+  <text class="sec" x="40" y="96">A · 运行时调用栈展开（Foo.main → X）</text>
+
+  <!-- Frame 1: main -->
+  <rect class="plain" x="40" y="108" width="392" height="98" rx="8"/>
+  <text class="mono sm b" x="54" y="128">栈帧 1 · Foo.main(String[] args)</text>
+  <rect class="blue" x="54" y="138" width="154" height="54" rx="6"/>
+  <text class="mono sm b blue-t" x="131" y="160" text-anchor="middle">try { X(); }</text>
+  <text class="xs blue-t" x="131" y="179" text-anchor="middle">受保护求值区域</text>
+
+  <rect class="acc" x="232" y="138" width="186" height="54" rx="6"/>
+  <text class="mono sm b acc-t" x="325" y="160" text-anchor="middle">catch (Exception e)</text>
+  <text class="mono xs acc-t" x="325" y="179" text-anchor="middle">println("Error!")</text>
+
+  <!-- Call arrow down -->
+  <line class="ln-blue" x1="131" y1="192" x2="131" y2="238" marker-end="url(#java-exception-flow-blue)"/>
+  <text class="xs blue-t b" x="58" y="220">正常调用 X()</text>
+
+  <!-- Frame 2: X() -->
+  <rect class="plain" x="40" y="242" width="392" height="84" rx="8"/>
+  <text class="mono sm b" x="54" y="262">栈帧 2 · X() throws MyException</text>
+  <rect class="bad" x="54" y="274" width="234" height="38" rx="6"/>
+  <text class="mono sm b acc-t" x="171" y="298" text-anchor="middle">throw new MyException();</text>
+
+  <!-- Unwind arrow up to catch -->
+  <path class="ln-acc" d="M 288 293 L 340 293 L 340 196" marker-end="url(#java-exception-flow-acc)"/>
+  <rect class="acc" x="348" y="210" width="80" height="44" rx="5"/>
+  <text class="xs b acc-t" x="388" y="228" text-anchor="middle">抛出 T(v1)</text>
+  <text class="xs acc-t" x="388" y="245" text-anchor="middle">栈帧弹出</text>
+
+  <text class="xs muted" x="40" y="348">MyException 是 Exception 子类，按子类型匹配进入 catch</text>
+  <text class="xs muted" x="40" y="366">多层嵌套调用中，未匹配的中间栈帧按 LIFO 顺序逐层清理</text>
+
+  <!-- Right panel: Operational Semantics -->
+  <rect class="box" x="468" y="72" width="468" height="314" rx="10"/>
+  <text class="sec" x="484" y="96">B · try / catch 的大步操作语义判定</text>
+
+  <!-- Entry -->
+  <rect class="plain" x="488" y="108" width="428" height="42" rx="7"/>
+  <text class="mono sm b" x="702" y="127" text-anchor="middle">E ⊢ try { e1 } catch (x) { e2 }</text>
+  <text class="xs muted" x="702" y="143" text-anchor="middle">第一步：在当前环境 E 下对主体 e1 求值</text>
+
+  <!-- Branch split lines -->
+  <path class="ln-green" d="M 624 150 L 624 166 L 590 166 L 590 184" marker-end="url(#java-exception-flow-green)"/>
+  <path class="ln-acc" d="M 780 150 L 780 166 L 814 166 L 814 184" marker-end="url(#java-exception-flow-acc)"/>
+
+  <!-- Normal branch -->
+  <rect class="green" x="488" y="188" width="204" height="126" rx="8"/>
+  <text class="sm b green-t" x="590" y="210" text-anchor="middle">路径 1 · 正常返回普通值</text>
+  <rect class="plain" x="504" y="220" width="172" height="28" rx="5"/>
+  <text class="mono sm" x="590" y="239" text-anchor="middle">E ⊢ e1 : v1</text>
+  <text class="xs green-t" x="590" y="268" text-anchor="middle">不执行 catch 体 e2</text>
+  <rect class="plain" x="504" y="278" width="172" height="26" rx="5"/>
+  <text class="mono sm b green-t" x="590" y="295" text-anchor="middle">最终结果 = v1</text>
+
+  <!-- Exception branch -->
+  <rect class="acc" x="712" y="188" width="204" height="126" rx="8"/>
+  <text class="sm b acc-t" x="814" y="210" text-anchor="middle">路径 2 · 抛出异常 T(v1)</text>
+  <rect class="plain" x="728" y="220" width="172" height="28" rx="5"/>
+  <text class="mono sm acc-t" x="814" y="239" text-anchor="middle">E ⊢ e1 : T(v1)</text>
+  <text class="mono xs acc-t" x="814" y="268" text-anchor="middle">E[x ← v1] ⊢ e2 : v2</text>
+  <rect class="plain" x="728" y="278" width="172" height="26" rx="5"/>
+  <text class="mono sm b acc-t" x="814" y="295" text-anchor="middle">最终结果 = v2</text>
+
+  <!-- Bottom note -->
+  <rect class="dead" x="488" y="328" width="428" height="44" rx="7"/>
+  <text class="xs" x="502" y="347">T(v) 与普通对象 v 属于不同结果形态，因此两条规则严格互斥</text>
+  <text class="xs muted" x="502" y="364">若外层没有 catch，其余表达式的推导规则会直接把 T(v) 原样上传</text>
+</svg>

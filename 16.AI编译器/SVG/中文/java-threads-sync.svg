@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="404" viewBox="0 0 960 404" role="img" aria-label="左侧展示三个线程各自持有独立 PC 与调用栈、由调度器循环切换并共享堆上对象；右侧展示 synchronized(x) 展开为 lock、求值、unlock 三步，以及同步方法默认锁定 this。">
+  <title>Java 线程与同步机制</title>
+  <desc>左侧展示三个线程各自持有独立 PC 与调用栈、由调度器循环切换并共享堆上对象；右侧展示 synchronized(x) 展开为 lock、求值、unlock 三步，以及同步方法默认锁定 this。</desc>
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', 'SimHei', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, 'Microsoft YaHei', monospace; }
+    .title { font-size: 15.5px; font-weight: 700; fill: #141413; }
+    .sub { font-size: 11.5px; fill: #6F6D66; }
+    .sec { font-size: 13px; font-weight: 600; fill: #141413; }
+    .sm { font-size: 11px; }
+    .xs { font-size: 10.5px; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .green-t { fill: #47703F; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .green { fill: #E0EBDB; stroke: #5E8A5A; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1.1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.8; stroke-dasharray: 5 3; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.4; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-green { stroke: #5E8A5A; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-blue-dash { stroke: #4F7FAF; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; }
+    .h-acc { fill: #D97757; }
+    .h-blue { fill: #4F7FAF; }
+    .h-green { fill: #5E8A5A; }
+  </style>
+  <defs>
+    <marker id="java-threads-sync-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-threads-sync-acc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-threads-sync-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-threads-sync-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect x="0" y="0" width="960" height="404" fill="rgb(245, 244, 237)"/>
+  <rect x="6" y="6" width="948" height="392" rx="14" fill="#F0EEE6"/>
+  <text class="title" x="26" y="36">Java 并发模型与 synchronized 同步块</text>
+  <text class="sub" x="26" y="56">每个线程独占程序计数器（PC）与调用栈，共享同一堆内存；synchronized 通过对象锁保护临界区</text>
+
+  <!-- Left panel: Threads + Scheduler + Shared Heap -->
+  <rect class="box" x="24" y="72" width="520" height="316" rx="10"/>
+  <text class="sec" x="40" y="96">A · 线程私有状态、调度器与共享堆</text>
+
+  <!-- Thread 1 -->
+  <text class="mono sm b blue-t" x="96" y="120" text-anchor="middle">Thread 1</text>
+  <text class="mono xs acc-t b" x="48" y="142">PC</text>
+  <line class="ln-acc" x1="65" y1="138" x2="78" y2="138" marker-end="url(#java-threads-sync-acc)"/>
+  <rect class="blue" x="82" y="128" width="52" height="22" rx="4"/>
+  <text class="xs blue-t" x="108" y="143" text-anchor="middle">帧 3</text>
+  <rect class="plain" x="82" y="152" width="52" height="22" rx="4"/>
+  <text class="xs" x="108" y="167" text-anchor="middle">帧 2</text>
+  <rect class="plain" x="82" y="176" width="52" height="22" rx="4"/>
+  <text class="xs" x="108" y="191" text-anchor="middle">帧 1</text>
+  <text class="xs muted" x="108" y="214" text-anchor="middle">私有栈</text>
+
+  <!-- Thread 2 -->
+  <text class="mono sm b blue-t" x="206" y="120" text-anchor="middle">Thread 2</text>
+  <text class="mono xs acc-t b" x="158" y="142">PC</text>
+  <line class="ln-acc" x1="175" y1="138" x2="188" y2="138" marker-end="url(#java-threads-sync-acc)"/>
+  <rect class="blue" x="192" y="128" width="52" height="22" rx="4"/>
+  <text class="xs blue-t" x="218" y="143" text-anchor="middle">帧 4</text>
+  <rect class="plain" x="192" y="152" width="52" height="22" rx="4"/>
+  <text class="xs" x="218" y="167" text-anchor="middle">帧 3</text>
+  <rect class="plain" x="192" y="176" width="52" height="22" rx="4"/>
+  <text class="xs" x="218" y="191" text-anchor="middle">帧 2</text>
+  <text class="xs muted" x="218" y="214" text-anchor="middle">私有栈</text>
+
+  <!-- Thread 3 -->
+  <text class="mono sm b blue-t" x="316" y="120" text-anchor="middle">Thread 3</text>
+  <text class="mono xs acc-t b" x="268" y="142">PC</text>
+  <line class="ln-acc" x1="285" y1="138" x2="298" y2="138" marker-end="url(#java-threads-sync-acc)"/>
+  <rect class="blue" x="302" y="128" width="52" height="22" rx="4"/>
+  <text class="xs blue-t" x="328" y="143" text-anchor="middle">帧 2</text>
+  <rect class="plain" x="302" y="152" width="52" height="22" rx="4"/>
+  <text class="xs" x="328" y="167" text-anchor="middle">帧 1</text>
+  <text class="xs muted" x="328" y="214" text-anchor="middle">私有栈</text>
+
+  <!-- Scheduler loop -->
+  <rect class="blue" x="380" y="114" width="148" height="106" rx="8"/>
+  <text class="sm b blue-t" x="454" y="136" text-anchor="middle">调度器 (Scheduler)</text>
+  <text class="xs" x="394" y="158">1. 挑选一个就绪线程</text>
+  <text class="xs" x="394" y="178">2. 执行语句 / 时间片</text>
+  <path class="ln-blue" d="M 488 188 C 514 198, 514 212, 454 212 C 398 212, 398 198, 416 190" marker-end="url(#java-threads-sync-blue)"/>
+  <text class="xs blue-t" x="454" y="205" text-anchor="middle">循环切换</text>
+
+  <!-- Shared Heap -->
+  <rect class="plain" x="40" y="256" width="488" height="114" rx="8"/>
+  <text class="sm b" x="52" y="276">共享堆（Heap）</text>
+
+  <rect class="acc" x="92" y="288" width="234" height="68" rx="7"/>
+  <text class="mono sm b acc-t" x="209" y="308" text-anchor="middle">共享对象 x</text>
+  <rect class="plain" x="104" y="318" width="112" height="26" rx="4"/>
+  <text class="xs acc-t b" x="160" y="335" text-anchor="middle">对象锁 (Monitor)</text>
+  <rect class="plain" x="224" y="318" width="90" height="26" rx="4"/>
+  <text class="xs" x="269" y="335" text-anchor="middle">实例字段</text>
+
+  <rect class="dead" x="342" y="288" width="172" height="68" rx="7"/>
+  <text class="xs b" x="428" y="311" text-anchor="middle">Thread 对象本身也在堆上</text>
+  <text class="xs muted" x="428" y="331" text-anchor="middle">提供 start() 启动线程</text>
+  <text class="xs acc-t" x="428" y="347" text-anchor="middle">stop() 已废弃（易破锁）</text>
+
+  <!-- Arrows down to Shared Object x (drawn on top of Shared Heap container) -->
+  <path class="ln-acc" d="M 108 220 L 108 242 L 178 242 L 178 284" marker-end="url(#java-threads-sync-acc)"/>
+  <line class="ln-acc" x1="218" y1="220" x2="218" y2="284" marker-end="url(#java-threads-sync-acc)"/>
+  <text class="xs acc-t" x="234" y="244">多线程竞争访问同一对象</text>
+
+  <!-- Right panel: synchronized desugaring -->
+  <rect class="box" x="564" y="72" width="372" height="316" rx="10"/>
+  <text class="sec" x="580" y="96">B · synchronized 语义展开</text>
+
+  <!-- Code pill -->
+  <rect class="plain" x="584" y="108" width="332" height="34" rx="7"/>
+  <text class="mono sm b acc-t" x="750" y="130" text-anchor="middle">synchronized (x) { e }</text>
+
+  <line class="ln" x1="750" y1="142" x2="750" y2="158" marker-end="url(#java-threads-sync-a)"/>
+
+  <!-- Step 1 -->
+  <rect class="acc" x="606" y="162" width="288" height="36" rx="6"/>
+  <text class="mono sm b acc-t" x="622" y="184">1. lock x</text>
+  <text class="xs acc-t" x="716" y="184">(monitorenter 抢占锁)</text>
+
+  <line class="ln" x1="750" y1="198" x2="750" y2="212" marker-end="url(#java-threads-sync-a)"/>
+
+  <!-- Step 2 -->
+  <rect class="blue" x="606" y="216" width="288" height="36" rx="6"/>
+  <text class="mono sm b blue-t" x="622" y="238">2. evaluate e</text>
+  <text class="xs blue-t" x="742" y="238">(互斥执行临界区)</text>
+
+  <line class="ln" x1="750" y1="252" x2="750" y2="266" marker-end="url(#java-threads-sync-a)"/>
+
+  <!-- Step 3 -->
+  <rect class="green" x="606" y="270" width="288" height="36" rx="6"/>
+  <text class="mono sm b green-t" x="622" y="292">3. unlock x</text>
+  <text class="xs green-t" x="726" y="292">(monitorexit 异常也释放)</text>
+
+  <!-- Synchronized method -->
+  <rect class="dead" x="584" y="320" width="332" height="54" rx="7"/>
+  <text class="mono sm b" x="600" y="342">synchronized void f() { ... }</text>
+  <text class="xs muted" x="600" y="362">同步实例方法默认锁定当前接收者对象 this</text>
+</svg>

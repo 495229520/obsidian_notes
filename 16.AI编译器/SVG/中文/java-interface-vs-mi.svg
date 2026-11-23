@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="394" viewBox="0 0 960 394" role="img" aria-label="左侧展示 GraduateStudent 同时实现 Employee 和 Student 两个接口；右侧对比单继承的固定前缀布局与虚表槽位，以及多接口因无关类槽位不同而需要 itable 查表的机制。">
+  <title>Java 接口与底层布局对比</title>
+  <desc>左侧展示 GraduateStudent 同时实现 Employee 和 Student 两个接口；右侧对比单继承的固定前缀布局与虚表槽位，以及多接口因无关类槽位不同而需要 itable 查表的机制。</desc>
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', 'SimHei', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, 'Microsoft YaHei', monospace; }
+    .title { font-size: 15.5px; font-weight: 700; fill: #141413; }
+    .sub { font-size: 11.5px; fill: #6F6D66; }
+    .sec { font-size: 13px; font-weight: 600; fill: #141413; }
+    .sm { font-size: 11px; }
+    .xs { font-size: 10.5px; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .green-t { fill: #47703F; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .green { fill: #E0EBDB; stroke: #5E8A5A; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1.1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.8; stroke-dasharray: 5 3; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.4; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-green { stroke: #5E8A5A; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-blue-dash { stroke: #4F7FAF; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; }
+    .h-acc { fill: #D97757; }
+    .h-blue { fill: #4F7FAF; }
+    .h-green { fill: #5E8A5A; }
+  </style>
+  <defs>
+    <marker id="java-interface-vs-mi-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-interface-vs-mi-acc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-interface-vs-mi-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-interface-vs-mi-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect x="0" y="0" width="960" height="394" fill="rgb(245, 244, 237)"/>
+  <rect x="6" y="6" width="948" height="382" rx="14" fill="#F0EEE6"/>
+  <text class="title" x="26" y="36">Java 接口：用多契约替代 C++ 多继承，保住扁平对象布局</text>
+  <text class="sub" x="26" y="56">接口不携带实例字段，使类可以实现多个角色而不破坏单继承前缀，代价是接口分派不能靠固定槽位</text>
+
+  <!-- Left panel: Interface hierarchy -->
+  <rect class="box" x="24" y="72" width="424" height="304" rx="10"/>
+  <text class="sec" x="40" y="96">A · 跨类契约：无需共同父类或污染 Object</text>
+
+  <!-- Interface boxes -->
+  <rect class="blue" x="42" y="114" width="180" height="58" rx="8"/>
+  <text class="mono xs blue-t" x="132" y="133" text-anchor="middle">&lt;&lt;interface&gt;&gt;</text>
+  <text class="mono b blue-t" x="132" y="151" text-anchor="middle">Employee</text>
+  <text class="xs muted" x="132" y="166" text-anchor="middle">只声明方法签名</text>
+
+  <rect class="blue" x="250" y="114" width="180" height="58" rx="8"/>
+  <text class="mono xs blue-t" x="340" y="133" text-anchor="middle">&lt;&lt;interface&gt;&gt;</text>
+  <text class="mono b blue-t" x="340" y="151" text-anchor="middle">Student</text>
+  <text class="xs muted" x="340" y="166" text-anchor="middle">只声明方法签名</text>
+
+  <!-- Implements arrows -->
+  <path class="ln-blue-dash" d="M 192 224 L 132 175" marker-end="url(#java-interface-vs-mi-blue)"/>
+  <path class="ln-blue-dash" d="M 280 224 L 340 175" marker-end="url(#java-interface-vs-mi-blue)"/>
+  <text class="mono xs blue-t" x="236" y="206" text-anchor="middle">implements</text>
+
+  <!-- Implementing class -->
+  <rect class="green" x="96" y="226" width="280" height="58" rx="8"/>
+  <text class="mono b green-t" x="236" y="248" text-anchor="middle">class GraduateStudent</text>
+  <text class="mono xs green-t" x="236" y="269" text-anchor="middle">implements Employee, Student</text>
+
+  <!-- Bottom note -->
+  <rect class="dead" x="42" y="302" width="388" height="58" rx="7"/>
+  <text class="xs" x="56" y="323">单继承树里，很难给「既是雇员又是学生」安排合理的唯一父类</text>
+  <text class="xs muted" x="56" y="343">多接口（class X implements A, B, C）补齐了多态角色，同时避开菱形继承</text>
+
+  <!-- Right panel: Layout & Dispatch comparison -->
+  <rect class="box" x="468" y="72" width="468" height="304" rx="10"/>
+  <text class="sec" x="484" y="96">B · 底层取舍：类继承固定槽位 vs 接口动态查表</text>
+
+  <!-- Top card: Single inheritance -->
+  <rect class="plain" x="486" y="110" width="432" height="106" rx="8"/>
+  <text class="sm b green-t" x="502" y="131">单继承类（extends）· 固定前缀布局 + invokevirtual</text>
+  <!-- Layout strip -->
+  <rect class="dead" x="502" y="144" width="76" height="30" rx="4"/>
+  <text class="mono xs" x="540" y="163" text-anchor="middle">vptr</text>
+  <rect class="green" x="578" y="144" width="110" height="30" rx="4"/>
+  <text class="xs green-t" x="633" y="163" text-anchor="middle">父类字段前缀</text>
+  <rect class="blue" x="688" y="144" width="100" height="30" rx="4"/>
+  <text class="xs blue-t" x="738" y="163" text-anchor="middle">子类新增字段</text>
+  <text class="mono xs green-t b" x="802" y="163">vtable[k] 固定</text>
+  <text class="xs muted" x="502" y="198">无 C++ 多继承的 this 指针偏移调整与虚基类表（vbtable）开销</text>
+
+  <!-- Bottom card: Interface dispatch -->
+  <rect class="acc" x="486" y="230" width="432" height="130" rx="8"/>
+  <text class="sm b acc-t" x="502" y="252">多接口（implements）· 槽位不固定 + invokeinterface</text>
+
+  <rect class="plain" x="502" y="264" width="190" height="44" rx="6"/>
+  <text class="mono xs b" x="514" y="282">Point 虚表</text>
+  <text class="mono xs acc-t" x="514" y="299">slot 2 → move(dx, dy)</text>
+
+  <rect class="plain" x="712" y="264" width="190" height="44" rx="6"/>
+  <text class="mono xs b" x="724" y="282">Cursor 虚表（无关类）</text>
+  <text class="mono xs acc-t" x="724" y="299">slot 6 → move(dx, dy)</text>
+
+  <text class="xs" x="502" y="330">无关类把同一接口方法放在不同偏移，编译期无法写死单一槽位号</text>
+  <text class="xs muted" x="502" y="348">JVM 借助接口方法表（itable）与内联缓存完成接口动态分派</text>
+</svg>

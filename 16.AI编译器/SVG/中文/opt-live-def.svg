@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="972" height="350" viewBox="-16 -16 972 350" role="img" aria-label="活跃性（Liveness）的形式化定义。左侧为单路径情形：语句 s: x := 2，沿执行路径到达语句 s': ... := x，路径上对 x 无覆盖写（no write to x），故 x 在 s 处活跃。右侧为多路径情形：路径 A 包含 x := 7 杀死了来自 s 的值，但路径 B 无覆盖写。只要存在任意一条可行路径，x 在 s 处即判定为活跃，此即 may 分析的本质（对应逻辑析取 ∨）。若仅存在路径 A，则 s 之后 x 死亡，x := 2 沦为死代码。">
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace; }
+    .sm { font-size: 11px; }
+    .lg { font-size: 14px; font-weight: 600; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 2; stroke-dasharray: 5 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.3; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; } .h-acc { fill: #D97757; } .h-blue { fill: #4F7FAF; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+  </style>
+  <rect x="-16" y="-16" width="972" height="350" rx="14" fill="#F0EEE6"/>
+  <defs><marker id="opt-live-def-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker><marker id="opt-live-def-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="opt-live-def-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <text class="b" x="0" y="42" xml:space="preserve">语句 s ───&gt;</text>
+  <rect class="blue" x="110" y="20" width="150" height="36" rx="8"/>
+  <text class="mono b" x="185.0" y="42.5" text-anchor="middle" xml:space="preserve">x := 2</text>
+  <line class="ln-blue" x1="185" y1="58" x2="185" y2="236"/>
+  <path d="M185,236 l-4,-8 l8,0 z" class="h-blue"/>
+  <text class="mono sm blue-t" x="200" y="128" xml:space="preserve">~~~ [执行流路径] ~~~</text>
+  <text class="sm" x="200" y="148" xml:space="preserve">(路径上对 x 无任何重写操作:</text>
+  <text class="sm" x="200" y="166" xml:space="preserve">no write to x)</text>
+  <text class="b" x="0" y="262" xml:space="preserve">语句 s' ───&gt;</text>
+  <rect class="plain" x="110" y="240" width="150" height="36" rx="8"/>
+  <text class="mono b" x="185.0" y="262.5" text-anchor="middle" xml:space="preserve">... := x</text>
+  <line class="ln" x1="300" y1="258" x2="264" y2="258" marker-end="url(#opt-live-def-a)"/>
+  <text class="sm b" x="308" y="262" xml:space="preserve">变量 x 被读取使用</text>
+  <line class="ln-muted" x1="470" y1="10" x2="470" y2="310"/>
+  <text class="b" x="500" y="14" xml:space="preserve">多分支路径情形：</text>
+  <rect class="blue" x="640" y="30" width="150" height="34" rx="8"/>
+  <text class="mono b" x="715.0" y="51.5" text-anchor="middle" xml:space="preserve">s:  x := 2</text>
+  <polyline class="ln" points="690,64 690,84 590,84 590,110" marker-end="url(#opt-live-def-a)"/>
+  <polyline class="ln-blue" points="740,64 740,84 840,84 840,228 794,228" marker-end="url(#opt-live-def-blue)"/>
+  <rect class="bad" x="530" y="112" width="120" height="32" rx="8"/>
+  <text class="mono b" x="590.0" y="132.5" text-anchor="middle" xml:space="preserve">x := 7</text>
+  <text class="sm b" x="520" y="102" text-anchor="end" xml:space="preserve">路径 A</text>
+  <text class="sm b blue-t" x="850" y="140" xml:space="preserve">路径 B</text>
+  <text class="sm blue-t" x="850" y="158" xml:space="preserve">无覆盖写操作</text>
+  <polyline class="ln" points="590,144 590,228 636,228" marker-end="url(#opt-live-def-a)"/>
+  <text class="sm acc-t" x="504" y="170" xml:space="preserve">杀死旧值 (Kill)</text>
+  <rect class="plain" x="640" y="212" width="150" height="32" rx="8"/>
+  <text class="mono" x="715.0" y="232.5" text-anchor="middle" xml:space="preserve">s':  ... := x</text>
+  <text class="sm b" x="500" y="270" xml:space="preserve">只需存在路径 B 一条通路即可：x 在 s 出口判定为活跃 (May-分析)。</text>
+  <text class="sm muted" x="500" y="290" xml:space="preserve">若仅有路径 A，则 s 直后 x 处于死亡状态，x := 2 即为可消除的死代码。</text>
+</svg>

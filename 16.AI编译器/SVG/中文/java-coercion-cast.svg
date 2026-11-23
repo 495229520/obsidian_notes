@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="414" viewBox="0 0 960 414" role="img" aria-label="展示编译器如何把 1 + 2.0 改写为 int2float(1) + 2.0，对比宽化转换与窄化转换在基本类型和引用类型上的规则，并突出 boolean 是唯一没有转换规则的类型。">
+  <title>Java 类型转换机制</title>
+  <desc>展示编译器如何把 1 + 2.0 改写为 int2float(1) + 2.0，对比宽化转换与窄化转换在基本类型和引用类型上的规则，并突出 boolean 是唯一没有转换规则的类型。</desc>
+  <style>
+    text { fill: #141413; font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'PingFang SC', 'SimHei', sans-serif; font-size: 12.5px; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, 'Microsoft YaHei', monospace; }
+    .title { font-size: 15.5px; font-weight: 700; fill: #141413; }
+    .sub { font-size: 11.5px; fill: #6F6D66; }
+    .sec { font-size: 13px; font-weight: 600; fill: #141413; }
+    .sm { font-size: 11px; }
+    .xs { font-size: 10.5px; }
+    .b { font-weight: 600; }
+    .muted { fill: #6F6D66; }
+    .acc-t { fill: #B0532F; }
+    .blue-t { fill: #3D6A97; }
+    .green-t { fill: #47703F; }
+    .box { fill: #FAF9F5; stroke: #B0AEA5; stroke-width: 1.2; }
+    .plain { fill: #FAF9F5; stroke: #6F6D66; stroke-width: 1.2; }
+    .acc { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.5; }
+    .blue { fill: #DCE7F2; stroke: #4F7FAF; stroke-width: 1.4; }
+    .green { fill: #E0EBDB; stroke: #5E8A5A; stroke-width: 1.4; }
+    .dead { fill: #E6E3D9; stroke: #B0AEA5; stroke-width: 1.1; }
+    .bad { fill: #F5DDD1; stroke: #D97757; stroke-width: 1.8; stroke-dasharray: 5 3; }
+    .ghost { fill: #F0EEE6; stroke: #B0AEA5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .ln { stroke: #6F6D66; stroke-width: 1.4; fill: none; }
+    .ln-acc { stroke: #D97757; stroke-width: 1.8; fill: none; }
+    .ln-blue { stroke: #4F7FAF; stroke-width: 1.8; fill: none; }
+    .ln-green { stroke: #5E8A5A; stroke-width: 1.8; fill: none; }
+    .ln-dash { stroke: #D97757; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ln-blue-dash { stroke: #4F7FAF; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .ln-muted { stroke: #B0AEA5; stroke-width: 1; fill: none; stroke-dasharray: 3 3; }
+    .h { fill: #6F6D66; }
+    .h-acc { fill: #D97757; }
+    .h-blue { fill: #4F7FAF; }
+    .h-green { fill: #5E8A5A; }
+  </style>
+  <defs>
+    <marker id="java-coercion-cast-a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-coercion-cast-acc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-coercion-cast-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="java-coercion-cast-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect x="0" y="0" width="960" height="414" fill="rgb(245, 244, 237)"/>
+  <rect x="6" y="6" width="948" height="402" rx="14" fill="#F0EEE6"/>
+  <text class="title" x="26" y="36">Java 类型转换：编译器插入的宽化、显式窄化与 boolean 孤岛</text>
+  <text class="sub" x="26" y="56">隐式转换本质上是编译器插入的原语调用；可能丢失信息或失败的转换则强制写明转型</text>
+
+  <!-- Top banner: Compiler coercion insertion -->
+  <rect class="box" x="24" y="72" width="912" height="66" rx="10"/>
+  <text class="sec" x="40" y="96">A · 编译器视角下的隐式转换（Coercion）</text>
+  <rect class="plain" x="40" y="102" width="132" height="26" rx="5"/>
+  <text class="mono sm b" x="106" y="119" text-anchor="middle">1 + 2.0</text>
+  <text class="xs muted" x="182" y="119">int + float</text>
+  <line class="ln-blue" x1="258" y1="115" x2="386" y2="115" marker-end="url(#java-coercion-cast-blue)"/>
+  <text class="xs blue-t b" x="322" y="107" text-anchor="middle">编译器自动插入</text>
+  <rect class="blue" x="394" y="102" width="212" height="26" rx="5"/>
+  <text class="mono sm b blue-t" x="500" y="119" text-anchor="middle">int2float(1) + 2.0</text>
+  <text class="sm muted" x="626" y="119">本质：插入底层转换原语</text>
+
+  <!-- Middle Left: Widening -->
+  <rect class="box" x="24" y="152" width="446" height="174" rx="10"/>
+  <text class="sec green-t" x="40" y="176">B · 宽化转换（Widening）— 可隐式</text>
+
+  <rect class="green" x="40" y="188" width="414" height="58" rx="7"/>
+  <text class="xs b green-t" x="52" y="206">基本类型宽化链</text>
+  <text class="mono xs muted" x="376" y="206">char → int</text>
+  <rect class="plain" x="52" y="214" width="48" height="22" rx="4"/>
+  <text class="mono xs" x="76" y="229" text-anchor="middle">byte</text>
+  <text class="mono xs green-t" x="108" y="229" text-anchor="middle">→</text>
+  <rect class="plain" x="116" y="214" width="52" height="22" rx="4"/>
+  <text class="mono xs" x="142" y="229" text-anchor="middle">short</text>
+  <text class="mono xs green-t" x="176" y="229" text-anchor="middle">→</text>
+  <rect class="plain" x="184" y="214" width="42" height="22" rx="4"/>
+  <text class="mono xs" x="205" y="229" text-anchor="middle">int</text>
+  <text class="mono xs green-t" x="234" y="229" text-anchor="middle">→</text>
+  <rect class="plain" x="242" y="214" width="48" height="22" rx="4"/>
+  <text class="mono xs" x="266" y="229" text-anchor="middle">long</text>
+  <text class="mono xs green-t" x="298" y="229" text-anchor="middle">→</text>
+  <rect class="plain" x="306" y="214" width="52" height="22" rx="4"/>
+  <text class="mono xs" x="332" y="229" text-anchor="middle">float</text>
+  <text class="mono xs green-t" x="366" y="229" text-anchor="middle">→</text>
+  <rect class="plain" x="374" y="214" width="66" height="22" rx="4"/>
+  <text class="mono xs" x="407" y="229" text-anchor="middle">double</text>
+
+  <rect class="plain" x="40" y="256" width="414" height="56" rx="7"/>
+  <text class="xs b" x="52" y="275">引用向上转型：子类 B → 父类 A</text>
+  <text class="xs green-t" x="330" y="275">总能成功，无需强转</text>
+  <text class="xs muted" x="52" y="297">注：int → float 不抛错，但大整数可能丢低位精度</text>
+
+  <!-- Middle Right: Narrowing -->
+  <rect class="box" x="490" y="152" width="446" height="174" rx="10"/>
+  <text class="sec acc-t" x="506" y="176">C · 窄化转换（Narrowing）— 必须显式</text>
+
+  <rect class="acc" x="506" y="188" width="414" height="58" rx="7"/>
+  <text class="xs b acc-t" x="518" y="206">数值反向截断（float → int）</text>
+  <rect class="plain" x="518" y="214" width="142" height="22" rx="4"/>
+  <text class="mono xs" x="589" y="229" text-anchor="middle">2.0 → 2 (无损)</text>
+  <rect class="plain" x="676" y="214" width="184" height="22" rx="4"/>
+  <text class="mono xs acc-t" x="768" y="229" text-anchor="middle">2.5 → 2 (丢失小数)</text>
+
+  <rect class="plain" x="506" y="256" width="414" height="56" rx="7"/>
+  <rect class="dead" x="518" y="264" width="32" height="18" rx="3"/>
+  <text class="mono xs b" x="534" y="277" text-anchor="middle">A</text>
+  <line class="ln" x1="534" y1="282" x2="534" y2="290"/>
+  <rect class="acc" x="518" y="290" width="32" height="18" rx="3"/>
+  <text class="mono xs b acc-t" x="534" y="303" text-anchor="middle">B</text>
+  <text class="xs b acc-t" x="564" y="276">引用向下转型：x : A 转为 (B) x</text>
+  <text class="xs muted" x="564" y="297">若运行期实际不是 B → 抛 ClassCastException</text>
+
+  <!-- Bottom strip: boolean island -->
+  <rect class="bad" x="24" y="340" width="912" height="58" rx="9"/>
+  <rect class="plain" x="40" y="353" width="106" height="32" rx="6"/>
+  <text class="mono b acc-t" x="93" y="373" text-anchor="middle">boolean</text>
+  <text class="sm b acc-t" x="164" y="366">唯一转换孤岛：Java 不为 boolean 定义任何隐式或显式转换</text>
+  <text class="xs muted" x="164" y="385">禁止 (int) true 或 (boolean) 1；直接堵死 C/C++ 中 if (x = 0) 静默编译的陷阱</text>
+</svg>
